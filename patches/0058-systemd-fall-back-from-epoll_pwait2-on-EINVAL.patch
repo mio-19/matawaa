@@ -1,0 +1,49 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 00:49:28 +1100
+Subject: [PATCH] systemd: fall back from epoll_pwait2 on EINVAL
+
+The vendor 4.14 kernel returns EINVAL for the unimplemented epoll_pwait2 syscall, which sd-event treated as fatal and killed systemd-udevd after its first timer. Treat EINVAL like ENOSYS and fall back to epoll_wait().
+---
+ overlay/cross-compile.nix                     |  1 +
+ .../systemd-262-epoll-pwait2-old-kernel.patch | 19 +++++++++++++++++++
+ 2 files changed, 20 insertions(+)
+ create mode 100644 overlay/patches/systemd-262-epoll-pwait2-old-kernel.patch
+
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index 15ea47a4..ba450985 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -53,6 +53,7 @@ else
+             ./patches/systemd-262-pidfd-old-kernel.patch
+             systemdStatxPatch
+             ./patches/systemd-262-close-range-old-kernel.patch
++            ./patches/systemd-262-epoll-pwait2-old-kernel.patch
+             ./patches/systemd-262-proc-credentials-old-kernel.patch
+           ];
+         });
+diff --git a/overlay/patches/systemd-262-epoll-pwait2-old-kernel.patch b/overlay/patches/systemd-262-epoll-pwait2-old-kernel.patch
+new file mode 100644
+index 00000000..fd54bbb1
+--- /dev/null
++++ b/overlay/patches/systemd-262-epoll-pwait2-old-kernel.patch
+@@ -0,0 +1,19 @@
++# systemd 262 uses epoll_pwait2 (Linux 5.11). The vendor 4.14 kernel can
++# return EINVAL for the unimplemented syscall instead of ENOSYS; treat that
++# like a missing syscall and fall back to epoll_wait().
++--- a/src/libsystemd/sd-event/sd-event.c
+++++ b/src/libsystemd/sd-event/sd-event.c
++@@ -4643,7 +4643,12 @@
++                                 /* sigmask= */ NULL);
++                 if (r >= 0)
++                         return r;
++-                if (!ERRNO_IS_NOT_SUPPORTED(errno) && !ERRNO_IS_PRIVILEGE(errno))
+++
+++                /* The vendor 4.14 kernel may return EINVAL for the unimplemented
+++                 * epoll_pwait2 syscall. Treat it like a missing syscall and fall
+++                 * back to epoll_wait(). */
+++                if (!ERRNO_IS_NOT_SUPPORTED(errno) && !ERRNO_IS_PRIVILEGE(errno) &&
+++                    errno != EINVAL)
++                         return -errno; /* Only fallback to old epoll_wait() if the syscall is masked or not
++                                         * supported. */
++ 
