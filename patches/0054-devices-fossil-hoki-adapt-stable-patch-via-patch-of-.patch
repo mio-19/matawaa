@@ -5,21 +5,26 @@ Subject: [PATCH] devices/fossil-hoki: adapt stable patch via patch-of-patch
 
 Replace the sed/awk transformation of the kernel.org incremental patch with a checked-in patch against the patch file. The patch keeps the vendor syncookies sock_net() argument and removes the perf core/header and Intel PT diffs already present downstream.
 ---
- devices/fossil-hoki/kernel/default.nix        |  22 +-
+ devices/fossil-hoki/kernel/default.nix        |  41 ++--
  .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++++++++++++
- 2 files changed, 233 insertions(+), 17 deletions(-)
+ 2 files changed, 244 insertions(+), 25 deletions(-)
  create mode 100644 devices/fossil-hoki/kernel/linux-4.14.206-207.patch.patch
 
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
-index b27cd66d..43023462 100644
+index b27cd66d..6f61e0b5 100644
 --- a/devices/fossil-hoki/kernel/default.nix
 +++ b/devices/fossil-hoki/kernel/default.nix
-@@ -71,24 +71,12 @@ let
-       url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.206-207.xz";
-       hash = "sha256-U7olrDZuRkGt6GbXp6Lna20cERa5GX8RqXgbZGPrvX4=";
-     };
-+    patchFile = ./linux-4.14.206-207.patch.patch;
-   } ''
+@@ -65,31 +65,22 @@ let
+ 
+   # Incremental 4.14.206 -> 4.14.207 stable patch. Use the kernel.org `incr`
+   # path; the plain `patch-4.14.207.xz` is a full 4.14.0 -> 4.14.207 diff.
+-  stablePatch = runCommand "linux-4.14.206-207.patch" {
+-    nativeBuildInputs = [ xz ];
+-    src = fetchurl {
+-      url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.206-207.xz";
+-      hash = "sha256-U7olrDZuRkGt6GbXp6Lna20cERa5GX8RqXgbZGPrvX4=";
+-    };
+-  } ''
 -    xz -dc "$src" > "$out"
 -    # The vendor tree calls tcp_select_initial_window() with an extra
 -    # sock_net() argument. Adapt the two syncookies hunks to that vendor API
@@ -37,13 +42,26 @@ index b27cd66d..43023462 100644
 -      !skip { print }
 -    ' "$out" > "$out.tmp"
 -    mv "$out.tmp" "$out"
-+    mkdir -p "$TMPDIR/stable"
-+    xz -dc "$src" > "$TMPDIR/stable/linux-4.14.206-207.patch"
-+    (cd "$TMPDIR/stable" && patch -p1 -i "$patchFile")
-+    cp "$TMPDIR/stable/linux-4.14.206-207.patch" "$out"
-   '';
+-  '';
++  stablePatch =
++    runCommand "linux-4.14.206-207.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.206-207.xz";
++          hash = "sha256-U7olrDZuRkGt6GbXp6Lna20cERa5GX8RqXgbZGPrvX4=";
++        };
++        patchFile = ./linux-4.14.206-207.patch.patch;
++      }
++      ''
++        mkdir -p "$TMPDIR/stable"
++        xz -dc "$src" > "$TMPDIR/stable/linux-4.14.206-207.patch"
++        (cd "$TMPDIR/stable" && patch -p1 -i "$patchFile")
++        cp "$TMPDIR/stable/linux-4.14.206-207.patch" "$out"
++      '';
  
    # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
+   # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
 diff --git a/devices/fossil-hoki/kernel/linux-4.14.206-207.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.206-207.patch.patch
 new file mode 100644
 index 00000000..c8fb0ed8
