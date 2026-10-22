@@ -1,0 +1,49 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Thu, 22 Oct 2026 22:11:28 +1100
+Subject: [PATCH] devices/fossil-hoki: update vendor kernel to 4.14.208
+
+Apply the incremental 4.14.207 -> 4.14.208 stable patch on top of the adapted 4.14.206 -> 4.14.207 update. The 207 -> 208 patch applies cleanly to the vendor tree; final kernel version is 4.14.208.
+---
+ devices/fossil-hoki/kernel/default.nix | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
+index 6f61e0b5..9048b6ae 100644
+--- a/devices/fossil-hoki/kernel/default.nix
++++ b/devices/fossil-hoki/kernel/default.nix
+@@ -82,6 +82,17 @@ let
+         cp "$TMPDIR/stable/linux-4.14.206-207.patch" "$out"
+       '';
+ 
++  # Incremental 4.14.207 -> 4.14.208 stable patch.
++  stablePatch208 = runCommand "linux-4.14.207-208.patch" {
++    nativeBuildInputs = [ xz ];
++    src = fetchurl {
++      url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.207-208.xz";
++      hash = "sha256-RUgB0ik3YaGix3k3Tm5VJbIMaSvZIp/+fuCNIuOguHk=";
++    };
++  } ''
++    xz -dc "$src" > "$out"
++  '';
++
+   # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
+   # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
+   configfile =
+@@ -96,7 +107,7 @@ let
+ in
+ 
+ kernel-builder-gcc8 {
+-  version = "4.14.207";
++  version = "4.14.208";
+   inherit configfile;
+ 
+   src = fetchFromGitHub {
+@@ -108,6 +119,7 @@ kernel-builder-gcc8 {
+ 
+   patches = [
+     stablePatch
++    stablePatch208
+     (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
+     (upstreamPatch "0002-mmc-Fix-embedded_sdio_data-duplicate-definition.patch" "0h7d3pxz8di2rh257kmc83iwcpf8xmrqhbqq4an2vclfdhyr297j")
+     (upstreamPatch "0003-video-fbdev-msm-Provide-mdss_dsi_switch_page.patch" "1igqg795cvr81w948k4dj8nrbzc2pz5bg6gdp68jfplm2hcs4nch")
