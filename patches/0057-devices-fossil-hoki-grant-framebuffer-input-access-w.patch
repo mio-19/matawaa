@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Thu, 22 Oct 2026 23:44:28 +1100
+Subject: [PATCH] devices/fossil-hoki: grant framebuffer/input access without
+ udev
+
+Set /dev/fb0 to root:video 0660 and /dev/input/event* to root:input 0660 with systemd-tmpfiles. udevd currently dies with EINVAL on this 4.14 kernel before its rules can run, so the launcher user cannot open the framebuffer or evdev nodes.
+---
+ devices/fossil-hoki/default.nix | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 6c023b9d..24e4487e 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -190,6 +190,8 @@
+     "L+ /system/lib/hw/gps.default.so - - - - /vendor/lib/hw/gps.default.so"
+     "L+ /vendor/bin/hw/android.hardware.gnss@1.0-service - - - - /vendor/bin/hw/android.hardware.gnss@1.0-service-qti"
+     "L+ /dev/graphics/fb0 - - - - /dev/fb0"
++    "z /dev/fb0 0660 root video -"
++    "z /dev/input/event* 0660 root input -"
+     "d /mnt/vendor 0755 root root -"
+     "L+ /mnt/vendor/persist - - - - /persist"
+     "d /data/vendor 0755 root root -"

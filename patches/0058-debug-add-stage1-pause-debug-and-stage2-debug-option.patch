@@ -169,7 +169,7 @@ index 46ce2d83..68c0836c 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 6c023b9d..fce9ecb6 100644
+index 24e4487e..876be512 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -30,6 +30,9 @@
