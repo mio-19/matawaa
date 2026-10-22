@@ -192,10 +192,10 @@ recipe pins the same revision. The vendor branch's last commit is from
 
 Upstream Linux 4.14 reached end-of-life on 2024-01-10, with 4.14.336 as the
 final release. The vendor tree is frozen at 4.14.206 plus Qualcomm/Android
-changes, with incremental 4.14.207, 4.14.208 and 4.14.209 stable updates
-applied. It still does not include later upstream stable or CVE backports. The
-Red Hat OpenShift 4.14 EUS lifecycle is unrelated to the Linux 4.14 kernel and
-does not patch this tree.
+changes, with incremental 4.14.207 through 4.14.212 stable updates applied. It
+still does not include later upstream stable or CVE backports. The Red Hat
+OpenShift 4.14 EUS lifecycle is unrelated to the Linux 4.14 kernel and does not
+patch this tree.
 
 ### Attempted 4.14 stable update
 
@@ -203,7 +203,7 @@ We tried three stable updates on top of the vendor tree:
 
 - OpenELA `4.14.206` -> `4.14.357`
 - kernel.org `4.14.206` -> `4.14.336`
-- kernel.org `4.14.206` -> `4.14.209` (incremental `incr/` patches)
+- kernel.org `4.14.206` -> `4.14.212` (separate `incr/` patches)
 
 The two latest-tree updates required resolving hundreds of vendor conflicts. The
 resulting trees failed to build on repeated subsystem/API and shared-header
@@ -219,12 +219,15 @@ incremental patch is `incr/patch-4.14.206-207.xz` (37K). It applies after
 adapting the syncookies `tcp_select_initial_window()` call to the vendor
 `sock_net()` argument and dropping the perf core/header and Intel PT diffs
 already present in the vendor tree. The `4.14.207` kernel and debug image build
-successfully. The `incr/patch-4.14.207-208.xz` patch then applies cleanly. A
-combined `4.14.207` -> `4.14.209` incremental file is not published, so
-`incr/patch-4.14.208-209.xz` is applied on top; it applies cleanly and the
-current kernel is `4.14.209`.
+successfully.
 
-A 4.14.209 debug image is produced; no 4.14.336 image was produced. Larger
+The later increments are kept separate. `4.14.207` -> `4.14.208` and `4.14.208`
+-> `4.14.209` apply cleanly. `4.14.209` -> `4.14.210` has an already-present
+UFS hunk dropped by a local patch-of-patch, and `4.14.211` -> `4.14.212` drops
+already-present/incompatible `tty_jobctrl` and `f_fs` hunks. The current kernel
+is `4.14.212`.
+
+A 4.14.212 debug image is produced; no 4.14.336 image was produced. Larger
 whole-tree stable updates remain impractical for this vendor fork.
 
 ### Security implication
