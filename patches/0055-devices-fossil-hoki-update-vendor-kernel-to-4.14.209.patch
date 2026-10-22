@@ -1,0 +1,49 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Thu, 22 Oct 2026 22:22:20 +1100
+Subject: [PATCH] devices/fossil-hoki: update vendor kernel to 4.14.209
+
+The combined 4.14.207 -> 4.14.209 incremental file is not published; apply the 4.14.208 -> 4.14.209 incremental patch on top of the 4.14.208 update. It applies cleanly and the 4.14.209 kernel builds.
+---
+ devices/fossil-hoki/kernel/default.nix | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
+index 9048b6ae..b5b6c385 100644
+--- a/devices/fossil-hoki/kernel/default.nix
++++ b/devices/fossil-hoki/kernel/default.nix
+@@ -93,6 +93,17 @@ let
+     xz -dc "$src" > "$out"
+   '';
+ 
++  # Incremental 4.14.208 -> 4.14.209 stable patch.
++  stablePatch209 = runCommand "linux-4.14.208-209.patch" {
++    nativeBuildInputs = [ xz ];
++    src = fetchurl {
++      url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.208-209.xz";
++      hash = "sha256-r0AtMyS92An0LizlWgoTbudht5/UD+f+MP38MlBQjQY=";
++    };
++  } ''
++    xz -dc "$src" > "$out"
++  '';
++
+   # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
+   # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
+   configfile =
+@@ -107,7 +118,7 @@ let
+ in
+ 
+ kernel-builder-gcc8 {
+-  version = "4.14.208";
++  version = "4.14.209";
+   inherit configfile;
+ 
+   src = fetchFromGitHub {
+@@ -120,6 +131,7 @@ kernel-builder-gcc8 {
+   patches = [
+     stablePatch
+     stablePatch208
++    stablePatch209
+     (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
+     (upstreamPatch "0002-mmc-Fix-embedded_sdio_data-duplicate-definition.patch" "0h7d3pxz8di2rh257kmc83iwcpf8xmrqhbqq4an2vclfdhyr297j")
+     (upstreamPatch "0003-video-fbdev-msm-Provide-mdss_dsi_switch_page.patch" "1igqg795cvr81w948k4dj8nrbzc2pz5bg6gdp68jfplm2hcs4nch")
