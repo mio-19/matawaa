@@ -4,6 +4,12 @@ The **Fossil Gen 6** (codename `hoki`) is the primary reference smartwatch platf
 
 ---
 
+## Kernel
+
+Vendor: git://github.com/fossil-engineering/kernel-msm-fossil-cw;branch=fossil-android-msm-hoki-lw1.2-4.14
+
+Merge with https://android.googlesource.com/kernel/common/+/refs/heads/deprecated/android-4.14-stable
+
 ## Hardware Specifications
 
 | Component | Specification | Notes |
