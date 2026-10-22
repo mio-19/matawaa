@@ -1,0 +1,65 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Thu, 22 Oct 2026 23:27:10 +1100
+Subject: [PATCH] boot/error: center round-screen error layout
+
+Center the message and action panes inside the round display safe area and center the message text, instead of laying them out from x=0 and leaving the right half empty.
+---
+ boot/error/main.rb | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/boot/error/main.rb b/boot/error/main.rb
+index aafbc56d..487a45d4 100644
+--- a/boot/error/main.rb
++++ b/boot/error/main.rb
+@@ -88,7 +88,7 @@ class UI
+   def add_messages_pane()
+     @messages_pane = LVGL::LVContainer.new(@screen)
+     @messages_pane.set_width(get_pane_width())
+-    @messages_pane.set_pos(0, @title_bar.get_height())
++    @messages_pane.set_pos(horizontal? ? 0 : pane_x, @title_bar.get_height())
+ 
+     # When horizontal, full height
+     if horizontal?
+@@ -136,7 +136,7 @@ class UI
+ 
+   def add_message_title()
+     @message_title = new_text($title, parent: @messages_pane)
+-    @message_title.set_align(LVGL::LABEL_ALIGN::LEFT)
++    @message_title.set_align(text_align())
+     @message_title.set_pos(
+       padding,
+       padding,
+@@ -145,7 +145,7 @@ class UI
+ 
+   def add_message()
+     @message = new_text($message, parent: @messages_pane)
+-    @message.set_align(LVGL::LABEL_ALIGN::LEFT)
++    @message.set_align(text_align())
+     @message.set_pos(
+       padding,
+       @message_title.get_height() + @message_title.get_y() + padding
+@@ -220,7 +220,7 @@ class UI
+       )
+ 
+       # Always push it as far down as possible!
+-      @actions_pane.set_pos(0, @screen.get_height() - @actions_pane.get_height())
++      @actions_pane.set_pos(pane_x, @screen.get_height() - @actions_pane.get_height())
+     end
+   end
+ 
+@@ -262,6 +262,14 @@ class UI
+     end
+   end
+ 
++  def pane_x()
++    (@screen.get_width() - get_pane_width()) / 2
++  end
++
++  def text_align()
++    round_screen? ? LVGL::LABEL_ALIGN::CENTER : LVGL::LABEL_ALIGN::LEFT
++  end
++
+   def unit()
+     (if horizontal?
+       @screen.get_height()
