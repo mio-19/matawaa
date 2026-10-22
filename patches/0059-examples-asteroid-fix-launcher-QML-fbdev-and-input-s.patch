@@ -1,0 +1,205 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 09:57:21 +1100
+Subject: [PATCH] examples/asteroid: fix launcher QML, fbdev and input setup
+
+Build the Nemo.Mce QML plugin with the target Qt libraries, add the Nemo.Configuration plugin from Sailfish, and include qt5compat in QML2_IMPORT_PATH. Run the fbdev launcher with the Qt Quick software backend so it does not require an EGL display on the 4.14 kernel. Add ceres to the tty group and drop the unavailable keys.qmap option so the compositor can open the tty and evdev keyboards.
+---
+ devices/fossil-hoki/default.nix               |  2 +-
+ examples/asteroid/asteroid-desktop.nix        |  5 +-
+ examples/asteroid/configuration.nix           |  1 +
+ overlay/asteroidos/default.nix                |  3 +
+ overlay/asteroidos/mce-qt6/default.nix        | 16 ++++-
+ .../nemo-qml-plugin-configuration/default.nix | 69 +++++++++++++++++++
+ 6 files changed, 92 insertions(+), 4 deletions(-)
+ create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 24e4487e..ba0c97e4 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -140,7 +140,7 @@
+     QPA_HWC_FORCE_GLES = "1";
+     QPA_HWC2_FORCE_DOZE_UPDATE = "1";
+     QT_OPENGL_NO_BGRA = "1";
+-    LIPSTICK_OPTIONS = "-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1";
++    LIPSTICK_OPTIONS = "-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1";
+   };
+ 
+   # Hardware node permissions and symlinks for Android HAL / libhybris
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 5d686296..311502b1 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -142,10 +142,12 @@ in
+       QT_VIRTUALKEYBOARD_STYLE = "watch";
+       QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+       RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
+-      QML2_IMPORT_PATH = "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml:${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml";
++      QML2_IMPORT_PATH = "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qt5compat}/lib/qt-6/qml:${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml:${pkgs.asteroid.mce-qt6}/lib/qt-6/qml:${pkgs.asteroid.mlite}/lib/qt-6/qml:${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml";
+       QT_PLUGIN_PATH = "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins";
+       # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
+       QT_ENABLE_HIGHDPI_SCALING = "0";
++      # Avoid requiring a hardware EGL display for the fbdev compositor.
++      QT_QUICK_BACKEND = "software";
+     };
+ 
+     # Wayland compositor and watchface launcher user service (runs under user session)
+@@ -159,6 +161,7 @@ in
+         QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+         RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
+         QT_QPA_PLATFORM = lib.mkDefault "linuxfb:fb=/dev/fb0";
++        QT_QUICK_BACKEND = "software";
+       }
+       // config.environment.variables;
+       serviceConfig = {
+diff --git a/examples/asteroid/configuration.nix b/examples/asteroid/configuration.nix
+index 781f4217..8b1b32c3 100644
+--- a/examples/asteroid/configuration.nix
++++ b/examples/asteroid/configuration.nix
+@@ -27,6 +27,7 @@ in
+         "input"
+         "networkmanager"
+         "systemd-journal"
++        "tty"
+         "video"
+         "wheel"
+       ];
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index 52582737..fa71a655 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -22,6 +22,9 @@ rec {
+ 
+   amber-mpris = callPackage ./amber-mpris { };
+   mlite = callPackage ./mlite { };
++  nemo-qml-plugin-configuration = callPackage ./nemo-qml-plugin-configuration {
++    inherit mlite;
++  };
+   mce-dev = callPackage ./mce-dev { };
+   mce-qt6 = callPackage ./mce-qt6 {
+     inherit mce-dev;
+diff --git a/overlay/asteroidos/mce-qt6/default.nix b/overlay/asteroidos/mce-qt6/default.nix
+index 6abc14e4..182d249c 100644
+--- a/overlay/asteroidos/mce-qt6/default.nix
++++ b/overlay/asteroidos/mce-qt6/default.nix
+@@ -23,23 +23,29 @@ stdenv.mkDerivation (finalAttrs: {
+   };
+ 
+   strictDeps = true;
++  dontWrapQtApps = true;
+ 
+   nativeBuildInputs = [
+     cmake
+     pkg-config
+-    qt6.wrapQtAppsHook
+   ];
+ 
+   buildInputs = [
+     qt6.qtbase
++    qt6.qtdeclarative
+     mce-dev
+   ];
+ 
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
+   postPatch = ''
+         cat << "EOF" > CMakeLists.txt
+     cmake_minimum_required(VERSION 3.16)
+     project(mce-qt6 LANGUAGES CXX)
+-    find_package(Qt6 REQUIRED COMPONENTS Core DBus)
++    find_package(Qt6 REQUIRED COMPONENTS Core DBus Qml)
+     find_package(PkgConfig REQUIRED)
+     pkg_check_modules(mce REQUIRED IMPORTED_TARGET mce)
+     set(CMAKE_AUTOMOC ON)
+@@ -58,6 +64,12 @@ stdenv.mkDerivation (finalAttrs: {
+     install(FILES ''${HEADERS} DESTINATION include/mce-qt6)
+     configure_file(mce-qt6.pc.in mce-qt6.pc @ONLY)
+     install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/mce-qt6.pc DESTINATION lib/pkgconfig)
++
++    add_library(qmcedeclarative MODULE plugin/qmcedeclarativeplugin.cpp)
++    target_include_directories(qmcedeclarative PRIVATE lib/include)
++    target_link_libraries(qmcedeclarative PRIVATE Qt6::Core Qt6::Qml mce-qt6)
++    install(TARGETS qmcedeclarative LIBRARY DESTINATION lib/qt-6/qml/Nemo/Mce)
++    install(FILES plugin/qmldir plugin/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/Mce)
+     EOF
+         cat << "EOF" > mce-qt6.pc.in
+     prefix=@CMAKE_INSTALL_PREFIX@
+diff --git a/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
+new file mode 100644
+index 00000000..214fc9e5
+--- /dev/null
++++ b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
+@@ -0,0 +1,69 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++  mlite,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "nemo-qml-plugin-configuration";
++  version = "nightly";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-qml-plugin-configuration";
++    rev = "b8ff8957f7ed9d2e3fceffc782434f2609768686";
++    hash = "sha256-KYmzafNLN+lhX45qazzZEjrEK251lOi4o6Qlas6/11g=";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    mlite
++  ];
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  postPatch = ''
++    cat > CMakeLists.txt <<'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(nemo-qml-plugin-configuration LANGUAGES CXX)
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_AUTOMOC ON)
++    find_package(Qt6 REQUIRED COMPONENTS Core Qml)
++    find_package(PkgConfig REQUIRED)
++    pkg_check_modules(MLITE REQUIRED IMPORTED_TARGET mlite6)
++    add_library(nemoconfiguration MODULE
++      src/plugin.cpp
++      src/configurationgroup.cpp
++      src/configurationvalue.cpp
++    )
++    target_include_directories(nemoconfiguration PRIVATE src ''${MLITE_INCLUDE_DIRS})
++    target_link_libraries(nemoconfiguration PRIVATE Qt6::Core Qt6::Qml PkgConfig::MLITE)
++    install(TARGETS nemoconfiguration LIBRARY DESTINATION lib/qt-6/qml/Nemo/Configuration)
++    install(FILES src/qmldir src/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/Configuration)
++    EOF
++  '';
++
++  meta = with lib; {
++    description = "Nemo configuration QML plugin";
++    homepage = "https://github.com/sailfishos/nemo-qml-plugin-configuration";
++    license = licenses.bsd3;
++    platforms = platforms.linux;
++  };
++})
