@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Thu, 22 Oct 2026 22:59:16 +1100
+Subject: [PATCH] examples/asteroid: unblock multi-user and user manager
+
+Disable autovt@tty1 (the getty generator creates it from the active console) and start the ceres user manager through logind's linger file instead of the loginctl enable-linger service, which returns EINVAL on this old kernel. This avoids holding multi-user.target on getty.target.
+---
+ examples/asteroid/asteroid-desktop.nix | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index c30b1c67..5d686296 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -96,6 +96,7 @@ in
+ 
+     systemd.tmpfiles.rules = [
+       "d /var/lib/kiwix 0775 ceres users -"
++      "f /var/lib/systemd/linger/ceres 0644 root root -"
+     ];
+ 
+     # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
+@@ -113,6 +114,17 @@ in
+       enable = false;
+     };
+ 
++    # The getty generator also creates autovt@tty1 from the active console.
++    # On this watch it waits for a tty device that udev never finishes, holding
++    # back multi-user.target and the user session.
++    systemd.services."autovt@tty1" = {
++      enable = false;
++    };
++
++    # Start the ceres user manager through logind's linger file instead of
++    # relying on loginctl, which fails with EINVAL on this old kernel.
++    systemd.services.linger-users.enable = false;
++
+     # Smartwatch stem/power button should be handled by compositor/shell, not
+     # logind shutdown; match AsteroidOS systemd-conf powerkey.conf.
+     # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd-conf/powerkey.conf
