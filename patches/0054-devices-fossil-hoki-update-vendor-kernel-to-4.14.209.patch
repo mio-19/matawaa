@@ -5,38 +5,41 @@ Subject: [PATCH] devices/fossil-hoki: update vendor kernel to 4.14.209
 
 kernel.org does not publish a combined 4.14.207 -> 4.14.209 incremental file. Build one derivation from the two published increments, 207 -> 208 and 208 -> 209, and apply the concatenated patch after the adapted 206 -> 207 update.
 ---
- devices/fossil-hoki/kernel/default.nix | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ devices/fossil-hoki/kernel/default.nix | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
-index 6f61e0b5..b28f1efc 100644
+index 6f61e0b5..44e0c52b 100644
 --- a/devices/fossil-hoki/kernel/default.nix
 +++ b/devices/fossil-hoki/kernel/default.nix
-@@ -82,6 +82,23 @@ let
+@@ -82,6 +82,26 @@ let
          cp "$TMPDIR/stable/linux-4.14.206-207.patch" "$out"
        '';
  
 +  # Incremental 4.14.207 -> 4.14.209 stable patch. kernel.org does not publish
 +  # a combined 207-209 file; concatenate the two published increments.
-+  stablePatch209 = runCommand "linux-4.14.207-209.patch" {
-+    nativeBuildInputs = [ xz ];
-+    src207_208 = fetchurl {
-+      url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.207-208.xz";
-+      hash = "sha256-RUgB0ik3YaGix3k3Tm5VJbIMaSvZIp/+fuCNIuOguHk=";
-+    };
-+    src208_209 = fetchurl {
-+      url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.208-209.xz";
-+      hash = "sha256-r0AtMyS92An0LizlWgoTbudht5/UD+f+MP38MlBQjQY=";
-+    };
-+  } ''
-+    xz -dc "$src207_208" > "$out"
-+    xz -dc "$src208_209" >> "$out"
-+  '';
++  stablePatch209 =
++    runCommand "linux-4.14.207-209.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src207_208 = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.207-208.xz";
++          hash = "sha256-RUgB0ik3YaGix3k3Tm5VJbIMaSvZIp/+fuCNIuOguHk=";
++        };
++        src208_209 = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.208-209.xz";
++          hash = "sha256-r0AtMyS92An0LizlWgoTbudht5/UD+f+MP38MlBQjQY=";
++        };
++      }
++      ''
++        xz -dc "$src207_208" > "$out"
++        xz -dc "$src208_209" >> "$out"
++      '';
 +
    # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
    # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
    configfile =
-@@ -96,7 +113,7 @@ let
+@@ -96,7 +116,7 @@ let
  in
  
  kernel-builder-gcc8 {
@@ -45,7 +48,7 @@ index 6f61e0b5..b28f1efc 100644
    inherit configfile;
  
    src = fetchFromGitHub {
-@@ -108,6 +125,7 @@ kernel-builder-gcc8 {
+@@ -108,6 +128,7 @@ kernel-builder-gcc8 {
  
    patches = [
      stablePatch
