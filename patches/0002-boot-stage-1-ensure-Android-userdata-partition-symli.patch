@@ -1,0 +1,72 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:26:33 +1100
+Subject: [PATCH] boot/stage-1: ensure Android userdata partition symlinks
+
+Add fallback symlink creation for Android userdata partitions before
+udev settles. This handles vendor kernels and bootloaders that do not
+expose stable by-partlabel or by-label links early enough for the
+rootfs mount.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ boot/init/tasks/udev.rb | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/boot/init/tasks/udev.rb b/boot/init/tasks/udev.rb
+index 3d9d98c0..fa99eba2 100644
+--- a/boot/init/tasks/udev.rb
++++ b/boot/init/tasks/udev.rb
+@@ -23,6 +23,8 @@ class Tasks::UDev < SingletonTask
+   def run()
+     udevd
+ 
++    ensure_partition_links
++
+     begin
+       udevadm("trigger", "--action=add", "--subsystem-match=platform", "--subsystem-match=mmc", "--subsystem-match=block", "--subsystem-match=input", "--subsystem-match=graphics")
+     rescue System::CommandError => e
+@@ -40,6 +42,43 @@ class Tasks::UDev < SingletonTask
+       rescue System::CommandError => e
+         $logger.warn("udevadm settle non-fatal timeout (proceeding): #{e.message}")
+       end
++      ensure_partition_links
++    end
++  end
++
++  def ensure_partition_links()
++    FileUtils.mkdir_p("/dev/disk/by-partlabel")
++    FileUtils.mkdir_p("/dev/disk/by-label")
++
++    ["/dev/mmcblk0p50", "/dev/block/mmcblk0p50", "/dev/block/bootdevice/by-name/userdata"].each do |candidate|
++      if File.exist?(candidate)
++        unless File.exist?("/dev/disk/by-partlabel/userdata")
++          System.symlink(candidate, "/dev/disk/by-partlabel/userdata")
++        end
++        unless File.exist?("/dev/disk/by-label/NIXOS_SYSTEM")
++          System.symlink(candidate, "/dev/disk/by-label/NIXOS_SYSTEM")
++        end
++        break
++      end
++    end
++
++    Dir.glob("/sys/class/block/*/uevent").each do |uevent|
++      content = File.read(uevent) rescue ""
++      if content.include?("PARTNAME=userdata")
++        devname = content[/DEVNAME=(\S+)/, 1]
++        if devname && File.exist?("/dev/#{devname}")
++          unless File.exist?("/dev/disk/by-partlabel/userdata")
++            System.symlink("/dev/#{devname}", "/dev/disk/by-partlabel/userdata")
++          end
++          unless File.exist?("/dev/disk/by-label/NIXOS_SYSTEM")
++            System.symlink("/dev/#{devname}", "/dev/disk/by-label/NIXOS_SYSTEM")
++          end
++        end
++      end
++    end
++
++    if File.exist?("/dev/disk/by-partlabel/userdata") && !File.exist?("/dev/disk/by-label/NIXOS_SYSTEM")
++      System.symlink("/dev/disk/by-partlabel/userdata", "/dev/disk/by-label/NIXOS_SYSTEM")
+     end
+   end
+ 

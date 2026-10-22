@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Thu, 22 Oct 2026 21:46:12 +1100
+Subject: [PATCH] devices/fossil-hoki: update vendor kernel to 4.14.207
+
+Apply the correct incremental kernel.org 4.14.206 -> 4.14.207 patch from the incr/ directory. Adapt the syncookies tcp_select_initial_window() call to the vendor sock_net() argument, and drop the perf core/header and Intel PT diffs that the vendor tree already contains. This keeps the update to one stable release instead of applying the full 4.14.0 -> 4.14.207 patch.
+---
+ devices/fossil-hoki/kernel/default.nix | 32 +++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
+index 1a520e75..b27cd66d 100644
+--- a/devices/fossil-hoki/kernel/default.nix
++++ b/devices/fossil-hoki/kernel/default.nix
+@@ -5,6 +5,7 @@
+   fetchFromGitHub,
+   fetchurl,
+   runCommand,
++  xz,
+   ...
+ }:
+ 
+@@ -62,6 +63,34 @@ let
+       inherit sha256;
+     };
+ 
++  # Incremental 4.14.206 -> 4.14.207 stable patch. Use the kernel.org `incr`
++  # path; the plain `patch-4.14.207.xz` is a full 4.14.0 -> 4.14.207 diff.
++  stablePatch = runCommand "linux-4.14.206-207.patch" {
++    nativeBuildInputs = [ xz ];
++    src = fetchurl {
++      url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.206-207.xz";
++      hash = "sha256-U7olrDZuRkGt6GbXp6Lna20cERa5GX8RqXgbZGPrvX4=";
++    };
++  } ''
++    xz -dc "$src" > "$out"
++    # The vendor tree calls tcp_select_initial_window() with an extra
++    # sock_net() argument. Adapt the two syncookies hunks to that vendor API
++    # without dropping the stable window-clamp fix.
++    sed -i \
++      -e 's|tcp_select_initial_window(tcp_full_space(sk), req->mss|tcp_select_initial_window(sock_net(sk), tcp_full_space(sk), req->mss|' \
++      -e 's|tcp_select_initial_window(full_space, req->mss|tcp_select_initial_window(sock_net(sk), full_space, req->mss|' \
++      "$out"
++    # The vendor 4.14 tree already carries the perf address-filter path API
++    # and the Intel PT changes. Drop those redundant file diffs instead of
++    # applying reversed hunks on top of them.
++    awk '
++      /^diff --git a\/(kernel\/events\/core.c|include\/linux\/perf_event.h|arch\/x86\/events\/intel\/pt.c)/ { skip = 1 }
++      skip && /^diff --git / && $0 !~ /(kernel\/events\/core.c|include\/linux\/perf_event.h|arch\/x86\/events\/intel\/pt.c)/ { skip = 0 }
++      !skip { print }
++    ' "$out" > "$out.tmp"
++    mv "$out.tmp" "$out"
++  '';
++
+   # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
+   # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
+   configfile =
+@@ -76,7 +105,7 @@ let
+ in
+ 
+ kernel-builder-gcc8 {
+-  version = "4.14.206";
++  version = "4.14.207";
+   inherit configfile;
+ 
+   src = fetchFromGitHub {
+@@ -87,6 +116,7 @@ kernel-builder-gcc8 {
+   };
+ 
+   patches = [
++    stablePatch
+     (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
+     (upstreamPatch "0002-mmc-Fix-embedded_sdio_data-duplicate-definition.patch" "0h7d3pxz8di2rh257kmc83iwcpf8xmrqhbqq4an2vclfdhyr297j")
+     (upstreamPatch "0003-video-fbdev-msm-Provide-mdss_dsi_switch_page.patch" "1igqg795cvr81w948k4dj8nrbzc2pz5bg6gdp68jfplm2hcs4nch")

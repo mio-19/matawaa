@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Thu, 22 Oct 2026 20:24:38 +1100
+Subject: [PATCH] overlay/asteroidos: bump launcher nightly pin
+
+Update asteroid-launcher to the current default-branch revision. The find-phone and skip-firstrun patches still apply.
+---
+ overlay/asteroidos/asteroid-launcher/default.nix | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
+index 921afd1b..1a58d148 100644
+--- a/overlay/asteroidos/asteroid-launcher/default.nix
++++ b/overlay/asteroidos/asteroid-launcher/default.nix
+@@ -30,8 +30,8 @@ stdenv.mkDerivation (finalAttrs: {
+   src = fetchFromGitHub {
+     owner = "AsteroidOS";
+     repo = "asteroid-launcher";
+-    rev = "7eae1ebc86b04377cdb3164a8027a1667de319a2";
+-    sha256 = "0inra188hizfap94dc95a13q1c82bqc5dsa6qdgkdsvim65fg3vq";
++    rev = "4bd3d281fe3a2ea9631c640e1f00871fa19bbd4c";
++    sha256 = "194hn7pkq100339gnavvjmyib15m557bykkyqr77jrgz0wl07bpz";
+   };
+ 
+   strictDeps = true;

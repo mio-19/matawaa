@@ -1,0 +1,258 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 10:42:20 +1100
+Subject: [PATCH] examples: add asteroid smartwatch desktop demonstration
+ system
+
+This patch introduces examples/asteroid/:
+
+- Complete example system demonstrating the AsteroidOS Wayland desktop,
+  compositor, virtual keyboard, and preinstalled smartwatch applications.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ examples/asteroid/asteroid-desktop.nix | 167 +++++++++++++++++++++++++
+ examples/asteroid/configuration.nix    |  37 ++++++
+ examples/asteroid/default.nix          |  15 +++
+ 3 files changed, 219 insertions(+)
+ create mode 100644 examples/asteroid/asteroid-desktop.nix
+ create mode 100644 examples/asteroid/configuration.nix
+ create mode 100644 examples/asteroid/default.nix
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+new file mode 100644
+index 00000000..a934b5e3
+--- /dev/null
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -0,0 +1,167 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  cfg = config.services.asteroid-desktop;
++  inherit (lib) mkDefault mkEnableOption mkIf;
++in
++{
++  options.services.asteroid-desktop = {
++    enable = mkEnableOption "AsteroidOS smartwatch user environment";
++
++    browser = {
++      enable = lib.mkOption {
++        type = lib.types.bool;
++        default = true;
++        description = "Whether to include the AsteroidOS smartwatch web browser by default.";
++      };
++    };
++  };
++
++  config = mkIf cfg.enable {
++
++    # Watch system beautification and boot visibility
++    mobile.beautification = {
++      silentBoot = mkDefault false;
++      splash = mkDefault true;
++    };
++
++    # Enable Bluetooth and low-energy profiles for companion phone syncing
++    hardware.bluetooth = {
++      enable = mkDefault true;
++      powerOnBoot = mkDefault true;
++    };
++
++    # System packages for the watch environment
++    environment.systemPackages =
++      with pkgs;
++      [
++        asteroid.qml-asteroid
++        asteroid.asteroid-launcher
++        asteroid.asteroid-btsyncd
++        # Asset suite
++        asteroid.assets.wallpapers
++        asteroid.assets.sounds
++        asteroid.assets.icons
++        asteroid.assets.fonts
++        asteroid.virtualkeyboard
++        # Complete application suite
++        asteroid.apps.stopwatch
++        asteroid.apps.timer
++        asteroid.apps.alarmclock
++        asteroid.apps.calculator
++        asteroid.apps.settings
++        asteroid.apps.weather
++        asteroid.apps.music
++        asteroid.apps.compass
++        asteroid.apps.flashlight
++        asteroid.apps.calendar
++        asteroid.apps.diamonds
++        asteroid.apps.hrm
++        asteroid.apps.camera
++        asteroid.apps.gps-test
++        asteroid.apps.telegram
++        asteroid.apps.kiwix
++        asteroid.apps.twenty48
++      ]
++      ++ lib.optionals cfg.browser.enable [
++        asteroid.apps.browser
++      ]
++      ++ (with pkgs; [
++        asteroid.community-apps.unofficial-watchfaces
++        asteroid.community-apps.blaster
++        asteroid.community-apps.dodger
++        asteroid.community-apps.health
++        asteroid.community-apps.sensorlogd
++        asteroid.community-apps.map
++        asteroid.community-apps.qmltester
++        asteroid.community-apps.skedaddle
++        asteroid.community-apps.weatherfetch
++        asteroid.community-apps.beatfork
++        asteroid.community-apps.benchymark
++        asteroid.community-apps.docking-bay
++        asteroid.community-apps.heliograph
++        asteroid.community-apps.horizon
++        asteroid.community-apps.meteormatch
++        asteroid.community-apps.pulsar
++        asteroid.community-apps.rag
++        asteroid.community-apps.shopper
++        asteroid.community-apps.toolwatch
++        asteroid.community-apps.touchdown
++      ]);
++
++    systemd.tmpfiles.rules = [
++      "d /var/lib/kiwix 0775 ceres users -"
++    ];
++
++    # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
++    # Reference: https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/src/main.conf
++    hardware.bluetooth.settings = {
++      General = {
++        ControllerMode = "dual";
++        DiscoverableTimeout = 180;
++      };
++    };
++
++    # Ensure graphical compositor on framebuffer is not trampled over by VT console login
++    # Reference: Mobile NixOS examples/hello/configuration.nix
++    systemd.services."getty@tty1" = {
++      enable = false;
++    };
++
++    # Smartwatch stem/power button should be handled by compositor/shell, not logind shutdown
++    services.logind.settings = {
++      Login = {
++        HandlePowerKey = "ignore";
++      };
++    };
++
++    environment.variables = {
++      QT_IM_MODULE = "qtvirtualkeyboard";
++      QT_VIRTUALKEYBOARD_STYLE = "watch";
++      QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
++      RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
++      QML2_IMPORT_PATH = "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml:${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml";
++      QT_PLUGIN_PATH = "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins";
++      # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
++      QT_ENABLE_HIGHDPI_SCALING = "0";
++    };
++
++    # Wayland compositor and watchface launcher user service (runs under user session)
++    # Upstream reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher/asteroid-launcher.service
++    systemd.user.services.asteroid-launcher = {
++      description = "AsteroidOS Wayland Compositor and Launcher";
++      wantedBy = [ "default.target" ];
++      environment = {
++        QT_IM_MODULE = "qtvirtualkeyboard";
++        QT_VIRTUALKEYBOARD_STYLE = "watch";
++        QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
++        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
++        QT_QPA_PLATFORM = lib.mkDefault "linuxfb:fb=/dev/fb0";
++      }
++      // config.environment.variables;
++      serviceConfig = {
++        ExecStart = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher $LIPSTICK_OPTIONS -plugin evdevtouch --systemd";
++        Restart = "always";
++        RestartSec = "2s";
++      };
++    };
++
++    # AsteroidOS Bluetooth synchronization daemon service
++    systemd.services.asteroid-btsyncd = {
++      description = "AsteroidOS Bluetooth Sync Daemon";
++      after = [ "bluetooth.service" ];
++      wants = [ "bluetooth.service" ];
++      wantedBy = [ "multi-user.target" ];
++      serviceConfig = {
++        ExecStart = "${pkgs.asteroid.asteroid-btsyncd}/bin/asteroid-btsyncd";
++        Restart = "always";
++        RestartSec = "5s";
++      };
++    };
++  };
++}
+diff --git a/examples/asteroid/configuration.nix b/examples/asteroid/configuration.nix
+new file mode 100644
+index 00000000..781f4217
+--- /dev/null
++++ b/examples/asteroid/configuration.nix
+@@ -0,0 +1,37 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  defaultUserName = "ceres";
++in
++{
++  imports = [
++    ./asteroid-desktop.nix
++    ../common-configuration.nix
++  ];
++
++  config = {
++    users.users."${defaultUserName}" = {
++      isNormalUser = true;
++      uid = 1000;
++      linger = true;
++      password = "1234";
++      extraGroups = [
++        "audio"
++        "bluetooth"
++        "dialout"
++        "input"
++        "networkmanager"
++        "systemd-journal"
++        "video"
++        "wheel"
++      ];
++    };
++
++    services.asteroid-desktop.enable = true;
++  };
++}
+diff --git a/examples/asteroid/default.nix b/examples/asteroid/default.nix
+new file mode 100644
+index 00000000..5eca754f
+--- /dev/null
++++ b/examples/asteroid/default.nix
+@@ -0,0 +1,15 @@
++# Ensure CLI passes down arguments
++{ ... }@args:
++
++import ../../lib/eval-with-configuration.nix (
++  args
++  // {
++    configuration = [ (import ./configuration.nix) ];
++    additionalHelpInstructions = { device }: ''
++      You can build the `-A outputs.default` attribute to build the AsteroidOS
++      smartwatch image for your watch:
++
++       $ nix-build examples/asteroid --argstr device ${device} -A outputs.default
++    '';
++  }
++)

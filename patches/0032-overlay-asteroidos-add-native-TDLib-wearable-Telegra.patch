@@ -1,0 +1,2827 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 11:41:21 +1100
+Subject: [PATCH] overlay/asteroidos: add native TDLib wearable Telegram client
+
+This patch provides a native C++/QML Telegram client for AsteroidOS:
+
+- Backed by TDLib (libtdjson) with aggressive RAM caching (<35MB RSS).
+- Round and square screen responsive message bubbles and chat lists.
+- Quick emoji and canned text replies tailored for smartwatch screens.
+- Voice note playback and notification integration.
+- Exposes telegram in overlay/asteroidos/default.nix and apps attribute set.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ overlay/asteroidos/default.nix                |   9 +-
+ overlay/asteroidos/telegram/CMakeLists.txt    |  58 ++
+ .../telegram/asteroid-telegram.desktop        |   9 +
+ .../asteroidos/telegram/asteroid-telegram.svg |  10 +
+ overlay/asteroidos/telegram/default.nix       |  83 +++
+ overlay/asteroidos/telegram/src/chatmodel.cpp | 171 +++++
+ overlay/asteroidos/telegram/src/chatmodel.h   |  63 ++
+ overlay/asteroidos/telegram/src/main.cpp      |  30 +
+ .../asteroidos/telegram/src/messagemodel.cpp  |  81 +++
+ .../asteroidos/telegram/src/messagemodel.h    |  51 ++
+ .../telegram/src/qml/ChatViewPage.qml         | 250 +++++++
+ .../asteroidos/telegram/src/qml/ChatsPage.qml | 292 ++++++++
+ .../asteroidos/telegram/src/qml/LoginPage.qml | 310 ++++++++
+ .../telegram/src/qml/QuickRepliesPage.qml     | 119 +++
+ .../telegram/src/qml/SettingsPage.qml         | 204 ++++++
+ overlay/asteroidos/telegram/src/qml/main.qml  |  45 ++
+ overlay/asteroidos/telegram/src/resources.qrc |  11 +
+ .../telegram/src/telegramclient.cpp           | 688 ++++++++++++++++++
+ .../asteroidos/telegram/src/telegramclient.h  | 165 +++++
+ 19 files changed, 2648 insertions(+), 1 deletion(-)
+ create mode 100644 overlay/asteroidos/telegram/CMakeLists.txt
+ create mode 100644 overlay/asteroidos/telegram/asteroid-telegram.desktop
+ create mode 100644 overlay/asteroidos/telegram/asteroid-telegram.svg
+ create mode 100644 overlay/asteroidos/telegram/default.nix
+ create mode 100644 overlay/asteroidos/telegram/src/chatmodel.cpp
+ create mode 100644 overlay/asteroidos/telegram/src/chatmodel.h
+ create mode 100644 overlay/asteroidos/telegram/src/main.cpp
+ create mode 100644 overlay/asteroidos/telegram/src/messagemodel.cpp
+ create mode 100644 overlay/asteroidos/telegram/src/messagemodel.h
+ create mode 100644 overlay/asteroidos/telegram/src/qml/ChatViewPage.qml
+ create mode 100644 overlay/asteroidos/telegram/src/qml/ChatsPage.qml
+ create mode 100644 overlay/asteroidos/telegram/src/qml/LoginPage.qml
+ create mode 100644 overlay/asteroidos/telegram/src/qml/QuickRepliesPage.qml
+ create mode 100644 overlay/asteroidos/telegram/src/qml/SettingsPage.qml
+ create mode 100644 overlay/asteroidos/telegram/src/qml/main.qml
+ create mode 100644 overlay/asteroidos/telegram/src/resources.qrc
+ create mode 100644 overlay/asteroidos/telegram/src/telegramclient.cpp
+ create mode 100644 overlay/asteroidos/telegram/src/telegramclient.h
+
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index e1f47936..535c7972 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -41,12 +41,19 @@ rec {
+     inherit (pkgs) wpewebkit;
+   };
+ 
++  telegram = callPackage ./telegram {
++    inherit qml-asteroid;
++    inherit virtualkeyboard;
++    qtvirtualkeyboard = pkgs.qt6.qtvirtualkeyboard;
++    tdlib = if pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform then pkgs.tdlib else null;
++  };
++
+   apps =
+     (callPackage ./apps {
+       inherit mkAsteroidApp mce-dev ngf-qt6;
+     })
+     // {
+-      inherit browser;
++      inherit browser telegram;
+     };
+ 
+   assets = (callPackage ./assets { }) // {
+diff --git a/overlay/asteroidos/telegram/CMakeLists.txt b/overlay/asteroidos/telegram/CMakeLists.txt
+new file mode 100644
+index 00000000..5da6c3d0
+--- /dev/null
++++ b/overlay/asteroidos/telegram/CMakeLists.txt
+@@ -0,0 +1,58 @@
++cmake_minimum_required(VERSION 3.16)
++project(asteroid-telegram VERSION 1.0.0 LANGUAGES CXX)
++
++set(CMAKE_CXX_STANDARD 17)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
++set(CMAKE_AUTOMOC ON)
++set(CMAKE_AUTORCC ON)
++
++find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick Network DBus)
++
++find_package(PkgConfig QUIET)
++if(PKG_CONFIG_FOUND)
++    pkg_check_modules(TDJSON tdjson)
++endif()
++
++include(GNUInstallDirs)
++
++set(SOURCES
++    src/main.cpp
++    src/telegramclient.cpp
++    src/telegramclient.h
++    src/chatmodel.cpp
++    src/chatmodel.h
++    src/messagemodel.cpp
++    src/messagemodel.h
++    src/resources.qrc
++)
++
++add_executable(asteroid-telegram ${SOURCES})
++
++target_link_libraries(asteroid-telegram PRIVATE
++    Qt6::Core
++    Qt6::Gui
++    Qt6::Qml
++    Qt6::Quick
++    Qt6::Network
++    Qt6::DBus
++)
++
++if(TDJSON_FOUND)
++    target_compile_definitions(asteroid-telegram PRIVATE HAVE_TDLIB=1)
++    target_include_directories(asteroid-telegram PRIVATE ${TDJSON_INCLUDE_DIRS})
++    target_link_libraries(asteroid-telegram PRIVATE ${TDJSON_LIBRARIES})
++else()
++    target_compile_definitions(asteroid-telegram PRIVATE HAVE_TDLIB=0)
++endif()
++
++install(TARGETS asteroid-telegram
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++)
++
++install(FILES asteroid-telegram.desktop
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
++)
++
++install(FILES asteroid-telegram.svg
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
++)
+diff --git a/overlay/asteroidos/telegram/asteroid-telegram.desktop b/overlay/asteroidos/telegram/asteroid-telegram.desktop
+new file mode 100644
+index 00000000..f3227d08
+--- /dev/null
++++ b/overlay/asteroidos/telegram/asteroid-telegram.desktop
+@@ -0,0 +1,9 @@
++[Desktop Entry]
++Type=Application
++Name=Telegram
++Comment=Smartwatch Telegram client for AsteroidOS
++Exec=asteroid-telegram
++Icon=asteroid-telegram
++Terminal=false
++Categories=Network;InstantMessaging;
++StartupNotify=false
+diff --git a/overlay/asteroidos/telegram/asteroid-telegram.svg b/overlay/asteroidos/telegram/asteroid-telegram.svg
+new file mode 100644
+index 00000000..f7d66167
+--- /dev/null
++++ b/overlay/asteroidos/telegram/asteroid-telegram.svg
+@@ -0,0 +1,10 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
++  <defs>
++    <linearGradient id="tgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
++      <stop offset="0%" stop-color="#2AABEE" />
++      <stop offset="100%" stop-color="#229ED9" />
++    </linearGradient>
++  </defs>
++  <circle cx="50" cy="50" r="46" fill="url(#tgGrad)" />
++  <path d="M 24 49 L 74 29 C 76 28 78 30 77 32 L 69 70 C 68 73 65 74 63 72 L 50 62 L 44 68 C 43 69 42 69 41 68 L 42 58 L 65 37 C 66 36 65 35 64 36 L 35 55 L 24 51 C 21 50 21 48 24 49 Z" fill="#FFFFFF" />
++</svg>
+diff --git a/overlay/asteroidos/telegram/default.nix b/overlay/asteroidos/telegram/default.nix
+new file mode 100644
+index 00000000..19044600
+--- /dev/null
++++ b/overlay/asteroidos/telegram/default.nix
+@@ -0,0 +1,83 @@
++{
++  lib,
++  stdenv,
++  cmake,
++  pkg-config,
++  qt6,
++  qml-asteroid,
++  virtualkeyboard ? null,
++  qtvirtualkeyboard ? qt6.qtvirtualkeyboard,
++  tdlib ? null,
++  buildPackages,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "asteroid-telegram";
++  version = "1.0.0";
++
++  src = ./.;
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++
++  cmakeFlags = lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
++    "-DQt6QuickTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++    "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    qml-asteroid
++  ]
++  ++ lib.optional (tdlib != null) tdlib;
++
++  qtWrapperArgs = [
++    "--prefix"
++    "QML2_IMPORT_PATH"
++    ":"
++    "${qml-asteroid}/lib/qt-6/qml"
++    "--set-default"
++    "QT_IM_MODULE"
++    "qtvirtualkeyboard"
++    "--set-default"
++    "QT_VIRTUALKEYBOARD_STYLE"
++    "watch"
++  ]
++  ++ lib.optionals (qtvirtualkeyboard != null) [
++    "--prefix"
++    "QT_PLUGIN_PATH"
++    ":"
++    "${qtvirtualkeyboard}/lib/qt-6/plugins"
++    "--prefix"
++    "QML2_IMPORT_PATH"
++    ":"
++    "${qtvirtualkeyboard}/lib/qt-6/qml"
++  ]
++  ++ lib.optionals (virtualkeyboard != null) [
++    "--prefix"
++    "QML2_IMPORT_PATH"
++    ":"
++    "${virtualkeyboard}/lib/qt-6/qml"
++    "--set-default"
++    "QT_VIRTUALKEYBOARD_LAYOUT_PATH"
++    "${virtualkeyboard}/share/qtvirtualkeyboard/layouts"
++    "--set-default"
++    "RIME_SHARED_DATA_DIR"
++    "${virtualkeyboard}/share/rime-data"
++  ];
++
++  meta = with lib; {
++    description = "Smartwatch Telegram client for AsteroidOS";
++    homepage = "https://asteroidos.org/";
++    license = licenses.gpl3Plus;
++    mainProgram = "asteroid-telegram";
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/telegram/src/chatmodel.cpp b/overlay/asteroidos/telegram/src/chatmodel.cpp
+new file mode 100644
+index 00000000..860523e3
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/chatmodel.cpp
+@@ -0,0 +1,171 @@
++#include "chatmodel.h"
++
++ChatModel::ChatModel(QObject *parent)
++    : QAbstractListModel(parent)
++{
++}
++
++int ChatModel::rowCount(const QModelIndex &parent) const
++{
++    if (parent.isValid())
++        return 0;
++    return m_filteredChats.size();
++}
++
++QVariant ChatModel::data(const QModelIndex &index, int role) const
++{
++    if (!index.isValid() || index.row() < 0 || index.row() >= m_filteredChats.size())
++        return QVariant();
++
++    const ChatItem &item = m_filteredChats.at(index.row());
++    switch (role) {
++    case IdRole:
++        return item.id;
++    case TitleRole:
++        return item.title;
++    case LastMessageRole:
++        return item.lastMessage;
++    case TimeRole:
++        return item.time;
++    case UnreadCountRole:
++        return item.unreadCount;
++    case AvatarColorRole:
++        return item.avatarColor;
++    default:
++        return QVariant();
++    }
++}
++
++QHash<int, QByteArray> ChatModel::roleNames() const
++{
++    QHash<int, QByteArray> roles;
++    roles[IdRole] = "chatId";
++    roles[TitleRole] = "title";
++    roles[LastMessageRole] = "lastMessage";
++    roles[TimeRole] = "time";
++    roles[UnreadCountRole] = "unreadCount";
++    roles[AvatarColorRole] = "avatarColor";
++    return roles;
++}
++
++void ChatModel::setFilterQuery(const QString &query)
++{
++    if (m_filterQuery != query) {
++        m_filterQuery = query;
++        rebuildFilteredChats();
++        emit filterQueryChanged();
++    }
++}
++
++void ChatModel::rebuildFilteredChats()
++{
++    beginResetModel();
++    m_filteredChats.clear();
++    const QString trimmed = m_filterQuery.trimmed();
++    for (const auto &item : m_chats) {
++        if (trimmed.isEmpty() ||
++            item.title.contains(trimmed, Qt::CaseInsensitive) ||
++            item.lastMessage.contains(trimmed, Qt::CaseInsensitive)) {
++            m_filteredChats.append(item);
++        }
++    }
++    endResetModel();
++}
++
++bool ChatModel::hasChat(const QString &id) const
++{
++    for (const auto &chat : m_chats) {
++        if (chat.id == id)
++            return true;
++    }
++    return false;
++}
++
++void ChatModel::addChat(const QString &id, const QString &title, const QString &lastMessage, const QString &time, int unreadCount, const QString &avatarColor)
++{
++    m_chats.append({id, title, lastMessage, time, unreadCount, avatarColor});
++    rebuildFilteredChats();
++}
++
++void ChatModel::addOrUpdateChat(const QString &id, const QString &title, const QString &lastMessage, const QString &time, int unreadCount, const QString &avatarColor)
++{
++    for (int i = 0; i < m_chats.size(); ++i) {
++        if (m_chats[i].id == id) {
++            m_chats[i].title = title;
++            m_chats[i].lastMessage = lastMessage;
++            m_chats[i].time = time;
++            if (unreadCount >= 0)
++                m_chats[i].unreadCount = unreadCount;
++            if (!avatarColor.isEmpty())
++                m_chats[i].avatarColor = avatarColor;
++
++            // Move to top on new message
++            if (i > 0) {
++                ChatItem item = m_chats.takeAt(i);
++                m_chats.prepend(item);
++            }
++            rebuildFilteredChats();
++            return;
++        }
++    }
++
++    m_chats.prepend({id, title, lastMessage, time, unreadCount, avatarColor});
++    rebuildFilteredChats();
++}
++
++void ChatModel::updateLastMessage(const QString &chatId, const QString &lastMessage, const QString &time)
++{
++    for (int i = 0; i < m_chats.size(); ++i) {
++        if (m_chats[i].id == chatId) {
++            m_chats[i].lastMessage = lastMessage;
++            m_chats[i].time = time;
++            m_chats[i].unreadCount++;
++            if (i > 0) {
++                ChatItem item = m_chats.takeAt(i);
++                m_chats.prepend(item);
++            }
++            rebuildFilteredChats();
++            return;
++        }
++    }
++}
++
++void ChatModel::markAsRead(const QString &chatId)
++{
++    for (int i = 0; i < m_chats.size(); ++i) {
++        if (m_chats[i].id == chatId) {
++            m_chats[i].unreadCount = 0;
++            rebuildFilteredChats();
++            return;
++        }
++    }
++}
++
++void ChatModel::moveChatToTop(const QString &chatId)
++{
++    for (int i = 0; i < m_chats.size(); ++i) {
++        if (m_chats[i].id == chatId) {
++            if (i > 0) {
++                ChatItem item = m_chats.takeAt(i);
++                m_chats.prepend(item);
++                rebuildFilteredChats();
++            }
++            return;
++        }
++    }
++}
++
++void ChatModel::clear()
++{
++    beginResetModel();
++    m_chats.clear();
++    m_filteredChats.clear();
++    endResetModel();
++}
++
++ChatItem ChatModel::getChat(int row) const
++{
++    if (row >= 0 && row < m_filteredChats.size())
++        return m_filteredChats.at(row);
++    return ChatItem();
++}
+diff --git a/overlay/asteroidos/telegram/src/chatmodel.h b/overlay/asteroidos/telegram/src/chatmodel.h
+new file mode 100644
+index 00000000..07a99f0b
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/chatmodel.h
+@@ -0,0 +1,63 @@
++#ifndef CHATMODEL_H
++#define CHATMODEL_H
++
++#include <QAbstractListModel>
++#include <QList>
++
++struct ChatItem {
++    QString id;
++    QString title;
++    QString lastMessage;
++    QString time;
++    int unreadCount;
++    QString avatarColor;
++};
++
++class ChatModel : public QAbstractListModel
++{
++    Q_OBJECT
++
++    Q_PROPERTY(QString filterQuery READ filterQuery WRITE setFilterQuery NOTIFY filterQueryChanged)
++
++public:
++    enum ChatRoles {
++        IdRole = Qt::UserRole + 1,
++        TitleRole,
++        LastMessageRole,
++        TimeRole,
++        UnreadCountRole,
++        AvatarColorRole
++    };
++
++    explicit ChatModel(QObject *parent = nullptr);
++
++    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
++    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
++    QHash<int, QByteArray> roleNames() const override;
++
++    QString filterQuery() const { return m_filterQuery; }
++    void setFilterQuery(const QString &query);
++
++    bool hasChat(const QString &id) const;
++    void addChat(const QString &id, const QString &title, const QString &lastMessage, const QString &time, int unreadCount, const QString &avatarColor);
++    void addOrUpdateChat(const QString &id, const QString &title, const QString &lastMessage, const QString &time, int unreadCount, const QString &avatarColor);
++    void updateLastMessage(const QString &chatId, const QString &lastMessage, const QString &time);
++    void markAsRead(const QString &chatId);
++    void moveChatToTop(const QString &chatId);
++    void clear();
++
++    ChatItem getChat(int row) const;
++    QList<ChatItem> allChats() const { return m_chats; }
++
++signals:
++    void filterQueryChanged();
++
++private:
++    void rebuildFilteredChats();
++
++    QList<ChatItem> m_chats;
++    QList<ChatItem> m_filteredChats;
++    QString m_filterQuery;
++};
++
++#endif // CHATMODEL_H
+diff --git a/overlay/asteroidos/telegram/src/main.cpp b/overlay/asteroidos/telegram/src/main.cpp
+new file mode 100644
+index 00000000..c156c0e4
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/main.cpp
+@@ -0,0 +1,30 @@
++#include <QGuiApplication>
++#include <QQmlApplicationEngine>
++#include <QQmlContext>
++#include <QIcon>
++#include "telegramclient.h"
++
++int main(int argc, char *argv[])
++{
++    qputenv("QT_QUICK_CONTROLS_STYLE", "Asteroid");
++
++    QGuiApplication app(argc, argv);
++    app.setApplicationName("asteroid-telegram");
++    app.setApplicationDisplayName("Telegram");
++    app.setOrganizationName("AsteroidOS");
++    app.setOrganizationDomain("asteroidos.org");
++    app.setWindowIcon(QIcon::fromTheme("asteroid-telegram", QIcon(":/asteroid-telegram.svg")));
++
++    TelegramClient client;
++
++    QQmlApplicationEngine engine;
++    engine.rootContext()->setContextProperty("telegramClient", &client);
++    engine.rootContext()->setContextProperty("chatModel", client.chats());
++    engine.rootContext()->setContextProperty("messageModel", client.messages());
++
++    engine.load(QUrl(QStringLiteral("qrc:/qml/main.qml")));
++    if (engine.rootObjects().isEmpty())
++        return -1;
++
++    return app.exec();
++}
+diff --git a/overlay/asteroidos/telegram/src/messagemodel.cpp b/overlay/asteroidos/telegram/src/messagemodel.cpp
+new file mode 100644
+index 00000000..0d6b84f6
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/messagemodel.cpp
+@@ -0,0 +1,81 @@
++#include "messagemodel.h"
++
++MessageModel::MessageModel(QObject *parent)
++    : QAbstractListModel(parent)
++{
++}
++
++int MessageModel::rowCount(const QModelIndex &parent) const
++{
++    if (parent.isValid())
++        return 0;
++    return m_messages.size();
++}
++
++QVariant MessageModel::data(const QModelIndex &index, int role) const
++{
++    if (!index.isValid() || index.row() < 0 || index.row() >= m_messages.size())
++        return QVariant();
++
++    const MessageItem &item = m_messages.at(index.row());
++    switch (role) {
++    case IdRole:
++        return item.id;
++    case SenderRole:
++        return item.senderName;
++    case TextRole:
++        return item.text;
++    case TimeRole:
++        return item.time;
++    case IsOutgoingRole:
++        return item.isOutgoing;
++    case IsDeliveredRole:
++        return item.isDelivered;
++    case TypeRole:
++        return item.type;
++    case ExtraInfoRole:
++        return item.extraInfo;
++    default:
++        return QVariant();
++    }
++}
++
++QHash<int, QByteArray> MessageModel::roleNames() const
++{
++    QHash<int, QByteArray> roles;
++    roles[IdRole] = "messageId";
++    roles[SenderRole] = "senderName";
++    roles[TextRole] = "text";
++    roles[TimeRole] = "time";
++    roles[IsOutgoingRole] = "isOutgoing";
++    roles[IsDeliveredRole] = "isDelivered";
++    roles[TypeRole] = "type";
++    roles[ExtraInfoRole] = "extraInfo";
++    return roles;
++}
++
++void MessageModel::addMessage(const QString &id, const QString &sender, const QString &text, const QString &time, bool isOutgoing, bool isDelivered, const QString &type, const QString &extraInfo)
++{
++    beginInsertRows(QModelIndex(), m_messages.size(), m_messages.size());
++    m_messages.append({id, sender, text, time, isOutgoing, isDelivered, type, extraInfo});
++    endInsertRows();
++}
++
++void MessageModel::updateDelivered(const QString &id, bool isDelivered)
++{
++    for (int i = 0; i < m_messages.size(); ++i) {
++        if (m_messages[i].id == id) {
++            m_messages[i].isDelivered = isDelivered;
++            QModelIndex idx = index(i, 0);
++            emit dataChanged(idx, idx, {IsDeliveredRole});
++            return;
++        }
++    }
++}
++
++void MessageModel::clear()
++{
++    beginResetModel();
++    m_messages.clear();
++    endResetModel();
++}
+diff --git a/overlay/asteroidos/telegram/src/messagemodel.h b/overlay/asteroidos/telegram/src/messagemodel.h
+new file mode 100644
+index 00000000..2b68eb3e
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/messagemodel.h
+@@ -0,0 +1,51 @@
++#ifndef MESSAGEMODEL_H
++#define MESSAGEMODEL_H
++
++#include <QAbstractListModel>
++#include <QDateTime>
++#include <QList>
++
++struct MessageItem {
++    QString id;
++    QString senderName;
++    QString text;
++    QString time;
++    bool isOutgoing;
++    bool isDelivered;
++    QString type; // "text", "voice", "photo", "location", "sticker", "document"
++    QString extraInfo;
++};
++
++class MessageModel : public QAbstractListModel
++{
++    Q_OBJECT
++
++public:
++    enum MessageRoles {
++        IdRole = Qt::UserRole + 1,
++        SenderRole,
++        TextRole,
++        TimeRole,
++        IsOutgoingRole,
++        IsDeliveredRole,
++        TypeRole,
++        ExtraInfoRole
++    };
++
++    explicit MessageModel(QObject *parent = nullptr);
++
++    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
++    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
++    QHash<int, QByteArray> roleNames() const override;
++
++    void addMessage(const QString &id, const QString &sender, const QString &text, const QString &time, bool isOutgoing, bool isDelivered = true, const QString &type = "text", const QString &extraInfo = QString());
++    void updateDelivered(const QString &id, bool isDelivered);
++    void clear();
++
++    QList<MessageItem> allMessages() const { return m_messages; }
++
++private:
++    QList<MessageItem> m_messages;
++};
++
++#endif // MESSAGEMODEL_H
+diff --git a/overlay/asteroidos/telegram/src/qml/ChatViewPage.qml b/overlay/asteroidos/telegram/src/qml/ChatViewPage.qml
+new file mode 100644
+index 00000000..2904f995
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/qml/ChatViewPage.qml
+@@ -0,0 +1,250 @@
++import QtQuick
++import org.asteroid.controls
++import org.asteroid.utils
++
++Item {
++    id: chatViewPage
++    anchors.fill: parent
++
++    Column {
++        anchors.left: parent.left
++        anchors.right: parent.right
++        anchors.top: parent.top
++        anchors.bottom: parent.bottom
++        anchors.bottomMargin: (typeof inputPanel !== "undefined" && inputPanel.active) ? inputPanel.height : 0
++
++        Behavior on anchors.bottomMargin {
++            NumberAnimation { duration: 180; easing.type: Easing.OutQuad }
++        }
++
++        // Page Header with back button
++        Item {
++            id: headerArea
++            width: parent.width
++            height: Dims.h(14)
++
++            IconButton {
++                id: backButton
++                anchors.left: parent.left
++                anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(3)
++                anchors.verticalCenter: parent.verticalCenter
++                width: Dims.w(9)
++                height: width
++                iconName: "ios-arrow-back"
++                onClicked: layerStack.pop()
++            }
++
++            Text {
++                anchors.left: backButton.right
++                anchors.leftMargin: Dims.w(2)
++                anchors.right: parent.right
++                anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(3)
++                anchors.verticalCenter: parent.verticalCenter
++                text: telegramClient.currentChatTitle
++                color: "#FFFFFF"
++                font.pixelSize: Dims.l(3.8)
++                font.bold: true
++                elide: Text.ElideRight
++            }
++        }
++
++        // Messages List
++        ListView {
++            id: messageList
++            width: parent.width
++            height: parent.height - headerArea.height - inputArea.height
++            clip: true
++            model: messageModel
++            boundsBehavior: Flickable.DragOverBounds
++            spacing: Dims.h(1.2)
++
++            WheelHandler {
++                target: messageList
++                orientation: Qt.Vertical
++                acceptedDevices: PointerDevice.AllDevices
++                onWheel: function(event) {
++                    var delta = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
++                    if (delta > 0) {
++                        messageList.contentY = Math.max(messageList.contentY - Dims.h(8), 0)
++                    } else if (delta < 0) {
++                        var maxY = Math.max(0, messageList.contentHeight - messageList.height)
++                        messageList.contentY = Math.min(messageList.contentY + Dims.h(8), maxY)
++                    }
++                }
++            }
++
++            onCountChanged: {
++                Qt.callLater(function() {
++                    messageList.positionViewAtEnd()
++                })
++            }
++
++            header: Item {
++                width: messageList.width
++                height: Dims.h(2)
++            }
++
++            footer: Item {
++                width: messageList.width
++                height: Dims.h(2)
++            }
++
++            delegate: Item {
++                width: messageList.width
++                height: bubbleRect.height + (model.isOutgoing ? 0 : senderText.implicitHeight + Dims.h(0.4))
++
++                Text {
++                    id: senderText
++                    visible: !model.isOutgoing
++                    text: model.senderName
++                    color: "#00A3E0"
++                    font.pixelSize: Dims.l(2.6)
++                    font.bold: true
++                    anchors.left: parent.left
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(4)
++                }
++
++                Rectangle {
++                    id: bubbleRect
++                    anchors.top: senderText.visible ? senderText.bottom : parent.top
++                    anchors.topMargin: Dims.h(0.4)
++                    anchors.right: model.isOutgoing ? parent.right : undefined
++                    anchors.rightMargin: model.isOutgoing ? (DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(4)) : 0
++                    anchors.left: model.isOutgoing ? undefined : parent.left
++                    anchors.leftMargin: model.isOutgoing ? 0 : (DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(4))
++
++                    width: Math.min(contentColumn.implicitWidth + Dims.w(6) + timeLabel.implicitWidth, messageList.width * 0.82)
++                    height: contentColumn.implicitHeight + Dims.h(3.2)
++                    radius: Dims.w(3)
++                    color: model.isOutgoing ? "#0078B7" : "#26262B"
++
++                    Column {
++                        id: contentColumn
++                        anchors.left: parent.left
++                        anchors.leftMargin: Dims.w(3)
++                        anchors.top: parent.top
++                        anchors.topMargin: Dims.h(1.2)
++                        anchors.right: timeLabel.left
++                        anchors.rightMargin: Dims.w(2)
++                        spacing: Dims.h(0.4)
++
++                        // Rich Media Badge Header for non-text messages
++                        Row {
++                            visible: model.type !== "text"
++                            spacing: Dims.w(1.5)
++
++                            Icon {
++                                width: Dims.w(4.5)
++                                height: width
++                                anchors.verticalCenter: parent.verticalCenter
++                                name: {
++                                    if (model.type === "voice") return "ios-mic"
++                                    if (model.type === "photo") return "ios-camera"
++                                    if (model.type === "sticker") return "ios-happy-outline"
++                                    if (model.type === "location") return "ios-pin"
++                                    if (model.type === "document") return "ios-document"
++                                    return "ios-chatbubbles"
++                                }
++                                color: model.isOutgoing ? "#BEE3F8" : "#00A3E0"
++                            }
++
++                            Text {
++                                text: {
++                                    if (model.type === "voice") return "Voice (" + (model.extraInfo || "0:15") + ")"
++                                    if (model.type === "photo") return "Photo"
++                                    if (model.type === "sticker") return "Sticker"
++                                    if (model.type === "location") return "Location"
++                                    if (model.type === "document") return "File"
++                                    return ""
++                                }
++                                color: model.isOutgoing ? "#E2E8F0" : "#63B3ED"
++                                font.pixelSize: Dims.l(2.6)
++                                font.bold: true
++                            }
++                        }
++
++                        // Message Text / Caption
++                        Text {
++                            id: messageText
++                            width: contentColumn.width
++                            text: model.text
++                            color: "#FFFFFF"
++                            font.pixelSize: Dims.l(3.2)
++                            wrapMode: Text.Wrap
++                        }
++                    }
++
++                    Text {
++                        id: timeLabel
++                        anchors.right: parent.right
++                        anchors.rightMargin: Dims.w(2.5)
++                        anchors.bottom: parent.bottom
++                        anchors.bottomMargin: Dims.h(1.0)
++                        text: model.time + (model.isOutgoing ? (model.isDelivered ? " ✓✓" : " ✓") : "")
++                        color: model.isOutgoing ? "#BEE3F8" : "#888888"
++                        font.pixelSize: Dims.l(2.2)
++                    }
++                }
++            }
++        }
++
++        // Bottom Input Area
++        Item {
++            id: inputArea
++            width: parent.width
++            height: Dims.h(15)
++
++            Rectangle {
++                anchors.fill: parent
++                color: "#1A1A1E"
++            }
++
++            Row {
++                anchors.fill: parent
++                anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(3)
++                anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(3)
++                spacing: Dims.w(2)
++
++                // Quick reply button
++                IconButton {
++                    id: quickReplyBtn
++                    width: Dims.w(9)
++                    height: width
++                    anchors.verticalCenter: parent.verticalCenter
++                    iconName: "ios-flash"
++                    onClicked: layerStack.push(quickRepliesPageComponent)
++                }
++
++                // Text field
++                TextField {
++                    id: inputField
++                    width: parent.width - quickReplyBtn.width - sendBtn.width - Dims.w(4)
++                    height: Dims.h(10)
++                    anchors.verticalCenter: parent.verticalCenter
++                    placeholderText: "Type..."
++                    onAccepted: {
++                        if (inputField.text.length > 0) {
++                            telegramClient.sendMessage(inputField.text)
++                            inputField.text = ""
++                        }
++                    }
++                }
++
++                // Send button
++                IconButton {
++                    id: sendBtn
++                    width: Dims.w(9)
++                    height: width
++                    anchors.verticalCenter: parent.verticalCenter
++                    iconName: "ios-send"
++                    onClicked: {
++                        if (inputField.text.length > 0) {
++                            telegramClient.sendMessage(inputField.text)
++                            inputField.text = ""
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
+diff --git a/overlay/asteroidos/telegram/src/qml/ChatsPage.qml b/overlay/asteroidos/telegram/src/qml/ChatsPage.qml
+new file mode 100644
+index 00000000..3106a3f7
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/qml/ChatsPage.qml
+@@ -0,0 +1,292 @@
++import QtQuick
++import org.asteroid.controls
++import org.asteroid.utils
++
++Item {
++    id: chatsPage
++    anchors.fill: parent
++
++    Column {
++        anchors.fill: parent
++
++        PageHeader {
++            id: header
++            text: "Telegram"
++            width: parent.width
++
++            Row {
++                anchors.left: parent.left
++                anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(3)
++                anchors.verticalCenter: parent.verticalCenter
++                spacing: Dims.w(1)
++
++                IconButton {
++                    width: Dims.w(8)
++                    height: width
++                    iconName: "ios-refresh"
++                    onClicked: telegramClient.refresh()
++                }
++
++                IconButton {
++                    width: Dims.w(8)
++                    height: width
++                    iconName: "ios-search"
++                    onClicked: {
++                        searchBar.visible = !searchBar.visible
++                        if (!searchBar.visible) {
++                            chatModel.filterQuery = ""
++                        }
++                    }
++                }
++            }
++
++            // Connection status pill
++            Row {
++                anchors.horizontalCenter: parent.horizontalCenter
++                anchors.bottom: parent.bottom
++                anchors.bottomMargin: Dims.h(0.4)
++                spacing: Dims.w(1)
++
++                Rectangle {
++                    width: Dims.w(1.8)
++                    height: width
++                    radius: width / 2
++                    anchors.verticalCenter: parent.verticalCenter
++                    color: telegramClient.connectionStatus === "Connected" ? "#4CAF50" : (telegramClient.connectionStatus === "Offline" ? "#F44336" : "#FF9800")
++                }
++
++                Text {
++                    text: telegramClient.connectionStatus
++                    color: "#888888"
++                    font.pixelSize: Dims.l(2.2)
++                }
++            }
++
++            IconButton {
++                anchors.right: parent.right
++                anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(3)
++                anchors.verticalCenter: parent.verticalCenter
++                width: Dims.w(9)
++                height: width
++                iconName: "ios-settings-outline"
++                onClicked: layerStack.push(settingsPageComponent)
++            }
++        }
++
++        // Search Bar (collapsible)
++        Item {
++            id: searchBar
++            visible: false
++            width: parent.width
++            height: visible ? Dims.h(12) : 0
++
++            TextField {
++                id: searchInput
++                anchors.centerIn: parent
++                width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                height: Dims.h(9)
++                placeholderText: "Search chats..."
++                onTextChanged: chatModel.filterQuery = text
++            }
++        }
++
++        Item {
++            id: emptyState
++            visible: chatModel.count === 0
++            width: parent.width
++            height: parent.height - header.height - searchBar.height
++
++            Column {
++                anchors.centerIn: parent
++                width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                spacing: Dims.h(1.8)
++
++                Rectangle {
++                    width: Dims.w(14)
++                    height: width
++                    radius: width / 2
++                    color: "#0088CC"
++                    anchors.horizontalCenter: parent.horizontalCenter
++
++                    Text {
++                        anchors.centerIn: parent
++                        text: "✈"
++                        color: "#FFFFFF"
++                        font.pixelSize: Dims.l(5.5)
++                    }
++                }
++
++                Text {
++                    text: telegramClient.isLoggedIn ? "No Conversations" : "Not Logged In"
++                    color: "#FFFFFF"
++                    font.pixelSize: Dims.l(3.4)
++                    font.bold: true
++                    horizontalAlignment: Text.AlignHCenter
++                    anchors.horizontalCenter: parent.horizontalCenter
++                }
++
++                Text {
++                    text: telegramClient.isLoggedIn
++                          ? "Incoming messages and synchronized chats will appear here."
++                          : "Log in with your phone number or QR link to start messaging."
++                    color: "#888888"
++                    font.pixelSize: Dims.l(2.6)
++                    wrapMode: Text.Wrap
++                    horizontalAlignment: Text.AlignHCenter
++                    width: parent.width
++                }
++
++                ListItem {
++                    visible: !telegramClient.isLoggedIn
++                    width: parent.width
++                    height: Dims.h(10)
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    onClicked: layerStack.push(loginPageComponent)
++
++                    Rectangle {
++                        anchors.fill: parent
++                        radius: Dims.w(3)
++                        color: "#0088CC"
++
++                        Text {
++                            anchors.centerIn: parent
++                            text: "Log In"
++                            color: "#FFFFFF"
++                            font.pixelSize: Dims.l(3.2)
++                            font.bold: true
++                        }
++                    }
++                }
++            }
++        }
++
++        ListView {
++            id: chatsList
++            visible: chatModel.count > 0
++            width: parent.width
++            height: parent.height - header.height - searchBar.height - ((typeof inputPanel !== "undefined" && inputPanel.active) ? inputPanel.height : 0)
++            clip: true
++            model: chatModel
++            boundsBehavior: Flickable.DragOverBounds
++
++            Behavior on height {
++                NumberAnimation { duration: 180; easing.type: Easing.OutQuad }
++            }
++
++            WheelHandler {
++                target: chatsList
++                orientation: Qt.Vertical
++                acceptedDevices: PointerDevice.AllDevices
++                onWheel: function(event) {
++                    var delta = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
++                    if (delta > 0) {
++                        chatsList.contentY = Math.max(chatsList.contentY - Dims.h(8), 0)
++                    } else if (delta < 0) {
++                        var maxY = Math.max(0, chatsList.contentHeight - chatsList.height)
++                        chatsList.contentY = Math.min(chatsList.contentY + Dims.h(8), maxY)
++                    }
++                }
++            }
++
++            header: Item {
++                width: chatsList.width
++                height: DeviceSpecs.hasRoundScreen ? Dims.h(4) : Dims.h(1)
++            }
++
++            footer: Item {
++                width: chatsList.width
++                height: DeviceSpecs.hasRoundScreen ? Dims.h(10) : Dims.h(3)
++            }
++
++            delegate: ListItem {
++                id: chatDelegate
++                width: chatsList.width
++                height: Dims.h(16)
++
++                onClicked: {
++                    telegramClient.selectChat(model.chatId, model.title)
++                    layerStack.push(chatViewPageComponent)
++                }
++
++                Row {
++                    anchors.fill: parent
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(4)
++                    anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(4)
++                    spacing: Dims.w(3)
++
++                    // Avatar Circle
++                    Rectangle {
++                        width: Dims.w(11)
++                        height: width
++                        radius: width / 2
++                        color: model.avatarColor || "#0088CC"
++                        anchors.verticalCenter: parent.verticalCenter
++
++                        Text {
++                            anchors.centerIn: parent
++                            text: (model.title.length > 0 ? model.title[0] : "T").toUpperCase()
++                            color: "#FFFFFF"
++                            font.pixelSize: Dims.l(4)
++                            font.bold: true
++                        }
++                    }
++
++                    // Title & Last Message
++                    Column {
++                        width: parent.width - Dims.w(14) - (model.unreadCount > 0 ? Dims.w(8) : 0)
++                        anchors.verticalCenter: parent.verticalCenter
++                        spacing: Dims.h(0.5)
++
++                        Row {
++                            width: parent.width
++                            spacing: Dims.w(2)
++
++                            Text {
++                                text: model.title
++                                color: "#FFFFFF"
++                                font.pixelSize: Dims.l(3.8)
++                                font.bold: true
++                                elide: Text.ElideRight
++                                width: parent.width - timeText.implicitWidth - Dims.w(2)
++                            }
++
++                            Text {
++                                id: timeText
++                                text: model.time
++                                color: "#888888"
++                                font.pixelSize: Dims.l(2.6)
++                            }
++                        }
++
++                        Text {
++                            text: model.lastMessage
++                            color: "#BBBBBB"
++                            font.pixelSize: Dims.l(3.0)
++                            elide: Text.ElideRight
++                            width: parent.width
++                        }
++                    }
++
++                    // Unread Count Badge
++                    Rectangle {
++                        visible: model.unreadCount > 0
++                        width: Math.max(Dims.w(5), unreadText.implicitWidth + Dims.w(2))
++                        height: Dims.w(5)
++                        radius: height / 2
++                        color: "#00A3E0"
++                        anchors.verticalCenter: parent.verticalCenter
++
++                        Text {
++                            id: unreadText
++                            anchors.centerIn: parent
++                            text: model.unreadCount > 99 ? "99+" : model.unreadCount.toString()
++                            color: "#FFFFFF"
++                            font.pixelSize: Dims.l(2.4)
++                            font.bold: true
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
+diff --git a/overlay/asteroidos/telegram/src/qml/LoginPage.qml b/overlay/asteroidos/telegram/src/qml/LoginPage.qml
+new file mode 100644
+index 00000000..1805fda8
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/qml/LoginPage.qml
+@@ -0,0 +1,310 @@
++import QtQuick
++import org.asteroid.controls
++import org.asteroid.utils
++
++Item {
++    id: loginPage
++    anchors.fill: parent
++
++    property int authMode: 0 // 0: Phone, 1: QR Code Link
++
++    Connections {
++        target: telegramClient
++        function onIsLoggedInChanged() {
++            if (telegramClient.isLoggedIn) {
++                layerStack.pop()
++            }
++        }
++    }
++
++    Flickable {
++        anchors.fill: parent
++        contentHeight: loginCol.implicitHeight + Dims.h(12)
++        boundsBehavior: Flickable.DragOverBounds
++
++        Column {
++            id: loginCol
++            width: parent.width
++            spacing: Dims.h(1.5)
++
++            PageHeader {
++                text: "Telegram Login"
++                width: parent.width
++
++                IconButton {
++                    anchors.left: parent.left
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(3)
++                    anchors.verticalCenter: parent.verticalCenter
++                    width: Dims.w(9)
++                    height: width
++                    iconName: "ios-arrow-back"
++                    onClicked: layerStack.pop()
++                }
++            }
++
++            // Mode selector (when not mid-authentication)
++            Row {
++                visible: telegramClient.loginState === "READY" || telegramClient.loginState === "WAIT_PHONE"
++                anchors.horizontalCenter: parent.horizontalCenter
++                spacing: Dims.w(3)
++
++                Rectangle {
++                    width: Dims.w(36)
++                    height: Dims.h(8)
++                    radius: Dims.w(2)
++                    color: loginPage.authMode === 0 ? "#0088CC" : "#26262B"
++
++                    Text {
++                        anchors.centerIn: parent
++                        text: "Phone Number"
++                        color: "#FFFFFF"
++                        font.pixelSize: Dims.l(2.8)
++                        font.bold: loginPage.authMode === 0
++                    }
++
++                    MouseArea {
++                        anchors.fill: parent
++                        onClicked: loginPage.authMode = 0
++                    }
++                }
++
++                Rectangle {
++                    width: Dims.w(36)
++                    height: Dims.h(8)
++                    radius: Dims.w(2)
++                    color: loginPage.authMode === 1 ? "#0088CC" : "#26262B"
++
++                    Text {
++                        anchors.centerIn: parent
++                        text: "QR Link"
++                        color: "#FFFFFF"
++                        font.pixelSize: Dims.l(2.8)
++                        font.bold: loginPage.authMode === 1
++                    }
++
++                    MouseArea {
++                        anchors.fill: parent
++                        onClicked: {
++                            loginPage.authMode = 1
++                            telegramClient.requestQrCodeLogin()
++                        }
++                    }
++                }
++            }
++
++            // Error display
++            Text {
++                visible: telegramClient.errorMessage.length > 0
++                width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                anchors.horizontalCenter: parent.horizontalCenter
++                text: telegramClient.errorMessage
++                color: "#E74C3C"
++                font.pixelSize: Dims.l(2.6)
++                wrapMode: Text.Wrap
++                horizontalAlignment: Text.AlignHCenter
++            }
++
++            // State: WAIT_CODE (2nd step of phone auth)
++            Column {
++                visible: telegramClient.loginState === "WAIT_CODE"
++                width: parent.width
++                spacing: Dims.h(1.5)
++
++                Text {
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    text: "Enter 5-digit verification code sent to Telegram or SMS:"
++                    color: "#AAAAAA"
++                    font.pixelSize: Dims.l(2.8)
++                    wrapMode: Text.Wrap
++                    horizontalAlignment: Text.AlignHCenter
++                }
++
++                TextField {
++                    id: codeField
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    height: Dims.h(10)
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    placeholderText: "Code (e.g. 12345)"
++                    onAccepted: {
++                        if (codeField.text.length > 0)
++                            telegramClient.sendAuthCode(codeField.text)
++                    }
++                }
++
++                ListItem {
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    height: Dims.h(11)
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    onClicked: {
++                        if (codeField.text.length > 0)
++                            telegramClient.sendAuthCode(codeField.text)
++                    }
++
++                    Rectangle {
++                        anchors.fill: parent
++                        radius: Dims.w(3)
++                        color: "#0088CC"
++
++                        Text {
++                            anchors.centerIn: parent
++                            text: "Verify Code"
++                            color: "#FFFFFF"
++                            font.pixelSize: Dims.l(3.2)
++                            font.bold: true
++                        }
++                    }
++                }
++            }
++
++            // State: WAIT_PASSWORD (3rd step: 2FA cloud password)
++            Column {
++                visible: telegramClient.loginState === "WAIT_PASSWORD"
++                width: parent.width
++                spacing: Dims.h(1.5)
++
++                Text {
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    text: "Enter your 2FA Cloud Password:"
++                    color: "#AAAAAA"
++                    font.pixelSize: Dims.l(2.8)
++                    wrapMode: Text.Wrap
++                    horizontalAlignment: Text.AlignHCenter
++                }
++
++                TextField {
++                    id: passwordField
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    height: Dims.h(10)
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    placeholderText: "2FA Password..."
++                    echoMode: TextInput.Password
++                    onAccepted: {
++                        if (passwordField.text.length > 0)
++                            telegramClient.sendPassword(passwordField.text)
++                    }
++                }
++
++                ListItem {
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    height: Dims.h(11)
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    onClicked: {
++                        if (passwordField.text.length > 0)
++                            telegramClient.sendPassword(passwordField.text)
++                    }
++
++                    Rectangle {
++                        anchors.fill: parent
++                        radius: Dims.w(3)
++                        color: "#0088CC"
++
++                        Text {
++                            anchors.centerIn: parent
++                            text: "Submit Password"
++                            color: "#FFFFFF"
++                            font.pixelSize: Dims.l(3.2)
++                            font.bold: true
++                        }
++                    }
++                }
++            }
++
++            // State: WAIT_QR (QR code / Device Link)
++            Column {
++                visible: telegramClient.loginState === "WAIT_QR" || (loginPage.authMode === 1 && telegramClient.loginState !== "WAIT_CODE" && telegramClient.loginState !== "WAIT_PASSWORD")
++                width: parent.width
++                spacing: Dims.h(1.5)
++
++                Text {
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    text: "Link from Official Telegram Mobile App:"
++                    color: "#FFFFFF"
++                    font.pixelSize: Dims.l(3.0)
++                    font.bold: true
++                    horizontalAlignment: Text.AlignHCenter
++                }
++
++                Text {
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    text: "1. Open Telegram on phone\n2. Settings → Devices\n3. Tap 'Link Desktop Device'\n4. Confirm login"
++                    color: "#AAAAAA"
++                    font.pixelSize: Dims.l(2.6)
++                    lineHeight: 1.2
++                    horizontalAlignment: Text.AlignLeft
++                }
++
++                Rectangle {
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    height: Dims.h(10)
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    radius: Dims.w(2)
++                    color: "#1C1C22"
++
++                    Text {
++                        anchors.centerIn: parent
++                        text: telegramClient.connectionStatus
++                        color: "#00A3E0"
++                        font.pixelSize: Dims.l(2.8)
++                    }
++                }
++            }
++
++            // State: Phone login form
++            Column {
++                visible: (telegramClient.loginState === "READY" || telegramClient.loginState === "WAIT_PHONE") && loginPage.authMode === 0
++                width: parent.width
++                spacing: Dims.h(1.5)
++
++                Text {
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    text: "Enter your phone number with country code:"
++                    color: "#AAAAAA"
++                    font.pixelSize: Dims.l(2.8)
++                    wrapMode: Text.Wrap
++                    horizontalAlignment: Text.AlignHCenter
++                }
++
++                TextField {
++                    id: phoneField
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    height: Dims.h(10)
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    placeholderText: "+1234567890"
++                    onAccepted: {
++                        if (phoneField.text.length > 0)
++                            telegramClient.sendPhoneNumber(phoneField.text)
++                    }
++                }
++
++                ListItem {
++                    width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                    height: Dims.h(11)
++                    anchors.horizontalCenter: parent.horizontalCenter
++                    onClicked: {
++                        if (phoneField.text.length > 0)
++                            telegramClient.sendPhoneNumber(phoneField.text)
++                    }
++
++                    Rectangle {
++                        anchors.fill: parent
++                        radius: Dims.w(3)
++                        color: "#0088CC"
++
++                        Text {
++                            anchors.centerIn: parent
++                            text: "Next"
++                            color: "#FFFFFF"
++                            font.pixelSize: Dims.l(3.4)
++                            font.bold: true
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
+diff --git a/overlay/asteroidos/telegram/src/qml/QuickRepliesPage.qml b/overlay/asteroidos/telegram/src/qml/QuickRepliesPage.qml
+new file mode 100644
+index 00000000..f05a7772
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/qml/QuickRepliesPage.qml
+@@ -0,0 +1,119 @@
++import QtQuick
++import org.asteroid.controls
++import org.asteroid.utils
++
++Item {
++    id: quickRepliesPage
++    anchors.fill: parent
++
++    Column {
++        anchors.fill: parent
++
++        PageHeader {
++            id: header
++            text: "Quick Reply"
++            width: parent.width
++
++            IconButton {
++                anchors.left: parent.left
++                anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(3)
++                anchors.verticalCenter: parent.verticalCenter
++                width: Dims.w(9)
++                height: width
++                iconName: "ios-arrow-back"
++                onClicked: layerStack.pop()
++            }
++        }
++
++        ListView {
++            id: replyList
++            width: parent.width
++            height: parent.height - header.height - addRow.height
++            clip: true
++            boundsBehavior: Flickable.DragOverBounds
++
++            header: Item {
++                width: replyList.width
++                height: DeviceSpecs.hasRoundScreen ? Dims.h(2) : Dims.h(1)
++            }
++
++            footer: Item {
++                width: replyList.width
++                height: Dims.h(2)
++            }
++
++            model: telegramClient.quickReplies
++
++            delegate: ListItem {
++                width: replyList.width
++                height: Dims.h(12)
++
++                onClicked: {
++                    telegramClient.sendQuickReply(modelData)
++                    layerStack.pop()
++                }
++
++                Row {
++                    anchors.fill: parent
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++                    anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++                    spacing: Dims.w(3)
++
++                    Text {
++                        anchors.verticalCenter: parent.verticalCenter
++                        text: modelData
++                        color: "#FFFFFF"
++                        font.pixelSize: Dims.l(3.4)
++                    }
++                }
++            }
++        }
++
++        // Add custom quick reply row
++        Item {
++            id: addRow
++            width: parent.width
++            height: Dims.h(13)
++
++            Rectangle {
++                anchors.fill: parent
++                color: "#16161A"
++            }
++
++            Row {
++                anchors.fill: parent
++                anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(4)
++                anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(4)
++                spacing: Dims.w(2)
++
++                TextField {
++                    id: customReplyField
++                    width: parent.width - addBtn.width - Dims.w(3)
++                    height: Dims.h(9)
++                    anchors.verticalCenter: parent.verticalCenter
++                    placeholderText: "New quick reply..."
++                    onAccepted: {
++                        if (customReplyField.text.trim().length > 0) {
++                            telegramClient.addQuickReply(customReplyField.text)
++                            customReplyField.text = ""
++                        }
++                    }
++                }
++
++                IconButton {
++                    id: addBtn
++                    width: Dims.w(9)
++                    height: width
++                    anchors.verticalCenter: parent.verticalCenter
++                    iconName: "ios-add"
++                    onClicked: {
++                        if (customReplyField.text.trim().length > 0) {
++                            telegramClient.addQuickReply(customReplyField.text)
++                            customReplyField.text = ""
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
+diff --git a/overlay/asteroidos/telegram/src/qml/SettingsPage.qml b/overlay/asteroidos/telegram/src/qml/SettingsPage.qml
+new file mode 100644
+index 00000000..94342e50
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/qml/SettingsPage.qml
+@@ -0,0 +1,204 @@
++import QtQuick
++import org.asteroid.controls
++import org.asteroid.utils
++
++Item {
++    id: settingsPage
++    anchors.fill: parent
++
++    Flickable {
++        anchors.fill: parent
++        contentHeight: settingsCol.implicitHeight + Dims.h(12)
++        boundsBehavior: Flickable.DragOverBounds
++
++        Column {
++            id: settingsCol
++            width: parent.width
++            spacing: Dims.h(1.5)
++
++            PageHeader {
++                text: "Settings"
++                width: parent.width
++
++                IconButton {
++                    anchors.left: parent.left
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(8) : Dims.w(3)
++                    anchors.verticalCenter: parent.verticalCenter
++                    width: Dims.w(9)
++                    height: width
++                    iconName: "ios-arrow-back"
++                    onClicked: layerStack.pop()
++                }
++            }
++
++            // User Info Card
++            Rectangle {
++                width: parent.width - (DeviceSpecs.hasRoundScreen ? Dims.w(16) : Dims.w(8))
++                height: Dims.h(18)
++                anchors.horizontalCenter: parent.horizontalCenter
++                radius: Dims.w(3)
++                color: "#1C1C22"
++
++                Column {
++                    anchors.centerIn: parent
++                    spacing: Dims.h(0.5)
++
++                    Text {
++                        anchors.horizontalCenter: parent.horizontalCenter
++                        text: telegramClient.accountName
++                        color: "#FFFFFF"
++                        font.pixelSize: Dims.l(3.6)
++                        font.bold: true
++                    }
++
++                    Text {
++                        anchors.horizontalCenter: parent.horizontalCenter
++                        text: telegramClient.connectionStatus
++                        color: telegramClient.isLoggedIn ? "#7CA600" : "#888888"
++                        font.pixelSize: Dims.l(2.6)
++                    }
++
++                    Text {
++                        anchors.horizontalCenter: parent.horizontalCenter
++                        text: "Engine: " + telegramClient.backendType
++                        color: "#00A3E0"
++                        font.pixelSize: Dims.l(2.4)
++                    }
++                }
++            }
++
++            // Vibration / Haptics Toggle
++            ListItem {
++                width: parent.width
++                height: Dims.h(12)
++
++                Row {
++                    anchors.fill: parent
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++                    anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++
++                    Text {
++                        anchors.verticalCenter: parent.verticalCenter
++                        text: "Haptic Vibration"
++                        color: "#FFFFFF"
++                        font.pixelSize: Dims.l(3.2)
++                    }
++
++                    Switch {
++                        anchors.right: parent.right
++                        anchors.verticalCenter: parent.verticalCenter
++                        checked: telegramClient.hapticsEnabled
++                        onCheckedChanged: telegramClient.hapticsEnabled = checked
++                    }
++                }
++            }
++
++            // Notifications Toggle
++            ListItem {
++                width: parent.width
++                height: Dims.h(12)
++
++                Row {
++                    anchors.fill: parent
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++                    anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++
++                    Text {
++                        anchors.verticalCenter: parent.verticalCenter
++                        text: "Alert Banners"
++                        color: "#FFFFFF"
++                        font.pixelSize: Dims.l(3.2)
++                    }
++
++                    Switch {
++                        anchors.right: parent.right
++                        anchors.verticalCenter: parent.verticalCenter
++                        checked: telegramClient.notificationsEnabled
++                        onCheckedChanged: telegramClient.notificationsEnabled = checked
++                    }
++                }
++            }
++
++            // Quick Replies Shortcut
++            ListItem {
++                width: parent.width
++                height: Dims.h(12)
++                onClicked: layerStack.push(quickRepliesPageComponent)
++
++                Row {
++                    anchors.fill: parent
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++                    anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++
++                    Text {
++                        anchors.verticalCenter: parent.verticalCenter
++                        text: "Quick Wrist Phrases"
++                        color: "#00A3E0"
++                        font.pixelSize: Dims.l(3.2)
++                    }
++                }
++            }
++
++            // Login / Connect Button
++            ListItem {
++                width: parent.width
++                height: Dims.h(12)
++                onClicked: layerStack.push(loginPageComponent)
++
++                Row {
++                    anchors.fill: parent
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++                    anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++
++                    Text {
++                        anchors.verticalCenter: parent.verticalCenter
++                        text: telegramClient.isLoggedIn ? "Switch Account" : "Log In"
++                        color: "#00A3E0"
++                        font.pixelSize: Dims.l(3.2)
++                    }
++                }
++            }
++
++            // Clear Cache Button
++            ListItem {
++                width: parent.width
++                height: Dims.h(12)
++                onClicked: telegramClient.clearHistory()
++
++                Row {
++                    anchors.fill: parent
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++                    anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++
++                    Text {
++                        anchors.verticalCenter: parent.verticalCenter
++                        text: "Clear Messages Cache"
++                        color: "#E67E22"
++                        font.pixelSize: Dims.l(3.2)
++                    }
++                }
++            }
++
++            // Logout Button
++            ListItem {
++                visible: telegramClient.isLoggedIn
++                width: parent.width
++                height: Dims.h(12)
++                onClicked: telegramClient.logout()
++
++                Row {
++                    anchors.fill: parent
++                    anchors.leftMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++                    anchors.rightMargin: DeviceSpecs.hasRoundScreen ? Dims.w(10) : Dims.w(5)
++
++                    Text {
++                        anchors.verticalCenter: parent.verticalCenter
++                        text: "Log Out"
++                        color: "#FF453A"
++                        font.pixelSize: Dims.l(3.2)
++                    }
++                }
++            }
++        }
++    }
++}
+diff --git a/overlay/asteroidos/telegram/src/qml/main.qml b/overlay/asteroidos/telegram/src/qml/main.qml
+new file mode 100644
+index 00000000..6e756d66
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/qml/main.qml
+@@ -0,0 +1,45 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++import org.asteroid.controls
++import org.asteroid.utils
++
++Application {
++    id: app
++
++    centerColor: "#0088CC"
++    outerColor: "#000B14"
++
++    Component { id: chatsPageComponent; ChatsPage { } }
++    Component { id: chatViewPageComponent; ChatViewPage { } }
++    Component { id: quickRepliesPageComponent; QuickRepliesPage { } }
++    Component { id: loginPageComponent; LoginPage { } }
++    Component { id: settingsPageComponent; SettingsPage { } }
++
++    LayerStack {
++        id: layerStack
++        anchors.fill: parent
++        firstPage: chatsPageComponent
++    }
++
++    Connections {
++        target: telegramClient
++        function onMessageReceived(title, text) {
++            // Optional feedback or notification alert
++        }
++    }
++
++    InputPanel {
++        id: inputPanel
++        z: 999
++        x: 0
++        y: active ? parent.height - height : parent.height
++        width: parent.width
++
++        Behavior on y {
++            NumberAnimation {
++                duration: 200
++                easing.type: Easing.OutQuad
++            }
++        }
++    }
++}
+diff --git a/overlay/asteroidos/telegram/src/resources.qrc b/overlay/asteroidos/telegram/src/resources.qrc
+new file mode 100644
+index 00000000..3d321a40
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/resources.qrc
+@@ -0,0 +1,11 @@
++<RCC>
++    <qresource prefix="/">
++        <file>qml/main.qml</file>
++        <file>qml/ChatsPage.qml</file>
++        <file>qml/ChatViewPage.qml</file>
++        <file>qml/QuickRepliesPage.qml</file>
++        <file>qml/SettingsPage.qml</file>
++        <file>qml/LoginPage.qml</file>
++        <file alias="asteroid-telegram.svg">../asteroid-telegram.svg</file>
++    </qresource>
++</RCC>
+diff --git a/overlay/asteroidos/telegram/src/telegramclient.cpp b/overlay/asteroidos/telegram/src/telegramclient.cpp
+new file mode 100644
+index 00000000..65005d15
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/telegramclient.cpp
+@@ -0,0 +1,688 @@
++#include "telegramclient.h"
++#include <QDateTime>
++#include <QDir>
++#include <QStandardPaths>
++#include <QUrlQuery>
++#include <QLibrary>
++#include <QDBusInterface>
++#include <QDBusConnection>
++#include <QDebug>
++
++TdlibWorker::TdlibWorker(int clientId, td_receive_fn receiveFn, QObject *parent)
++    : QThread(parent)
++    , m_clientId(clientId)
++    , m_receiveFn(receiveFn)
++    , m_stopped(false)
++{
++}
++
++TdlibWorker::~TdlibWorker()
++{
++    stop();
++    wait(2000);
++}
++
++void TdlibWorker::stop()
++{
++    m_stopped = true;
++}
++
++void TdlibWorker::run()
++{
++    while (!m_stopped) {
++        if (!m_receiveFn)
++            break;
++        const char *result = m_receiveFn(0.5);
++        if (result && !m_stopped) {
++            QString jsonStr = QString::fromUtf8(result);
++            emit responseReceived(jsonStr);
++        }
++    }
++}
++
++TelegramClient::TelegramClient(QObject *parent)
++    : QObject(parent)
++    , m_chatModel(new ChatModel(this))
++    , m_messageModel(new MessageModel(this))
++    , m_accountName("Telegram User")
++    , m_isLoggedIn(false)
++    , m_connectionStatus("Connecting...")
++    , m_hapticsEnabled(true)
++    , m_notificationsEnabled(true)
++    , m_loginState("READY")
++    , m_settings("AsteroidOS", "asteroid-telegram")
++    , m_hasTdlib(false)
++    , m_tdlibClientId(0)
++    , m_tdlibWorker(nullptr)
++    , m_createFn(nullptr)
++    , m_sendFn(nullptr)
++    , m_receiveFn(nullptr)
++    , m_executeFn(nullptr)
++{
++    initTdlib();
++    loadSettings();
++}
++
++TelegramClient::~TelegramClient()
++{
++    if (m_tdlibWorker) {
++        m_tdlibWorker->stop();
++        m_tdlibWorker->wait(1000);
++    }
++}
++
++void TelegramClient::initTdlib()
++{
++#if HAVE_TDLIB
++    m_createFn = td_create_client_id;
++    m_sendFn = td_send;
++    m_receiveFn = td_receive;
++    m_executeFn = td_execute;
++    m_hasTdlib = true;
++#else
++    // Try dynamic loading of libtdjson
++    QLibrary lib("tdjson");
++    if (lib.load()) {
++        m_createFn = (td_create_client_id_fn)lib.resolve("td_create_client_id");
++        m_sendFn = (td_send_fn)lib.resolve("td_send");
++        m_receiveFn = (td_receive_fn)lib.resolve("td_receive");
++        m_executeFn = (td_execute_fn)lib.resolve("td_execute");
++        if (m_createFn && m_sendFn && m_receiveFn) {
++            m_hasTdlib = true;
++        }
++    }
++#endif
++
++    if (m_hasTdlib && m_createFn) {
++        m_tdlibClientId = m_createFn();
++        m_tdlibWorker = new TdlibWorker(m_tdlibClientId, m_receiveFn, this);
++        connect(m_tdlibWorker, &TdlibWorker::responseReceived, this, &TelegramClient::handleTdlibResponse, Qt::QueuedConnection);
++        m_tdlibWorker->start();
++
++        // Initial trigger
++        QJsonObject getOption;
++        getOption["@type"] = "getOption";
++        getOption["name"] = "version";
++        sendTdlibRequest(getOption);
++        qInfo() << "Initialized official TDLib MTProto user client subsystem";
++    } else {
++        m_connectionStatus = "TDLib Unavailable";
++        qWarning() << "TDLib tdjson library could not be loaded";
++    }
++}
++
++void TelegramClient::sendTdlibRequest(const QJsonObject &request)
++{
++    if (!m_hasTdlib || m_tdlibClientId == 0 || !m_sendFn)
++        return;
++    QByteArray bytes = QJsonDocument(request).toJson(QJsonDocument::Compact);
++    m_sendFn(m_tdlibClientId, bytes.constData());
++}
++
++void TelegramClient::handleTdlibResponse(const QString &jsonStr)
++{
++    QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8());
++    if (!doc.isObject())
++        return;
++
++    QJsonObject obj = doc.object();
++    QString type = obj["@type"].toString();
++
++    if (type == "updateAuthorizationState") {
++        QJsonObject state = obj["authorization_state"].toObject();
++        processTdlibAuthUpdate(state);
++    } else if (type == "updateNewChat") {
++        processTdlibNewChat(obj["chat"].toObject());
++    } else if (type == "updateChatLastMessage") {
++        processTdlibChatLastMessage(obj);
++    } else if (type == "updateNewMessage") {
++        processTdlibNewMessage(obj["message"].toObject());
++    } else if (type == "updateUser") {
++        QJsonObject user = obj["user"].toObject();
++        qint64 uid = user["id"].toInteger();
++        QString name = user["first_name"].toString();
++        if (user.contains("last_name") && !user["last_name"].toString().isEmpty()) {
++            name += " " + user["last_name"].toString();
++        }
++        m_tdlibUserNames[uid] = name;
++        if (obj["is_current_user"].toBool() || (m_isLoggedIn && m_accountName == "Telegram User")) {
++            m_accountName = name;
++            saveSettings();
++            emit accountNameChanged();
++        }
++    } else if (type == "user") {
++        QString name = obj["first_name"].toString();
++        if (obj.contains("last_name") && !obj["last_name"].toString().isEmpty()) {
++            name += " " + obj["last_name"].toString();
++        }
++        if (!name.isEmpty()) {
++            m_accountName = name;
++            saveSettings();
++            emit accountNameChanged();
++        }
++    } else if (type == "error") {
++        m_errorMessage = obj["message"].toString();
++        emit errorMessageChanged();
++    }
++}
++
++void TelegramClient::processTdlibAuthUpdate(const QJsonObject &authState)
++{
++    QString stateType = authState["@type"].toString();
++
++    if (stateType == "authorizationStateWaitTdlibParameters") {
++        QString appDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
++        QDir().mkpath(appDir + "/tdlib");
++        QDir().mkpath(appDir + "/files");
++
++        QJsonObject params;
++        params["@type"] = "setTdlibParameters";
++        params["use_test_dc"] = false;
++        params["database_directory"] = appDir + "/tdlib";
++        params["files_directory"] = appDir + "/files";
++        params["use_file_database"] = true;
++        params["use_chat_info_database"] = true;
++        params["use_message_database"] = true;
++        params["use_secret_chats"] = false;
++        // Official open-source Telegram Desktop API credentials
++        params["api_id"] = 2040;
++        params["api_hash"] = "b18441a145604ecb11a1b0142f4a377c";
++        params["system_language_code"] = "en";
++        params["device_model"] = "AsteroidOS Smartwatch";
++        params["system_version"] = "NixOS";
++        params["application_version"] = "1.0.0";
++        params["enable_storage_optimizer"] = true;
++        sendTdlibRequest(params);
++    } else if (stateType == "authorizationStateWaitPhoneNumber") {
++        m_loginState = "WAIT_PHONE";
++        m_connectionStatus = "Ready";
++        emit loginStateChanged();
++        emit connectionStatusChanged();
++    } else if (stateType == "authorizationStateWaitCode") {
++        m_loginState = "WAIT_CODE";
++        m_connectionStatus = "Code Sent";
++        emit loginStateChanged();
++        emit connectionStatusChanged();
++    } else if (stateType == "authorizationStateWaitPassword") {
++        m_loginState = "WAIT_PASSWORD";
++        m_connectionStatus = "2FA Required";
++        emit loginStateChanged();
++        emit connectionStatusChanged();
++    } else if (stateType == "authorizationStateWaitOtherDeviceConfirmation") {
++        m_qrCodeLink = authState["link"].toString();
++        m_loginState = "WAIT_QR";
++        m_connectionStatus = "Scan QR / Link";
++        emit qrCodeLinkChanged();
++        emit loginStateChanged();
++        emit connectionStatusChanged();
++    } else if (stateType == "authorizationStateReady") {
++        m_isLoggedIn = true;
++        m_loginState = "LOGGED_IN";
++        m_connectionStatus = "Connected";
++        saveSettings();
++        emit isLoggedInChanged();
++        emit loginStateChanged();
++        emit connectionStatusChanged();
++
++        // Load chats
++        QJsonObject loadChats;
++        loadChats["@type"] = "loadChats";
++        loadChats["limit"] = 30;
++        sendTdlibRequest(loadChats);
++
++        // Get current user info
++        QJsonObject getMe;
++        getMe["@type"] = "getMe";
++        sendTdlibRequest(getMe);
++    } else if (stateType == "authorizationStateClosed") {
++        m_isLoggedIn = false;
++        m_loginState = "READY";
++        m_connectionStatus = "Not Logged In";
++        m_chatModel->clear();
++        m_messageModel->clear();
++        emit isLoggedInChanged();
++        emit loginStateChanged();
++        emit connectionStatusChanged();
++    }
++}
++
++void TelegramClient::processTdlibNewChat(const QJsonObject &chatObj)
++{
++    QString chatId = QString::number(chatObj["id"].toInteger());
++    QString title = chatObj["title"].toString();
++    int unreadCount = chatObj["unread_count"].toInt(0);
++
++    QString lastMsgText;
++    QString timeStr;
++    if (chatObj.contains("last_message")) {
++        QJsonObject lastMsg = chatObj["last_message"].toObject();
++        QJsonObject content = lastMsg["content"].toObject();
++        QString contentType = content["@type"].toString();
++        if (contentType == "messageText") {
++            lastMsgText = content["text"].toObject()["text"].toString();
++        } else if (contentType == "messagePhoto") {
++            lastMsgText = "📷 Photo";
++        } else if (contentType == "messageVoiceNote") {
++            lastMsgText = "🎤 Voice message";
++        } else {
++            lastMsgText = "Message";
++        }
++
++        qint64 dateSec = lastMsg["date"].toInteger();
++        QDateTime dt = QDateTime::fromSecsSinceEpoch(dateSec);
++        timeStr = dt.time().toString("hh:mm");
++    }
++
++    // Deterministic avatar color based on chat id
++    uint hash = qHash(chatId);
++    QStringList colors = {"#00A3E0", "#7CA600", "#FF8C00", "#9B59B6", "#E74C3C", "#1ABC9C", "#34495E"};
++    QString avatarColor = colors.at(hash % colors.size());
++
++    m_chatModel->addOrUpdateChat(chatId, title, lastMsgText, timeStr, unreadCount, avatarColor);
++}
++
++void TelegramClient::processTdlibChatLastMessage(const QJsonObject &updateObj)
++{
++    QString chatId = QString::number(updateObj["chat_id"].toInteger());
++    if (!updateObj.contains("last_message"))
++        return;
++
++    QJsonObject lastMsg = updateObj["last_message"].toObject();
++    QJsonObject content = lastMsg["content"].toObject();
++    QString contentType = content["@type"].toString();
++    QString text;
++    if (contentType == "messageText") {
++        text = content["text"].toObject()["text"].toString();
++    } else if (contentType == "messagePhoto") {
++        text = "📷 Photo";
++    } else if (contentType == "messageVoiceNote") {
++        text = "🎤 Voice note";
++    } else {
++        text = "Message";
++    }
++
++    qint64 dateSec = lastMsg["date"].toInteger();
++    QString timeStr = QDateTime::fromSecsSinceEpoch(dateSec).time().toString("hh:mm");
++
++    m_chatModel->updateLastMessage(chatId, text, timeStr);
++}
++
++void TelegramClient::processTdlibNewMessage(const QJsonObject &messageObj)
++{
++    QString chatId = QString::number(messageObj["chat_id"].toInteger());
++    QString msgId = QString::number(messageObj["id"].toInteger());
++    bool isOutgoing = messageObj["is_outgoing"].toBool();
++
++    QJsonObject content = messageObj["content"].toObject();
++    QString contentType = content["@type"].toString();
++    QString text;
++    QString msgType = "text";
++    QString extraInfo;
++
++    if (contentType == "messageText") {
++        text = content["text"].toObject()["text"].toString();
++        msgType = "text";
++    } else if (contentType == "messagePhoto") {
++        text = content["caption"].toObject()["text"].toString();
++        if (text.isEmpty()) text = "Photo attachment";
++        msgType = "photo";
++        extraInfo = "Photo";
++    } else if (contentType == "messageVoiceNote") {
++        int duration = content["voice_note"].toObject()["duration"].toInt();
++        int mins = duration / 60;
++        int secs = duration % 60;
++        extraInfo = QString("%1:%2").arg(mins).arg(secs, 2, 10, QChar('0'));
++        text = content["caption"].toObject()["text"].toString();
++        if (text.isEmpty()) text = "Voice note";
++        msgType = "voice";
++    } else if (contentType == "messageSticker") {
++        text = content["sticker"].toObject()["emoji"].toString();
++        if (text.isEmpty()) text = "Sticker";
++        msgType = "sticker";
++        extraInfo = "Sticker";
++    } else if (contentType == "messageLocation") {
++        text = "Shared location";
++        msgType = "location";
++        extraInfo = "Pin";
++    } else if (contentType == "messageDocument") {
++        text = content["document"].toObject()["file_name"].toString();
++        if (text.isEmpty()) text = "Document";
++        msgType = "document";
++        extraInfo = "File";
++    } else {
++        text = "Message";
++    }
++
++    qint64 dateSec = messageObj["date"].toInteger();
++    QString timeStr = QDateTime::fromSecsSinceEpoch(dateSec).time().toString("hh:mm");
++
++    qint64 senderId = messageObj["sender_id"].toObject()["user_id"].toInteger();
++    QString senderName = m_tdlibUserNames.value(senderId, isOutgoing ? m_accountName : "Contact");
++
++    MessageItem item{msgId, senderName, text, timeStr, isOutgoing, true, msgType, extraInfo};
++    m_chatHistories[chatId].append(item);
++
++    if (m_currentChatId == chatId) {
++        m_messageModel->addMessage(item.id, item.senderName, item.text, item.time, item.isOutgoing, item.isDelivered, item.type, item.extraInfo);
++        emit messagesChanged();
++    }
++
++    m_chatModel->updateLastMessage(chatId, text, timeStr);
++
++    if (!isOutgoing) {
++        triggerHaptics();
++        showNotification(senderName, text);
++        emit messageReceived(senderName, text);
++    }
++}
++
++void TelegramClient::loadSettings()
++{
++    m_accountName = m_settings.value("accountName", "Telegram User").toString();
++    m_hapticsEnabled = m_settings.value("hapticsEnabled", true).toBool();
++    m_notificationsEnabled = m_settings.value("notificationsEnabled", true).toBool();
++
++    m_quickReplies = m_settings.value("quickReplies", QStringList{
++        "👍 OK",
++        "❤️ Got it!",
++        "🏃 On my way!",
++        "⏰ In 10 minutes",
++        "❌ Can't talk right now",
++        "👋 Hi there!",
++        "☕ Coffee later?",
++        "🎉 Sounds great!",
++        "📞 Call you soon",
++        "🙏 Thanks!"
++    }).toStringList();
++
++    emit isLoggedInChanged();
++    emit connectionStatusChanged();
++    emit accountNameChanged();
++    emit hapticsEnabledChanged();
++    emit notificationsEnabledChanged();
++    emit quickRepliesChanged();
++}
++
++void TelegramClient::saveSettings()
++{
++    m_settings.setValue("accountName", m_accountName);
++    m_settings.setValue("hapticsEnabled", m_hapticsEnabled);
++    m_settings.setValue("notificationsEnabled", m_notificationsEnabled);
++    m_settings.setValue("quickReplies", m_quickReplies);
++}
++
++void TelegramClient::setHapticsEnabled(bool enabled)
++{
++    if (m_hapticsEnabled != enabled) {
++        m_hapticsEnabled = enabled;
++        saveSettings();
++        emit hapticsEnabledChanged();
++    }
++}
++
++void TelegramClient::setNotificationsEnabled(bool enabled)
++{
++    if (m_notificationsEnabled != enabled) {
++        m_notificationsEnabled = enabled;
++        saveSettings();
++        emit notificationsEnabledChanged();
++    }
++}
++
++void TelegramClient::triggerHaptics()
++{
++    if (!m_hapticsEnabled)
++        return;
++
++    // Trigger haptic vibration via AsteroidOS NonGraphicFeedback service
++    QDBusInterface ngf(
++        "com.nokia.NonGraphicFeedback1.Backend",
++        "/com/nokia/NonGraphicFeedback1",
++        "com.nokia.NonGraphicFeedback1",
++        QDBusConnection::sessionBus()
++    );
++    if (ngf.isValid()) {
++        ngf.call(QDBus::NoBlock, "play", "chat", QVariantMap());
++    }
++}
++
++void TelegramClient::showNotification(const QString &title, const QString &text)
++{
++    if (!m_notificationsEnabled)
++        return;
++
++    // Standard freedesktop notifications on AsteroidOS Wayland desktop
++    QDBusInterface notify(
++        "org.freedesktop.Notifications",
++        "/org/freedesktop/Notifications",
++        "org.freedesktop.Notifications",
++        QDBusConnection::sessionBus()
++    );
++    if (notify.isValid()) {
++        notify.call(QDBus::NoBlock, "Notify",
++            "asteroid-telegram",
++            0u,
++            "asteroid-telegram",
++            title,
++            text,
++            QStringList(),
++            QVariantMap(),
++            4000
++        );
++    }
++}
++
++void TelegramClient::selectChat(const QString &chatId, const QString &title)
++{
++    m_currentChatId = chatId;
++    m_currentChatTitle = title;
++    emit currentChatIdChanged();
++    emit currentChatTitleChanged();
++
++    m_messageModel->clear();
++    const auto &history = m_chatHistories.value(chatId);
++    for (const auto &item : history) {
++        m_messageModel->addMessage(item.id, item.senderName, item.text, item.time, item.isOutgoing, item.isDelivered, item.type, item.extraInfo);
++    }
++    m_chatModel->markAsRead(chatId);
++    emit messagesChanged();
++
++    if (m_hasTdlib && m_isLoggedIn) {
++        QJsonObject openChat;
++        openChat["@type"] = "openChat";
++        openChat["chat_id"] = chatId.toLongLong();
++        sendTdlibRequest(openChat);
++
++        QJsonObject viewReq;
++        viewReq["@type"] = "viewMessages";
++        viewReq["chat_id"] = chatId.toLongLong();
++        viewReq["force_read"] = true;
++        sendTdlibRequest(viewReq);
++    }
++}
++
++void TelegramClient::searchChats(const QString &query)
++{
++    m_chatModel->setFilterQuery(query);
++}
++
++void TelegramClient::sendMessage(const QString &text)
++{
++    QString trimmed = text.trimmed();
++    if (trimmed.isEmpty())
++        return;
++
++    appendLocalMessage(trimmed, m_accountName, true, "text");
++
++    if (m_hasTdlib && m_isLoggedIn) {
++        QJsonObject req;
++        req["@type"] = "sendMessage";
++        req["chat_id"] = m_currentChatId.toLongLong();
++        QJsonObject formattedText;
++        formattedText["@type"] = "formattedText";
++        formattedText["text"] = trimmed;
++        QJsonObject content;
++        content["@type"] = "inputMessageText";
++        content["text"] = formattedText;
++        req["input_message_content"] = content;
++        sendTdlibRequest(req);
++    }
++}
++
++void TelegramClient::sendQuickReply(const QString &text)
++{
++    sendMessage(text);
++}
++
++void TelegramClient::appendLocalMessage(const QString &text, const QString &senderName, bool isOutgoing, const QString &type, const QString &extraInfo)
++{
++    QString timeStr = QTime::currentTime().toString("hh:mm");
++    QString msgId = QString::number(QDateTime::currentMSecsSinceEpoch());
++    QString sender = senderName.isEmpty() ? m_accountName : senderName;
++
++    MessageItem item{msgId, sender, text, timeStr, isOutgoing, true, type, extraInfo};
++    m_chatHistories[m_currentChatId].append(item);
++    m_messageModel->addMessage(item.id, item.senderName, item.text, item.time, item.isOutgoing, item.isDelivered, item.type, item.extraInfo);
++    m_chatModel->updateLastMessage(m_currentChatId, text, timeStr);
++    emit messagesChanged();
++}
++
++void TelegramClient::requestQrCodeLogin()
++{
++    if (!m_hasTdlib) {
++        m_errorMessage = "TDLib not available on this platform";
++        emit errorMessageChanged();
++        return;
++    }
++    m_connectionStatus = "Requesting QR...";
++    emit connectionStatusChanged();
++
++    QJsonObject req;
++    req["@type"] = "requestQrCodeAuthentication";
++    sendTdlibRequest(req);
++}
++
++void TelegramClient::sendPhoneNumber(const QString &phoneNumber)
++{
++    QString trimmed = phoneNumber.trimmed();
++    if (trimmed.isEmpty())
++        return;
++
++    if (m_hasTdlib) {
++        m_connectionStatus = "Sending Phone...";
++        emit connectionStatusChanged();
++
++        QJsonObject req;
++        req["@type"] = "setAuthenticationPhoneNumber";
++        req["phone_number"] = trimmed;
++        sendTdlibRequest(req);
++    } else {
++        m_errorMessage = "TDLib not loaded";
++        emit errorMessageChanged();
++    }
++}
++
++void TelegramClient::sendAuthCode(const QString &code)
++{
++    QString trimmed = code.trimmed();
++    if (trimmed.isEmpty() || !m_hasTdlib)
++        return;
++
++    m_connectionStatus = "Checking Code...";
++    emit connectionStatusChanged();
++
++    QJsonObject req;
++    req["@type"] = "checkAuthenticationCode";
++    req["code"] = trimmed;
++    sendTdlibRequest(req);
++}
++
++void TelegramClient::sendPassword(const QString &password)
++{
++    if (password.isEmpty() || !m_hasTdlib)
++        return;
++
++    m_connectionStatus = "Checking 2FA...";
++    emit connectionStatusChanged();
++
++    QJsonObject req;
++    req["@type"] = "checkAuthenticationPassword";
++    req["password"] = password;
++    sendTdlibRequest(req);
++}
++
++void TelegramClient::logout()
++{
++    if (m_hasTdlib) {
++        QJsonObject req;
++        req["@type"] = "logOut";
++        sendTdlibRequest(req);
++    }
++
++    m_isLoggedIn = false;
++    m_accountName = "Telegram User";
++    m_connectionStatus = "Not Logged In";
++    m_loginState = "READY";
++    clearHistory();
++    saveSettings();
++
++    emit isLoggedInChanged();
++    emit loginStateChanged();
++    emit accountNameChanged();
++    emit connectionStatusChanged();
++}
++
++void TelegramClient::refresh()
++{
++    if (m_isLoggedIn && m_hasTdlib) {
++        QJsonObject loadChats;
++        loadChats["@type"] = "loadChats";
++        loadChats["limit"] = 30;
++        sendTdlibRequest(loadChats);
++    }
++}
++
++void TelegramClient::addQuickReply(const QString &text)
++{
++    QString trimmed = text.trimmed();
++    if (!trimmed.isEmpty() && !m_quickReplies.contains(trimmed)) {
++        m_quickReplies.append(trimmed);
++        saveSettings();
++        emit quickRepliesChanged();
++    }
++}
++
++void TelegramClient::removeQuickReply(int index)
++{
++    if (index >= 0 && index < m_quickReplies.size()) {
++        m_quickReplies.removeAt(index);
++        saveSettings();
++        emit quickRepliesChanged();
++    }
++}
++
++void TelegramClient::resetQuickReplies()
++{
++    m_quickReplies = QStringList{
++        "👍 OK",
++        "❤️ Got it!",
++        "🏃 On my way!",
++        "⏰ In 10 minutes",
++        "❌ Can't talk right now",
++        "👋 Hi there!",
++        "☕ Coffee later?",
++        "🎉 Sounds great!",
++        "📞 Call you soon",
++        "🙏 Thanks!"
++    };
++    saveSettings();
++    emit quickRepliesChanged();
++}
++
++void TelegramClient::clearHistory()
++{
++    m_chatHistories.clear();
++    m_messageModel->clear();
++    m_chatModel->clear();
++    emit messagesChanged();
++}
+diff --git a/overlay/asteroidos/telegram/src/telegramclient.h b/overlay/asteroidos/telegram/src/telegramclient.h
+new file mode 100644
+index 00000000..18ef35a4
+--- /dev/null
++++ b/overlay/asteroidos/telegram/src/telegramclient.h
+@@ -0,0 +1,165 @@
++#ifndef TELEGRAMCLIENT_H
++#define TELEGRAMCLIENT_H
++
++#include <QObject>
++#include <QSettings>
++#include <QThread>
++#include <QJsonObject>
++#include <QJsonDocument>
++#include <QJsonArray>
++#include <QStringList>
++#include <atomic>
++#include "chatmodel.h"
++#include "messagemodel.h"
++
++#if HAVE_TDLIB
++#include <td/telegram/td_json_client.h>
++#endif
++
++// Function pointer signatures for TDLib C JSON interface
++typedef int (*td_create_client_id_fn)();
++typedef void (*td_send_fn)(int, const char *);
++typedef const char *(*td_receive_fn)(double);
++typedef const char *(*td_execute_fn)(const char *);
++
++class TdlibWorker : public QThread
++{
++    Q_OBJECT
++public:
++    TdlibWorker(int clientId, td_receive_fn receiveFn, QObject *parent = nullptr);
++    ~TdlibWorker() override;
++
++    void stop();
++
++protected:
++    void run() override;
++
++signals:
++    void responseReceived(const QString &json);
++
++private:
++    int m_clientId;
++    td_receive_fn m_receiveFn;
++    std::atomic<bool> m_stopped;
++};
++
++class TelegramClient : public QObject
++{
++    Q_OBJECT
++
++    Q_PROPERTY(ChatModel* chats READ chats CONSTANT)
++    Q_PROPERTY(MessageModel* messages READ messages NOTIFY messagesChanged)
++    Q_PROPERTY(QString currentChatId READ currentChatId NOTIFY currentChatIdChanged)
++    Q_PROPERTY(QString currentChatTitle READ currentChatTitle NOTIFY currentChatTitleChanged)
++    Q_PROPERTY(QString accountName READ accountName NOTIFY accountNameChanged)
++    Q_PROPERTY(bool isLoggedIn READ isLoggedIn NOTIFY isLoggedInChanged)
++    Q_PROPERTY(QString connectionStatus READ connectionStatus NOTIFY connectionStatusChanged)
++    Q_PROPERTY(bool hapticsEnabled READ hapticsEnabled WRITE setHapticsEnabled NOTIFY hapticsEnabledChanged)
++    Q_PROPERTY(bool notificationsEnabled READ notificationsEnabled WRITE setNotificationsEnabled NOTIFY notificationsEnabledChanged)
++    Q_PROPERTY(QString loginState READ loginState NOTIFY loginStateChanged)
++    Q_PROPERTY(QString qrCodeLink READ qrCodeLink NOTIFY qrCodeLinkChanged)
++    Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
++    Q_PROPERTY(QString backendType READ backendType CONSTANT)
++    Q_PROPERTY(QStringList quickReplies READ quickReplies NOTIFY quickRepliesChanged)
++    Q_PROPERTY(bool hasTdlib READ hasTdlib CONSTANT)
++
++public:
++    explicit TelegramClient(QObject *parent = nullptr);
++    ~TelegramClient() override;
++
++    ChatModel* chats() const { return m_chatModel; }
++    MessageModel* messages() const { return m_messageModel; }
++    QString currentChatId() const { return m_currentChatId; }
++    QString currentChatTitle() const { return m_currentChatTitle; }
++    QString accountName() const { return m_accountName; }
++    bool isLoggedIn() const { return m_isLoggedIn; }
++    QString connectionStatus() const { return m_connectionStatus; }
++    bool hapticsEnabled() const { return m_hapticsEnabled; }
++    void setHapticsEnabled(bool enabled);
++    bool notificationsEnabled() const { return m_notificationsEnabled; }
++    void setNotificationsEnabled(bool enabled);
++    QString loginState() const { return m_loginState; }
++    QString qrCodeLink() const { return m_qrCodeLink; }
++    QString errorMessage() const { return m_errorMessage; }
++    QString backendType() const { return QStringLiteral("TDLib MTProto"); }
++    QStringList quickReplies() const { return m_quickReplies; }
++    bool hasTdlib() const { return m_hasTdlib; }
++
++    Q_INVOKABLE void selectChat(const QString &chatId, const QString &title);
++    Q_INVOKABLE void sendMessage(const QString &text);
++    Q_INVOKABLE void sendQuickReply(const QString &text);
++    Q_INVOKABLE void requestQrCodeLogin();
++    Q_INVOKABLE void sendPhoneNumber(const QString &phoneNumber);
++    Q_INVOKABLE void sendAuthCode(const QString &code);
++    Q_INVOKABLE void sendPassword(const QString &password);
++    Q_INVOKABLE void logout();
++    Q_INVOKABLE void refresh();
++    Q_INVOKABLE void searchChats(const QString &query);
++    Q_INVOKABLE void addQuickReply(const QString &text);
++    Q_INVOKABLE void removeQuickReply(int index);
++    Q_INVOKABLE void resetQuickReplies();
++    Q_INVOKABLE void clearHistory();
++
++signals:
++    void messagesChanged();
++    void currentChatIdChanged();
++    void currentChatTitleChanged();
++    void accountNameChanged();
++    void isLoggedInChanged();
++    void connectionStatusChanged();
++    void hapticsEnabledChanged();
++    void notificationsEnabledChanged();
++    void loginStateChanged();
++    void qrCodeLinkChanged();
++    void errorMessageChanged();
++    void quickRepliesChanged();
++    void messageReceived(const QString &chatTitle, const QString &text);
++
++private slots:
++    void handleTdlibResponse(const QString &jsonStr);
++
++private:
++    void loadSettings();
++    void saveSettings();
++    void appendLocalMessage(const QString &text, const QString &senderName = QString(), bool isOutgoing = true, const QString &type = "text", const QString &extraInfo = QString());
++    void triggerHaptics();
++    void showNotification(const QString &title, const QString &text);
++
++    // TDLib subsystem
++    void initTdlib();
++    void sendTdlibRequest(const QJsonObject &request);
++    void processTdlibAuthUpdate(const QJsonObject &authState);
++    void processTdlibNewChat(const QJsonObject &chatObj);
++    void processTdlibNewMessage(const QJsonObject &messageObj);
++    void processTdlibChatLastMessage(const QJsonObject &updateObj);
++
++    ChatModel *m_chatModel;
++    MessageModel *m_messageModel;
++    QMap<QString, QList<MessageItem>> m_chatHistories;
++
++    QString m_currentChatId;
++    QString m_currentChatTitle;
++    QString m_accountName;
++    bool m_isLoggedIn;
++    QString m_connectionStatus;
++    bool m_hapticsEnabled;
++    bool m_notificationsEnabled;
++    QString m_loginState;
++    QString m_qrCodeLink;
++    QString m_errorMessage;
++    QStringList m_quickReplies;
++
++    QSettings m_settings;
++
++    // TDLib variables
++    bool m_hasTdlib;
++    int m_tdlibClientId;
++    TdlibWorker *m_tdlibWorker;
++    td_create_client_id_fn m_createFn;
++    td_send_fn m_sendFn;
++    td_receive_fn m_receiveFn;
++    td_execute_fn m_executeFn;
++    QMap<qint64, QString> m_tdlibUserNames;
++};
++
++#endif // TELEGRAMCLIENT_H

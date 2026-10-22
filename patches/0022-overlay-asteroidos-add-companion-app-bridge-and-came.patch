@@ -1,0 +1,410 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:12:55 +1100
+Subject: [PATCH] overlay/asteroidos: add companion app bridge and camera
+ shutter
+
+Add a generic GATT App Bridge service to asteroid-btsyncd for
+bidirectional companion-phone communication:
+
+- app-bridge.patch and appbridgeservice.{h,cpp}: expose a D-Bus
+  interface for remote camera and sensor messages.
+- camera-shutter.sh: small helper that triggers the companion camera
+  shutter through the new bridge.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ .../asteroid-btsyncd/app-bridge.patch         |  85 ++++++++++
+ .../asteroid-btsyncd/appbridgeservice.cpp     | 155 ++++++++++++++++++
+ .../asteroid-btsyncd/appbridgeservice.h       |  80 +++++++++
+ .../asteroid-btsyncd/camera-shutter.sh        |  11 ++
+ .../asteroidos/asteroid-btsyncd/default.nix   |   8 +
+ 5 files changed, 339 insertions(+)
+ create mode 100644 overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
+ create mode 100644 overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
+ create mode 100644 overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
+ create mode 100644 overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh
+
+diff --git a/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch b/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
+new file mode 100644
+index 00000000..bb8690c8
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
+@@ -0,0 +1,85 @@
++diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
++index 758b697..4ff5042 100644
++--- a/src/CMakeLists.txt
+++++ b/src/CMakeLists.txt
++@@ -19,6 +19,7 @@ set(
++ 	ancs_notification.cpp
++ 	cts.cpp
++ 	findphoneservice.cpp
+++	appbridgeservice.cpp
++ )
++ set(
++ 	HEADERS
++@@ -42,6 +43,7 @@ set(
++ 	ancs_notification.h
++ 	cts.h
++ 	findphoneservice.h
+++	appbridgeservice.h
++ )
++ 
++ add_executable(asteroid-btsyncd ${SRC} ${HEADERS})
++diff --git a/src/advertisement.cpp b/src/advertisement.cpp
++index 18cd9e6..db95670 100644
++--- a/src/advertisement.cpp
+++++ b/src/advertisement.cpp
++@@ -25,6 +25,7 @@ Advertisement::Advertisement(QDBusConnection bus, QObject *parent) : QObject(par
++     mIncludeTxPower = false;
++     addServiceUuid("00000000-0000-0000-0000-00a57e401d05");
++     addServiceUuid(FINDPHONE_UUID);
+++    addServiceUuid(APP_BRIDGE_UUID);
++     mDiscoverable = true;
++ 
++     bus.registerObject(mPath, this, QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllProperties);
++diff --git a/src/application.cpp b/src/application.cpp
++index 019f16a..9df9581 100644
++--- a/src/application.cpp
+++++ b/src/application.cpp
++@@ -23,6 +23,7 @@
++ #include "screenshotservice.h"
++ #include "timeservice.h"
++ #include "findphoneservice.h"
+++#include "appbridgeservice.h"
++ 
++ #include <QDBusMetaType>
++ 
++@@ -37,6 +38,7 @@ Application::Application(QDBusConnection bus, QObject *parent) : QObject(parent)
++     addService(new ScreenshotService(4, bus));
++     addService(new TimeService(5, bus));
++     addService(new FindPhoneService(6, bus));
+++    addService(new AppBridgeService(7, bus));
++ 
++     qDBusRegisterMetaType<InterfaceList>();
++     qDBusRegisterMetaType<ManagedObjectList>();
++diff --git a/src/common.h b/src/common.h
++index bed5e28..8f28a72 100644
++--- a/src/common.h
+++++ b/src/common.h
++@@ -77,4 +77,8 @@
++ #define FINDPHONE_UUID      "0000F071-0000-0000-0000-00A57E401D05"
++ #define FINDPHONE_RING_UUID "0000F001-0000-0000-0000-00A57E401D05"
++ 
+++#define APP_BRIDGE_UUID     "0000A071-0000-0000-0000-00A57E401D05"
+++#define APP_BRIDGE_TX_UUID  "0000A001-0000-0000-0000-00A57E401D05"
+++#define APP_BRIDGE_RX_UUID  "0000A002-0000-0000-0000-00A57E401D05"
+++
++ #endif // COMMON_H
++diff --git a/src/main.cpp b/src/main.cpp
++index 7a07dc3..cb85501 100644
++--- a/src/main.cpp
+++++ b/src/main.cpp
++@@ -44,10 +44,10 @@ int main(int argc, char **argv)
++         fprintf(stderr, "Cannot connect to the D-Bus session bus.\n");
++         return 2;
++     }
++-    /* if (!bus.registerService(SERVICE_NAME)) {
++-        fprintf(stderr, "%s\n",
+++    if (!QDBusConnection::systemBus().registerService(SERVICE_NAME)) {
+++        fprintf(stderr, "Warning: Failed to register D-Bus service %s: %s\n",
+++                SERVICE_NAME,
++                 qPrintable(QDBusConnection::systemBus().lastError().message()));
++-        exit(1);
++-    } */
+++    }
++ 
++     Application app;
++
+diff --git a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
+new file mode 100644
+index 00000000..7dc8fed7
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
+@@ -0,0 +1,155 @@
++/*
++ * Copyright (C) 2026 AsteroidOS
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ */
++
++#include "appbridgeservice.h"
++#include <QDebug>
++
++AppBridgeTxChrc::AppBridgeTxChrc(QDBusConnection bus, int index, Service *service)
++    : Characteristic(bus, index, APP_BRIDGE_TX_UUID,
++                     {"read", "notify", "encrypt-authenticated-read", "encrypt-authenticated-notify"},
++                     service)
++{
++}
++
++void AppBridgeTxChrc::sendPacket(const QByteArray &packet)
++{
++    m_value = packet;
++    emit valueChanged();
++    emitPropertiesChanged();
++    qDebug() << "AppBridge: Sent packet size" << packet.size();
++}
++
++void AppBridgeTxChrc::emitPropertiesChanged()
++{
++    QDBusConnection connection = QDBusConnection::systemBus();
++    QDBusMessage message = QDBusMessage::createSignal(getPath().path(),
++                                                      "org.freedesktop.DBus.Properties",
++                                                      "PropertiesChanged");
++
++    QVariantMap changedProperties;
++    changedProperties[QStringLiteral("Value")] = QVariant(m_value);
++
++    QList<QVariant> arguments;
++    arguments << QVariant(GATT_CHRC_IFACE) << QVariant(changedProperties) << QVariant(QStringList());
++    message.setArguments(arguments);
++
++    if (!connection.send(message)) {
++        qDebug() << "AppBridge: Failed to send DBus property notification signal";
++    }
++}
++
++AppBridgeRxChrc::AppBridgeRxChrc(QDBusConnection bus, int index, AppBridgeService *service)
++    : Characteristic(bus, index, APP_BRIDGE_RX_UUID,
++                     {"write", "write-without-response", "encrypt-authenticated-write"},
++                     service),
++      m_service(service)
++{
++}
++
++void AppBridgeRxChrc::WriteValue(QByteArray value, QVariantMap)
++{
++    if (m_service) {
++        m_service->handleRxPacket(value);
++    }
++}
++
++AppBridgeService::AppBridgeService(int index, QDBusConnection bus, QObject *parent)
++    : Service(bus, index, APP_BRIDGE_UUID, parent)
++{
++    m_txChrc = new AppBridgeTxChrc(bus, 0, this);
++    addCharacteristic(m_txChrc);
++
++    m_rxChrc = new AppBridgeRxChrc(bus, 1, this);
++    addCharacteristic(m_rxChrc);
++
++    bus.registerObject("/org/asteroidos/btsyncd/appbridge", this,
++                       QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllSignals | QDBusConnection::ExportAllProperties);
++}
++
++static QString normalizeAppId(const QString &id)
++{
++    if (id == QStringLiteral("cam") || id == QStringLiteral("camera")) {
++        return QStringLiteral("org.asteroidos.camera");
++    }
++    if (id == QStringLiteral("spo2")) {
++        return QStringLiteral("org.asteroidos.spo2");
++    }
++    return id;
++}
++
++static QString compactAppId(const QString &id)
++{
++    if (id == QStringLiteral("org.asteroidos.camera")) {
++        return QStringLiteral("cam");
++    }
++    if (id == QStringLiteral("org.asteroidos.spo2")) {
++        return QStringLiteral("spo2");
++    }
++    return id;
++}
++
++void AppBridgeService::sendMessage(const QString &appId, const QString &action, const QString &payload)
++{
++    sendBytes(appId, action, payload.toUtf8());
++}
++
++void AppBridgeService::sendBytes(const QString &appId, const QString &action, const QByteArray &payload)
++{
++    QString compactId = compactAppId(appId);
++    QByteArray appIdBytes = compactId.toUtf8();
++    QByteArray actionBytes = action.toUtf8();
++
++    if (appIdBytes.size() > 255 || actionBytes.size() > 255) {
++        qWarning() << "AppBridge: appId or action too long";
++        return;
++    }
++
++    QByteArray packet;
++    packet.append((char)0xA0);
++    packet.append((char)appIdBytes.size());
++    packet.append(appIdBytes);
++    packet.append((char)actionBytes.size());
++    packet.append(actionBytes);
++    packet.append(payload);
++
++    if (m_txChrc) {
++        m_txChrc->sendPacket(packet);
++    }
++}
++
++void AppBridgeService::handleRxPacket(const QByteArray &packet)
++{
++    if (packet.size() < 3) {
++        return;
++    }
++
++    if ((uint8_t)packet.at(0) != 0xA0) {
++        qWarning() << "AppBridge: invalid magic byte" << Qt::hex << (uint8_t)packet.at(0);
++        return;
++    }
++
++    int offset = 1;
++    int appIdLen = (uint8_t)packet.at(offset++);
++    if (packet.size() < offset + appIdLen + 1) return;
++    QString rawAppId = QString::fromUtf8(packet.mid(offset, appIdLen));
++    QString appId = normalizeAppId(rawAppId);
++    offset += appIdLen;
++
++    int actionLen = (uint8_t)packet.at(offset++);
++    if (packet.size() < offset + actionLen) return;
++    QString action = QString::fromUtf8(packet.mid(offset, actionLen));
++    offset += actionLen;
++
++    QByteArray payloadBytes = packet.mid(offset);
++    QString payload = QString::fromUtf8(payloadBytes);
++
++    qDebug() << "AppBridge: Received message for" << appId << "action:" << action;
++    emit messageReceived(appId, action, payload);
++}
++
+diff --git a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
+new file mode 100644
+index 00000000..b9a51364
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
+@@ -0,0 +1,80 @@
++/*
++ * Copyright (C) 2026 AsteroidOS
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef APPBRIDGESERVICE_H
++#define APPBRIDGESERVICE_H
++
++#include <QObject>
++#include <QDBusConnection>
++#include <QDBusMessage>
++#include "service.h"
++#include "characteristic.h"
++#include "common.h"
++
++class AppBridgeService;
++
++// TX characteristic: Watch -> Phone notifications
++class AppBridgeTxChrc : public Characteristic
++{
++    Q_OBJECT
++    Q_PROPERTY(QByteArray Value READ getValue NOTIFY valueChanged)
++public:
++    AppBridgeTxChrc(QDBusConnection bus, int index, Service *service);
++
++public slots:
++    QByteArray ReadValue(QVariantMap) { return m_value; }
++    void StartNotify() {}
++    void StopNotify() {}
++    void sendPacket(const QByteArray &packet);
++
++signals:
++    void valueChanged();
++
++private:
++    QByteArray m_value;
++    QByteArray getValue() { return m_value; }
++    void emitPropertiesChanged();
++};
++
++// RX characteristic: Phone -> Watch writes
++class AppBridgeRxChrc : public Characteristic
++{
++    Q_OBJECT
++public:
++    AppBridgeRxChrc(QDBusConnection bus, int index, AppBridgeService *service);
++
++public slots:
++    void WriteValue(QByteArray value, QVariantMap);
++
++private:
++    AppBridgeService *m_service;
++};
++
++class AppBridgeService : public Service
++{
++    Q_OBJECT
++    Q_CLASSINFO("D-Bus Interface", "org.asteroidos.btsyncd.AppBridge")
++public:
++    explicit AppBridgeService(int index, QDBusConnection bus, QObject *parent = nullptr);
++
++    void handleRxPacket(const QByteArray &packet);
++
++public slots:
++    void sendMessage(const QString &appId, const QString &action, const QString &payload);
++    void sendBytes(const QString &appId, const QString &action, const QByteArray &payload);
++
++signals:
++    void messageReceived(const QString &appId, const QString &action, const QString &payload);
++
++private:
++    AppBridgeTxChrc *m_txChrc;
++    AppBridgeRxChrc *m_rxChrc;
++};
++
++#endif // APPBRIDGESERVICE_H
+diff --git a/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh b/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh
+new file mode 100644
+index 00000000..08f15914
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh
+@@ -0,0 +1,11 @@
++#!/bin/sh
++set -e
++
++DEST="org.asteroidos.btsyncd"
++OBJECT="/org/asteroidos/btsyncd/appbridge"
++INTERFACE="org.asteroidos.btsyncd.AppBridge"
++ACTION="${1:-capture}"
++
++busctl call "$DEST" "$OBJECT" "$INTERFACE" sendMessage sss "org.asteroidos.camera" "$ACTION" "" 2>/dev/null || \
++gdbus call --system --dest "$DEST" --object-path "$OBJECT" --method "$INTERFACE.sendMessage" "org.asteroidos.camera" "$ACTION" "" 2>/dev/null || \
++dbus-send --system --print-reply --dest="$DEST" "$OBJECT" "$INTERFACE.sendMessage" string:"org.asteroidos.camera" string:"$ACTION" string:""
+diff --git a/overlay/asteroidos/asteroid-btsyncd/default.nix b/overlay/asteroidos/asteroid-btsyncd/default.nix
+index 0cb3257c..770dc95b 100644
+--- a/overlay/asteroidos/asteroid-btsyncd/default.nix
++++ b/overlay/asteroidos/asteroid-btsyncd/default.nix
+@@ -35,8 +35,15 @@ stdenv.mkDerivation (finalAttrs: {
+   patches = [
+     # Adds find-phone D-Bus command and synchronization packet support for Gadgetbridge
+     ./find-phone.patch
++    # Generic App Bridge GATT service and D-Bus interface for remote camera and sensor sync
++    ./app-bridge.patch
+   ];
+ 
++  postPatch = ''
++    cp ${./appbridgeservice.h} src/appbridgeservice.h
++    cp ${./appbridgeservice.cpp} src/appbridgeservice.cpp
++  '';
++
+   nativeBuildInputs = [
+     cmake
+     kdePackages.extra-cmake-modules
+@@ -65,6 +72,7 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   postInstall = ''
+     install -Dm755 ${./find-phone.sh} $out/bin/find-phone
++    install -Dm755 ${./camera-shutter.sh} $out/bin/camera-shutter
+     install -Dm644 ${./org.asteroidos.btsyncd.conf} $out/share/dbus-1/system.d/org.asteroidos.btsyncd.conf
+   '';
+ 

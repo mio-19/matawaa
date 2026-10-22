@@ -1,0 +1,288 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Thu, 22 Oct 2026 12:34:27 +1100
+Subject: [PATCH] overlay/systemd: add 4.14 old-kernel compatibility patches
+
+Combine the pidfd/waitid, close_range, and OpenEmbedded /proc/self/fdinfo
+statx fallbacks needed by the vendor 4.14 kernel.
+---
+ overlay/cross-compile.nix                     | 14 ++-
+ .../systemd-262-chase-mnt-id-old-kernel.patch | 43 ---------
+ .../systemd-262-close-range-old-kernel.patch  | 92 +++++++++++++++++++
+ .../systemd-262-pidfd-old-kernel.patch        | 37 ++++++++
+ ...temd-262-proc-credentials-old-kernel.patch | 41 +++++++++
+ 5 files changed, 183 insertions(+), 44 deletions(-)
+ delete mode 100644 overlay/patches/systemd-262-chase-mnt-id-old-kernel.patch
+ create mode 100644 overlay/patches/systemd-262-close-range-old-kernel.patch
+ create mode 100644 overlay/patches/systemd-262-pidfd-old-kernel.patch
+ create mode 100644 overlay/patches/systemd-262-proc-credentials-old-kernel.patch
+
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index c111af81..15ea47a4 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -23,6 +23,15 @@ else
+           "-DQt6ShaderToolsTools_DIR=${final.buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
+         ];
+       });
++
++    # Prefer OpenEmbedded's fdinfo-based STATX_MNT_ID fallback over our
++    # st_dev approximation. OE marks it native-tools-only, but /proc/self/fdinfo
++    # is available in stage-2, so apply it to the target as well.
++    # Reference: https://github.com/openembedded/openembedded-core/blob/master/meta/recipes-core/systemd/systemd/Handle-missing-STATX_MNT_ID-on-older-kernels.patch
++    systemdStatxPatch = final.fetchurl {
++      url = "https://raw.githubusercontent.com/openembedded/openembedded-core/99c96202a2c9aea84f5ceb267a8c63c0cff58b1e/meta/recipes-core/systemd/systemd/Handle-missing-STATX_MNT_ID-on-older-kernels.patch";
++      hash = "sha256-griFG/VhaG1Y5CJeWPuwIo2tCFF5EN9R1YE6T7b80gQ=";
++    };
+   in
+   {
+     # systemd 261 requires STATX_ATTR_MOUNT_ROOT (Linux 5.8+) for mount point
+@@ -41,7 +50,10 @@ else
+           patches = (old.patches or [ ]) ++ [
+             ./patches/systemd-261-mountpoint-old-kernel.patch
+             ./patches/systemd-261-faccessat-old-kernel.patch
+-            ./patches/systemd-262-chase-mnt-id-old-kernel.patch
++            ./patches/systemd-262-pidfd-old-kernel.patch
++            systemdStatxPatch
++            ./patches/systemd-262-close-range-old-kernel.patch
++            ./patches/systemd-262-proc-credentials-old-kernel.patch
+           ];
+         });
+ 
+diff --git a/overlay/patches/systemd-262-chase-mnt-id-old-kernel.patch b/overlay/patches/systemd-262-chase-mnt-id-old-kernel.patch
+deleted file mode 100644
+index dd82c43e..00000000
+--- a/overlay/patches/systemd-262-chase-mnt-id-old-kernel.patch
++++ /dev/null
+@@ -1,43 +0,0 @@
+-# systemd 262 uses XSTATX_MNT_ID_BEST in chase_statx(), which requires
+-# STATX_MNT_ID or STATX_MNT_ID_UNIQUE. Vendor kernels older than Linux 5.8
+-# (including the hoki 4.14 kernel) do not provide either, so xstatx_full()
+-# returns -EUNATCH and systemd fails to resolve unit symlinks. That leaves
+-# stage-2 unable to start services and produces a black screen.
+-#
+-# Retry the statx without mount-ID tracking on EUNATCH. Path resolution then
+-# works, with mount-ID checks treated as unknown.
+-#
+-# Reference: https://github.com/systemd/systemd/blob/v262/src/basic/chase.c
+---- a/src/basic/chase.c
+-+++ b/src/basic/chase.c
+-@@ -40,7 +40,9 @@
+-         (CHASE_MUST_BE_DIRECTORY|CHASE_MUST_BE_REGULAR|CHASE_MUST_BE_SOCKET)
+- 
+- static int chase_statx(int fd, struct statx *ret) {
+--        return xstatx_full(fd,
+-+        int r;
+-+
+-+        r = xstatx_full(fd,
+-                         /* path= */ NULL,
+-                         /* statx_flags= */ 0,
+-                         XSTATX_MNT_ID_BEST,
+-@@ -48,6 +50,19 @@
+-                         /* optional_mask= */ 0,
+-                         /* mandatory_attributes= */ 0,
+-                         ret);
+-+        if (r == -EUNATCH)
+-+                /* Linux < 5.8 does not provide STATX_MNT_ID{,_UNIQUE}. Retry without
+-+                 * mount-ID tracking so path resolution keeps working on vendor kernels. */
+-+                r = xstatx_full(fd,
+-+                                /* path= */ NULL,
+-+                                /* statx_flags= */ 0,
+-+                                /* xstatx_flags= */ 0,
+-+                                STATX_TYPE|STATX_UID|STATX_INO,
+-+                                /* optional_mask= */ 0,
+-+                                /* mandatory_attributes= */ 0,
+-+                                ret);
+-+
+-+        return r;
+- }
+- 
+- static int chase_openat2(int root_fd, int dir_fd, const char *path, ChaseFlags chase_flags) {
+diff --git a/overlay/patches/systemd-262-close-range-old-kernel.patch b/overlay/patches/systemd-262-close-range-old-kernel.patch
+new file mode 100644
+index 00000000..462eaa31
+--- /dev/null
++++ b/overlay/patches/systemd-262-close-range-old-kernel.patch
+@@ -0,0 +1,92 @@
++# systemd 262's close_all_fds() uses close_range(), which is unavailable on
++# Linux < 5.9. On the hoki 4.14 kernel every service fails at step FDS with
++# "Function not implemented" or "Operation not permitted" (status=202/FDS).
++#
++# Probe close_range() once. When it is missing, close descriptors through
++# /proc/self/fd. The old close_all_fds_frugal() fallback refuses to loop over
++# RLIMIT_NOFILE (1073741791) potential fds, so it cannot be used for the
++# service-manager path. Keep the /proc-less fallback for
++# close_all_fds_without_malloc(), which must remain safe in signal handler
++# context.
++#
++# Reference: https://github.com/systemd/systemd/blob/v262/src/basic/fd-util.c
++--- a/src/basic/fd-util.c
+++++ b/src/basic/fd-util.c
++@@ -325,11 +325,27 @@
++         }
++ }
++ 
+++static bool close_range_supported(void) {
+++        static int cached = -1;
+++
+++        if (cached < 0) {
+++                if (close_range(INT_MAX, INT_MAX, 0) < 0 && errno == ENOSYS)
+++                        cached = 0;
+++                else
+++                        cached = 1;
+++        }
+++
+++        return cached > 0;
+++}
+++
++ int close_all_fds_without_malloc(const int except[], size_t n_except) {
++         int r;
++ 
++         assert(n_except == 0 || except);
++ 
+++        if (!close_range_supported())
+++                return close_all_fds_frugal(except, n_except);
+++
++         r = close_all_fds_special_case(except, n_except);
++         if (r < 0)
++                 return r;
++@@ -339,11 +355,49 @@
++         return close_all_fds_frugal(except, n_except);
++ }
++ 
+++static int close_all_fds_procfs(const int except[], size_t n_except) {
+++        _cleanup_closedir_ DIR *d = NULL;
+++        int r = 0;
+++
+++        d = opendir("/proc/self/fd");
+++        if (!d)
+++                return -errno;
+++
+++        for (;;) {
+++                struct dirent *de;
+++                int fd;
+++
+++                errno = 0;
+++                de = readdir(d);
+++                if (!de) {
+++                        if (errno > 0)
+++                                return -errno;
+++                        break;
+++                }
+++
+++                if (de->d_name[0] == '.')
+++                        continue;
+++                if (safe_atoi(de->d_name, &fd) < 0)
+++                        continue;
+++                if (fd < 3 || fd == dirfd(d))
+++                        continue;
+++                if (fd_in_set(fd, except, n_except))
+++                        continue;
+++
+++                RET_GATHER(r, close_nointr(fd));
+++        }
+++
+++        return r;
+++}
+++
++ int close_all_fds(const int except[], size_t n_except) {
++         int r;
++ 
++         assert(n_except == 0 || except);
++ 
+++        if (!close_range_supported())
+++                return close_all_fds_procfs(except, n_except);
+++
++         r = close_all_fds_special_case(except, n_except);
++         if (r < 0)
++                 return r;
+diff --git a/overlay/patches/systemd-262-pidfd-old-kernel.patch b/overlay/patches/systemd-262-pidfd-old-kernel.patch
+new file mode 100644
+index 00000000..f1a18f53
+--- /dev/null
++++ b/overlay/patches/systemd-262-pidfd-old-kernel.patch
+@@ -0,0 +1,37 @@
++# systemd 262 pidfd fallbacks for vendor kernels older than Linux 5.8.
++#
++# The hoki 4.14 kernel has incomplete pidfd support: pidfd_open() may exist
++# while waitid(P_PIDFD) returns EINVAL. systemd 262 treats that as fatal:
++#
++#   Failed to wait for '(environment-generators)': Invalid argument
++#   Freezing execution.
++#
++# Fall back to waitid(P_PID) when the pidfd wait is unsupported.
++#
++# Reference: https://github.com/systemd/systemd/blob/v262/src/basic/pidref.c
++--- a/src/basic/pidref.c
+++++ b/src/basic/pidref.c
++@@ -108,7 +108,8 @@
++         if (fd < 0) {
++                 /* Graceful fallback in case the kernel is out of fds.
++                  * The PIDFD_THREAD flag is supported since kernel v6.9 (64bef697d33b75fc06c5789b3f8108680271529f). */
++-                if (!(ERRNO_IS_RESOURCE(errno) || (errno == EINVAL && FLAGS_SET(flags, PIDFD_THREAD))))
+++                if (!(ERRNO_IS_RESOURCE(errno) ||
+++                      IN_SET(errno, ENOSYS, EOPNOTSUPP, EINVAL)))
++                         return log_debug_errno(errno, "Failed to open pidfd for pid " PID_FMT ": %m", pid);
++ 
++                 fd = -EBADF;
++@@ -502,9 +503,11 @@
++ 
++                 siginfo_t si = {};
++ 
++-                if (pidref->fd >= 0)
+++                if (pidref->fd >= 0) {
++                         r = RET_NERRNO(waitid(P_PIDFD, pidref->fd, &si, WEXITED));
++-                else
+++                        if (IN_SET(r, -EINVAL, -ENOSYS, -EOPNOTSUPP))
+++                                r = RET_NERRNO(waitid(P_PID, pidref->pid, &si, WEXITED));
+++                } else
++                         r = RET_NERRNO(waitid(P_PID, pidref->pid, &si, WEXITED));
++                 if (r >= 0) {
++                         if (ret_si)
+diff --git a/overlay/patches/systemd-262-proc-credentials-old-kernel.patch b/overlay/patches/systemd-262-proc-credentials-old-kernel.patch
+new file mode 100644
+index 00000000..cf16aa51
+--- /dev/null
++++ b/overlay/patches/systemd-262-proc-credentials-old-kernel.patch
+@@ -0,0 +1,41 @@
++# systemd 262 uses hidepid=invisible (Linux 5.8+) and the new mount API for
++# credentials (fsopen/fsmount, Linux 5.2+). On 4.14 the textual hidepid option
++# is rejected and fsmount_credentials_fs() returns ENOSYS.
++#
++# Older systemd versions fall back to an unrestricted proc mount when the
++# hidepid option is rejected. Do the same here instead of translating
++# invisible to hidepid=2, which has different per-namespace semantics on
++# pre-5.8 kernels. Keep the plain-directory credentials fallback for old
++# kernels.
++--- a/src/core/namespace.c
+++++ b/src/core/namespace.c
++@@ -1588,7 +1588,15 @@
++          * one. i.e we don't reuse existing mounts here under any condition, we want a new instance owned by
++          * our user namespace and with our hidepid= settings applied. Hence, let's get rid of everything
++          * mounted on /proc/ first. */
++-        return mount_private_apivfs("proc", mount_entry_path(m), "/proc", opts, p->runtime_scope);
+++        r = mount_private_apivfs("proc", mount_entry_path(m), "/proc", opts, p->runtime_scope);
+++        if (r == -EINVAL && opts) {
+++                /* hidepid=invisible requires Linux 5.8. On older kernels the
+++                 * textual option is rejected; fall back to an unrestricted
+++                 * proc mount, as systemd did before v257. */
+++                opts = mfree(opts);
+++                r = mount_private_apivfs("proc", mount_entry_path(m), "/proc", NULL, p->runtime_scope);
+++        }
+++        return r;
++ }
++ 
++ static int mount_tmpfs(const MountEntry *m) {
++--- a/src/core/exec-credential.c
+++++ b/src/core/exec-credential.c
++@@ -1052,8 +1052,8 @@
++         }
++ 
++         mfd = fsmount_credentials_fs(&fs_fd);
++-        if (ERRNO_IS_NEG_PRIVILEGE(mfd) && !dir_mounted) {
++-                log_debug_errno(mfd, "Lacking privilege to mount credentials fs, falling back to plain directory.");
+++        if ((ERRNO_IS_NEG_PRIVILEGE(mfd) || IN_SET(mfd, -ENOSYS, -EOPNOTSUPP)) && !dir_mounted) {
+++                log_debug_errno(mfd, "Unable to mount credentials fs, falling back to plain directory: %m");
++                 return setup_credentials_plain_dir(context, cred_dir);
++         }
++         if (mfd < 0)

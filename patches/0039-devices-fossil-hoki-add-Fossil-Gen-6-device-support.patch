@@ -1,0 +1,675 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:32:30 +1100
+Subject: [PATCH] devices/fossil-hoki: add Fossil Gen 6 device support
+
+Add the Fossil Gen 6 (hoki) device configuration and its Snapdragon Wear
+4100 family variants:
+
+- display, touch, crown, haptics, audio routing, and firmware loaders
+- vendor kernel derivation that fetches the six upstream AsteroidOS
+  kernel patches from the pinned meta-smartwatch revision instead of
+  vendoring their contents
+- fossil-firefish, fossil-ray, and fossil-triggerfish family entries
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ devices/fossil-firefish/default.nix       |  56 ++++
+ devices/fossil-hoki/default.nix           | 303 ++++++++++++++++++++++
+ devices/fossil-hoki/gps_xtra.ini          |   2 +
+ devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
+ devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
+ devices/fossil-ray/default.nix            |  56 ++++
+ devices/fossil-triggerfish/default.nix    |  56 ++++
+ 7 files changed, 601 insertions(+)
+ create mode 100644 devices/fossil-firefish/default.nix
+ create mode 100644 devices/fossil-hoki/default.nix
+ create mode 100644 devices/fossil-hoki/gps_xtra.ini
+ create mode 100644 devices/fossil-hoki/kernel/default.nix
+ create mode 100644 devices/fossil-hoki/wlan-firmware-hoki.sh
+ create mode 100644 devices/fossil-ray/default.nix
+ create mode 100644 devices/fossil-triggerfish/default.nix
+
+diff --git a/devices/fossil-firefish/default.nix b/devices/fossil-firefish/default.nix
+new file mode 100644
+index 00000000..b8605a4c
+--- /dev/null
++++ b/devices/fossil-firefish/default.nix
+@@ -0,0 +1,56 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++{
++  imports = [
++    ../families/asteroidos.nix
++  ];
++
++  mobile.device.name = "fossil-firefish";
++  mobile.device.identity = {
++    name = "Gen 4 Explorist HR";
++    manufacturer = "Fossil";
++  };
++
++  mobile.device.supportLevel = "supported";
++
++  mobile.hardware = {
++    # Qualcomm Snapdragon Wear 2100 (MSM8909W)
++    soc = "qualcomm-msm8909w";
++    ram = 512;
++    screen = {
++      width = 454;
++      height = 454;
++    };
++    watch = {
++      hasCrown = true;
++      hasHaptics = true;
++      aodSupport = true;
++    };
++  };
++
++  mobile.system.android = {
++    device_name = "firefish";
++    bootimg.flash = {
++      offset_base = "0x80000000";
++      offset_kernel = "0x00008000";
++      offset_ramdisk = "0x01000000";
++      offset_second = "0x00f00000";
++      offset_tags = "0x00000100";
++      pagesize = "2048";
++    };
++  };
++
++  boot.kernelParams = [
++    "console=ttyMSM0,115200,n8"
++    "androidboot.console=ttyMSM0"
++    "androidboot.hardware=firefish"
++    "msm_rtb.filter=0x237"
++    "ehci-hcd.park=3"
++    "vmalloc=300M"
++  ];
++}
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+new file mode 100644
+index 00000000..6c023b9d
+--- /dev/null
++++ b/devices/fossil-hoki/default.nix
+@@ -0,0 +1,303 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++{
++  imports = [
++    ../families/asteroidos.nix
++  ];
++
++  mobile.device.name = "fossil-hoki";
++  mobile.device.identity = {
++    name = "Gen 6";
++    manufacturer = "Fossil";
++  };
++
++  mobile.device.supportLevel = "supported";
++
++  mobile.hardware = {
++    # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), 32-bit Cortex-A7 SoC.
++    soc = "qualcomm-sda429w";
++    ram = 1024 * 1;
++    screen = {
++      width = 416;
++      height = 416;
++    };
++    watch = {
++      hasCrown = true;
++      hasHaptics = true;
++      aodSupport = true;
++    };
++  };
++
++  mobile.boot.stage-1 = {
++    kernel.package = pkgs.callPackage ./kernel { };
++  };
++
++  mobile.system.android = {
++    device_name = "hoki";
++    ab_partitions = true;
++    bootimg.flash = {
++      offset_base = "0x80000000";
++      offset_kernel = "0x00008000";
++      offset_ramdisk = "0x01000000";
++      offset_second = "0x00f00000";
++      offset_tags = "0x00000100";
++      pagesize = "4096";
++    };
++  };
++
++  # The DTB is appended to the kernel image (CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE).
++  # 90_dtbs-install.patch copies it flat into $out/dtbs/.
++  mobile.system.android.appendDTB = [
++    "dtbs/sda429-hoki.dtb"
++  ];
++
++  # Kernel parameters matching upstream AsteroidOS / Android bootloader configuration
++  # Reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-kernel/linux/linux-hoki/img_info
++  boot.kernelParams = [
++    "console=ttyMSM0,115200,n8"
++    "androidboot.console=ttyMSM0"
++    "androidboot.hardware=hoki"
++    "androidboot.selinux=permissive"
++    "audit=0"
++    "user_debug=30"
++    "msm_rtb.filter=0x237"
++    "ehci-hcd.park=3"
++    "androidboot.bootdevice=7824900.sdhci"
++    "lpm_levels.sleep_disabled=1"
++    "earlycon=msm_serial_dm,0x78b0000"
++    "vmalloc=300M"
++    "androidboot.usbconfigfs=true"
++    "loop.max_part=7"
++    "cgroup.memory=nokmem,nosocket"
++  ];
++
++  mobile.system.type = "android";
++
++  # Ensure stage-1 udev immediately links userdata to /dev/disk/by-label/NIXOS_SYSTEM and /dev/disk/by-partlabel/userdata
++  mobile.boot.stage-1.extraUdevRules = ''
++    KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
++    ENV{PARTNAME}=="userdata", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
++    ENV{ID_PART_ENTRY_NAME}=="userdata", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
++  '';
++
++  environment.systemPackages = [
++    pkgs.alsa-utils
++  ];
++
++  # Hardware audio mixer DAI link routing for NXP TFA98xx speaker amplifier & digital mic
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/issues/343
++  systemd.services.audio-routing-hoki = {
++    description = "Fossil Gen 6 TFA98xx audio amplifier and microphone mixer routing";
++    wantedBy = [ "multi-user.target" ];
++    after = [
++      "sound.target"
++      "subsystems-hoki.service"
++    ];
++    path = with pkgs; [
++      alsa-utils
++      coreutils
++    ];
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = pkgs.writeShellScript "audio-routing-hoki" ''
++        # Symlink TFA98xx amplifier DSP container firmware into /lib/firmware
++        mkdir -p /lib/firmware
++        for p in /system/etc/firmware/tfa98xx.cnt /vendor/firmware/tfa98xx.cnt /etc/firmware/tfa98xx.cnt; do
++          if [ -e "$p" ] && [ ! -e /lib/firmware/tfa98xx.cnt ]; then
++            ln -sf "$p" /lib/firmware/tfa98xx.cnt
++          fi
++        done
++
++        # Bounded poll for ALSA sound card 0 enumeration (up to 15 seconds) to avoid cold boot race
++        for i in $(seq 1 30); do
++          if [ -e /proc/asound/card0 ]; then
++            break
++          fi
++          sleep 0.5
++        done
++
++        if [ -e /proc/asound/card0 ]; then
++          # QUAT_MI2S_RX connects MultiMedia1 frontend to TFA98xx speaker amplifier DAI link
++          amixer -c 0 sset 'QUAT_MI2S_RX Audio Mixer MultiMedia1' 1 2>/dev/null || true
++          # TERT_MI2S_TX connects digital microphone to MultiMedia1 capture frontend
++          amixer -c 0 sset 'MultiMedia1 Mixer TERT_MI2S_TX' 1 2>/dev/null || true
++          # Route digital mic 1 to DEC1
++          amixer -c 0 sset 'DEC1 MUX' 'DMIC1' 2>/dev/null || true
++        fi
++      '';
++    };
++  };
++
++  # AsteroidOS Wayland compositor & libhybris hwcomposer environment options for hoki
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-asteroid/asteroid-launcher/asteroid-launcher-configs/20-device.conf
++  environment.variables = {
++    QPA_HWC_FORCE_GLES = "1";
++    QPA_HWC2_FORCE_DOZE_UPDATE = "1";
++    QT_OPENGL_NO_BGRA = "1";
++    LIPSTICK_OPTIONS = "-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1";
++  };
++
++  # Hardware node permissions and symlinks for Android HAL / libhybris
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-android/android-init/android-init/init.rc
++  services.udev.extraRules = ''
++    KERNEL=="hwbinder", MODE="0666"
++    KERNEL=="vndbinder", MODE="0666"
++    KERNEL=="mdss_rotator", MODE="0666"
++    SUBSYSTEM=="leds", KERNEL=="vibrator", ATTR{trigger}="transient", MODE="0666"
++    DEVPATH=="/devices/platform/soc/soc:qcom,bg-rsb", ATTR{enable}=="*", MODE="0666"
++  '';
++
++  # Persistent hardware partition mounts on Fossil Gen 6 eMMC
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-core/base-files/base-files/fstab
++  fileSystems = {
++    "/persist" = {
++      device = "/dev/disk/by-partlabel/persist";
++      fsType = "ext4";
++      options = [
++        "nofail"
++        "errors=continue"
++      ];
++    };
++    "/vendor/firmware_mnt" = {
++      device = "/dev/disk/by-partlabel/modem";
++      fsType = "vfat";
++      options = [
++        "ro"
++        "shortname=lower"
++        "nofail"
++      ];
++    };
++    "/vendor/bt_firmware" = {
++      device = "/dev/disk/by-partlabel/bluetooth";
++      fsType = "vfat";
++      options = [
++        "ro"
++        "shortname=lower"
++        "nofail"
++      ];
++    };
++  };
++
++  # Subsystem boots and firmware mount setup
++  # GNSS vendor service symlink PR: https://github.com/AsteroidOS/meta-smartwatch/pull/342
++  systemd.tmpfiles.rules = [
++    "L+ /system/lib/hw/gps.default.so - - - - /vendor/lib/hw/gps.default.so"
++    "L+ /vendor/bin/hw/android.hardware.gnss@1.0-service - - - - /vendor/bin/hw/android.hardware.gnss@1.0-service-qti"
++    "L+ /dev/graphics/fb0 - - - - /dev/fb0"
++    "d /mnt/vendor 0755 root root -"
++    "L+ /mnt/vendor/persist - - - - /persist"
++    "d /data/vendor 0755 root root -"
++    "d /data/vendor/ssrdump 0755 root root -"
++    "d /data/vendor/bgdaemon 0755 root root -"
++  ];
++
++  # Fossil Gen 6 Qualcomm ADSP, CDSP, and SLPI subsystem initialization
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-android/android-init/android-init/init.rc
++  systemd.services.subsystems-hoki = {
++    description = "Fossil Gen 6 Qualcomm ADSP/CDSP/SLPI subsystem boot";
++    wantedBy = [ "basic.target" ];
++    before = [ "wlan-firmware-hoki.service" ];
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = pkgs.writeShellScript "subsystems-hoki-init" ''
++        for i in 0 1 2 3 4; do
++          if [ -f "/sys/bus/msm_subsys/devices/subsys$i/restart_level" ]; then
++            echo RELATED > "/sys/bus/msm_subsys/devices/subsys$i/restart_level" 2>/dev/null || true
++          fi
++        done
++        for sub in adsp cdsp slpi; do
++          if [ -f "/sys/kernel/boot_$sub/boot" ]; then
++            echo 1 > "/sys/kernel/boot_$sub/boot" 2>/dev/null || true
++          fi
++        done
++        # Qualcomm Blackghost RSB companion processor bus permissions and init
++        if [ -f "/sys/devices/platform/soc/soc:qcom,bg-rsb/enable" ]; then
++          chmod 0666 /sys/devices/platform/soc/soc:qcom,bg-rsb/enable 2>/dev/null || true
++        fi
++        if [ -x "/vendor/bin/init.rsb.sh" ]; then
++          /vendor/bin/init.rsb.sh 2>/dev/null || true
++        fi
++      '';
++    };
++  };
++
++  # Fossil Gen 6 CPU/GPU underclock and power collapse profile
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-core/underclock/underclock/underclock
++  # Commit: https://github.com/AsteroidOS/meta-smartwatch/commit/8c1dbee6c37cdd4ad97d083a59085abf7032ad42
++  systemd.services.underclock-hoki = {
++    description = "Fossil Gen 6 low power collapse and CPU underclocking";
++    wantedBy = [ "multi-user.target" ];
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStartPre = "${pkgs.coreutils}/bin/sleep 20";
++      ExecStart = pkgs.writeShellScript "underclock-hoki" ''
++        # Enable low power mode & allow system-pc
++        if [ -f /sys/module/lpm_levels/parameters/sleep_disabled ]; then
++          echo 0 > /sys/module/lpm_levels/parameters/sleep_disabled 2>/dev/null || true
++        fi
++        if [ -f /sys/module/lpm_levels/system/system-pc/idle_enabled ]; then
++          echo 0 > /sys/module/lpm_levels/system/system-pc/idle_enabled 2>/dev/null || true
++        fi
++        # Set CPU governor to ondemand for quick burst responses
++        if [ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]; then
++          echo ondemand > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || true
++        fi
++        # Disable secondary cores to save battery on wrist
++        for c in 1 2 3; do
++          if [ -f /sys/devices/system/cpu/cpu$c/online ]; then
++            echo 0 > /sys/devices/system/cpu/cpu$c/online 2>/dev/null || true
++          fi
++        done
++      '';
++    };
++  };
++
++  # WCNSS Wi-Fi firmware initialization and driver loading
++  # Upstream PR: https://github.com/AsteroidOS/meta-smartwatch/pull/341 ("hoki: wlan: working WiFi driver from source")
++  systemd.services.wlan-firmware-hoki = {
++    description = "Fossil Gen 6 WCNSS WLAN firmware setup";
++    wantedBy = [ "multi-user.target" ];
++    before = [ "network-pre.target" ];
++    path = with pkgs; [
++      kmod
++      coreutils
++    ];
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = "${pkgs.writeShellScript "wlan-firmware-hoki" (
++        builtins.readFile ./wlan-firmware-hoki.sh
++      )}";
++    };
++  };
++
++  # GNSS AGPS NTP injection configuration & Android HAL library symlink
++  # Upstream PR: https://github.com/AsteroidOS/meta-smartwatch/pull/342 ("hoki: gnss: symlink real vendor HAL service, enable NTP AGPS assistance")
++  environment.etc."gps_xtra.ini".source = ./gps_xtra.ini;
++
++  # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd/51-ffmemless.ini
++  environment.etc."ngf/51-ffmemless.ini".source = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd/51-ffmemless.ini";
++    sha256 = "19bzmmhhn526wyqcg163x1hc8czrmxli22m68s07srr4zza9dman";
++  };
++
++  # Near Field Communication (NFC) controller configuration
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/libnci/libncicore/libncicore.conf
++  environment.etc."libncicore.conf".source = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/libnci/libncicore/libncicore.conf";
++    sha256 = "12zg3n0jysy7lczqwh0kl5ccg1ljgidkqazj6i8v2j9k0nckkx29";
++  };
++
++  # Audio support on Fossil Gen 6 (hoki) is handled natively via Android Audio HAL (audio.primary.sdm429w.so)
++  # and pulseaudio-modules-droid with `source_channel_map=mono rate=48000` (48 kHz DSP frontend clock).
++  # Upstream PR (Merged): https://github.com/AsteroidOS/meta-smartwatch/pull/357 ("hoki: Fix microphone and speaker")
++}
+diff --git a/devices/fossil-hoki/gps_xtra.ini b/devices/fossil-hoki/gps_xtra.ini
+new file mode 100644
+index 00000000..594fc6c1
+--- /dev/null
++++ b/devices/fossil-hoki/gps_xtra.ini
+@@ -0,0 +1,2 @@
++[ntp]
++NTP_FORCE_INJECT=true
+diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
+new file mode 100644
+index 00000000..1a520e75
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/default.nix
+@@ -0,0 +1,109 @@
++{
++  mobile-nixos,
++  stdenv,
++  cpio,
++  fetchFromGitHub,
++  fetchurl,
++  runCommand,
++  ...
++}:
++
++# Fossil Gen 6 (hoki) ships a 4.14 downstream Qualcomm kernel.
++# Upstream source tree: https://github.com/fossil-engineering/kernel-msm-fossil-cw
++# AsteroidOS recipe: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-kernel/linux/linux-hoki_p.bb
++#
++# It must be built with GCC 8: AsteroidOS's recipe inherits `kernel-gcc8` (https://github.com/AsteroidOS/meta-asteroid/blob/master/classes/kernel-gcc8.bbclass)
++# and notes "gcc >= 13 doesn't boot". Nixpkgs dropped gcc8, so borrow the armv7l
++# cross compiler from nixos-24.05 (the last channel still shipping 8.5.0).
++#
++# Patches 0001-0006 are fetched verbatim from AsteroidOS meta-smartwatch at
++# rev 873c865ca06593d239f911b76b09228ddd70eccc:
++# https://github.com/AsteroidOS/meta-smartwatch/tree/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-kernel/linux/files
++# Patch 0007 fixes unconditional pm_qos_remove_request crash in pcm_native.c:
++# https://github.com/AsteroidOS/meta-smartwatch/pull/344
++# 90_dtbs-install is ours: this tree has no ARM dtbs_install target.
++let
++  # Pinned by git rev rather than a channel URL: channels.nixos.org/nixos-24.05
++  # is a moving target whose NAR hash changes as the branch advances, and that
++  # branch is gone now that 24.05 is EOL.
++  pkgsGcc8 = import (builtins.fetchGit {
++    url = "https://github.com/NixOS/nixpkgs.git";
++    rev = "b134951a4c9f3c995fd7be05f3243f8ecd65d798";
++    shallow = true;
++  }) { };
++
++  cc8 = pkgsGcc8.pkgsCross.armv7l-hf-multiplatform.buildPackages.gcc8;
++
++  # Same as pkgs.overrideCC (pkgs/stdenv/adapters.nix), inlined so this file
++  # does not need the surrounding package set.
++  stdenvGcc8 = stdenv.override {
++    allowedRequisites = null;
++    cc = cc8;
++    hasCC = true;
++  };
++
++  kernel-builder-gcc8 = mobile-nixos.kernel-builder.override {
++    stdenv = stdenvGcc8;
++  };
++
++  # Upstream AsteroidOS defconfig for Fossil Gen 6 (hoki):
++  # https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-kernel/linux/linux-hoki/defconfig
++  upstreamDefconfig = fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-kernel/linux/linux-hoki/defconfig";
++    sha256 = "0fk14m3h7qdbyjlidifddrsp76j0wgq5wsg86vzisv65s8ha84as";
++  };
++
++  # Fetch the verbatim vendor patches instead of vendoring their contents.
++  # fetchurl is used rather than fetchpatch so the files are not transformed.
++  upstreamPatch =
++    name: sha256:
++    fetchurl {
++      url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-kernel/linux/files/${name}";
++      inherit sha256;
++    };
++
++  # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
++  # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
++  configfile =
++    runCommand "fossil-hoki-defconfig"
++      {
++        upstream = upstreamDefconfig;
++        patch = ./defconfig.patch;
++      }
++      ''
++        patch -p1 -i "$patch" -o "$out" "$upstream"
++      '';
++in
++
++kernel-builder-gcc8 {
++  version = "4.14.206";
++  inherit configfile;
++
++  src = fetchFromGitHub {
++    owner = "fossil-engineering";
++    repo = "kernel-msm-fossil-cw";
++    rev = "c0b4c201f2d5a641defe19958a9b4c16f40d866b";
++    sha256 = "sha256-uf5Vln2M64ksT9BC4/R9gLV2yo6zK0vQeolyCUj/u+o=";
++  };
++
++  patches = [
++    (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
++    (upstreamPatch "0002-mmc-Fix-embedded_sdio_data-duplicate-definition.patch" "0h7d3pxz8di2rh257kmc83iwcpf8xmrqhbqq4an2vclfdhyr297j")
++    (upstreamPatch "0003-video-fbdev-msm-Provide-mdss_dsi_switch_page.patch" "1igqg795cvr81w948k4dj8nrbzc2pz5bg6gdp68jfplm2hcs4nch")
++    (upstreamPatch "0004-usb-hcd-Handle-when-host-mode-isn-t-available.patch" "156q9s63d0w5q10jzqs32li91a48ji1652rabvndvm0az8klpxld")
++    (upstreamPatch "0005-initramfs-Don-t-skip-initramfs.patch" "19zjr91880fiisvajnr3sykz5xpmy8i0jnjfvdmvjiw0dd5aa6g2")
++    (upstreamPatch "0006-ARM-8933-1-replace-Sun-Solaris-style-flag-on-section.patch" "0vcplkfqgfb8qyalls4bk55y46vij0a9jaak0shxncyf8a4yfx74")
++    ./0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
++    ./90_dtbs-install.patch
++  ];
++
++  isModular = false;
++
++  # Qualcomm backported the 5.3 kheaders feature into this 4.14 tree
++  # (CONFIG_IKHEADERS=y), and kernel/gen_kheaders.sh needs cpio. The builder
++  # only supplies cpio for >= 5.2, so add it here.
++  nativeBuildInputs = [ cpio ];
++
++  # Set by CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE in the defconfig.
++  buildDTBs = true;
++}
+diff --git a/devices/fossil-hoki/wlan-firmware-hoki.sh b/devices/fossil-hoki/wlan-firmware-hoki.sh
+new file mode 100644
+index 00000000..32d6dca3
+--- /dev/null
++++ b/devices/fossil-hoki/wlan-firmware-hoki.sh
+@@ -0,0 +1,19 @@
++#!/bin/sh
++# SPDX-License-Identifier: MIT
++# Fossil Gen 6 (hoki) Wi-Fi WCNSS firmware extraction and initialization.
++# Symlinks stock vendor WCNSS calibration data, triggers WCNSS powerup,
++# and loads the WLAN driver module.
++
++mkdir -p /lib/firmware/wlan/prima
++
++for f in WCNSS_qcom_cfg.ini WCNSS_qcom_wlan_nv.bin WCNSS_wlan_dictionary.dat; do
++	if [ -e "/vendor/firmware/wlan/prima/$f" ] && [ ! -e "/lib/firmware/wlan/prima/$f" ]; then
++		ln -sf "/vendor/firmware/wlan/prima/$f" "/lib/firmware/wlan/prima/$f"
++	fi
++done
++
++# Opening /dev/wcnss_wlan powers on the WCNSS subsystem
++echo 1 > /dev/wcnss_wlan 2>/dev/null || true
++
++modprobe wlan 2>/dev/null || true
++exit 0
+diff --git a/devices/fossil-ray/default.nix b/devices/fossil-ray/default.nix
+new file mode 100644
+index 00000000..1aa4a568
+--- /dev/null
++++ b/devices/fossil-ray/default.nix
+@@ -0,0 +1,56 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++{
++  imports = [
++    ../families/asteroidos.nix
++  ];
++
++  mobile.device.name = "fossil-ray";
++  mobile.device.identity = {
++    name = "Gen 4 (41mm)";
++    manufacturer = "Fossil";
++  };
++
++  mobile.device.supportLevel = "supported";
++
++  mobile.hardware = {
++    # Qualcomm Snapdragon Wear 2100 (MSM8909W)
++    soc = "qualcomm-msm8909w";
++    ram = 512;
++    screen = {
++      width = 390;
++      height = 390;
++      shape = "round";
++    };
++    watch = {
++      hasCrown = true;
++      hasHaptics = true;
++      aodSupport = true;
++      burnInProtection = true;
++    };
++  };
++
++  mobile.system.android = {
++    device_name = "ray";
++    bootimg.flash = {
++      offset_base = "0x80000000";
++      offset_kernel = "0x00008000";
++      offset_ramdisk = "0x02000000";
++      offset_second = "0x00f00000";
++      offset_tags = "0x01e00000";
++      pagesize = "2048";
++    };
++  };
++
++  boot.kernelParams = [
++    "console=ttyMSM0,115200,n8"
++    "androidboot.console=ttyMSM0"
++    "androidboot.hardware=ray"
++    "msm_rtb.filter=0x237"
++  ];
++}
+diff --git a/devices/fossil-triggerfish/default.nix b/devices/fossil-triggerfish/default.nix
+new file mode 100644
+index 00000000..b29f7d73
+--- /dev/null
++++ b/devices/fossil-triggerfish/default.nix
+@@ -0,0 +1,56 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++{
++  imports = [
++    ../families/asteroidos.nix
++  ];
++
++  mobile.device.name = "fossil-triggerfish";
++  mobile.device.identity = {
++    name = "Gen 5";
++    manufacturer = "Fossil";
++  };
++
++  mobile.device.supportLevel = "supported";
++
++  mobile.hardware = {
++    # Qualcomm Snapdragon Wear 3100
++    soc = "qualcomm-sda429w";
++    ram = 1024 * 1;
++    screen = {
++      width = 416;
++      height = 416;
++    };
++    watch = {
++      hasCrown = true;
++      hasHaptics = true;
++      aodSupport = true;
++    };
++  };
++
++  mobile.system.android = {
++    device_name = "triggerfish";
++    bootimg.flash = {
++      offset_base = "0x80000000";
++      offset_kernel = "0x00008000";
++      offset_ramdisk = "0x01000000";
++      offset_second = "0x00f00000";
++      offset_tags = "0x00000100";
++      pagesize = "2048";
++    };
++  };
++
++  boot.kernelParams = [
++    "console=ttyMSM0,115200,n8"
++    "androidboot.console=ttyMSM0"
++    "androidboot.hardware=triggerfish"
++    "msm_rtb.filter=0x237"
++    "ehci-hcd.park=3"
++    "vmalloc=300M"
++  ];
++}

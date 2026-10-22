@@ -1,0 +1,101 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:22:17 +1100
+Subject: [PATCH] modules: add watch power profile
+
+Add mobile.hardware.watch.powerManagement, which applies wearable power
+and memory tuning when enabled:
+
+- zram swap with zstd and a high memory percentage
+- volatile, size-limited journald storage to reduce eMMC writes
+- swappiness and dirty-page writeback tuning
+- schedutil CPU frequency governor where cpupower is available
+
+The profile is gated on mobile.hardware.watch.enable and defaults to on
+for watch devices only.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ modules/module-list.nix |  1 +
+ modules/watch-power.nix | 61 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 62 insertions(+)
+ create mode 100644 modules/watch-power.nix
+
+diff --git a/modules/module-list.nix b/modules/module-list.nix
+index e9d9a143..0a18885d 100644
+--- a/modules/module-list.nix
++++ b/modules/module-list.nix
+@@ -57,5 +57,6 @@
+   ./system-target.nix
+   ./system-types.nix
+   ./usb-gadget.nix
++  ./watch-power.nix
+   ./zram.nix
+ ]
+diff --git a/modules/watch-power.nix b/modules/watch-power.nix
+new file mode 100644
+index 00000000..0432730a
+--- /dev/null
++++ b/modules/watch-power.nix
+@@ -0,0 +1,61 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  inherit (lib)
++    mkDefault
++    mkIf
++    mkOption
++    types
++    ;
++
++  watchCfg = config.mobile.hardware.watch;
++in
++{
++  options.mobile.hardware.watch.powerManagement = {
++    enable = mkOption {
++      type = types.bool;
++      default = true;
++      description = ''
++        Enable battery and low-RAM optimizations tailored for smartwatches:
++        zram swap, aggressive pagecache flushing, volatile journald to reduce flash writes,
++        and battery conservation.
++      '';
++    };
++  };
++
++  config = mkIf (config.mobile.enable && watchCfg.enable && watchCfg.powerManagement.enable) {
++    # Smartwatches have constrained RAM (often 512MB to 2GB).
++    # Enable zram with high compression to prevent out-of-memory kills.
++    zramSwap = {
++      enable = mkDefault true;
++      algorithm = mkDefault "zstd";
++      memoryPercent = mkDefault 100;
++    };
++
++    # Systemd journal volatile storage reduces write cycles on watch eMMC/UFS storage
++    # and saves flash controller power draw.
++    services.journald.extraConfig = ''
++      Storage=volatile
++      RuntimeMaxUse=16M
++    '';
++
++    # Sysctl kernel tuning for battery life and wrist devices
++    boot.kernel.sysctl = {
++      # Proactively compress idle anonymous memory into zram
++      "vm.swappiness" = mkDefault 100;
++      # Reduce dirty page age before flush
++      "vm.dirty_writeback_centisecs" = mkDefault 1500;
++      "vm.dirty_expire_centisecs" = mkDefault 3000;
++    };
++
++    # Power savings: enable CPU frequency governor powersave / schedutil when cpupower is available
++    powerManagement.cpuFreqGovernor = mkIf (config.boot.kernelPackages ? cpupower) (
++      mkDefault "schedutil"
++    );
++  };
++}

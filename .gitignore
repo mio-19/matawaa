@@ -1,0 +1,5 @@
+work/
+result
+result-*
+.direnv/
+.reasonix/

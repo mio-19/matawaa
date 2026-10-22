@@ -1,0 +1,1135 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 11:41:05 +1100
+Subject: [PATCH] overlay/wpewebkit: add WPE WebKit lightweight browser for
+ wearables
+
+This patch integrates the lightweight WPE WebKit rendering engine and browser:
+
+- overlay/wpewebkit: WPE WebKit build definition tuned for low RAM usage
+  and OpenGL ES acceleration on wearable GPUs.
+- overlay/asteroidos/wpewebkit-qt: Qt 6 bindings and QML view components.
+- overlay/asteroidos/browser: Minimalist touch-optimized browser with
+  captive portal helper and kinetic touch scrolling.
+- overlay/asteroidos/default.nix: Exposes browser and wpewebkit-qt in asteroid scope.
+- overlay/overlay.nix: Registers wpewebkit package in Nixpkgs overlay.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ overlay/asteroidos/browser/CMakeLists.txt     |  49 +++
+ .../browser/asteroid-browser.desktop          |  12 +
+ .../asteroidos/browser/asteroid-browser.svg   |  50 +++
+ overlay/asteroidos/browser/default.nix        |  44 ++
+ overlay/asteroidos/browser/portal.html        | 237 +++++++++++
+ overlay/asteroidos/browser/src/main.c         | 384 ++++++++++++++++++
+ overlay/asteroidos/default.nix                |  14 +-
+ overlay/asteroidos/wpewebkit-qt/default.nix   |  70 ++++
+ overlay/overlay.nix                           |   2 +
+ overlay/wpewebkit/default.nix                 | 163 ++++++++
+ 10 files changed, 1023 insertions(+), 2 deletions(-)
+ create mode 100644 overlay/asteroidos/browser/CMakeLists.txt
+ create mode 100644 overlay/asteroidos/browser/asteroid-browser.desktop
+ create mode 100644 overlay/asteroidos/browser/asteroid-browser.svg
+ create mode 100644 overlay/asteroidos/browser/default.nix
+ create mode 100644 overlay/asteroidos/browser/portal.html
+ create mode 100644 overlay/asteroidos/browser/src/main.c
+ create mode 100644 overlay/asteroidos/wpewebkit-qt/default.nix
+ create mode 100644 overlay/wpewebkit/default.nix
+
+diff --git a/overlay/asteroidos/browser/CMakeLists.txt b/overlay/asteroidos/browser/CMakeLists.txt
+new file mode 100644
+index 00000000..1ecd71a9
+--- /dev/null
++++ b/overlay/asteroidos/browser/CMakeLists.txt
+@@ -0,0 +1,49 @@
++cmake_minimum_required(VERSION 3.16)
++project(asteroid-browser VERSION 1.0.0 LANGUAGES C)
++
++set(CMAKE_C_STANDARD 11)
++set(CMAKE_C_STANDARD_REQUIRED ON)
++
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(WEBKIT REQUIRED IMPORTED_TARGET webkitgtk-6.0)
++pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4)
++
++include(GNUInstallDirs)
++
++set(SOURCES
++    src/main.c
++)
++
++add_executable(asteroid-browser ${SOURCES})
++
++target_link_libraries(asteroid-browser PRIVATE
++    PkgConfig::WEBKIT
++    PkgConfig::GTK4
++    m
++)
++
++install(TARGETS asteroid-browser
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++)
++
++install(FILES asteroid-browser.desktop
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
++)
++
++install(FILES asteroid-browser.desktop
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
++    RENAME org.asteroidos.browser.desktop
++)
++
++install(FILES asteroid-browser.svg
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
++)
++
++install(FILES asteroid-browser.svg
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
++    RENAME org.asteroidos.browser.svg
++)
++
++install(FILES portal.html
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/asteroid-browser
++)
+diff --git a/overlay/asteroidos/browser/asteroid-browser.desktop b/overlay/asteroidos/browser/asteroid-browser.desktop
+new file mode 100644
+index 00000000..6e0de5d7
+--- /dev/null
++++ b/overlay/asteroidos/browser/asteroid-browser.desktop
+@@ -0,0 +1,12 @@
++[Desktop Entry]
++Name=Browser
++GenericName=Web Browser
++Comment=Web Browser for Smartwatches
++Exec=asteroid-browser %U
++Icon=asteroid-browser
++Terminal=false
++Type=Application
++Categories=Network;WebBrowser;
++StartupNotify=true
++MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
++Keywords=web;browser;internet;
+diff --git a/overlay/asteroidos/browser/asteroid-browser.svg b/overlay/asteroidos/browser/asteroid-browser.svg
+new file mode 100644
+index 00000000..b65fe4b9
+--- /dev/null
++++ b/overlay/asteroidos/browser/asteroid-browser.svg
+@@ -0,0 +1,50 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
++  <defs>
++    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
++      <stop offset="0%" stop-color="#0b1e36"/>
++      <stop offset="50%" stop-color="#102a4c"/>
++      <stop offset="100%" stop-color="#091322"/>
++    </linearGradient>
++    <linearGradient id="orbit" x1="0%" y1="0%" x2="100%" y2="100%">
++      <stop offset="0%" stop-color="#00e5ff"/>
++      <stop offset="100%" stop-color="#2979ff"/>
++    </linearGradient>
++    <linearGradient id="compass-north" x1="0%" y1="0%" x2="100%" y2="100%">
++      <stop offset="0%" stop-color="#ff1744"/>
++      <stop offset="100%" stop-color="#d50000"/>
++    </linearGradient>
++    <linearGradient id="compass-south" x1="0%" y1="0%" x2="100%" y2="100%">
++      <stop offset="0%" stop-color="#ffffff"/>
++      <stop offset="100%" stop-color="#cfd8dc"/>
++    </linearGradient>
++    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
++      <feGaussianBlur stdDeviation="3" result="blur" />
++      <feComposite in="SourceGraphic" in2="blur" operator="over" />
++    </filter>
++  </defs>
++
++  <!-- Circular background badge -->
++  <circle cx="64" cy="64" r="60" fill="url(#bg)" stroke="#1e3a5f" stroke-width="2"/>
++
++  <!-- Outer orbital ring -->
++  <circle cx="64" cy="64" r="50" fill="none" stroke="url(#orbit)" stroke-width="3" stroke-dasharray="14 6" opacity="0.8" filter="url(#glow)"/>
++
++  <!-- Latitude / Longitude globe lines -->
++  <ellipse cx="64" cy="64" rx="42" ry="42" fill="none" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
++  <ellipse cx="64" cy="64" rx="20" ry="42" fill="none" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
++  <line x1="22" y1="64" x2="106" y2="64" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
++  <line x1="64" y1="22" x2="64" y2="106" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
++
++  <!-- Stylized Compass / Navigator Pointer (35 degree tilt) -->
++  <g transform="translate(64,64) rotate(35)">
++    <!-- North Needle -->
++    <polygon points="0,-36 9,0 0,-4" fill="url(#compass-north)" filter="url(#glow)"/>
++    <polygon points="0,-36 -9,0 0,-4" fill="#b71c1c"/>
++    <!-- South Needle -->
++    <polygon points="0,36 9,0 0,4" fill="url(#compass-south)"/>
++    <polygon points="0,36 -9,0 0,4" fill="#90a4ae"/>
++    <!-- Center Pivot Pin -->
++    <circle cx="0" cy="0" r="5" fill="#eceff1" stroke="#37474f" stroke-width="1.5"/>
++    <circle cx="0" cy="0" r="2" fill="#00e5ff"/>
++  </g>
++</svg>
+diff --git a/overlay/asteroidos/browser/default.nix b/overlay/asteroidos/browser/default.nix
+new file mode 100644
+index 00000000..4ee89f74
+--- /dev/null
++++ b/overlay/asteroidos/browser/default.nix
+@@ -0,0 +1,44 @@
++# AsteroidOS native smartwatch web browser
++# Real WebKit browser engine (WebKitGTK 6.0) optimized for wearable displays
++# Upstream architecture: https://asteroidos.org/
++{
++  lib,
++  stdenv,
++  cmake,
++  pkg-config,
++  webkitgtk_6_0,
++  gtk4,
++  wrapGAppsHook4,
++  glib,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "asteroid-browser";
++  version = "1.0.0";
++
++  src = ./.;
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    wrapGAppsHook4
++  ];
++
++  buildInputs = [
++    webkitgtk_6_0
++    gtk4
++    glib
++  ];
++
++  dontWrapGApps = false;
++
++  meta = with lib; {
++    description = "Native WebKit smartwatch browser for AsteroidOS";
++    homepage = "https://asteroidos.org";
++    license = licenses.gpl3Plus;
++    platforms = platforms.linux;
++    mainProgram = "asteroid-browser";
++  };
++})
+diff --git a/overlay/asteroidos/browser/portal.html b/overlay/asteroidos/browser/portal.html
+new file mode 100644
+index 00000000..1924bbc8
+--- /dev/null
++++ b/overlay/asteroidos/browser/portal.html
+@@ -0,0 +1,237 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++  <meta charset="utf-8">
++  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
++  <title>Watch Browser</title>
++  <style>
++    :root {
++      --bg-color: #000000;
++      --card-bg: #121824;
++      --accent-color: #00e5ff;
++      --accent-glow: rgba(0, 229, 255, 0.35);
++      --text-main: #f0f4f8;
++      --text-muted: #8b9bb4;
++      --border-color: #1e293b;
++    }
++
++    * {
++      box-sizing: border-box;
++      margin: 0;
++      padding: 0;
++      -webkit-tap-highlight-color: transparent;
++      user-select: none;
++    }
++
++    body {
++      background-color: var(--bg-color);
++      color: var(--text-main);
++      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
++      width: 100vw;
++      min-height: 100vh;
++      display: flex;
++      flex-direction: column;
++      align-items: center;
++      justify-content: flex-start;
++      overflow-x: hidden;
++      overflow-y: auto;
++      padding: 24px 16px 40px 16px;
++    }
++
++    /* Circular display safe-area header */
++    .header {
++      display: flex;
++      flex-direction: column;
++      align-items: center;
++      margin-top: 8px;
++      margin-bottom: 12px;
++      text-align: center;
++    }
++
++    .badge {
++      font-size: 10px;
++      font-weight: 700;
++      text-transform: uppercase;
++      letter-spacing: 1.5px;
++      color: var(--accent-color);
++      margin-bottom: 2px;
++    }
++
++    .title {
++      font-size: 16px;
++      font-weight: 600;
++      color: var(--text-main);
++    }
++
++    /* Search input bar */
++    .search-box {
++      width: 85%;
++      max-width: 320px;
++      margin-bottom: 14px;
++    }
++
++    .search-form {
++      display: flex;
++      background: var(--card-bg);
++      border: 1px solid var(--border-color);
++      border-radius: 24px;
++      overflow: hidden;
++      padding: 2px 4px;
++      box-shadow: 0 0 10px var(--accent-glow);
++    }
++
++    .search-input {
++      flex: 1;
++      background: transparent;
++      border: none;
++      outline: none;
++      color: var(--text-main);
++      font-size: 13px;
++      padding: 8px 12px;
++    }
++
++    .search-btn {
++      background: var(--accent-color);
++      border: none;
++      border-radius: 20px;
++      color: #000;
++      font-size: 12px;
++      font-weight: bold;
++      padding: 0 12px;
++      cursor: pointer;
++    }
++
++    /* Speed dial bookmark tiles */
++    .tiles-grid {
++      display: grid;
++      grid-template-columns: repeat(2, 1fr);
++      gap: 10px;
++      width: 82%;
++      max-width: 300px;
++      margin-bottom: 16px;
++    }
++
++    .tile {
++      display: flex;
++      flex-direction: column;
++      align-items: center;
++      justify-content: center;
++      background: var(--card-bg);
++      border: 1px solid var(--border-color);
++      border-radius: 16px;
++      padding: 12px 8px;
++      text-decoration: none;
++      color: var(--text-main);
++      transition: transform 0.1s ease, border-color 0.1s ease;
++    }
++
++    .tile:active {
++      transform: scale(0.95);
++      border-color: var(--accent-color);
++      background: #1a2332;
++    }
++
++    .tile-icon {
++      font-size: 18px;
++      margin-bottom: 4px;
++    }
++
++    .tile-label {
++      font-size: 11px;
++      font-weight: 500;
++      color: var(--text-muted);
++    }
++
++    /* Quick controls at bottom */
++    .controls {
++      display: flex;
++      justify-content: center;
++      gap: 12px;
++      margin-top: 6px;
++      width: 75%;
++    }
++
++    .ctrl-btn {
++      background: var(--card-bg);
++      border: 1px solid var(--border-color);
++      border-radius: 50%;
++      width: 36px;
++      height: 36px;
++      display: flex;
++      align-items: center;
++      justify-content: center;
++      color: var(--text-muted);
++      font-size: 14px;
++      text-decoration: none;
++      cursor: pointer;
++    }
++
++    .ctrl-btn:active {
++      background: var(--accent-color);
++      color: #000;
++    }
++
++    .footer {
++      font-size: 9px;
++      color: #556980;
++      margin-top: 14px;
++      text-align: center;
++    }
++  </style>
++</head>
++<body>
++  <div class="header">
++    <div class="badge">NixOS Watch</div>
++    <div class="title">Web Navigator</div>
++  </div>
++
++  <div class="search-box">
++    <form class="search-form" action="https://html.duckduckgo.com/html/" method="get" onsubmit="return handleNavigate(event);">
++      <input id="url-input" class="search-input" type="search" name="q" placeholder="Search or URL..." autocomplete="off">
++      <button class="search-btn" type="submit">&#8594;</button>
++    </form>
++  </div>
++
++  <div class="tiles-grid">
++    <a class="tile" href="http://127.0.0.1:8080">
++      <div class="tile-icon">&#128214;</div>
++      <div class="tile-label">Kiwix (Offline)</div>
++    </a>
++    <a class="tile" href="https://en.m.wikipedia.org">
++      <div class="tile-icon">&#128218;</div>
++      <div class="tile-label">Wikipedia</div>
++    </a>
++    <a class="tile" href="https://html.duckduckgo.com">
++      <div class="tile-icon">&#128269;</div>
++      <div class="tile-label">DuckDuckGo</div>
++    </a>
++    <a class="tile" href="https://asteroidos.org/wiki/">
++      <div class="tile-icon">&#128392;</div>
++      <div class="tile-label">AsteroidOS</div>
++    </a>
++  </div>
++
++  <div class="controls">
++    <button class="ctrl-btn" onclick="history.back()" title="Back">&#9664;</button>
++    <button class="ctrl-btn" onclick="location.reload()" title="Reload">&#8635;</button>
++    <button class="ctrl-btn" onclick="history.forward()" title="Forward">&#9654;</button>
++  </div>
++
++  <div class="footer">Optimized for 400x400 Circular Display</div>
++
++  <script>
++    function handleNavigate(event) {
++      var input = document.getElementById('url-input').value.trim();
++      if (!input) return false;
++      if (/^https?:\/\//i.test(input)) {
++        window.location.href = input;
++        return false;
++      } else if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/i.test(input)) {
++        window.location.href = 'https://' + input;
++        return false;
++      }
++      return true;
++    }
++  </script>
++</body>
++</html>
+diff --git a/overlay/asteroidos/browser/src/main.c b/overlay/asteroidos/browser/src/main.c
+new file mode 100644
+index 00000000..c8cf0974
+--- /dev/null
++++ b/overlay/asteroidos/browser/src/main.c
+@@ -0,0 +1,384 @@
++#include <gtk/gtk.h>
++#include <webkit/webkit.h>
++#include <math.h>
++#include <stdio.h>
++#include <string.h>
++
++typedef struct {
++    GtkApplication *app;
++    GtkWidget *window;
++    GtkWidget *overlay;
++    GtkWidget *web_view;
++    GtkWidget *progress_bar;
++    GtkWidget *hud_box;
++    GtkWidget *search_box;
++    GtkWidget *search_entry;
++    GtkWidget *btn_back;
++    GtkWidget *btn_forward;
++    GtkWidget *btn_reload;
++    GtkWidget *btn_search;
++    GtkWidget *btn_home;
++    char *initial_url;
++} WatchBrowserApp;
++
++static WatchBrowserApp g_app_data;
++
++static void navigate_to(WatchBrowserApp *app, const char *input)
++{
++    if (!input || strlen(input) == 0) return;
++
++    if (g_str_has_prefix(input, "http://") ||
++        g_str_has_prefix(input, "https://") ||
++        g_str_has_prefix(input, "file://")) {
++        webkit_web_view_load_uri(WEBKIT_WEB_VIEW(app->web_view), input);
++    } else if (strchr(input, '.') && !strchr(input, ' ')) {
++        char *full_url = g_strdup_printf("https://%s", input);
++        webkit_web_view_load_uri(WEBKIT_WEB_VIEW(app->web_view), full_url);
++        g_free(full_url);
++    } else {
++        char *escaped = g_uri_escape_string(input, NULL, TRUE);
++        char *search_url = g_strdup_printf("https://html.duckduckgo.com/html/?q=%s", escaped);
++        webkit_web_view_load_uri(WEBKIT_WEB_VIEW(app->web_view), search_url);
++        g_free(escaped);
++        g_free(search_url);
++    }
++}
++
++static void on_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer user_data)
++{
++    WatchBrowserApp *app = (WatchBrowserApp *)user_data;
++
++    switch (load_event) {
++    case WEBKIT_LOAD_STARTED:
++        gtk_widget_set_visible(app->progress_bar, TRUE);
++        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(app->progress_bar), 0.1);
++        break;
++    case WEBKIT_LOAD_COMMITTED:
++        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(app->progress_bar), 0.5);
++        break;
++    case WEBKIT_LOAD_FINISHED:
++        gtk_widget_set_visible(app->progress_bar, FALSE);
++        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(app->progress_bar), 0.0);
++        break;
++    default:
++        break;
++    }
++
++    gtk_widget_set_sensitive(app->btn_back, webkit_web_view_can_go_back(web_view));
++    gtk_widget_set_sensitive(app->btn_forward, webkit_web_view_can_go_forward(web_view));
++}
++
++static void on_notify_progress(GObject *object, GParamSpec *pspec, gpointer user_data)
++{
++    WatchBrowserApp *app = (WatchBrowserApp *)user_data;
++    double progress = webkit_web_view_get_estimated_load_progress(WEBKIT_WEB_VIEW(object));
++    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(app->progress_bar), progress);
++}
++
++static void on_btn_back_clicked(GtkButton *btn, gpointer user_data)
++{
++    WatchBrowserApp *app = (WatchBrowserApp *)user_data;
++    if (webkit_web_view_can_go_back(WEBKIT_WEB_VIEW(app->web_view))) {
++        webkit_web_view_go_back(WEBKIT_WEB_VIEW(app->web_view));
++    }
++}
++
++static void on_btn_forward_clicked(GtkButton *btn, gpointer user_data)
++{
++    WatchBrowserApp *app = (WatchBrowserApp *)user_data;
++    if (webkit_web_view_can_go_forward(WEBKIT_WEB_VIEW(app->web_view))) {
++        webkit_web_view_go_forward(WEBKIT_WEB_VIEW(app->web_view));
++    }
++}
++
++static void on_btn_reload_clicked(GtkButton *btn, gpointer user_data)
++{
++    WatchBrowserApp *app = (WatchBrowserApp *)user_data;
++    if (webkit_web_view_is_loading(WEBKIT_WEB_VIEW(app->web_view))) {
++        webkit_web_view_stop_loading(WEBKIT_WEB_VIEW(app->web_view));
++    } else {
++        webkit_web_view_reload(WEBKIT_WEB_VIEW(app->web_view));
++    }
++}
++
++static void on_btn_home_clicked(GtkButton *btn, gpointer user_data)
++{
++    WatchBrowserApp *app = (WatchBrowserApp *)user_data;
++    const char *portal_path = g_getenv("ASTEROID_BROWSER_SHARE");
++    char *portal_file = NULL;
++
++    if (portal_path) {
++        portal_file = g_build_filename(portal_path, "portal.html", NULL);
++    } else {
++        portal_file = g_build_filename("/run/current-system/sw/share/asteroid-browser", "portal.html", NULL);
++    }
++
++    if (g_file_test(portal_file, G_FILE_TEST_EXISTS)) {
++        char *file_uri = g_strdup_printf("file://%s", portal_file);
++        webkit_web_view_load_uri(WEBKIT_WEB_VIEW(app->web_view), file_uri);
++        g_free(file_uri);
++    } else {
++        webkit_web_view_load_uri(WEBKIT_WEB_VIEW(app->web_view), "https://html.duckduckgo.com/html/");
++    }
++    g_free(portal_file);
++}
++
++static void on_btn_search_clicked(GtkButton *btn, gpointer user_data)
++{
++    WatchBrowserApp *app = (WatchBrowserApp *)user_data;
++    gboolean is_visible = gtk_widget_get_visible(app->search_box);
++    gtk_widget_set_visible(app->search_box, !is_visible);
++    if (!is_visible) {
++        gtk_widget_grab_focus(app->search_entry);
++    }
++}
++
++static void on_search_entry_activate(GtkEntry *entry, gpointer user_data)
++{
++    WatchBrowserApp *app = (WatchBrowserApp *)user_data;
++    const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
++    if (text && strlen(text) > 0) {
++        navigate_to(app, text);
++        gtk_widget_set_visible(app->search_box, FALSE);
++    }
++}
++
++static gboolean on_crown_scroll(GtkEventControllerScroll *scroll, gdouble dx, gdouble dy, gpointer user_data)
++{
++    WebKitWebView *view = WEBKIT_WEB_VIEW(user_data);
++    int delta = (int)(dy * 80.0);
++    char *js = g_strdup_printf("window.scrollBy({ top: %d, behavior: 'smooth' });", delta);
++    webkit_web_view_evaluate_javascript(view, js, -1, NULL, NULL, NULL, NULL, NULL);
++    g_free(js);
++    return GDK_EVENT_STOP;
++}
++
++static void on_swipe(GtkGestureSwipe *gesture, gdouble velocity_x, gdouble velocity_y, gpointer user_data)
++{
++    WatchBrowserApp *app = (WatchBrowserApp *)user_data;
++    WebKitWebView *view = WEBKIT_WEB_VIEW(app->web_view);
++
++    if (velocity_x > 350.0 && fabs(velocity_x) > fabs(velocity_y) * 1.5) {
++        if (webkit_web_view_can_go_back(view)) {
++            webkit_web_view_go_back(view);
++        }
++    } else if (velocity_x < -350.0 && fabs(velocity_x) > fabs(velocity_y) * 1.5) {
++        if (webkit_web_view_can_go_forward(view)) {
++            webkit_web_view_go_forward(view);
++        }
++    }
++}
++
++static void activate(GtkApplication *app, gpointer user_data)
++{
++    WatchBrowserApp *app_data = (WatchBrowserApp *)user_data;
++    app_data->app = app;
++
++    GtkWidget *window = gtk_application_window_new(app);
++    app_data->window = window;
++    gtk_window_set_title(GTK_WINDOW(window), "Browser");
++    gtk_window_set_default_size(GTK_WINDOW(window), 400, 400);
++    gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
++
++    /* AMOLED Dark Smartwatch CSS styling */
++    GtkCssProvider *css = gtk_css_provider_new();
++    gtk_css_provider_load_from_string(css,
++        "window { background-color: #000000; color: #FFFFFF; }\n"
++        ".watch-hud {\n"
++        "  background: rgba(14, 20, 32, 0.94);\n"
++        "  border: 1px solid rgba(0, 229, 255, 0.4);\n"
++        "  border-radius: 28px;\n"
++        "  padding: 4px 8px;\n"
++        "  margin-bottom: 12px;\n"
++        "}\n"
++        ".watch-btn {\n"
++        "  background: transparent;\n"
++        "  border: none;\n"
++        "  border-radius: 50%;\n"
++        "  min-width: 36px;\n"
++        "  min-height: 36px;\n"
++        "  padding: 0;\n"
++        "  color: #F0F4F8;\n"
++        "  font-size: 15px;\n"
++        "  font-weight: bold;\n"
++        "}\n"
++        ".watch-btn:hover, .watch-btn:active {\n"
++        "  background: rgba(0, 229, 255, 0.3);\n"
++        "  color: #00E5FF;\n"
++        "}\n"
++        ".watch-entry-box {\n"
++        "  background: rgba(10, 15, 26, 0.96);\n"
++        "  border: 1px solid #00E5FF;\n"
++        "  border-radius: 22px;\n"
++        "  padding: 4px 8px;\n"
++        "  margin: 14px 20px;\n"
++        "}\n"
++        ".watch-entry {\n"
++        "  background: transparent;\n"
++        "  color: #FFFFFF;\n"
++        "  border: none;\n"
++        "  padding: 4px 8px;\n"
++        "  font-size: 14px;\n"
++        "}\n"
++        ".watch-progress progressbar trough {\n"
++        "  min-height: 3px;\n"
++        "  background-color: transparent;\n"
++        "  border: none;\n"
++        "}\n"
++        ".watch-progress progressbar progress {\n"
++        "  min-height: 3px;\n"
++        "  background-color: #00E5FF;\n"
++        "  border-radius: 2px;\n"
++        "}\n");
++    gtk_style_context_add_provider_for_display(
++        gdk_display_get_default(),
++        GTK_STYLE_PROVIDER(css),
++        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
++    g_object_unref(css);
++
++    /* Root Overlay Layout */
++    GtkWidget *overlay = gtk_overlay_new();
++    app_data->overlay = overlay;
++    gtk_window_set_child(GTK_WINDOW(window), overlay);
++
++    /* WebKit Engine & Settings */
++    WebKitSettings *settings = webkit_settings_new();
++    webkit_settings_set_enable_javascript(settings, TRUE);
++    webkit_settings_set_enable_smooth_scrolling(settings, TRUE);
++    webkit_settings_set_enable_webgl(settings, TRUE);
++    webkit_settings_set_enable_webaudio(settings, FALSE);
++    webkit_settings_set_enable_page_cache(settings, FALSE);
++    webkit_settings_set_user_agent(settings,
++        "Mozilla/5.0 (Linux; Android 10; Wear OS) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 AsteroidOS/1.0");
++
++    GtkWidget *web_view = webkit_web_view_new();
++    app_data->web_view = web_view;
++    webkit_web_view_set_settings(WEBKIT_WEB_VIEW(web_view), settings);
++
++    GdkRGBA black = { 0.0, 0.0, 0.0, 1.0 };
++    webkit_web_view_set_background_color(WEBKIT_WEB_VIEW(web_view), &black);
++    gtk_widget_set_hexpand(web_view, TRUE);
++    gtk_widget_set_vexpand(web_view, TRUE);
++    gtk_overlay_set_child(GTK_OVERLAY(overlay), web_view);
++
++    /* Low-Memory Management for Wearable Profile */
++    WebKitMemoryPressureSettings *pressure = webkit_memory_pressure_settings_new();
++    webkit_memory_pressure_settings_set_memory_limit(pressure, 256);
++    webkit_network_session_set_memory_pressure_settings(pressure);
++    webkit_memory_pressure_settings_free(pressure);
++
++    /* Progress bar */
++    GtkWidget *progress = gtk_progress_bar_new();
++    app_data->progress_bar = progress;
++    gtk_widget_add_css_class(progress, "watch-progress");
++    gtk_widget_set_valign(progress, GTK_ALIGN_START);
++    gtk_widget_set_hexpand(progress, TRUE);
++    gtk_widget_set_visible(progress, FALSE);
++    gtk_overlay_add_overlay(GTK_OVERLAY(overlay), progress);
++
++    g_signal_connect(web_view, "load-changed", G_CALLBACK(on_load_changed), app_data);
++    g_signal_connect(web_view, "notify::estimated-load-progress", G_CALLBACK(on_notify_progress), app_data);
++
++    /* Search & URL entry dialog box */
++    GtkWidget *search_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
++    app_data->search_box = search_box;
++    gtk_widget_add_css_class(search_box, "watch-entry-box");
++    gtk_widget_set_halign(search_box, GTK_ALIGN_FILL);
++    gtk_widget_set_valign(search_box, GTK_ALIGN_START);
++    gtk_widget_set_visible(search_box, FALSE);
++
++    GtkWidget *search_entry = gtk_entry_new();
++    app_data->search_entry = search_entry;
++    gtk_widget_add_css_class(search_entry, "watch-entry");
++    gtk_entry_set_placeholder_text(GTK_ENTRY(search_entry), "Search or URL...");
++    gtk_widget_set_hexpand(search_entry, TRUE);
++    g_signal_connect(search_entry, "activate", G_CALLBACK(on_search_entry_activate), app_data);
++    gtk_box_append(GTK_BOX(search_box), search_entry);
++
++    GtkWidget *btn_go = gtk_button_new_with_label("Go");
++    gtk_widget_add_css_class(btn_go, "watch-btn");
++    g_signal_connect_swapped(btn_go, "clicked", G_CALLBACK(on_search_entry_activate), search_entry);
++    gtk_box_append(GTK_BOX(search_box), btn_go);
++
++    gtk_overlay_add_overlay(GTK_OVERLAY(overlay), search_box);
++
++    /* Floating Navigation Action HUD */
++    GtkWidget *hud = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
++    app_data->hud_box = hud;
++    gtk_widget_add_css_class(hud, "watch-hud");
++    gtk_widget_set_halign(hud, GTK_ALIGN_CENTER);
++    gtk_widget_set_valign(hud, GTK_ALIGN_END);
++
++    GtkWidget *btn_back = gtk_button_new_with_label("◀");
++    app_data->btn_back = btn_back;
++    gtk_widget_add_css_class(btn_back, "watch-btn");
++    gtk_widget_set_sensitive(btn_back, FALSE);
++    g_signal_connect(btn_back, "clicked", G_CALLBACK(on_btn_back_clicked), app_data);
++    gtk_box_append(GTK_BOX(hud), btn_back);
++
++    GtkWidget *btn_home = gtk_button_new_with_label("⌂");
++    app_data->btn_home = btn_home;
++    gtk_widget_add_css_class(btn_home, "watch-btn");
++    g_signal_connect(btn_home, "clicked", G_CALLBACK(on_btn_home_clicked), app_data);
++    gtk_box_append(GTK_BOX(hud), btn_home);
++
++    GtkWidget *btn_search = gtk_button_new_with_label("🔍");
++    app_data->btn_search = btn_search;
++    gtk_widget_add_css_class(btn_search, "watch-btn");
++    g_signal_connect(btn_search, "clicked", G_CALLBACK(on_btn_search_clicked), app_data);
++    gtk_box_append(GTK_BOX(hud), btn_search);
++
++    GtkWidget *btn_reload = gtk_button_new_with_label("↻");
++    app_data->btn_reload = btn_reload;
++    gtk_widget_add_css_class(btn_reload, "watch-btn");
++    g_signal_connect(btn_reload, "clicked", G_CALLBACK(on_btn_reload_clicked), app_data);
++    gtk_box_append(GTK_BOX(hud), btn_reload);
++
++    GtkWidget *btn_forward = gtk_button_new_with_label("▶");
++    app_data->btn_forward = btn_forward;
++    gtk_widget_add_css_class(btn_forward, "watch-btn");
++    gtk_widget_set_sensitive(btn_forward, FALSE);
++    g_signal_connect(btn_forward, "clicked", G_CALLBACK(on_btn_forward_clicked), app_data);
++    gtk_box_append(GTK_BOX(hud), btn_forward);
++
++    gtk_overlay_add_overlay(GTK_OVERLAY(overlay), hud);
++
++    /* Hardware Crown Scroll Controller */
++    GtkEventController *scroll = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_VERTICAL | GTK_EVENT_CONTROLLER_SCROLL_DISCRETE);
++    g_signal_connect(scroll, "scroll", G_CALLBACK(on_crown_scroll), web_view);
++    gtk_widget_add_controller(window, scroll);
++
++    /* Touch Edge Swipe Navigation */
++    GtkGesture *swipe = gtk_gesture_swipe_new();
++    g_signal_connect(swipe, "swipe", G_CALLBACK(on_swipe), app_data);
++    gtk_widget_add_controller(window, GTK_EVENT_CONTROLLER(swipe));
++
++    /* Load initial URL or Home */
++    if (app_data->initial_url && strlen(app_data->initial_url) > 0) {
++        navigate_to(app_data, app_data->initial_url);
++    } else {
++        on_btn_home_clicked(NULL, app_data);
++    }
++
++    gtk_window_present(GTK_WINDOW(window));
++}
++
++int main(int argc, char *argv[])
++{
++    memset(&g_app_data, 0, sizeof(WatchBrowserApp));
++
++    if (argc > 1 && argv[1][0] != '-') {
++        g_app_data.initial_url = g_strdup(argv[1]);
++    }
++
++    GtkApplication *app = gtk_application_new("org.asteroidos.browser", G_APPLICATION_DEFAULT_FLAGS);
++    g_signal_connect(app, "activate", G_CALLBACK(activate), &g_app_data);
++
++    int status = g_application_run(G_APPLICATION(app), argc, argv);
++
++    g_object_unref(app);
++    if (g_app_data.initial_url) {
++        g_free(g_app_data.initial_url);
++    }
++    return status;
++}
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index b1ed8dc8..e1f47936 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -35,10 +35,20 @@ rec {
+     inherit qml-asteroid amber-mpris mlite;
+   };
+ 
+-  apps = callPackage ./apps {
+-    inherit mkAsteroidApp mce-dev ngf-qt6;
++  browser = callPackage ./browser { };
++
++  wpewebkit-qt = callPackage ./wpewebkit-qt {
++    inherit (pkgs) wpewebkit;
+   };
+ 
++  apps =
++    (callPackage ./apps {
++      inherit mkAsteroidApp mce-dev ngf-qt6;
++    })
++    // {
++      inherit browser;
++    };
++
+   assets = (callPackage ./assets { }) // {
+     inherit virtualkeyboard;
+   };
+diff --git a/overlay/asteroidos/wpewebkit-qt/default.nix b/overlay/asteroidos/wpewebkit-qt/default.nix
+new file mode 100644
+index 00000000..e2a9aedc
+--- /dev/null
++++ b/overlay/asteroidos/wpewebkit-qt/default.nix
+@@ -0,0 +1,70 @@
++# WPE WebKit Qt6 Quick / QML plugin (WPEQt)
++# Upstream: https://github.com/nowrep/wpewebkit-qt
++# Inspired by WPE WebKit for embedded devices: https://wpewebkit.org/
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  wpewebkit,
++  libwpe,
++  libwpe-fdo,
++  libepoxy,
++  mesa,
++  glib,
++  buildPackages,
++}:
++
++let
++  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
++in
++stdenv.mkDerivation (finalAttrs: {
++  pname = "wpewebkit-qt";
++  version = "0.1.0-unstable-2024-05-18";
++
++  src = fetchFromGitHub {
++    owner = "nowrep";
++    repo = "wpewebkit-qt";
++    rev = "4632cb569d6e79c54dd4df17fd9bba297ad76974";
++    sha256 = "04c12bacrf5py7rhrzs3hvxj79g7c43wylhrbgkbp5nqirq7m6yr";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++
++  cmakeFlags = [
++    "-DUSE_QT6=ON"
++  ]
++  ++ lib.optionals isCross [
++    "-DQt6QuickTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++    "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    wpewebkit
++    libwpe
++    libwpe-fdo
++    libepoxy
++    mesa
++    glib
++  ];
++
++  dontWrapQtApps = true;
++
++  meta = with lib; {
++    description = "WPE WebKit QML plugin for Qt6";
++    homepage = "https://github.com/nowrep/wpewebkit-qt";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/overlay.nix b/overlay/overlay.nix
+index 765a0608..e096cb9a 100644
+--- a/overlay/overlay.nix
++++ b/overlay/overlay.nix
+@@ -53,6 +53,8 @@ in
+     pd-mapper = callPackage ./qrtr/pd-mapper.nix { };
+     rmtfs = callPackage ./qrtr/rmtfs.nix { };
+ 
++    wpewebkit = callPackage ./wpewebkit { };
++
+     lk2ndMsm8953 = callPackage ./lk2nd/msm8953.nix {};
+ 
+     #
+diff --git a/overlay/wpewebkit/default.nix b/overlay/wpewebkit/default.nix
+new file mode 100644
+index 00000000..bfc7ecb0
+--- /dev/null
++++ b/overlay/wpewebkit/default.nix
+@@ -0,0 +1,163 @@
++# WPE WebKit port optimized for embedded devices and smartwatches
++# Upstream: https://wpewebkit.org/
++# Packaging inspired by: https://github.com/eval-exec/nix-wpe-webkit
++{
++  lib,
++  stdenv,
++  fetchurl,
++  cmake,
++  ninja,
++  pkg-config,
++  perl,
++  python3,
++  ruby,
++  bison,
++  flex,
++  gperf,
++  gettext,
++  unifdef,
++  gi-docgen,
++  gobject-introspection,
++  libsysprof-capture,
++  glib,
++  libsoup_3,
++  libxml2,
++  libxslt,
++  icu,
++  harfbuzz,
++  fontconfig,
++  freetype,
++  cairo,
++  libepoxy,
++  libdrm,
++  libgbm,
++  libinput,
++  libxkbcommon,
++  wayland,
++  wayland-protocols,
++  wayland-scanner,
++  mesa,
++  sqlite,
++  zlib,
++  libpng,
++  libjpeg,
++  libwebp,
++  libavif,
++  libjxl,
++  woff2,
++  lcms2,
++  hyphen,
++  libgcrypt,
++  libgpg-error,
++  libtasn1,
++  p11-kit,
++  pcre2,
++  libseccomp,
++  systemd,
++  bubblewrap,
++  xdg-dbus-proxy,
++  at-spi2-core,
++  gst_all_1,
++  libwpe,
++  libwpe-fdo,
++  expat,
++  libedit,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "wpewebkit";
++  version = "2.54.1";
++
++  outputs = [
++    "out"
++    "dev"
++  ];
++
++  src = fetchurl {
++    url = "https://wpewebkit.org/releases/wpewebkit-${finalAttrs.version}.tar.xz";
++    hash = "sha256-Dei9+6AR+c1jupqRcfpgON0sCCN4lPQIKru4IfKdP+k=";
++  };
++
++  nativeBuildInputs = [
++    bison
++    cmake
++    flex
++    gettext
++    gperf
++    ninja
++    perl
++    pkg-config
++    python3
++    ruby
++    unifdef
++    wayland-protocols
++    wayland-scanner
++  ];
++
++  buildInputs = [
++    at-spi2-core
++    bubblewrap
++    cairo
++    expat
++    fontconfig
++    freetype
++    glib
++    gst_all_1.gst-plugins-base
++    gst_all_1.gstreamer
++    icu
++    (harfbuzz.override { withIcu = true; })
++    hyphen
++    lcms2
++    libavif
++    libdrm
++    libedit
++    libepoxy
++    libgbm
++    libgcrypt
++    libgpg-error
++    libinput
++    libjpeg
++    libjxl
++    libpng
++    libseccomp
++    libsoup_3
++    libtasn1
++    libwebp
++    libwpe
++    libwpe-fdo
++    libxkbcommon
++    libxml2
++    libxslt
++    mesa
++    p11-kit
++    pcre2
++    sqlite
++    systemd
++    wayland
++    woff2
++    xdg-dbus-proxy
++    zlib
++  ];
++
++  cmakeFlags = [
++    (lib.cmakeFeature "PORT" "WPE")
++    (lib.cmakeBool "ENABLE_DOCUMENTATION" false)
++    (lib.cmakeBool "ENABLE_INTROSPECTION" false)
++    (lib.cmakeBool "ENABLE_MINIBROWSER" true)
++    (lib.cmakeBool "ENABLE_SPEECH_SYNTHESIS" false)
++    (lib.cmakeBool "ENABLE_VIDEO" false)
++    (lib.cmakeBool "ENABLE_WEB_AUDIO" false)
++    (lib.cmakeBool "ENABLE_MEDIA_STREAM" false)
++    (lib.cmakeBool "ENABLE_WEB_RTC" false)
++    (lib.cmakeBool "ENABLE_WPE_PLATFORM" true)
++    (lib.cmakeBool "USE_LIBBACKTRACE" false)
++  ];
++
++  meta = with lib; {
++    description = "WPE WebKit port optimized for embedded devices and smartwatches";
++    homepage = "https://wpewebkit.org";
++    license = licenses.bsd2;
++    platforms = platforms.linux;
++    pkgConfigModules = [ "wpe-webkit-2.0" ];
++  };
++})

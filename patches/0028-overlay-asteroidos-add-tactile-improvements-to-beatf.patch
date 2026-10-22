@@ -1,0 +1,492 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:23:41 +1100
+Subject: [PATCH] overlay/asteroidos: add tactile improvements to beatfork
+
+Apply the Tack-inspired patch to moWerk/asteroid-beatfork, adding tap
+tempo, accented subdivisions, a pulse ring, and haptic feedback.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ .../beatfork-tack-improvements.patch          | 449 ++++++++++++++++++
+ overlay/asteroidos/community-apps/default.nix |   4 +
+ 2 files changed, 453 insertions(+)
+ create mode 100644 overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
+
+diff --git a/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch b/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
+new file mode 100644
+index 00000000..3887693a
+--- /dev/null
++++ b/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
+@@ -0,0 +1,449 @@
++diff -ruN a/src/main.qml b/src/main.qml
++--- a/src/main.qml	2026-10-18 23:59:51.691512427 +1100
+++++ b/src/main.qml	2026-10-19 00:03:53.163889229 +1100
++@@ -138,6 +138,39 @@
++         event: "press"
++     }
++ 
+++    NonGraphicalFeedback {
+++        id: hapticAccent
+++        event: "warning"
+++    }
+++
+++    // Tack-inspired time signatures & subdivisions (1/4, 2/4, 3/4, 4/4, 5/4, 6/8, 7/8)
+++    readonly property var timeSignatures: [
+++        { name: "1/4", beats: 1 },
+++        { name: "2/4", beats: 2 },
+++        { name: "3/4", beats: 3 },
+++        { name: "4/4", beats: 4 },
+++        { name: "5/4", beats: 5 },
+++        { name: "6/8", beats: 6 },
+++        { name: "7/8", beats: 7 }
+++    ]
+++    property int timeSignatureIndex: 3
+++    property int beatIndex:          0
+++    property bool isAccent:          true
+++    property bool isMuted:           false
+++    property var mutedBeats:         ({})
+++
+++    readonly property var tempoPresets: [60, 80, 100, 120, 140, 160, 180]
+++
+++    // Tack-inspired practice duration tracker
+++    property int practiceElapsedSeconds: 0
+++    Timer {
+++        id: practiceTimer
+++        interval: 1000
+++        repeat: true
+++        running: page1State.soundActive || page1State.hapticActive || page1State.pulseVisible
+++        onTriggered: app.practiceElapsedSeconds++
+++    }
+++
++     Timer {
++         id: beatTimer
++         interval:         Math.max(1, Math.round(60000 / bpmConfig.value))
++@@ -186,9 +219,19 @@
++     signal beat()
++ 
++     function beatFlash() {
+++        var numBeats = app.timeSignatures[app.timeSignatureIndex].beats
+++        app.beatIndex = (app.beatIndex + 1) % numBeats
+++        app.isAccent = (app.beatIndex === 0)
+++        app.isMuted = !!(app.mutedBeats && app.mutedBeats[app.beatIndex])
+++
++         app.beat()
++-        if (page1State.soundActive)  tickSound.play()
++-            if (page1State.hapticActive) hapticFeedback.play()
+++        if (!app.isMuted) {
+++            if (page1State.soundActive) tickSound.play()
+++            if (page1State.hapticActive) {
+++                if (app.isAccent) hapticAccent.play()
+++                else hapticFeedback.play()
+++            }
+++        }
++     }
++ 
++     ListView {
++@@ -265,6 +308,44 @@
++                 soundActive:    page1State.soundActive
++                 hapticActive:   page1State.hapticActive
++                 beatSource:     app
+++                isAccent:               app.isAccent
+++                isMuted:                app.isMuted
+++                timeSignatureIndex:     app.timeSignatureIndex
+++                timeSignatures:         app.timeSignatures
+++                currentBeat:            app.beatIndex
+++                mutedBeats:             app.mutedBeats
+++                practiceElapsedSeconds: app.practiceElapsedSeconds
+++
+++                onTimeSignatureCycle: {
+++                    app.timeSignatureIndex = (app.timeSignatureIndex + 1) % app.timeSignatures.length
+++                    app.beatIndex = 0
+++                    app.isAccent = true
+++                    app.mutedBeats = ({})
+++                }
+++
+++                onToggleMuteBeat: function(bIdx) {
+++                    var m = Object.assign({}, app.mutedBeats)
+++                    if (m[bIdx]) delete m[bIdx]
+++                    else m[bIdx] = true
+++                    app.mutedBeats = m
+++                }
+++
+++                onResetPracticeTimer: {
+++                    app.practiceElapsedSeconds = 0
+++                }
+++
+++                onNextPreset: {
+++                    var cur = bpmConfig.value
+++                    var next = app.tempoPresets[0]
+++                    for (var i = 0; i < app.tempoPresets.length; i++) {
+++                        if (app.tempoPresets[i] > cur) {
+++                            next = app.tempoPresets[i]
+++                            break
+++                        }
+++                    }
+++                    bpmConfig.value = next
+++                }
+++
++                 onPulseVisibleSet: page1State.pulseVisible = active
++                 onSoundActiveSet:  page1State.soundActive  = active
++                 onHapticActiveSet: page1State.hapticActive = active
++diff -ruN a/src/MetronomePage.qml b/src/MetronomePage.qml
++--- a/src/MetronomePage.qml	2026-10-18 23:59:51.690512425 +1100
+++++ b/src/MetronomePage.qml	2026-10-19 00:08:09.939289726 +1100
++@@ -30,12 +30,73 @@
++ 
++     property bool   pageActive: false
++ 
+++    // Tack-inspired properties
+++    property bool   isAccent:     false
+++    property bool   isMuted:      false
+++    property int    timeSignatureIndex: 3
+++    property var    timeSignatures: [
+++        { name: "1/4", beats: 1 },
+++        { name: "2/4", beats: 2 },
+++        { name: "3/4", beats: 3 },
+++        { name: "4/4", beats: 4 },
+++        { name: "5/4", beats: 5 },
+++        { name: "6/8", beats: 6 },
+++        { name: "7/8", beats: 7 }
+++    ]
+++    property int    currentBeat:  0
+++    property var    mutedBeats:   ({})
+++    property int    practiceElapsedSeconds: 0
+++    property var    tapTimes:     []
+++
++     // Write-back signals
++     signal pulseVisibleSet(bool active)
++     signal soundActiveSet(bool active)
++     signal hapticActiveSet(bool active)
++     signal colorIndexSet(int idx)
++-    signal bpmPending(int bpm)          // main restarts spinnerDebounce and sets pendingBpm
+++    signal timeSignatureCycle()
+++    signal toggleMuteBeat(int bIdx)
+++    signal resetPracticeTimer()
+++    signal nextPreset()
+++    signal bpmPending(int bpm)
+++
+++    function getTempoName(bpm) {
+++        if (bpm < 45)  return "Grave"
+++        if (bpm < 60)  return "Largo"
+++        if (bpm < 66)  return "Larghetto"
+++        if (bpm < 76)  return "Adagio"
+++        if (bpm < 108) return "Andante"
+++        if (bpm < 120) return "Moderato"
+++        if (bpm < 156) return "Allegro"
+++        if (bpm < 176) return "Vivace"
+++        if (bpm <= 200) return "Presto"
+++        return "Prestissimo"
+++    }
+++
+++    function formatPracticeTime(totalSeconds) {
+++        var m = Math.floor(totalSeconds / 60)
+++        var s = totalSeconds % 60
+++        return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s)
+++    }
+++
+++    function registerTap() {
+++        var now = Date.now()
+++        if (tapTimes.length > 0 && (now - tapTimes[tapTimes.length - 1]) > 2000) {
+++            tapTimes = []
+++        }
+++        tapTimes.push(now)
+++        if (tapTimes.length > 6) tapTimes.shift()
+++        if (tapTimes.length >= 2) {
+++            var total = 0
+++            for (var i = 1; i < tapTimes.length; i++) {
+++                total += (tapTimes[i] - tapTimes[i - 1])
+++            }
+++            var avgDelta = total / (tapTimes.length - 1)
+++            var newBpm = Math.round(60000 / avgDelta)
+++            if (newBpm >= page.bpmMin && newBpm <= page.bpmMax) {
+++                page.bpmPending(newBpm)
+++            }
+++        }
+++    }
++ 
++     // ── Settle guard ──────────────────────────────────────────────────────────
++     property bool settled: false
++@@ -95,7 +156,7 @@
++             Connections {
++                 target: page.beatSource
++                 function onBeat() {
++-                    if (page.settled && page.pulseVisible) pulseToggleBeat.restart()
+++                    if (page.settled && page.pulseVisible && !page.isMuted) pulseToggleBeat.restart()
++                 }
++             }
++         }
++@@ -149,7 +210,7 @@
++             Connections {
++                 target: page.beatSource
++                 function onBeat() {
++-                    if (page.settled && page.pulseVisible) colorCycleBeat.restart()
+++                    if (page.settled && page.pulseVisible && !page.isMuted) colorCycleBeat.restart()
++                 }
++             }
++         }
++@@ -198,7 +259,7 @@
++             Connections {
++                 target: page.beatSource
++                 function onBeat() {
++-                    if (page.settled && page.soundActive) soundToggleBeat.restart()
+++                    if (page.settled && page.soundActive && !page.isMuted) soundToggleBeat.restart()
++                 }
++             }
++         }
++@@ -250,7 +311,7 @@
++             Connections {
++                 target: page.beatSource
++                 function onBeat() {
++-                    if (page.settled && page.hapticActive) hapticToggleBeat.restart()
+++                    if (page.settled && page.hapticActive && !page.isMuted) hapticToggleBeat.restart()
++                 }
++             }
++         }
++@@ -288,14 +349,111 @@
++ 
++         SequentialAnimation {
++             id: pulseBigAnim
++-            NumberAnimation { target: pulseBig; property: "opacity"; to: 1.0; duration: 60;  easing.type: Easing.OutQuad }
+++            NumberAnimation { target: pulseBig; property: "opacity"; to: page.isAccent ? 1.0 : 0.55; duration: 60;  easing.type: Easing.OutQuad }
++             NumberAnimation { target: pulseBig; property: "opacity"; to: 0.0; duration: 140; easing.type: Easing.InQuad }
++         }
++ 
++         Connections {
++             target: page.beatSource
++             function onBeat() {
++-                if (page.settled && page.pulseVisible) pulseBigAnim.restart()
+++                if (page.settled && page.pulseVisible && !page.isMuted) pulseBigAnim.restart()
+++            }
+++        }
+++    }
+++
+++    // ── Concentric visual pulse ring (Tack-inspired) ─────────────────────────
+++    Rectangle {
+++        id: pulseRing
+++        anchors.centerIn: parent
+++        width: Dims.l(25)
+++        height: width
+++        radius: width / 2
+++        color: "transparent"
+++        border.color: page.pulseColor
+++        border.width: page.isAccent ? Dims.l(3.5) : Dims.l(1.8)
+++        opacity: 0.0
+++        z: 10
+++
+++        ParallelAnimation {
+++            id: pulseRingAnim
+++            NumberAnimation { target: pulseRing; property: "width"; from: Dims.l(25); to: page.isAccent ? Dims.l(95) : Dims.l(75); duration: 250; easing.type: Easing.OutQuad }
+++            NumberAnimation { target: pulseRing; property: "opacity"; from: page.isAccent ? 0.95 : 0.65; to: 0.0; duration: 250; easing.type: Easing.OutQuad }
+++        }
+++
+++        Connections {
+++            target: page.beatSource
+++            function onBeat() {
+++                if (page.settled && page.pulseVisible && !page.isMuted) pulseRingAnim.restart()
+++            }
+++        }
+++    }
+++
+++    // ── Subdivision indicator & Time Signature Selector (Tack-inspired) ────────
+++    Item {
+++        id: subdivisionControl
+++        anchors.top: parent.top
+++        anchors.topMargin: Dims.h(11)
+++        anchors.horizontalCenter: parent.horizontalCenter
+++        width: Dims.w(58)
+++        height: Dims.h(12)
+++        z: 3
+++
+++        Rectangle {
+++            anchors.fill: parent
+++            radius: height / 2
+++            color: "#182030"
+++            opacity: 0.88
+++            border.color: page.isAccent ? page.pulseColor : "#3a4660"
+++            border.width: 1
+++        }
+++
+++        Row {
+++            anchors.centerIn: parent
+++            spacing: Dims.w(2.5)
+++
+++            // Time Signature pill
+++            Item {
+++                width: timeSigText.implicitWidth + Dims.w(2)
+++                height: parent.height
+++
+++                Text {
+++                    id: timeSigText
+++                    anchors.centerIn: parent
+++                    text: page.timeSignatures[page.timeSignatureIndex].name
+++                    color: page.pulseColor
+++                    font.bold: true
+++                    font.pixelSize: Dims.l(5.5)
+++                }
+++
+++                MouseArea {
+++                    anchors.fill: parent
+++                    onClicked: page.timeSignatureCycle()
+++                }
+++            }
+++
+++            // Beat dots with mute support (Tack-inspired)
+++            Row {
+++                anchors.verticalCenter: parent.verticalCenter
+++                spacing: Dims.w(1.5)
+++
+++                Repeater {
+++                    model: page.timeSignatures[page.timeSignatureIndex].beats
+++                    Rectangle {
+++                        property bool muted: !!(page.mutedBeats && page.mutedBeats[index])
+++                        width: Dims.l(index === 0 ? 3.6 : 2.6)
+++                        height: width
+++                        radius: width / 2
+++                        color: muted ? "transparent" : (index === page.currentBeat ? page.pulseColor : (index === 0 ? "#708090" : "#404855"))
+++                        border.color: muted ? "#FF4444" : "transparent"
+++                        border.width: muted ? 1.5 : 0
+++                        opacity: index === page.currentBeat ? 1.0 : (muted ? 0.5 : 0.65)
+++
+++                        MouseArea {
+++                            anchors.fill: parent
+++                            onClicked: page.toggleMuteBeat(index)
+++                        }
+++                    }
+++                }
++             }
++         }
++     }
++@@ -305,7 +463,7 @@
++         id: bpmSpinner
++         anchors.centerIn: parent
++         width:  Dims.w(40)
++-        height: Dims.h(60)
+++        height: Dims.h(58)
++         z: 1
++         model: page.bpmModelCount
++         currentIndex: {
++@@ -317,6 +475,101 @@
++         }
++     }
++ 
+++    // ── Italian Musical Tempo Name & Preset Quick-Select (Tack-inspired) ─────
+++    Item {
+++        id: tempoNameBadge
+++        anchors.bottom: bottomRow.top
+++        anchors.bottomMargin: Dims.h(1)
+++        anchors.horizontalCenter: parent.horizontalCenter
+++        width: Dims.w(45)
+++        height: Dims.h(6)
+++        z: 3
+++
+++        Text {
+++            anchors.centerIn: parent
+++            text: page.getTempoName(page.bpmValue)
+++            color: page.pulseColor
+++            font.bold: true
+++            font.pixelSize: Dims.l(4.2)
+++            opacity: 0.9
+++        }
+++
+++        MouseArea {
+++            anchors.fill: parent
+++            onClicked: page.nextPreset()
+++        }
+++    }
+++
+++    // ── Tap Tempo Button & Practice Duration (Tack-inspired) ──────────────────
+++    Row {
+++        id: bottomRow
+++        anchors.bottom: parent.bottom
+++        anchors.bottomMargin: Dims.h(8)
+++        anchors.horizontalCenter: parent.horizontalCenter
+++        spacing: Dims.w(3)
+++        z: 3
+++
+++        // Tap Button
+++        Item {
+++            id: tapTempoButton
+++            width: Dims.w(25)
+++            height: Dims.h(8.5)
+++
+++            Rectangle {
+++                anchors.fill: parent
+++                radius: height / 2
+++                color: tapMouse.pressed ? page.pulseColor : "#1c2538"
+++                opacity: 0.88
+++                border.color: page.pulseColor
+++                border.width: 1
+++            }
+++
+++            Text {
+++                anchors.centerIn: parent
+++                text: "TAP"
+++                color: tapMouse.pressed ? "#000000" : page.pulseColor
+++                font.bold: true
+++                font.pixelSize: Dims.l(4.8)
+++            }
+++
+++            MouseArea {
+++                id: tapMouse
+++                anchors.fill: parent
+++                onClicked: page.registerTap()
+++            }
+++        }
+++
+++        // Practice Duration Timer Badge
+++        Item {
+++            id: practiceTimerBadge
+++            width: Dims.w(25)
+++            height: Dims.h(8.5)
+++
+++            Rectangle {
+++                anchors.fill: parent
+++                radius: height / 2
+++                color: timerMouse.pressed ? "#304060" : "#141c2c"
+++                opacity: 0.88
+++                border.color: "#3a4660"
+++                border.width: 1
+++            }
+++
+++            Text {
+++                anchors.centerIn: parent
+++                text: "⏱ " + page.formatPracticeTime(page.practiceElapsedSeconds)
+++                color: "#E0E6F0"
+++                font.bold: true
+++                font.pixelSize: Dims.l(3.4)
+++            }
+++
+++            MouseArea {
+++                id: timerMouse
+++                anchors.fill: parent
+++                onClicked: page.resetPracticeTimer()
+++            }
+++        }
+++    }
+++
++     Connections {
++         target: bpmSpinner
++         function onCurrentIndexChanged() {
+diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
+index dd25bd98..0e218d1c 100644
+--- a/overlay/asteroidos/community-apps/default.nix
++++ b/overlay/asteroidos/community-apps/default.nix
+@@ -200,6 +200,7 @@ rec {
+ 
+   # A metronome and chromatic tuning fork app for smartwatches
+   # Upstream repository: https://github.com/moWerk/asteroid-beatfork
++  # Inspired by Tack metronome features (tap tempo, accented subdivisions, pulse ring, haptics): https://github.com/patzly/tack-android
+   beatfork = mkAsteroidApp {
+     name = "beatfork";
+     owner = "moWerk";
+@@ -207,6 +208,9 @@ rec {
+     desc = "Metronome and chromatic tuning fork app for smartwatches";
+     rev = "e3fbc5dd6da40868e0f338c9a0d3f6e877afca25";
+     sha256 = "1s4n5qfqximi05szksjbl806rpd37j3q7245z1iip5rrnlbkc7m2";
++    patches = [
++      ./beatfork-tack-improvements.patch
++    ];
+     extraBuildInputs = [
+       qt6.qtmultimedia
+     ];

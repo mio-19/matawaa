@@ -1,0 +1,390 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:12:43 +1100
+Subject: [PATCH] overlay/asteroidos: add Find My Phone support
+
+Add Matawaa's "Find My Phone" feature on top of upstream AsteroidOS:
+
+- asteroid-btsyncd: add BLE synchronization packets and D-Bus commands
+  compatible with Gadgetbridge, plus a find-phone CLI helper.
+- asteroid-launcher: add a QuickPanel toggle that asks the companion
+  phone to ring.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ .../asteroidos/asteroid-btsyncd/default.nix   |   9 +
+ .../asteroid-btsyncd/find-phone.patch         | 206 ++++++++++++++++++
+ .../asteroidos/asteroid-btsyncd/find-phone.sh |  37 ++++
+ .../asteroidos/asteroid-launcher/default.nix  |   7 +
+ .../asteroid-launcher/find-phone.patch        |  60 +++++
+ 5 files changed, 319 insertions(+)
+ create mode 100644 overlay/asteroidos/asteroid-btsyncd/find-phone.patch
+ create mode 100644 overlay/asteroidos/asteroid-btsyncd/find-phone.sh
+ create mode 100644 overlay/asteroidos/asteroid-launcher/find-phone.patch
+
+diff --git a/overlay/asteroidos/asteroid-btsyncd/default.nix b/overlay/asteroidos/asteroid-btsyncd/default.nix
+index af76edf4..0cb3257c 100644
+--- a/overlay/asteroidos/asteroid-btsyncd/default.nix
++++ b/overlay/asteroidos/asteroid-btsyncd/default.nix
+@@ -29,6 +29,14 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   strictDeps = true;
+ 
++  # AsteroidOS Bluetooth synchronization daemon
++  # Upstream repository: https://github.com/AsteroidOS/asteroid-btsyncd
++  # Companion phone app protocol (Gadgetbridge): https://codeberg.org/Freeyourgadget/Gadgetbridge
++  patches = [
++    # Adds find-phone D-Bus command and synchronization packet support for Gadgetbridge
++    ./find-phone.patch
++  ];
++
+   nativeBuildInputs = [
+     cmake
+     kdePackages.extra-cmake-modules
+@@ -56,6 +64,7 @@ stdenv.mkDerivation (finalAttrs: {
+   ];
+ 
+   postInstall = ''
++    install -Dm755 ${./find-phone.sh} $out/bin/find-phone
+     install -Dm644 ${./org.asteroidos.btsyncd.conf} $out/share/dbus-1/system.d/org.asteroidos.btsyncd.conf
+   '';
+ 
+diff --git a/overlay/asteroidos/asteroid-btsyncd/find-phone.patch b/overlay/asteroidos/asteroid-btsyncd/find-phone.patch
+new file mode 100644
+index 00000000..20c1e484
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-btsyncd/find-phone.patch
+@@ -0,0 +1,206 @@
++diff -ruN btsync-orig/src/advertisement.cpp btsync-mod/src/advertisement.cpp
++--- btsync-orig/src/advertisement.cpp	2026-10-18 08:44:27.427477548 +1100
+++++ btsync-mod/src/advertisement.cpp	2026-10-18 08:44:49.635530613 +1100
++@@ -24,6 +24,7 @@
++     mAdType = "peripheral";
++     mIncludeTxPower = false;
++     addServiceUuid("00000000-0000-0000-0000-00a57e401d05");
+++    addServiceUuid(FINDPHONE_UUID);
++     mDiscoverable = true;
++ 
++     bus.registerObject(mPath, this, QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllProperties);
++diff -ruN btsync-orig/src/application.cpp btsync-mod/src/application.cpp
++--- btsync-orig/src/application.cpp	2026-10-18 08:44:27.427477548 +1100
+++++ btsync-mod/src/application.cpp	2026-10-18 08:44:49.636530616 +1100
++@@ -22,6 +22,7 @@
++ #include "batteryservice.h"
++ #include "screenshotservice.h"
++ #include "timeservice.h"
+++#include "findphoneservice.h"
++ 
++ #include <QDBusMetaType>
++ 
++@@ -35,6 +36,7 @@
++     addService(new BatteryService(3, bus));
++     addService(new ScreenshotService(4, bus));
++     addService(new TimeService(5, bus));
+++    addService(new FindPhoneService(6, bus));
++ 
++     qDBusRegisterMetaType<InterfaceList>();
++     qDBusRegisterMetaType<ManagedObjectList>();
++diff -ruN btsync-orig/src/CMakeLists.txt btsync-mod/src/CMakeLists.txt
++--- btsync-orig/src/CMakeLists.txt	2026-10-18 08:44:27.428477551 +1100
+++++ btsync-mod/src/CMakeLists.txt	2026-10-18 08:44:49.636530616 +1100
++@@ -18,6 +18,7 @@
++ 	ancs.cpp
++ 	ancs_notification.cpp
++ 	cts.cpp
+++	findphoneservice.cpp
++ )
++ set(
++ 	HEADERS
++@@ -40,6 +41,7 @@
++ 	ancs.h
++ 	ancs_notification.h
++ 	cts.h
+++	findphoneservice.h
++ )
++ 
++ add_executable(asteroid-btsyncd ${SRC} ${HEADERS})
++diff -ruN btsync-orig/src/common.h btsync-mod/src/common.h
++--- btsync-orig/src/common.h	2026-10-18 08:44:27.426477546 +1100
+++++ btsync-mod/src/common.h	2026-10-18 08:44:49.635530613 +1100
++@@ -74,4 +74,7 @@
++ #define TIME_UUID         "00005071-0000-0000-0000-00A57E401D05"
++ #define TIME_SET_UUID     "00005001-0000-0000-0000-00A57E401D05"
++ 
+++#define FINDPHONE_UUID      "0000F071-0000-0000-0000-00A57E401D05"
+++#define FINDPHONE_RING_UUID "0000F001-0000-0000-0000-00A57E401D05"
+++
++ #endif // COMMON_H
++diff -ruN btsync-orig/src/findphoneservice.cpp btsync-mod/src/findphoneservice.cpp
++--- btsync-orig/src/findphoneservice.cpp	1970-01-01 10:00:00.000000000 +1000
+++++ btsync-mod/src/findphoneservice.cpp	2026-10-18 08:44:41.904511132 +1100
++@@ -0,0 +1,79 @@
+++/*
+++ * Copyright (C) 2026 AsteroidOS
+++ *
+++ * This program is free software: you can redistribute it and/or modify
+++ * it under the terms of the GNU General Public License as published by
+++ * the Free Software Foundation, either version 3 of the License, or
+++ * (at your option) any later version.
+++ */
+++
+++#include "findphoneservice.h"
+++#include <QDebug>
+++
+++FindPhoneRingChrc::FindPhoneRingChrc(QDBusConnection bus, int index, Service *service)
+++    : Characteristic(bus, index, FINDPHONE_RING_UUID,
+++                     {"read", "notify", "encrypt-authenticated-read", "encrypt-authenticated-notify"},
+++                     service)
+++{
+++    m_value.append((char)0);
+++}
+++
+++void FindPhoneRingChrc::setRinging(bool ring)
+++{
+++    char val = ring ? 1 : 0;
+++    if (m_value.isEmpty() || m_value.at(0) != val) {
+++        m_value.clear();
+++        m_value.append(val);
+++        emit valueChanged();
+++        emitPropertiesChanged();
+++        qDebug() << "FindPhone: Ringing state set to" << (ring ? "ON" : "OFF");
+++    }
+++}
+++
+++void FindPhoneRingChrc::emitPropertiesChanged()
+++{
+++    QDBusConnection connection = QDBusConnection::systemBus();
+++    QDBusMessage message = QDBusMessage::createSignal(getPath().path(),
+++                                                      "org.freedesktop.DBus.Properties",
+++                                                      "PropertiesChanged");
+++
+++    QVariantMap changedProperties;
+++    changedProperties[QStringLiteral("Value")] = QVariant(m_value);
+++
+++    QList<QVariant> arguments;
+++    arguments << QVariant(GATT_CHRC_IFACE) << QVariant(changedProperties) << QVariant(QStringList());
+++    message.setArguments(arguments);
+++
+++    if (!connection.send(message)) {
+++        qDebug() << "FindPhone: Failed to send DBus property notification signal";
+++    }
+++}
+++
+++FindPhoneService::FindPhoneService(int index, QDBusConnection bus, QObject *parent)
+++    : Service(bus, index, FINDPHONE_UUID, parent)
+++{
+++    m_ringChrc = new FindPhoneRingChrc(bus, 0, this);
+++    addCharacteristic(m_ringChrc);
+++
+++    bus.registerObject("/org/asteroidos/btsyncd/findphone", this,
+++                       QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllProperties);
+++}
+++
+++void FindPhoneService::ringPhone(bool ring)
+++{
+++    if (m_ringChrc) {
+++        m_ringChrc->setRinging(ring);
+++    }
+++}
+++
+++void FindPhoneService::toggleRing()
+++{
+++    if (m_ringChrc) {
+++        m_ringChrc->setRinging(!m_ringChrc->isRinging());
+++    }
+++}
+++
+++bool FindPhoneService::isRinging()
+++{
+++    return m_ringChrc ? m_ringChrc->isRinging() : false;
+++}
++diff -ruN btsync-orig/src/findphoneservice.h btsync-mod/src/findphoneservice.h
++--- btsync-orig/src/findphoneservice.h	1970-01-01 10:00:00.000000000 +1000
+++++ btsync-mod/src/findphoneservice.h	2026-10-18 08:44:34.515493991 +1100
++@@ -0,0 +1,59 @@
+++/*
+++ * Copyright (C) 2026 AsteroidOS
+++ *
+++ * This program is free software: you can redistribute it and/or modify
+++ * it under the terms of the GNU General Public License as published by
+++ * the Free Software Foundation, either version 3 of the License, or
+++ * (at your option) any later version.
+++ */
+++
+++#ifndef FINDPHONESERVICE_H
+++#define FINDPHONESERVICE_H
+++
+++#include <QObject>
+++#include <QDBusConnection>
+++#include <QDBusMessage>
+++#include "service.h"
+++#include "characteristic.h"
+++#include "common.h"
+++
+++class FindPhoneRingChrc : public Characteristic
+++{
+++    Q_OBJECT
+++    Q_PROPERTY(QByteArray Value READ getValue NOTIFY valueChanged)
+++public:
+++    FindPhoneRingChrc(QDBusConnection bus, int index, Service *service);
+++
+++public slots:
+++    QByteArray ReadValue(QVariantMap) { return m_value; }
+++    void StartNotify() {}
+++    void StopNotify() {}
+++    void setRinging(bool ring);
+++    bool isRinging() const { return !m_value.isEmpty() && m_value.at(0) == 1; }
+++
+++signals:
+++    void valueChanged();
+++
+++private:
+++    QByteArray m_value;
+++    QByteArray getValue() { return m_value; }
+++    void emitPropertiesChanged();
+++};
+++
+++class FindPhoneService : public Service
+++{
+++    Q_OBJECT
+++    Q_CLASSINFO("D-Bus Interface", "org.asteroidos.btsyncd.FindPhone")
+++public:
+++    explicit FindPhoneService(int index, QDBusConnection bus, QObject *parent = nullptr);
+++
+++public slots:
+++    void ringPhone(bool ring);
+++    void toggleRing();
+++    bool isRinging();
+++
+++private:
+++    FindPhoneRingChrc *m_ringChrc;
+++};
+++
+++#endif // FINDPHONESERVICE_H
+diff --git a/overlay/asteroidos/asteroid-btsyncd/find-phone.sh b/overlay/asteroidos/asteroid-btsyncd/find-phone.sh
+new file mode 100644
+index 00000000..d34883f4
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-btsyncd/find-phone.sh
+@@ -0,0 +1,37 @@
++#!/bin/sh
++set -e
++
++DEST="org.asteroidos.btsyncd"
++OBJECT="/org/asteroidos/btsyncd/findphone"
++INTERFACE="org.asteroidos.btsyncd.FindPhone"
++
++usage() {
++    echo "Usage: find-phone [toggle|start|stop|status]"
++    exit 1
++}
++
++case "$1" in
++    ""|toggle)
++        busctl call "$DEST" "$OBJECT" "$INTERFACE" toggleRing 2>/dev/null || \
++        gdbus call --system --dest "$DEST" --object-path "$OBJECT" --method "$INTERFACE.toggleRing" 2>/dev/null || \
++        dbus-send --system --print-reply --dest="$DEST" "$OBJECT" "$INTERFACE.toggleRing"
++        ;;
++    start|on|ring)
++        busctl call "$DEST" "$OBJECT" "$INTERFACE" ringPhone b true 2>/dev/null || \
++        gdbus call --system --dest "$DEST" --object-path "$OBJECT" --method "$INTERFACE.ringPhone" true 2>/dev/null || \
++        dbus-send --system --print-reply --dest="$DEST" "$OBJECT" "$INTERFACE.ringPhone" boolean:true
++        ;;
++    stop|off|silence)
++        busctl call "$DEST" "$OBJECT" "$INTERFACE" ringPhone b false 2>/dev/null || \
++        gdbus call --system --dest "$DEST" --object-path "$OBJECT" --method "$INTERFACE.ringPhone" false 2>/dev/null || \
++        dbus-send --system --print-reply --dest="$DEST" "$OBJECT" "$INTERFACE.ringPhone" boolean:false
++        ;;
++    status)
++        busctl call "$DEST" "$OBJECT" "$INTERFACE" isRinging 2>/dev/null || \
++        gdbus call --system --dest "$DEST" --object-path "$OBJECT" --method "$INTERFACE.isRinging" 2>/dev/null || \
++        dbus-send --system --print-reply --dest="$DEST" "$OBJECT" "$INTERFACE.isRinging"
++        ;;
++    *)
++        usage
++        ;;
++esac
+diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
+index 793dfc2b..1e0f7da9 100644
+--- a/overlay/asteroidos/asteroid-launcher/default.nix
++++ b/overlay/asteroidos/asteroid-launcher/default.nix
+@@ -36,6 +36,13 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   strictDeps = true;
+ 
++  # AsteroidOS wayland compositor & shell
++  # Upstream repository: https://github.com/AsteroidOS/asteroid-launcher
++  patches = [
++    # QuickPanel quick-toggle button to trigger the find-phone alarm on the companion phone
++    ./find-phone.patch
++  ];
++
+   nativeBuildInputs = [
+     cmake
+     kdePackages.extra-cmake-modules
+diff --git a/overlay/asteroidos/asteroid-launcher/find-phone.patch b/overlay/asteroidos/asteroid-launcher/find-phone.patch
+new file mode 100644
+index 00000000..cb025507
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/find-phone.patch
+@@ -0,0 +1,60 @@
++--- a/src/qml/quickpanel/QuickPanel.qml
+++++ b/src/qml/quickpanel/QuickPanel.qml
++@@ -191,7 +191,7 @@
++     ConfigurationValue {
++         id: sliderToggles
++         key: "/desktop/asteroid/quickpanel/slider"
++-        defaultValue: ["brightnessToggle", "bluetoothToggle", "hapticsToggle", "wifiToggle", "soundToggle", "cinemaToggle", "aodToggle", "powerOffToggle", "rebootToggle", "musicButton", "flashlightButton"]
+++        defaultValue: ["brightnessToggle", "bluetoothToggle", "findPhoneToggle", "hapticsToggle", "wifiToggle", "soundToggle", "cinemaToggle", "aodToggle", "powerOffToggle", "rebootToggle", "musicButton", "flashlightButton"]
++     }
++ 
++     ConfigurationValue {
++@@ -207,6 +207,7 @@
++             "soundToggle": true,
++             "cinemaToggle": true,
++             "aodToggle": true,
+++            "findPhoneToggle": true,
++             "powerOffToggle": true,
++             "rebootToggle": true,
++             "musicButton": false,
++@@ -368,6 +369,7 @@
++             "cinemaToggle": cinemaToggleComponent,
++             "aodToggle": aodToggleComponent,
++             "powerOffToggle": powerOffToggleComponent,
+++            "findPhoneToggle": findPhoneToggleComponent,
++             "rebootToggle": rebootToggleComponent,
++             "musicButton": musicButtonComponent,
++             "flashlightButton": flashlightButtonComponent
++@@ -971,6 +973,32 @@
++             }
++         }
++     }
+++
+++    Component {
+++        id: findPhoneToggleComponent
+++        QuickPanelToggle {
+++            id: findPhoneToggle
+++            icon: "ios-phone-portrait"
+++            checkable: true
+++            checked: findPhoneDbus.isRinging
+++
+++            DBusInterface {
+++                id: findPhoneDbus
+++                service: "org.asteroidos.btsyncd"
+++                path: "/org/asteroidos/btsyncd/findphone"
+++                iface: "org.asteroidos.btsyncd.FindPhone"
+++                bus: DBus.SystemBus
+++                property bool isRinging: false
+++            }
+++
+++            onClicked: {
+++                findPhoneDbus.call("toggleRing", undefined)
+++                findPhoneDbus.call("isRinging", undefined, function(res) {
+++                    findPhoneDbus.isRinging = res
+++                })
+++            }
+++        }
+++    }
++ 
++     Component {
++         id: powerOffToggleComponent

@@ -1,0 +1,246 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:25:44 +1100
+Subject: [PATCH] overlay/systemd: add old-kernel compatibility patches
+
+Backport two systemd 261 compatibility fixes for vendor Android/Linux
+kernels used by smartwatches:
+
+- systemd-261-mountpoint-old-kernel.patch: avoid mount point detection
+  paths that require newer kernel features.
+- systemd-261-faccessat-old-kernel.patch: fall back to access() when
+  faccessat(AT_EMPTY_PATH) is unsupported on kernels older than 5.8.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ .../systemd-261-faccessat-old-kernel.patch    |  19 +++
+ .../systemd-261-mountpoint-old-kernel.patch   | 143 ++++++++++++++++++
+ .../systemd-262-chase-mnt-id-old-kernel.patch |  43 ++++++
+ 3 files changed, 205 insertions(+)
+ create mode 100644 overlay/patches/systemd-261-faccessat-old-kernel.patch
+ create mode 100644 overlay/patches/systemd-261-mountpoint-old-kernel.patch
+ create mode 100644 overlay/patches/systemd-262-chase-mnt-id-old-kernel.patch
+
+diff --git a/overlay/patches/systemd-261-faccessat-old-kernel.patch b/overlay/patches/systemd-261-faccessat-old-kernel.patch
+new file mode 100644
+index 00000000..9fd1fd0b
+--- /dev/null
++++ b/overlay/patches/systemd-261-faccessat-old-kernel.patch
+@@ -0,0 +1,19 @@
++# systemd 261 uses faccessat(fd, "", X_OK, AT_EMPTY_PATH) to verify
++# executables. Vendor 4.14 kernels return EINVAL for AT_EMPTY_PATH,
++# which makes pin_callout_binary() fail and systemd freeze at startup.
++# Fall back to access(path, X_OK) on EINVAL as well as ENOSYS.
++
++--- a/src/basic/path-util.c
+++++ b/src/basic/path-util.c
++@@ -687,8 +687,9 @@
++                 return r;
++ 
++         r = access_fd(fd, X_OK);
++-        if (r == -ENOSYS)
++-                /* /proc/ is not mounted. Fall back to access(). */
+++        if (IN_SET(r, -ENOSYS, -EINVAL))
+++                /* /proc/ is not mounted, or the kernel does not support
+++                 * faccessat(AT_EMPTY_PATH) (Linux < 5.8). Fall back to access(). */
++                 r = RET_NERRNO(access(name, X_OK));
++         if (r < 0)
++                 return r;
+diff --git a/overlay/patches/systemd-261-mountpoint-old-kernel.patch b/overlay/patches/systemd-261-mountpoint-old-kernel.patch
+new file mode 100644
+index 00000000..cb5a10e2
+--- /dev/null
++++ b/overlay/patches/systemd-261-mountpoint-old-kernel.patch
+@@ -0,0 +1,143 @@
++# Backport systemd v257 mount-point detection fallback for kernels without
++# STATX_ATTR_MOUNT_ROOT (Linux < 6.8), such as the vendor 4.14 kernels used
++# by supported watches.
++# Reference: https://github.com/systemd/systemd/blob/v257/src/basic/mountpoint-util.c
++
++--- a/src/basic/mountpoint-util.c
+++++ b/src/basic/mountpoint-util.c
++@@ -240,7 +240,10 @@
++ }
++ 
++ int is_mount_point_at(int dir_fd, const char *path, int flags) {
++-        int r;
+++        _cleanup_close_ int fd = -EBADF;
+++        _cleanup_free_ struct file_handle *h = NULL, *h_parent = NULL;
+++        int mount_id = -1, mount_id_parent = -1, r;
+++        bool nosupp = false;
++ 
++         assert(wildcard_fd_is_valid(dir_fd));
++         assert((flags & ~AT_SYMLINK_FOLLOW) == 0);
++@@ -261,25 +264,109 @@
++                         /* optional_mask = */ 0,
++                         STATX_ATTR_MOUNT_ROOT,
++                         &sx);
++-        if (r < 0)
+++        if (r >= 0) {
+++                if (FLAGS_SET(sx.stx_attributes, STATX_ATTR_MOUNT_ROOT))
+++                        return true;
+++
+++                /* When running on chroot environment, the root may not be a mount point, but we unconditionally
+++                 * return true when the input is "/" in the above, but the shortcut may not work e.g. when the path
+++                 * is relative. */
+++                struct statx sx2;
+++                r = xstatx(AT_FDCWD,
+++                           "/",
+++                           AT_STATX_DONT_SYNC,
+++                           STATX_TYPE|STATX_INO,
+++                           &sx2);
+++                if (r < 0)
+++                        return r;
+++
+++                return statx_inode_same(&sx, &sx2);
+++        }
+++
+++        /* Linux before 6.8 does not expose STATX_ATTR_MOUNT_ROOT. Fall back to the
+++         * name_to_handle_at()/fstat() logic used by older systemd releases. */
+++        if (!IN_SET(r, -EUNATCH, -EINVAL) &&
+++            !ERRNO_IS_NEG_NOT_SUPPORTED(r) &&
+++            !ERRNO_IS_NEG_PRIVILEGE(r))
++                 return r;
++ 
++-        if (FLAGS_SET(sx.stx_attributes, STATX_ATTR_MOUNT_ROOT))
+++        if (isempty(path)) {
+++                if (dir_fd == XAT_FDROOT)
+++                        fd = open("/", O_PATH|O_DIRECTORY|O_CLOEXEC);
+++                else if (dir_fd == AT_FDCWD)
+++                        fd = open(".", O_PATH|O_DIRECTORY|O_CLOEXEC);
+++                else
+++                        fd = fcntl(dir_fd, F_DUPFD_CLOEXEC, 3);
+++        } else {
+++                _cleanup_close_ int root_fd = -EBADF;
+++
+++                if (dir_fd == XAT_FDROOT) {
+++                        root_fd = open("/", O_PATH|O_DIRECTORY|O_CLOEXEC);
+++                        if (root_fd < 0)
+++                                return -errno;
+++                }
+++
+++                fd = openat(dir_fd == XAT_FDROOT ? root_fd : dir_fd, path,
+++                            O_PATH|O_CLOEXEC|
+++                            (FLAGS_SET(flags, AT_SYMLINK_FOLLOW) ? 0 : O_NOFOLLOW));
+++        }
+++        if (fd < 0)
+++                return -errno;
+++
+++        r = name_to_handle_at_try_fid(fd, "", &h, &mount_id, /* ret_unique_mnt_id= */ NULL, AT_EMPTY_PATH);
+++        if (r < 0) {
+++                if (r == -ENOTDIR)
+++                        goto fallback_fstat;
+++                if (is_name_to_handle_at_fatal_error(r))
+++                        return r;
+++                if (!ERRNO_IS_NEG_NOT_SUPPORTED(r))
+++                        goto fallback_fstat;
+++                nosupp = true;
+++        }
+++
+++        r = name_to_handle_at_try_fid(fd, "..", &h_parent, &mount_id_parent, /* ret_unique_mnt_id= */ NULL, 0);
+++        if (r < 0) {
+++                if (r == -ENOTDIR)
+++                        goto fallback_fstat;
+++                if (is_name_to_handle_at_fatal_error(r))
+++                        return r;
+++                if (!ERRNO_IS_NEG_NOT_SUPPORTED(r))
+++                        goto fallback_fstat;
+++                if (nosupp)
+++                        goto fallback_fstat;
+++
+++                /* The parent does not support name_to_handle_at() but the path
+++                 * does, so the path must be a mount point. */
+++                return true;
+++        }
+++        if (nosupp)
++                 return true;
++ 
++-        /* When running on chroot environment, the root may not be a mount point, but we unconditionally
++-         * return true when the input is "/" in the above, but the shortcut may not work e.g. when the path
++-         * is relative. */
++-        struct statx sx2;
++-        r = xstatx(AT_FDCWD,
++-                   "/",
++-                   AT_STATX_DONT_SYNC,
++-                   STATX_TYPE|STATX_INO,
++-                   &sx2);
++-        if (r < 0)
++-                return r;
+++        if (file_handle_equal(h_parent, h))
+++                return true;
+++
+++        return mount_id != mount_id_parent;
+++
+++fallback_fstat:
+++        {
+++                struct stat a, b;
+++
+++                if (fstat(fd, &a) < 0)
+++                        return -errno;
+++
+++                /* Files and symlinks are never mount points. */
+++                if (!S_ISDIR(a.st_mode))
+++                        return false;
+++
+++                if (fstatat(fd, "..", &b, 0) < 0)
+++                        return -errno;
+++
+++                /* A directory with the same device and inode as its parent is the root directory. */
+++                if (stat_inode_same(&a, &b))
+++                        return true;
++ 
++-        return statx_inode_same(&sx, &sx2);
+++                return a.st_dev != b.st_dev;
+++        }
++ }
++ 
++ /* flags can be AT_SYMLINK_FOLLOW or 0 */
+diff --git a/overlay/patches/systemd-262-chase-mnt-id-old-kernel.patch b/overlay/patches/systemd-262-chase-mnt-id-old-kernel.patch
+new file mode 100644
+index 00000000..dd82c43e
+--- /dev/null
++++ b/overlay/patches/systemd-262-chase-mnt-id-old-kernel.patch
+@@ -0,0 +1,43 @@
++# systemd 262 uses XSTATX_MNT_ID_BEST in chase_statx(), which requires
++# STATX_MNT_ID or STATX_MNT_ID_UNIQUE. Vendor kernels older than Linux 5.8
++# (including the hoki 4.14 kernel) do not provide either, so xstatx_full()
++# returns -EUNATCH and systemd fails to resolve unit symlinks. That leaves
++# stage-2 unable to start services and produces a black screen.
++#
++# Retry the statx without mount-ID tracking on EUNATCH. Path resolution then
++# works, with mount-ID checks treated as unknown.
++#
++# Reference: https://github.com/systemd/systemd/blob/v262/src/basic/chase.c
++--- a/src/basic/chase.c
+++++ b/src/basic/chase.c
++@@ -40,7 +40,9 @@
++         (CHASE_MUST_BE_DIRECTORY|CHASE_MUST_BE_REGULAR|CHASE_MUST_BE_SOCKET)
++ 
++ static int chase_statx(int fd, struct statx *ret) {
++-        return xstatx_full(fd,
+++        int r;
+++
+++        r = xstatx_full(fd,
++                         /* path= */ NULL,
++                         /* statx_flags= */ 0,
++                         XSTATX_MNT_ID_BEST,
++@@ -48,6 +50,19 @@
++                         /* optional_mask= */ 0,
++                         /* mandatory_attributes= */ 0,
++                         ret);
+++        if (r == -EUNATCH)
+++                /* Linux < 5.8 does not provide STATX_MNT_ID{,_UNIQUE}. Retry without
+++                 * mount-ID tracking so path resolution keeps working on vendor kernels. */
+++                r = xstatx_full(fd,
+++                                /* path= */ NULL,
+++                                /* statx_flags= */ 0,
+++                                /* xstatx_flags= */ 0,
+++                                STATX_TYPE|STATX_UID|STATX_INO,
+++                                /* optional_mask= */ 0,
+++                                /* mandatory_attributes= */ 0,
+++                                ret);
+++
+++        return r;
++ }
++ 
++ static int chase_openat2(int root_fd, int dir_fd, const char *path, ChaseFlags chase_flags) {

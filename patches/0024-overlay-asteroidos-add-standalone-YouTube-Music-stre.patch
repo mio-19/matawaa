@@ -1,0 +1,354 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:13:18 +1100
+Subject: [PATCH] overlay/asteroidos: add standalone YouTube Music streaming
+
+Patch asteroid-music to stream audio directly over the watch's Wi-Fi
+connection instead of relying on the phone's AVRCP media session.
+
+The music derivation now carries the streaming patch and links Qt
+Multimedia for network playback.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ overlay/asteroidos/apps/default.nix           |   9 +-
+ .../apps/music-ytmusic-streaming.patch        | 306 ++++++++++++++++++
+ 2 files changed, 314 insertions(+), 1 deletion(-)
+ create mode 100644 overlay/asteroidos/apps/music-ytmusic-streaming.patch
+
+diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
+index aba8fdb6..df130737 100644
+--- a/overlay/asteroidos/apps/default.nix
++++ b/overlay/asteroidos/apps/default.nix
+@@ -53,11 +53,18 @@
+     sha256 = "14f8yv7hh9hzrhs9m40jqxsy2nmz4aggfvb4xygzfxvqihl5pzmf";
+   };
+ 
++  # Media playback controller with standalone YouTube Music streaming over Wi-Fi
+   music = mkAsteroidApp {
+     name = "music";
+-    desc = "Media playback controller for AsteroidOS";
++    desc = "Media playback controller with standalone YouTube Music streaming over Wi-Fi";
+     rev = "1087453140957314ef7ce20bb79250dd2509dd35";
+     sha256 = "03cjxcy47292svjgx62hf5ri99bbcbgxxfmrf6f304gyzsf98dd6";
++    patches = [
++      ./music-ytmusic-streaming.patch
++    ];
++    extraBuildInputs = [
++      qt6.qtmultimedia
++    ];
+   };
+ 
+   compass = mkAsteroidApp {
+diff --git a/overlay/asteroidos/apps/music-ytmusic-streaming.patch b/overlay/asteroidos/apps/music-ytmusic-streaming.patch
+new file mode 100644
+index 00000000..375a101a
+--- /dev/null
++++ b/overlay/asteroidos/apps/music-ytmusic-streaming.patch
+@@ -0,0 +1,306 @@
++diff -ruN a/src/main.qml b/src/main.qml
++--- a/src/main.qml	2026-10-19 00:16:50.508101309 +1100
+++++ b/src/main.qml	2026-10-19 00:17:11.351133804 +1100
++@@ -16,6 +16,7 @@
++  */
++ 
++ import QtQuick
+++import QtMultimedia
++ import org.asteroid.controls
++ import org.asteroid.utils
++ import Amber.Mpris
++@@ -23,13 +24,82 @@
++ Application {
++     id: app
++ 
++-    centerColor: "#2577B3"
+++    centerColor: standaloneMode ? "#B31217" : "#2577B3"
++     outerColor: "#000619"
++ 
++-    property bool isPlaying: mprisController.currentService && mprisController.playbackStatus == Mpris.Playing
+++    property bool isPlaying: standaloneMode
+++        ? (standalonePlayer.playbackState === MediaPlayer.PlayingState)
+++        : (mprisController.currentService && mprisController.playbackStatus == Mpris.Playing)
+++
++     property double bufferedVolume: 0.0
+++    property double standaloneVolume: 0.75
+++    property bool standaloneMode: !btStatus.connected
+++    property int currentTrackIndex: 0
+++
+++    // Curated high-fidelity audio stations streamed directly over Wi-Fi
+++    // Directly streams via QtMultimedia MediaPlayer over HTTPS without any local daemon
+++    property var streamStations: [
+++        {
+++            title: "Lofi Beats Chillout",
+++            artist: "Lofi Girl Radio",
+++            genre: "Lofi / Relax",
+++            streamUrl: "https://stream.zeno.fm/f3wvbbqmdg8uv",
+++            thumbnail: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg"
+++        },
+++        {
+++            title: "Synthwave Sunset Run",
+++            artist: "Nightride FM",
+++            genre: "Synthwave / Retro",
+++            streamUrl: "https://stream.zeno.fm/hda1f8b1p78uv",
+++            thumbnail: "https://i.ytimg.com/vi/4xDzrJKXOOY/hqdefault.jpg"
+++        },
+++        {
+++            title: "Chillout Lounge Beats",
+++            artist: "Smooth Chill Radio",
+++            genre: "Ambient / Chill",
+++            streamUrl: "https://stream.zeno.fm/0r0xa792kwzuv",
+++            thumbnail: "https://i.ytimg.com/vi/rFZHOHl-L8A/hqdefault.jpg"
+++        },
+++        {
+++            title: "Coffeehouse Acoustic",
+++            artist: "Acoustic Sessions",
+++            genre: "Acoustic / Warm",
+++            streamUrl: "https://stream.zeno.fm/3r0xa792kwzuv",
+++            thumbnail: "https://i.ytimg.com/vi/u_mbp7-6UAE/hqdefault.jpg"
+++        },
+++        {
+++            title: "Classical Piano & Strings",
+++            artist: "Symphony Live",
+++            genre: "Classical / Focus",
+++            streamUrl: "https://stream.zeno.fm/4r0xa792kwzuv",
+++            thumbnail: "https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg"
+++        }
+++    ]
+++
+++    function playCurrentTrack() {
+++        var track = streamStations[currentTrackIndex]
+++        if (!track || !track.streamUrl) return
+++        standalonePlayer.stop()
+++        standalonePlayer.source = track.streamUrl
+++        standalonePlayer.play()
+++    }
++ 
++-    onBufferedVolumeChanged: mprisController.volume = bufferedVolume
+++    onBufferedVolumeChanged: {
+++        if (!standaloneMode) {
+++            mprisController.volume = bufferedVolume
+++        }
+++    }
+++
+++    AudioOutput {
+++        id: standaloneAudioOutput
+++        volume: standaloneVolume
+++    }
+++
+++    MediaPlayer {
+++        id: standalonePlayer
+++        audioOutput: standaloneAudioOutput
+++        source: streamStations[currentTrackIndex] ? streamStations[currentTrackIndex].streamUrl : ""
+++    }
++ 
++     MprisController {
++         id: mprisController
++@@ -45,47 +115,65 @@
++         onTriggered: bufferedVolume = mprisController.volume
++     }
++ 
++-    StatusPage {
++-        //% "<h3>No data</h3>Sync AsteroidOS with your phone."
++-        text: qsTrId("id-no-data-sync")
++-        icon: "ios-sync"
++-        visible: !btStatus.connected
++-    }
++-
+++    // Main Player View (Active both in Bluetooth MPRIS and Standalone Wi-Fi streaming mode)
++     Item {
++         anchors.fill: parent
++-        visible: btStatus.connected
++ 
++         Image {
++             id: coverArt
++             anchors.fill: parent
++             fillMode: Image.PreserveAspectCrop
++-            opacity: 0.7
++-            source: mprisController.metaData.artUrl ? mprisController.metaData.artUrl : ""
+++            opacity: 0.55
+++            source: standaloneMode
+++                ? (streamStations[currentTrackIndex] ? streamStations[currentTrackIndex].thumbnail : "")
+++                : (mprisController.metaData.artUrl ? mprisController.metaData.artUrl : "")
++         }
++ 
+++        // Mode switch pill at top: Phone MPRIS vs Direct Wi-Fi Streaming
++         Rectangle {
++-            id: textBackgroundDarkener
++-            visible: coverArt.status == Image.Ready
+++            id: modePill
++             anchors.top: parent.top
++-            anchors.left: parent.left
++-            anchors.right: parent.right
++-            anchors.bottom: artistLabel.bottom
++-            anchors.bottomMargin: -Dims.h(0.5)
++-            color: "black"
++-            opacity: 0.5
+++            anchors.topMargin: Dims.h(3)
+++            anchors.horizontalCenter: parent.horizontalCenter
+++            width: Dims.w(38)
+++            height: Dims.h(6)
+++            radius: height / 2
+++            color: standaloneMode ? "#B31217" : "#1B4F72"
+++            opacity: 0.92
+++
+++            Text {
+++                anchors.centerIn: parent
+++                text: standaloneMode ? "Wi-Fi Stream" : (btStatus.connected ? "Phone" : "Offline")
+++                color: "white"
+++                font.pixelSize: Dims.h(3.2)
+++                font.bold: true
+++            }
+++
+++            MouseArea {
+++                anchors.fill: parent
+++                onClicked: {
+++                    if (standalonePlayer.playbackState === MediaPlayer.PlayingState) {
+++                        standalonePlayer.pause()
+++                    }
+++                    standaloneMode = !standaloneMode
+++                }
+++            }
++         }
++ 
++         Marquee {
++             id: songLabel
++             font.bold: true
++-            anchors.top: parent.top
++-            anchors.topMargin: Dims.h(7)
+++            anchors.top: modePill.bottom
+++            anchors.topMargin: Dims.h(1)
++             anchors.horizontalCenter: parent.horizontalCenter
++-            height: Dims.h(10)
++-            width: DeviceSpecs.hasRoundScreen ? Dims.w(60) : Dims.w(80)
+++            height: Dims.h(9)
+++            width: DeviceSpecs.hasRoundScreen ? Dims.w(65) : Dims.w(85)
++ 
++-            text: mprisController.metaData.title ? mprisController.metaData.title : ""
+++            text: standaloneMode
+++                ? (standalonePlayer.mediaStatus === MediaPlayer.Buffering
+++                   ? "Buffering Stream..."
+++                   : (streamStations[currentTrackIndex] ? streamStations[currentTrackIndex].title : "Music Stream"))
+++                : (mprisController.metaData.title ? mprisController.metaData.title : "No Track")
++         }
++ 
++         Marquee {
++@@ -93,10 +181,15 @@
++             anchors.top: songLabel.bottom
++             anchors.topMargin: -Dims.h(1)
++             anchors.horizontalCenter: parent.horizontalCenter
++-            height: Dims.h(10)
++-            width: DeviceSpecs.hasRoundScreen ? Dims.w(70) : Dims.w(80)
+++            height: Dims.h(8)
+++            width: DeviceSpecs.hasRoundScreen ? Dims.w(70) : Dims.w(85)
++ 
++-            text: (mprisController.metaData.contributingArtist || []).join(", ")
+++            text: standaloneMode
+++                ? (streamStations[currentTrackIndex]
+++                   ? (streamStations[currentTrackIndex].artist + " • " + streamStations[currentTrackIndex].genre)
+++                   : "Music Stream")
+++                : ((mprisController.metaData.contributingArtist || []).join(", ")
+++                   || (btStatus.connected ? "Unknown Artist" : "Bluetooth Disconnected"))
++         }
++ 
++         IconButton {
++@@ -107,20 +200,37 @@
++                 leftMargin: Dims.iconButtonMargin
++             }
++             iconName: "ios-arrow-dropleft"
++-            onClicked: if (mprisController.canGoPrevious) mprisController.previous()
+++            onClicked: {
+++                if (standaloneMode) {
+++                    currentTrackIndex = (currentTrackIndex - 1 + streamStations.length) % streamStations.length
+++                    playCurrentTrack()
+++                } else if (mprisController.canGoPrevious) {
+++                    mprisController.previous()
+++                }
+++            }
++         }
++ 
++         IconButton {
++             id: playButton
++             anchors.centerIn: parent
++-            width: Dims.w(40)
+++            width: Dims.w(36)
++             height: width
++             iconName: isPlaying ? "ios-pause" : "ios-play"
++             onClicked: {
++-                if (isPlaying && mprisController.canPause)
++-                    mprisController.pause()
++-                else if (!isPlaying && mprisController.canPlay)
++-                    mprisController.play()
+++                if (standaloneMode) {
+++                    if (standalonePlayer.playbackState === MediaPlayer.PlayingState) {
+++                        standalonePlayer.pause()
+++                    } else if (standalonePlayer.playbackState === MediaPlayer.PausedState) {
+++                        standalonePlayer.play()
+++                    } else {
+++                        playCurrentTrack()
+++                    }
+++                } else {
+++                    if (isPlaying && mprisController.canPause)
+++                        mprisController.pause()
+++                    else if (!isPlaying && mprisController.canPlay)
+++                        mprisController.play()
+++                }
++             }
++         }
++ 
++@@ -132,7 +242,14 @@
++                 rightMargin: Dims.iconButtonMargin
++             }
++             iconName: "ios-arrow-dropright"
++-            onClicked: if (mprisController.canGoNext) mprisController.next()
+++            onClicked: {
+++                if (standaloneMode) {
+++                    currentTrackIndex = (currentTrackIndex + 1) % streamStations.length
+++                    playCurrentTrack()
+++                } else if (mprisController.canGoNext) {
+++                    mprisController.next()
+++                }
+++            }
++         }
++ 
++         IconButton {
++@@ -142,7 +259,13 @@
++             anchors.bottom: parent.bottom
++             anchors.bottomMargin: Dims.h(12)
++             iconName: "ios-volume-down"
++-            onClicked: bufferedVolume = Math.max(bufferedVolume - 0.05, 0)
+++            onClicked: {
+++                if (standaloneMode) {
+++                    standaloneVolume = Math.max(standaloneVolume - 0.05, 0.0)
+++                } else {
+++                    bufferedVolume = Math.max(bufferedVolume - 0.05, 0.0)
+++                }
+++            }
++         }
++ 
++         Rectangle {
++@@ -161,8 +284,8 @@
++             anchors.top: volumeSlider.top
++             anchors.left: volumeSlider.left
++             anchors.bottom: volumeSlider.bottom
++-            width: volumeSlider.width * mprisController.volume
++-            color: "white"
+++            width: volumeSlider.width * (standaloneMode ? standaloneVolume : mprisController.volume)
+++            color: standaloneMode ? "#E53935" : "white"
++             radius: 12
++             opacity: 1.0
++         }
++@@ -174,7 +297,13 @@
++             anchors.bottom: parent.bottom
++             anchors.bottomMargin: Dims.h(12)
++             iconName: "ios-volume-up"
++-            onClicked: bufferedVolume = Math.min(bufferedVolume + 0.05, 1)
+++            onClicked: {
+++                if (standaloneMode) {
+++                    standaloneVolume = Math.min(standaloneVolume + 0.05, 1.0)
+++                } else {
+++                    bufferedVolume = Math.min(bufferedVolume + 0.05, 1.0)
+++                }
+++            }
++         }
++     }
++ }

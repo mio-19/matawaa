@@ -1,0 +1,301 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:24:48 +1100
+Subject: [PATCH] overlay/asteroidos: add shell, sync daemon, and virtual
+ keyboard
+
+Package the core AsteroidOS userland services on top of the middleware
+layer:
+
+- asteroid-launcher: Wayland compositor and touch smartwatch shell
+- asteroid-btsyncd: Bluetooth LE synchronization daemon
+- virtualkeyboard: on-screen touch keyboard with watch styling
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ .../asteroidos/asteroid-btsyncd/default.nix   | 68 +++++++++++++++
+ .../org.asteroidos.btsyncd.conf               | 13 +++
+ .../asteroidos/asteroid-launcher/default.nix  | 82 +++++++++++++++++++
+ overlay/asteroidos/default.nix                | 19 +++++
+ .../asteroidos/virtualkeyboard/default.nix    | 52 ++++++++++++
+ 5 files changed, 234 insertions(+)
+ create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
+ create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
+ create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
+ create mode 100644 overlay/asteroidos/virtualkeyboard/default.nix
+
+diff --git a/overlay/asteroidos/asteroid-btsyncd/default.nix b/overlay/asteroidos/asteroid-btsyncd/default.nix
+new file mode 100644
+index 00000000..af76edf4
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-btsyncd/default.nix
+@@ -0,0 +1,68 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  systemd,
++  qt6,
++  qml-asteroid,
++  amber-mpris,
++  mlite,
++  kdePackages,
++  buildPackages,
++}:
++
++let
++  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
++in
++stdenv.mkDerivation (finalAttrs: {
++  pname = "asteroid-btsyncd";
++  version = "nightly";
++
++  src = fetchFromGitHub {
++    owner = "AsteroidOS";
++    repo = "asteroid-btsyncd";
++    rev = "e14fbcd9a157f0988204e874b03f6f800f89d645";
++    sha256 = "15vpd3y817gz8j1d7f56k5g1y3747grsjqc5z7b896n7rs2p8ijc";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    cmake
++    kdePackages.extra-cmake-modules
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++
++  cmakeFlags = [
++    "-DECM_DIR=${kdePackages.extra-cmake-modules}/share/ECM/cmake"
++  ]
++  ++ lib.optionals isCross [
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++    "-DQt6QuickTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
++    "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
++    "-DQt6LinguistTools_DIR=${buildPackages.qt6.qttools}/lib/cmake/Qt6LinguistTools"
++  ];
++
++  buildInputs = [
++    systemd
++    qt6.qtbase
++    qt6.qtdeclarative
++    qml-asteroid
++    amber-mpris
++    mlite
++  ];
++
++  postInstall = ''
++    install -Dm644 ${./org.asteroidos.btsyncd.conf} $out/share/dbus-1/system.d/org.asteroidos.btsyncd.conf
++  '';
++
++  meta = with lib; {
++    description = "Bluetooth Low Energy synchronization daemon for AsteroidOS";
++    homepage = "https://asteroidos.org/";
++    license = licenses.gpl3Plus;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
+new file mode 100644
+index 00000000..a856e19c
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
+@@ -0,0 +1,13 @@
++<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
++ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
++<busconfig>
++  <policy user="root">
++    <allow own="org.asteroidos.btsyncd"/>
++    <allow send_destination="org.asteroidos.btsyncd"/>
++    <allow receive_sender="org.asteroidos.btsyncd"/>
++  </policy>
++  <policy context="default">
++    <allow send_destination="org.asteroidos.btsyncd"/>
++    <allow receive_sender="org.asteroidos.btsyncd"/>
++  </policy>
++</busconfig>
+diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
+new file mode 100644
+index 00000000..793dfc2b
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/default.nix
+@@ -0,0 +1,82 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  qml-asteroid,
++  mlite,
++  mce-dev,
++  mce-qt6,
++  ngf-qt6,
++  usb-moded-qt6,
++  keepalive,
++  timed-qt6,
++  dbus,
++  dbus-glib,
++  systemd,
++  kdePackages,
++  buildPackages,
++}:
++
++let
++  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
++in
++stdenv.mkDerivation (finalAttrs: {
++  pname = "asteroid-launcher";
++  version = "nightly";
++
++  src = fetchFromGitHub {
++    owner = "AsteroidOS";
++    repo = "asteroid-launcher";
++    rev = "7eae1ebc86b04377cdb3164a8027a1667de319a2";
++    sha256 = "0inra188hizfap94dc95a13q1c82bqc5dsa6qdgkdsvim65fg3vq";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    cmake
++    kdePackages.extra-cmake-modules
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++
++  cmakeFlags = [
++    "-DECM_DIR=${kdePackages.extra-cmake-modules}/share/ECM/cmake"
++  ]
++  ++ lib.optionals isCross [
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++    "-DQt6QuickTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
++    "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
++    "-DQt6LinguistTools_DIR=${buildPackages.qt6.qttools}/lib/cmake/Qt6LinguistTools"
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    qt6.qtwayland
++    qt6.qtsensors
++    qt6.qtshadertools
++    qml-asteroid
++    mlite
++    mce-dev
++    mce-qt6
++    ngf-qt6
++    usb-moded-qt6
++    keepalive
++    timed-qt6
++    dbus
++    dbus-glib
++    systemd
++  ];
++
++  meta = with lib; {
++    description = "AsteroidOS Wayland compositor and smartwatch home shell";
++    homepage = "https://asteroidos.org/";
++    license = licenses.gpl3Plus;
++    mainProgram = "asteroid-launcher";
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index 90363944..70d27e43 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -7,6 +7,19 @@ rec {
+ 
+   qml-asteroid = callPackage ./qml-asteroid { };
+ 
++  asteroid-launcher = callPackage ./asteroid-launcher {
++    inherit
++      qml-asteroid
++      mlite
++      mce-dev
++      mce-qt6
++      ngf-qt6
++      usb-moded-qt6
++      keepalive
++      timed-qt6
++      ;
++  };
++
+   amber-mpris = callPackage ./amber-mpris { };
+   mlite = callPackage ./mlite { };
+   mce-dev = callPackage ./mce-dev { };
+@@ -18,5 +31,11 @@ rec {
+   keepalive = callPackage ./keepalive { };
+   timed-qt6 = callPackage ./timed-qt6 { };
+ 
++  asteroid-btsyncd = callPackage ./asteroid-btsyncd {
++    inherit qml-asteroid amber-mpris mlite;
++  };
++
++  virtualkeyboard = callPackage ./virtualkeyboard { };
++
+   inherit (pkgs) msm-fb-refresher;
+ }
+diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
+new file mode 100644
+index 00000000..f5df8828
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/default.nix
+@@ -0,0 +1,52 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "asteroid-virtualkeyboard";
++  version = "2.1.0";
++
++  src = fetchFromGitHub {
++    owner = "AsteroidOS";
++    repo = "asteroid-virtualkeyboard";
++    rev = "666743fc42eaa02b9f82155ff3aff3a40e0d45ac";
++    sha256 = "0yw1xq315p7q7illjpq92cs0060lrw94bfk8ywc7fbrr1gmkmvjf";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    qt6.qtvirtualkeyboard
++  ];
++
++  cmakeFlags = [
++    "-DCMAKE_INSTALL_LIBDIR=lib"
++    "-DCMAKE_INSTALL_DATADIR=share"
++  ]
++  ++ lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
++    "-DQt6QuickTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++    "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
++  ];
++
++  meta = with lib; {
++    description = "AsteroidOS on-screen virtual keyboard with watch style and layouts";
++    homepage = "https://asteroidos.org/";
++    license = licenses.gpl3Plus;
++    platforms = platforms.linux;
++  };
++})

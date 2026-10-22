@@ -1,0 +1,196 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:21:49 +1100
+Subject: [PATCH] modules: add wearable Qualcomm, Exynos, and MediaTek SoC
+ options
+
+Add the SoC identifiers used by supported smartwatches so the vendor
+hardware modules can select the correct target ABI:
+
+- Qualcomm: SDA429W, SW5100, APQ8026, MSM8909W, MSM8926, MSM8226
+- Samsung: Exynos 3250
+- MediaTek: MT2601, MT6580
+
+Each option defaults to false to preserve existing device behavior.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ modules/hardware-exynos.nix   | 11 ++++++
+ modules/hardware-mediatek.nix | 22 ++++++++++++
+ modules/hardware-qualcomm.nix | 66 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 99 insertions(+)
+
+diff --git a/modules/hardware-exynos.nix b/modules/hardware-exynos.nix
+index 4a00b153..136c974b 100644
+--- a/modules/hardware-exynos.nix
++++ b/modules/hardware-exynos.nix
+@@ -5,6 +5,7 @@ let
+   cfg = config.mobile.hardware.socs;
+   anyExynos = lib.any (v: v) [
+     cfg.exynos-7880.enable
++    cfg.samsung-exynos3250.enable
+   ];
+ in
+ {
+@@ -14,6 +15,11 @@ in
+       default = false;
+       description = "enable when SOC is Exynos 7880";
+     };
++    hardware.socs.samsung-exynos3250.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "enable when SOC is Exynos 3250";
++    };
+   };
+ 
+   config = mkMerge [
+@@ -23,6 +29,11 @@ in
+         quirks.fb-refresher.enable = true;
+       };
+     }
++    {
++      mobile = mkIf cfg.samsung-exynos3250.enable {
++        system.system = "armv7l-linux";
++      };
++    }
+     (mkIf anyExynos {
+       mobile.kernel.structuredConfig = [
+         (helpers: with helpers; {
+diff --git a/modules/hardware-mediatek.nix b/modules/hardware-mediatek.nix
+index eaf350c9..1b0bfed1 100644
+--- a/modules/hardware-mediatek.nix
++++ b/modules/hardware-mediatek.nix
+@@ -8,6 +8,8 @@ let
+     cfg.mediatek-mt6785.enable
+     cfg.mediatek-mt8127.enable
+     cfg.mediatek-mt8183.enable
++    cfg.mediatek-mt2601.enable
++    cfg.mediatek-mt6580.enable
+   ];
+ in
+ {
+@@ -32,6 +34,16 @@ in
+       default = false;
+       description = "enable when SOC is Mediatek MT8183";
+     };
++    hardware.socs.mediatek-mt2601.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "enable when SOC is Mediatek MT2601";
++    };
++    hardware.socs.mediatek-mt6580.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "enable when SOC is Mediatek MT6580";
++    };
+   };
+ 
+   config = mkMerge [
+@@ -63,6 +75,16 @@ in
+         system.system = "aarch64-linux";
+       };
+     }
++    {
++      mobile = mkIf cfg.mediatek-mt2601.enable {
++        system.system = "armv7l-linux";
++      };
++    }
++    {
++      mobile = mkIf cfg.mediatek-mt6580.enable {
++        system.system = "armv7l-linux";
++      };
++    }
+     (mkIf anyMediatek {
+       mobile.kernel.structuredConfig = [
+         (helpers: with helpers; {
+diff --git a/modules/hardware-qualcomm.nix b/modules/hardware-qualcomm.nix
+index 0959687f..43b980ea 100644
+--- a/modules/hardware-qualcomm.nix
++++ b/modules/hardware-qualcomm.nix
+@@ -20,6 +20,12 @@ let
+     cfg.qualcomm-sdm845.enable
+     cfg.qualcomm-sm6125.enable
+     cfg.qualcomm-apq8064-1aa.enable
++    cfg.qualcomm-sda429w.enable
++    cfg.qualcomm-sw5100.enable
++    cfg.qualcomm-apq8026.enable
++    cfg.qualcomm-msm8909w.enable
++    cfg.qualcomm-msm8926.enable
++    cfg.qualcomm-msm8226.enable
+   ];
+ in
+ {
+@@ -74,6 +80,36 @@ in
+       default = false;
+       description = "enable when SOC is SM6125";
+     };
++    hardware.socs.qualcomm-sda429w.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "enable when SOC is SDA429W (Snapdragon Wear 4100)";
++    };
++    hardware.socs.qualcomm-sw5100.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "enable when SOC is SW5100 (Snapdragon W5 Gen 1)";
++    };
++    hardware.socs.qualcomm-apq8026.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "enable when SOC is APQ8026 (Snapdragon 400 Wear)";
++    };
++    hardware.socs.qualcomm-msm8909w.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "enable when SOC is MSM8909W (Snapdragon Wear 2100)";
++    };
++    hardware.socs.qualcomm-msm8926.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "enable when SOC is MSM8926 (Snapdragon 400)";
++    };
++    hardware.socs.qualcomm-msm8226.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "enable when SOC is MSM8226 (Snapdragon 400)";
++    };
+   };
+ 
+   config = mkMerge [
+@@ -128,6 +164,36 @@ in
+         system.system = "armv7l-linux";
+       };
+     }
++    {
++      mobile = mkIf cfg.qualcomm-sda429w.enable {
++        system.system = "armv7l-linux";
++      };
++    }
++    {
++      mobile = mkIf cfg.qualcomm-sw5100.enable {
++        system.system = "armv7l-linux";
++      };
++    }
++    {
++      mobile = mkIf cfg.qualcomm-apq8026.enable {
++        system.system = "armv7l-linux";
++      };
++    }
++    {
++      mobile = mkIf cfg.qualcomm-msm8909w.enable {
++        system.system = "armv7l-linux";
++      };
++    }
++    {
++      mobile = mkIf cfg.qualcomm-msm8926.enable {
++        system.system = "armv7l-linux";
++      };
++    }
++    {
++      mobile = mkIf cfg.qualcomm-msm8226.enable {
++        system.system = "armv7l-linux";
++      };
++    }
+     (mkIf anyQualcomm {
+       mobile.kernel.structuredConfig = [
+         (helpers: with helpers; {

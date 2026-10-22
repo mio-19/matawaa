@@ -1,0 +1,73 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:24:18 +1100
+Subject: [PATCH] overlay: update msm-fb-refresher to current AsteroidOS source
+
+Refresh the upstream msm-fb-refresher package from the old 0.2 release
+tarball to the current AsteroidOS git revision and modern stdenv
+arguments. This keeps the Qualcomm framebuffer refresher compatible with
+the watch display stack.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ overlay/msm-fb-refresher/default.nix | 43 +++++++++++++++++-----------
+ 1 file changed, 26 insertions(+), 17 deletions(-)
+
+diff --git a/overlay/msm-fb-refresher/default.nix b/overlay/msm-fb-refresher/default.nix
+index fec3de71..37ce451f 100644
+--- a/overlay/msm-fb-refresher/default.nix
++++ b/overlay/msm-fb-refresher/default.nix
+@@ -1,27 +1,36 @@
+-{stdenv, fetchurl}:
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++}:
+ 
+-let
+-  version = "0.2";
+-in
+-stdenv.mkDerivation {
+-  inherit version;
+-  name = "msm-fb-refresher";
++stdenv.mkDerivation rec {
++  pname = "msm-fb-refresher";
++  version = "nightly";
+ 
+-  src = fetchurl {
+-    url = "https://github.com/AsteroidOS/msm-fb-refresher/archive/v${version}.tar.gz";
+-    sha256 = "1w1kvk8kgmzh7v50sc24c9dkq4ix9pf65dscqzwikbaz537x5rkf";
++  src = fetchFromGitHub {
++    owner = "AsteroidOS";
++    repo = "msm-fb-refresher";
++    rev = "8a8378ab0108357908d51ecd5d92d22c7d549018";
++    sha256 = "1p5sj0xa1j74lr9hyz4a5klyk86g9n3w0avz2x2jz927hdrhxmkr";
+   };
+ 
+-  CC = "${stdenv.cc}/bin/gcc";
+-
+   buildPhase = ''
+-    $CC refresher.c -o refresher.o -c
+-    $CC refresher.o -o msm-fb-refresher
++    runHook preBuild
++    $CC refresher.c -o msm-fb-refresher
++    runHook postBuild
+   '';
+ 
+   installPhase = ''
+-    mkdir -p $out/bin
+-    cp -v msm-fb-refresher $out/bin/
+-    chmod +x $out/bin/*
++    runHook preInstall
++    install -Dm755 msm-fb-refresher $out/bin/msm-fb-refresher
++    runHook postInstall
+   '';
++
++  meta = with lib; {
++    description = "Refreshes Qualcomm framebuffer ioctl on boot for early display wakeup";
++    homepage = "https://asteroidos.org/";
++    license = licenses.gpl3Only;
++    platforms = platforms.linux;
++  };
+ }

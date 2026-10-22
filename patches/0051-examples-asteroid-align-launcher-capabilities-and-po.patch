@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Thu, 22 Oct 2026 01:13:05 +1100
+Subject: [PATCH] examples/asteroid: align launcher capabilities and polkit
+ rule
+
+Match upstream AsteroidOS:
+- grant asteroid-launcher cap_wake_alarm and cap_block_suspend for
+  always-on-display ticks through the NixOS security wrapper
+- allow the ceres user to reboot and power off via polkit
+---
+ examples/asteroid/asteroid-desktop.nix | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 7ca898e0..c30b1c67 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -150,12 +150,36 @@ in
+       }
+       // config.environment.variables;
+       serviceConfig = {
+-        ExecStart = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher $LIPSTICK_OPTIONS -plugin evdevtouch --systemd";
++        ExecStart = "${config.security.wrapperDir}/asteroid-launcher $LIPSTICK_OPTIONS -plugin evdevtouch --systemd";
+         Restart = "always";
+         RestartSec = "2s";
+       };
+     };
+ 
++    # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
++    # cap_block_suspend for always-on-display ticks; expose the same file
++    # capabilities through the NixOS wrapper.
++    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
++    security.wrappers.asteroid-launcher = {
++      source = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher";
++      capabilities = "cap_wake_alarm,cap_block_suspend+ep";
++      owner = "root";
++      group = "root";
++    };
++
++    # Upstream AsteroidOS allows the ceres user to reboot and power off.
++    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-apps/files/30-org.freedesktop.login1.rules
++    security.polkit.extraConfig = ''
++      polkit.addRule(function(action, subject) {
++        if ((action.id == "org.freedesktop.login1.set-reboot-parameter" ||
++             action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
++             action.id == "org.freedesktop.login1.reboot-multiple-sessions") &&
++            subject.user == "ceres") {
++          return polkit.Result.YES;
++        }
++      });
++    '';
++
+     # AsteroidOS Bluetooth synchronization daemon service
+     systemd.services.asteroid-btsyncd = {
+       description = "AsteroidOS Bluetooth Sync Daemon";

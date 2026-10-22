@@ -1,0 +1,358 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:00:58 +1100
+Subject: [PATCH] debug: add stage1-pause-debug and stage2 debug options
+
+Add the development-only stage debugging modes:
+- modules/hardware-watch.nix: add stage1-pause-debug.enable, stage2-save-journal.enable, and stage2-ssh.enable.
+- modules/initrd-ssh.nix: add debug root login, telnetd fallback, /bin/continue-boot, and the switch-root pause flag for stage1-pause-debug.
+- boot/init/tasks/switch_root.rb: pause before switch_root only when stage1-pause-debug is enabled.
+- devices/families/asteroidos.nix: gate the stage-1 console/SSH/telnet and pause behind stage1-pause-debug; persist journals only when stage2-save-journal is enabled; enable stage-2 OpenSSH and USB networking when stage2-ssh is enabled; assert that stage1-pause-debug and stage2-ssh are mutually exclusive; do not pull sshd into multi-user while only stage1 debug is active.
+- devices/fossil-hoki/default.nix: enable stage1-pause-debug, disable stage2-ssh, and enable stage2-save-journal for the current bring-up; keep verbose systemd logging gated by the stage1 debug mode.
+
+Signed-off-by: Mio <mio@mio19.uk>
+---
+ boot/init/tasks/switch_root.rb  | 19 +++++++
+ devices/families/asteroidos.nix | 87 +++++++++++++++++++++++++++++++++
+ devices/fossil-hoki/default.nix | 12 +++++
+ modules/hardware-watch.nix      | 17 +++++++
+ modules/initrd-ssh.nix          | 72 +++++++++++++++++++++------
+ 5 files changed, 192 insertions(+), 15 deletions(-)
+
+diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
+index b3a6045b..0644044c 100644
+--- a/boot/init/tasks/switch_root.rb
++++ b/boot/init/tasks/switch_root.rb
+@@ -383,6 +383,23 @@ class Tasks::SwitchRoot < SingletonTask
+     end
+   end
+ 
++  def should_hold?()
++    return false if System.cmdline().grep(/^mobile-nixos\.hold=(no|0)$/).any?
++    return true if System.cmdline().grep(/^mobile-nixos\.hold(=yes|=1)?$/).any?
++    Configuration["debug"] == true
++  end
++
++  def hold_before_switch_root()
++    return unless should_hold?
++
++    log("Stage-1 hold: run 'continue-boot' to resume.")
++    File.delete("/run/continue-boot") if File.exist?("/run/continue-boot")
++    Tasks::Splash.instance.quit("Stage-1 debug hold (run 'continue-boot')", sticky: true)
++    sleep 0.5 until File.exist?("/run/continue-boot")
++    File.delete("/run/continue-boot") rescue nil
++    Tasks::Splash.instance.quit("Continuing to stage-2")
++  end
++
+   def run()
+     init = File.join(selected_generation.path, "init")
+ 
+@@ -401,6 +418,8 @@ class Tasks::SwitchRoot < SingletonTask
+     log("***")
+     log("")
+ 
++    hold_before_switch_root()
++
+     kexec_in_generation(selected_generation) if will_kexec?
+ 
+     Tasks::UDev.instance.teardown()
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 46ce2d83..68c0836c 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -10,8 +10,19 @@ let
+     mkDefault
+     mkIf
+     ;
++  cfg = config.mobile.hardware.watch.stage1-pause-debug;
++  journalCfg = config.mobile.hardware.watch.stage2-save-journal;
++  stage2SshCfg = config.mobile.hardware.watch.stage2-ssh;
++  debugNetwork = cfg.enable || stage2SshCfg.enable;
+ in
+ {
++  assertions = [
++    {
++      assertion = !(cfg.enable && stage2SshCfg.enable);
++      message = "mobile.hardware.watch.stage1-pause-debug and mobile.hardware.watch.stage2-ssh are mutually exclusive.";
++    }
++  ];
++
+   mobile.system.type = mkDefault "android";
+   mobile.system.system = mkDefault "armv7l-linux";
+ 
+@@ -98,6 +109,8 @@ in
+     memoryPercent = lib.mkOptionDefault 50;
+   };
+ 
++  mobile.boot.stage-1.fail.delay = mkDefault 60;
++
+   # AsteroidOS credits the saved random seed as entropy to avoid slow boots on
+   # pre-5.4 watch kernels.
+   # Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
+@@ -123,4 +136,78 @@ in
+   boot.kernelParams = [
+     "loop.max_part=7"
+   ];
++
++  # Persist the journal only in stage1-pause-debug; production watches keep
++  # the volatile journal to avoid eMMC/UFS writes.
++  services.journald.settings.Journal = mkIf journalCfg.enable {
++    Storage = lib.mkForce "persistent";
++    SystemMaxUse = lib.mkForce "64M";
++  };
++
++  mobile.beautification.silentBoot = mkIf cfg.enable (lib.mkForce false);
++
++  mobile.usb = mkIf debugNetwork {
++    mode = mkDefault "gadgetfs";
++    idVendor = mkDefault "18d1";
++    idProduct = mkDefault "d002";
++    gadgetfs.functions.rndis = "ncm.usb0";
++  };
++
++  mobile.boot.stage-1.networking.enable = mkIf cfg.enable (mkDefault true);
++  mobile.boot.stage-1.ssh.enable = mkIf cfg.enable (mkDefault true);
++
++  services.openssh = mkIf debugNetwork {
++    enable = mkDefault true;
++    settings = {
++      PermitRootLogin = "yes";
++      PermitEmptyPasswords = "yes";
++    };
++  };
++
++  # A pending stage-2 sshd holds back multi-user.target on first boot; stage-1
++  # telnet/SSH remains available for debugging.
++  systemd.services.sshd.wantedBy = mkIf (cfg.enable && !stage2SshCfg.enable) (lib.mkForce [ ]);
++
++  networking.firewall.enable = mkIf debugNetwork (mkDefault false);
++
++  networking.interfaces.usb0.ipv4.addresses = mkIf debugNetwork [
++    {
++      address = "192.168.2.15";
++      prefixLength = 24;
++    }
++    {
++      address = "172.16.42.1";
++      prefixLength = 24;
++    }
++  ];
++
++  users.users.root.password = mkIf debugNetwork "root";
++
++  systemd.services.usb-gadget-network = mkIf debugNetwork {
++    description = "USB Gadget Ethernet (NCM) Setup";
++    wantedBy = [ "network-pre.target" ];
++    before = [ "network-pre.target" ];
++    unitConfig.DefaultDependencies = false;
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = pkgs.writeShellScript "setup-usb-gadget" ''
++        set -e
++        mountpoint -q /sys/kernel/config || { mkdir -p /sys/kernel/config; mount -t configfs none /sys/kernel/config; }
++        udc="$(ls /sys/class/udc 2>/dev/null | head -n1)"
++        [ -n "$udc" ] || exit 0
++        g=/sys/kernel/config/usb_gadget/g1
++        if [ ! -d "$g" ]; then
++          mkdir -p "$g/strings/0x409" "$g/functions/ncm.usb0" "$g/configs/c.1/strings/0x409"
++          echo 0x18d1 > "$g/idVendor"
++          echo 0xd002 > "$g/idProduct"
++          echo AsteroidOS > "$g/strings/0x409/manufacturer"
++          echo Smartwatch > "$g/strings/0x409/product"
++          echo "CDC NCM" > "$g/configs/c.1/strings/0x409/configuration"
++          ln -sf "$g/functions/ncm.usb0" "$g/configs/c.1/"
++        fi
++        [ -s "$g/UDC" ] || echo "$udc" > "$g/UDC"
++      '';
++    };
++  };
+ }
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 6c023b9d..fce9ecb6 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -30,6 +30,9 @@
+       hasCrown = true;
+       hasHaptics = true;
+       aodSupport = true;
++      stage1-pause-debug.enable = true;
++      stage2-ssh.enable = false;
++      stage2-save-journal.enable = true;
+     };
+   };
+ 
+@@ -74,10 +77,19 @@
+     "androidboot.usbconfigfs=true"
+     "loop.max_part=7"
+     "cgroup.memory=nokmem,nosocket"
++  ]
++  ++ lib.optionals config.mobile.hardware.watch.stage1-pause-debug.enable [
++    # Verbose systemd logging for early stage-2 debugging.
++    "systemd.log_level=debug"
++    "systemd.log_target=kmsg"
+   ];
+ 
+   mobile.system.type = "android";
+ 
++  # The hoki vendor kernel does not provide a zram module; avoid the
++  # dev-zram0.device boot timeout.
++  zramSwap.enable = lib.mkForce false;
++
+   # Ensure stage-1 udev immediately links userdata to /dev/disk/by-label/NIXOS_SYSTEM and /dev/disk/by-partlabel/userdata
+   mobile.boot.stage-1.extraUdevRules = ''
+     KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
+diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
+index 35ac4030..dffbb7ba 100644
+--- a/modules/hardware-watch.nix
++++ b/modules/hardware-watch.nix
+@@ -117,6 +117,23 @@ in
+       '';
+     };
+ 
++    stage1-pause-debug.enable = mkOption {
++      type = types.bool;
++      default = true;
++      description = "Enable stage1-pause-debug mode: smartwatch stage-1 console, SSH/telnet, and switch-root pause.";
++    };
++
++    stage2-save-journal.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "Persist the stage-2 systemd journal to /var/log/journal for debugging; disabled for production watches.";
++    };
++
++    stage2-ssh.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "Enable the stage-2 SSH server and USB networking without the stage-1 pause/console.";
++    };
+   };
+ 
+   config = mkIf (config.mobile.enable && watchCfg.enable) {
+diff --git a/modules/initrd-ssh.nix b/modules/initrd-ssh.nix
+index db771346..b4842997 100644
+--- a/modules/initrd-ssh.nix
++++ b/modules/initrd-ssh.nix
+@@ -1,15 +1,27 @@
+-{ config, lib, pkgs, ... }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
+ 
+ let
+   inherit (lib)
+     mkOption
+     types
+-  ;
++    ;
+   device_name = config.mobile.device.name;
+   cfg = config.mobile.boot.stage-1.ssh;
+   banner = pkgs.writeText "${device_name}-banner" ''
+     From a mobile-nixos device ${device_name}
+   '';
++  rootHash = "$6$wearroot$RYEJMmyL0CBIaGRy54AUS9B3AWgIjMOeiamag/f.9PQAgfyG8MUsQNJ.pOP77SWdlL9pjf9vZXtc2iQnYRYRm/";
++
++  continueBootScript = pkgs.writeScript "continue-boot" ''
++    #!/bin/sh
++    echo "Resuming boot to Stage-2..."
++    touch /run/continue-boot
++  '';
+ in
+ {
+   options.mobile.boot.stage-1.ssh = {
+@@ -18,24 +30,38 @@ in
+       default = false;
+       description = ''
+         Enables ssh during stage-1.
++      '';
++    };
+ 
+-        **CURRENT CONFIGURATION ALSO OPENS ACCESS TO ALL WITHOUT A PASSWORD NOR SSH KEY.**
++    insecureDebug = mkOption {
++      type = types.bool;
++      default = config.mobile.hardware.watch.stage1-pause-debug.enable or false;
++      description = ''
++        When enabled, sets predefined root password 'root' and spawns
++        an unauthenticated telnetd daemon on 172.16.42.1 for emergency debugging.
+       '';
+     };
+   };
+ 
+   config.mobile.boot.stage-1 = lib.mkIf cfg.enable {
++    bootConfig = {
++      debug = cfg.insecureDebug;
++    };
++
+     tasks = [
+-      # Oh boy, that's insecure! (As documented.)
+-      (pkgs.writeText "insecure-root-password-task.rb" ''
+-        class Tasks::InsecureRootPassword < SingletonTask
++      (pkgs.writeText "debug-root-password-task.rb" ''
++        class Tasks::DebugRootPassword < SingletonTask
+           def initialize()
+-            add_dependency(:Target, :Environment)
++            add_dependency(:Task, Tasks::LoginEnvironment.instance)
+           end
+-          
++
+           def run()
+-            # Puts a blank password for the root user.
+-            System.run("passwd", "-d", "root")
++            ${lib.optionalString cfg.insecureDebug ''
++              System.write("/etc/passwd", "root:x:0:0:root:/root:/bin/sh\n")
++              System.write("/etc/group", "root:x:0:\n")
++              System.write("/etc/shadow", "root:${rootHash}:19000:0:99999:7:::\n")
++              System.write("/etc/nsswitch.conf", "passwd: files\ngroup: files\nshadow: files\n")
++            ''}
+           end
+         end
+       '')
+@@ -43,23 +69,39 @@ in
+         class Tasks::DropbearSSHD < SingletonTask
+           def initialize()
+             add_dependency(:Target, :Networking)
++            add_dependency(:Task, Tasks::DebugRootPassword.instance)
+             Targets[:SwitchRoot].add_dependency(:Task, self)
+           end
+           
+           def run()
+             FileUtils.mkdir_p("/etc/dropbear")
+-            # THIS IS HIGHLY INSECURE
+-            # This allows blank login passwords.
+-            System.spawn("dropbear", "-ERB", "-b", "/etc/banner")
++            FileUtils.mkdir_p("/dev/pts")
++            System.run("mount", "-t", "devpts", "-o", "ptmxmode=0666,mode=620", "devpts", "/dev/pts") rescue nil
++            FileUtils.ln_sf("/dev/pts/ptmx", "/dev/ptmx") rescue nil
++            System.run("busybox", "--install", "-s", "/bin") rescue nil
++            System.spawn("dropbear", Configuration["debug"] == true ? "-ERB" : "-ER", "-b", "/etc/banner")
++            if Configuration["debug"] == true && System.which("telnetd")
++              System.spawn("telnetd", "-F", "-l", "/bin/sh")
++            end
+           end
+         end
+       '')
+     ];
+     contents = [
+-      { object = banner; symlink = "/etc/banner"; }
++      {
++        object = banner;
++        symlink = "/etc/banner";
++      }
++      {
++        object = continueBootScript;
++        symlink = "/bin/continue-boot";
++      }
+     ];
+     extraUtils = [
+-      { package = pkgs.dropbear; extraCommand = "cp -fpv ${pkgs.glibc.out}/lib/libnss_files.so.* $out/lib"; }
++      {
++        package = pkgs.dropbear;
++        extraCommand = "cp -fpv ${pkgs.glibc.out}/lib/libnss_files.so.* $out/lib";
++      }
+     ];
+   };
+ }
