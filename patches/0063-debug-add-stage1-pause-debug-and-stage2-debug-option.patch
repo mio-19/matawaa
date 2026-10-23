@@ -4,20 +4,20 @@ Date: Tue, 20 Oct 2026 19:00:58 +1100
 Subject: [PATCH] debug: add stage1-pause-debug and stage2 debug options
 
 Add the development-only stage debugging modes:
-- modules/hardware-watch.nix: add stage1-pause-debug.enable (default false), stage2-save-journal.enable, and stage2-ssh.enable. Production watches do not get a boot pause or debug console unless they opt in.
+- modules/hardware-watch.nix: add stage1-pause-debug.enable (default false), stage2-save-logs.enable (journal plus coredumps), and stage2-ssh.enable. Production watches do not get a boot pause or debug console unless they opt in.
 - modules/initrd-ssh.nix: add debug root login, telnetd fallback, /bin/continue-boot, and the switch-root pause flag for stage1-pause-debug.
 - boot/init/tasks/switch_root.rb: pause before switch_root only when stage1-pause-debug is enabled.
-- devices/families/asteroidos.nix: gate the stage-1 console/SSH/telnet and pause behind stage1-pause-debug; persist journals only when stage2-save-journal is enabled; enable stage-2 OpenSSH and USB networking when stage2-ssh is enabled; assert that stage1-pause-debug and stage2-ssh are mutually exclusive.
-- devices/fossil-hoki/default.nix: opt hoki into stage1-pause-debug and stage2-save-journal for the current bring-up, and keep verbose systemd logging gated by the stage1 debug mode.
+- devices/families/asteroidos.nix: gate the stage-1 console/SSH/telnet and pause behind stage1-pause-debug; persist the journal and coredumps only when stage2-save-logs is enabled; enable stage-2 OpenSSH and USB networking when stage2-ssh is enabled; assert that stage1-pause-debug and stage2-ssh are mutually exclusive.
+- devices/fossil-hoki/default.nix: opt hoki into stage1-pause-debug and stage2-save-logs for the current bring-up, and keep verbose systemd logging gated by the stage1 debug mode.
 
 Signed-off-by: Mio <mio@mio19.uk>
 ---
  boot/init/tasks/switch_root.rb  | 19 +++++++
- devices/families/asteroidos.nix | 87 +++++++++++++++++++++++++++++++++
- devices/fossil-hoki/default.nix | 12 +++++
- modules/hardware-watch.nix      | 17 +++++++
- modules/initrd-ssh.nix          | 72 +++++++++++++++++++++------
- 5 files changed, 192 insertions(+), 15 deletions(-)
+ devices/families/asteroidos.nix | 97 +++++++++++++++++++++++++++++++++
+ devices/fossil-hoki/default.nix | 12 ++++
+ modules/hardware-watch.nix      | 17 ++++++
+ modules/initrd-ssh.nix          | 72 +++++++++++++++++++-----
+ 5 files changed, 202 insertions(+), 15 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
 index b3a6045b..0644044c 100644
@@ -57,7 +57,7 @@ index b3a6045b..0644044c 100644
  
      Tasks::UDev.instance.teardown()
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 46ce2d83..68c0836c 100644
+index 46ce2d83..0b4dd437 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -10,8 +10,19 @@ let
@@ -65,7 +65,7 @@ index 46ce2d83..68c0836c 100644
      mkIf
      ;
 +  cfg = config.mobile.hardware.watch.stage1-pause-debug;
-+  journalCfg = config.mobile.hardware.watch.stage2-save-journal;
++  journalCfg = config.mobile.hardware.watch.stage2-save-logs;
 +  stage2SshCfg = config.mobile.hardware.watch.stage2-ssh;
 +  debugNetwork = cfg.enable || stage2SshCfg.enable;
  in
@@ -89,16 +89,26 @@ index 46ce2d83..68c0836c 100644
    # AsteroidOS credits the saved random seed as entropy to avoid slow boots on
    # pre-5.4 watch kernels.
    # Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
-@@ -123,4 +136,78 @@ in
+@@ -123,4 +136,88 @@ in
    boot.kernelParams = [
      "loop.max_part=7"
    ];
 +
-+  # Persist the journal only in stage1-pause-debug; production watches keep
-+  # the volatile journal to avoid eMMC/UFS writes.
++  # Persist the journal and coredumps only for stage1 debug/ssh bring-up;
++  # production watches keep the volatile journal to avoid eMMC/UFS writes.
 +  services.journald.settings.Journal = mkIf journalCfg.enable {
 +    Storage = lib.mkForce "persistent";
 +    SystemMaxUse = lib.mkForce "64M";
++  };
++
++  # systemd-coredump writes external files for the launcher/compositor
++  # crashes that otherwise only appear as "Core dump" lines in kmsg.
++  systemd.coredump = mkIf journalCfg.enable {
++    enable = true;
++    settings.Coredump = {
++      Storage = "external";
++      MaxUse = "256M";
++    };
 +  };
 +
 +  mobile.beautification.silentBoot = mkIf cfg.enable (lib.mkForce false);
@@ -169,7 +179,7 @@ index 46ce2d83..68c0836c 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index cb03a636..39659eb5 100644
+index cb03a636..3954ce31 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -41,6 +41,9 @@
@@ -178,7 +188,7 @@ index cb03a636..39659eb5 100644
        aodSupport = true;
 +      stage1-pause-debug.enable = true;
 +      stage2-ssh.enable = false;
-+      stage2-save-journal.enable = true;
++      stage2-save-logs.enable = true;
      };
    };
  
@@ -203,7 +213,7 @@ index cb03a636..39659eb5 100644
    mobile.boot.stage-1.extraUdevRules = ''
      KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
-index 35ac4030..f774c123 100644
+index 35ac4030..acfaee54 100644
 --- a/modules/hardware-watch.nix
 +++ b/modules/hardware-watch.nix
 @@ -117,6 +117,23 @@ in
@@ -216,10 +226,10 @@ index 35ac4030..f774c123 100644
 +      description = "Enable development-only stage-1 console, SSH/telnet, and switch-root pause; enable explicitly in the debug device/example configuration.";
 +    };
 +
-+    stage2-save-journal.enable = mkOption {
++    stage2-save-logs.enable = mkOption {
 +      type = types.bool;
 +      default = false;
-+      description = "Persist the stage-2 systemd journal to /var/log/journal for debugging; disabled for production watches.";
++      description = "Persist the stage-2 systemd journal to /var/log/journal and coredumps to /var/lib/systemd/coredump for debugging; disabled for production watches.";
 +    };
 +
 +    stage2-ssh.enable = mkOption {
