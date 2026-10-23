@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 18:20:36 +1100
+Subject: [PATCH] boot: use explicit drop-in for systemd-user-sessions
+
+environment.etc cannot create a drop-in below the read-only /etc/systemd/system symlink. Use systemd.services.systemd-user-sessions.overrideStrategy = "asDropin" with an empty After=, so the unit no longer waits for nss-user-lookup.target.
+---
+ devices/families/asteroidos.nix | 18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index a1c798ff..10f244bc 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -75,19 +75,13 @@ in
+     nixos.enable = mkDefault false;
+   };
+ 
+-  # Drop-in because overriding systemd-user-sessions' After= through
+-  # systemd.services did not change the system closure. This unit only manages
+-  # /run/nologin; it must not be ordered after the unresolved nss lookup target.
+-  environment.etc."systemd/system/systemd-user-sessions.service.d/10-no-nss.conf".text = ''
+-    [Unit]
+-    After=
+-  '';
+-
+   # systemd-user-sessions only manages /run/nologin, but its upstream unit is
+-  # ordered after nss-user-lookup.target. On this vendor kernel that ordering
+-  # still holds multi-user.target even though nscd is running. Start the
+-  # user-sessions gate without waiting on name-service lookup.
+-  systemd.services.systemd-user-sessions.after = lib.mkForce [ ];
++  # ordered after nss-user-lookup.target. Force an explicit drop-in; /etc is
++  # read-only in the Nix store, so environment.etc cannot create this path.
++  systemd.services.systemd-user-sessions = {
++    after = lib.mkForce [ ];
++    overrideStrategy = "asDropin";
++  };
+ 
+   # nsncd's generated nscd.service is Type=notify but the daemon does not send
+   # READY. nss-user-lookup.target then never completes, which holds
