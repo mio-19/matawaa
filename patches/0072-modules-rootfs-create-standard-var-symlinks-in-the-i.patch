@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 20:07:47 +1100
+Subject: [PATCH] modules/rootfs: create standard /var symlinks in the image
+
+The generated Mobile-NixOS rootfs image did not contain /var/run or /var/lock; stage-1 and tmpfiles workarounds were needed. Create the standard symlinks in populateCommands so every boot sees them before early systemd units, and remove the workarounds.
+---
+ boot/init/tasks/switch_root.rb  | 8 --------
+ devices/families/asteroidos.nix | 9 ---------
+ modules/rootfs.nix              | 5 +++++
+ 3 files changed, 5 insertions(+), 17 deletions(-)
+
+diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
+index 8f5c877d..b3a6045b 100644
+--- a/boot/init/tasks/switch_root.rb
++++ b/boot/init/tasks/switch_root.rb
+@@ -386,14 +386,6 @@ class Tasks::SwitchRoot < SingletonTask
+   def run()
+     init = File.join(selected_generation.path, "init")
+ 
+-    # The generated rootfs image does not populate the standard /var/run and
+-    # /var/lock symlinks. Create them in the target root before systemd starts;
+-    # otherwise dhcpcd/nscd fail and multi-user.target stays held.
+-    system_var = File.join(SYSTEM_MOUNT_POINT, "var")
+-    System.run("mkdir", "-p", system_var)
+-    System.run("ln", "-sfn", "/run", File.join(system_var, "run"))
+-    System.run("ln", "-sfn", "/run/lock", File.join(system_var, "lock"))
+-
+     # This is the traditional way we printed the init path.
+     # This is still helpful to take vertical real estate when visually looking
+     # through the log.
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 5d9bf896..4a0a75f4 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -27,15 +27,6 @@ in
+   # growPartition must be disabled to avoid pulling 64-bit qemu-utils into 32-bit ARMv7 targets.
+   boot.growPartition = lib.mkForce false;
+ 
+-  # The generated rootfs image does not include the standard /var/run and
+-  # /var/lock symlinks. Without them dhcpcd and nscd fail to create their
+-  # runtime directories, nss-user-lookup.target stays pending, and
+-  # multi-user.target remains held, so the user session and launcher never start.
+-  systemd.tmpfiles.rules = lib.mkAfter [
+-    "L+ /var/run - - - - /run"
+-    "L+ /var/lock - - - - /run/lock"
+-  ];
+-
+   # Display quirks for Qualcomm MDSS framebuffer and DSI command-mode panels
+   mobile.quirks.fb-refresher.enable = mkDefault true;
+   mobile.quirks.fb-refresher.stage-1.enable = mkDefault true;
+diff --git a/modules/rootfs.nix b/modules/rootfs.nix
+index 31ea82da..2cc889fa 100644
+--- a/modules/rootfs.nix
++++ b/modules/rootfs.nix
+@@ -53,6 +53,11 @@ in
+       in
+       ''
+         mkdir -p ./nix/store
++        # The generated rootfs must contain the standard /var symlinks before
++        # systemd starts; creating them in stage 1 is too late for early units.
++        mkdir -p ./var
++        ln -sfn /run ./var/run
++        ln -sfn /run/lock ./var/lock
+         echo "Copying system closure..."
+ 
+         err=0
