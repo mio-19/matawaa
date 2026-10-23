@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 18:04:53 +1100
+Subject: [PATCH] boot: do not let nscd hold nss-user-lookup
+
+nsncd's generated nscd.service is Type=notify but the daemon never sends READY. nss-user-lookup.target therefore stays incomplete, holding systemd-user-sessions.service and multi-user.target. Mark nscd as a simple service so name-service caching starts without blocking the user session.
+---
+ devices/families/asteroidos.nix | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index b4d0f237..672acff1 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -75,6 +75,12 @@ in
+     nixos.enable = mkDefault false;
+   };
+ 
++  # nsncd's generated nscd.service is Type=notify but the daemon does not send
++  # READY. nss-user-lookup.target then never completes, which holds
++  # systemd-user-sessions.service and therefore multi-user.target. Treat it as
++  # simple so name-service caching starts without blocking the user session.
++  systemd.services.nscd.serviceConfig.Type = lib.mkForce "simple";
++
+   # Keep DHCP available but do not let it hold boot. There is no guaranteed
+   # DHCP-capable interface at stage-2 startup, and dhcpcd otherwise waits for
+   # an address, holding multi-user.target. Forking to background lets the user
