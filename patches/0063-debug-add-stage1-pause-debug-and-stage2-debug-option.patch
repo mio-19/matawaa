@@ -4,11 +4,11 @@ Date: Tue, 20 Oct 2026 19:00:58 +1100
 Subject: [PATCH] debug: add stage1-pause-debug and stage2 debug options
 
 Add the development-only stage debugging modes:
-- modules/hardware-watch.nix: add stage1-pause-debug.enable, stage2-save-journal.enable, and stage2-ssh.enable.
+- modules/hardware-watch.nix: add stage1-pause-debug.enable (default false), stage2-save-journal.enable, and stage2-ssh.enable. Production watches do not get a boot pause or debug console unless they opt in.
 - modules/initrd-ssh.nix: add debug root login, telnetd fallback, /bin/continue-boot, and the switch-root pause flag for stage1-pause-debug.
 - boot/init/tasks/switch_root.rb: pause before switch_root only when stage1-pause-debug is enabled.
-- devices/families/asteroidos.nix: gate the stage-1 console/SSH/telnet and pause behind stage1-pause-debug; persist journals only when stage2-save-journal is enabled; enable stage-2 OpenSSH and USB networking when stage2-ssh is enabled; assert that stage1-pause-debug and stage2-ssh are mutually exclusive; do not pull sshd into multi-user while only stage1 debug is active.
-- devices/fossil-hoki/default.nix: enable stage1-pause-debug, disable stage2-ssh, and enable stage2-save-journal for the current bring-up; keep verbose systemd logging gated by the stage1 debug mode.
+- devices/families/asteroidos.nix: gate the stage-1 console/SSH/telnet and pause behind stage1-pause-debug; persist journals only when stage2-save-journal is enabled; enable stage-2 OpenSSH and USB networking when stage2-ssh is enabled; assert that stage1-pause-debug and stage2-ssh are mutually exclusive.
+- devices/fossil-hoki/default.nix: opt hoki into stage1-pause-debug and stage2-save-journal for the current bring-up, and keep verbose systemd logging gated by the stage1 debug mode.
 
 Signed-off-by: Mio <mio@mio19.uk>
 ---
@@ -203,7 +203,7 @@ index 714d7a08..2cedecb0 100644
    mobile.boot.stage-1.extraUdevRules = ''
      KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
-index 35ac4030..dffbb7ba 100644
+index 35ac4030..f774c123 100644
 --- a/modules/hardware-watch.nix
 +++ b/modules/hardware-watch.nix
 @@ -117,6 +117,23 @@ in
@@ -212,8 +212,8 @@ index 35ac4030..dffbb7ba 100644
  
 +    stage1-pause-debug.enable = mkOption {
 +      type = types.bool;
-+      default = true;
-+      description = "Enable stage1-pause-debug mode: smartwatch stage-1 console, SSH/telnet, and switch-root pause.";
++      default = false;
++      description = "Enable development-only stage-1 console, SSH/telnet, and switch-root pause; enable explicitly in the debug device/example configuration.";
 +    };
 +
 +    stage2-save-journal.enable = mkOption {
