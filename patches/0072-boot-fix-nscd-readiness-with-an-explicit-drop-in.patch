@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 18:24:17 +1100
+Subject: [PATCH] boot: fix nscd readiness with an explicit drop-in
+
+Apply the Type=simple override as a systemd drop-in so it reaches the nscd unit required by nss-user-lookup.target. Remove the systemd-user-sessions ordering workaround; nscd is the actual blocker.
+---
+ devices/families/asteroidos.nix | 18 +++++++-----------
+ 1 file changed, 7 insertions(+), 11 deletions(-)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 10f244bc..01323613 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -75,20 +75,16 @@ in
+     nixos.enable = mkDefault false;
+   };
+ 
+-  # systemd-user-sessions only manages /run/nologin, but its upstream unit is
+-  # ordered after nss-user-lookup.target. Force an explicit drop-in; /etc is
+-  # read-only in the Nix store, so environment.etc cannot create this path.
+-  systemd.services.systemd-user-sessions = {
+-    after = lib.mkForce [ ];
++  # nsncd's generated nscd.service is Type=notify but the daemon never sends
++  # READY. Use an explicit drop-in so the setting applies to the nscd unit that
++  # nss-user-lookup.target requires, not only to a newly generated unit. With
++  # nscd actually active, nss-user-lookup and systemd-user-sessions can complete
++  # normally without bypassing the user-sessions gate.
++  systemd.services.nscd = {
+     overrideStrategy = "asDropin";
++    serviceConfig.Type = lib.mkForce "simple";
+   };
+ 
+-  # nsncd's generated nscd.service is Type=notify but the daemon does not send
+-  # READY. nss-user-lookup.target then never completes, which holds
+-  # systemd-user-sessions.service and therefore multi-user.target. Treat it as
+-  # simple so name-service caching starts without blocking the user session.
+-  systemd.services.nscd.serviceConfig.Type = lib.mkForce "simple";
+-
+   # Keep DHCP available but do not let it hold boot. There is no guaranteed
+   # DHCP-capable interface at stage-2 startup, and dhcpcd otherwise waits for
+   # an address, holding multi-user.target. Forking to background lets the user
