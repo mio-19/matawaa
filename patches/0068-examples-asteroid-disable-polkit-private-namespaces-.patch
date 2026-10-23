@@ -5,14 +5,14 @@ Subject: [PATCH] examples/asteroid: disable polkit private namespaces on 4.14
 
 polkitd exits with status=226/NAMESPACE because the vendor kernel has no /dev/mqueue or /dev/hugepages for the private-device namespace. Disable PrivateDevices and PrivateTmp for polkit so it can start and authorize loginctl SetUserLinger.
 ---
- examples/asteroid/asteroid-desktop.nix | 7 +++++++
- 1 file changed, 7 insertions(+)
+ examples/asteroid/asteroid-desktop.nix | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 9036a0a4..082ca472 100644
+index 9036a0a4..09fb7b6f 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -203,6 +203,13 @@ in
+@@ -203,6 +203,26 @@ in
      systemd.services.polkit = {
        wantedBy = lib.mkForce [ "multi-user.target" ];
        before = [ "linger-users.service" ];
@@ -22,6 +22,19 @@ index 9036a0a4..082ca472 100644
 +      serviceConfig = {
 +        PrivateDevices = lib.mkForce false;
 +        PrivateTmp = lib.mkForce false;
++        PrivateNetwork = lib.mkForce false;
++        PrivateUsers = lib.mkForce false;
++        PrivateMounts = lib.mkForce false;
++        ProtectSystem = lib.mkForce false;
++        ProtectHome = lib.mkForce false;
++        ProtectKernelTunables = lib.mkForce false;
++        ProtectKernelModules = lib.mkForce false;
++        ProtectControlGroups = lib.mkForce false;
++        ProtectClock = lib.mkForce false;
++        ProtectHostname = lib.mkForce false;
++        ProtectProc = lib.mkForce "default";
++        ProcSubset = lib.mkForce "all";
++        RestrictNamespaces = lib.mkForce false;
 +      };
      };
  

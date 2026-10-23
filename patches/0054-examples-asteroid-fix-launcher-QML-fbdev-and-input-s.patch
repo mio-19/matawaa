@@ -5,30 +5,59 @@ Subject: [PATCH] examples/asteroid: fix launcher QML, fbdev and input setup
 
 Build the Nemo.Mce QML plugin with the target Qt libraries, add the Nemo.Configuration plugin from Sailfish, and include qt5compat in QML2_IMPORT_PATH. Run the fbdev launcher with the Qt Quick software backend so it does not require an EGL display on the 4.14 kernel. Add ceres to the tty group and drop the unavailable keys.qmap option so the compositor can open the tty and evdev keyboards.
 ---
- devices/fossil-hoki/default.nix               |  2 +-
- examples/asteroid/asteroid-desktop.nix        |  5 +-
+ devices/fossil-hoki/default.nix               | 20 +++---
+ examples/asteroid/asteroid-desktop.nix        | 19 ++++-
  examples/asteroid/configuration.nix           |  1 +
  overlay/asteroidos/default.nix                |  3 +
  overlay/asteroidos/mce-qt6/default.nix        | 16 ++++-
  .../nemo-qml-plugin-configuration/default.nix | 69 +++++++++++++++++++
- 6 files changed, 92 insertions(+), 4 deletions(-)
+ 6 files changed, 117 insertions(+), 11 deletions(-)
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 24e4487e..ba0c97e4 100644
+index 24e4487e..3ebe0d83 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -140,7 +140,7 @@
-     QPA_HWC_FORCE_GLES = "1";
-     QPA_HWC2_FORCE_DOZE_UPDATE = "1";
-     QT_OPENGL_NO_BGRA = "1";
--    LIPSTICK_OPTIONS = "-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1";
-+    LIPSTICK_OPTIONS = "-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1";
+@@ -134,18 +134,15 @@
+     };
    };
  
+-  # AsteroidOS Wayland compositor & libhybris hwcomposer environment options for hoki
+-  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-asteroid/asteroid-launcher/asteroid-launcher-configs/20-device.conf
+-  environment.variables = {
+-    QPA_HWC_FORCE_GLES = "1";
+-    QPA_HWC2_FORCE_DOZE_UPDATE = "1";
+-    QT_OPENGL_NO_BGRA = "1";
+-    LIPSTICK_OPTIONS = "-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1";
+-  };
++  # AsteroidOS Wayland compositor environment is installed as
++  # /var/lib/environment/compositor/20-device.conf below, matching the
++  # upstream EnvironmentFile contract.
+ 
    # Hardware node permissions and symlinks for Android HAL / libhybris
+   # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-android/android-init/android-init/init.rc
+   services.udev.extraRules = ''
++    KERNEL=="binder", MODE="0666"
++    KERNEL=="ashmem", MODE="0666"
+     KERNEL=="hwbinder", MODE="0666"
+     KERNEL=="vndbinder", MODE="0666"
+     KERNEL=="mdss_rotator", MODE="0666"
+@@ -187,6 +184,13 @@
+   # Subsystem boots and firmware mount setup
+   # GNSS vendor service symlink PR: https://github.com/AsteroidOS/meta-smartwatch/pull/342
+   systemd.tmpfiles.rules = [
++    "d /var/lib/environment/compositor 0755 root root -"
++    "L+ /var/lib/environment/compositor/20-device.conf - - - - ${pkgs.writeText "20-device.conf" ''
++      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"
++      QPA_HWC_FORCE_GLES=1
++      QPA_HWC2_FORCE_DOZE_UPDATE=1
++      QT_OPENGL_NO_BGRA=1
++    ''}"
+     "L+ /system/lib/hw/gps.default.so - - - - /vendor/lib/hw/gps.default.so"
+     "L+ /vendor/bin/hw/android.hardware.gnss@1.0-service - - - - /vendor/bin/hw/android.hardware.gnss@1.0-service-qti"
+     "L+ /dev/graphics/fb0 - - - - /dev/fb0"
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 5d686296..311502b1 100644
+index 5d686296..8615cb64 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
 @@ -142,10 +142,12 @@ in
@@ -45,7 +74,15 @@ index 5d686296..311502b1 100644
      };
  
      # Wayland compositor and watchface launcher user service (runs under user session)
-@@ -159,6 +161,7 @@ in
+@@ -153,16 +155,31 @@ in
+     systemd.user.services.asteroid-launcher = {
+       description = "AsteroidOS Wayland Compositor and Launcher";
+       wantedBy = [ "default.target" ];
++      requires = [ "dbus.socket" ];
++      unitConfig.ConditionUser = "!root";
+       environment = {
+         QT_IM_MODULE = "qtvirtualkeyboard";
+         QT_VIRTUALKEYBOARD_STYLE = "watch";
          QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
          RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
          QT_QPA_PLATFORM = lib.mkDefault "linuxfb:fb=/dev/fb0";
@@ -53,6 +90,22 @@ index 5d686296..311502b1 100644
        }
        // config.environment.variables;
        serviceConfig = {
++        Type = "notify";
++        WorkingDirectory = "/";
++        EnvironmentFile = "-/var/lib/environment/compositor/*.conf";
++        ExecStartPre = [
++          "${pkgs.writeShellScript "asteroid-launcher-precondition" ''
++            if [ -f /usr/lib/systemd/user/android-boot-completed.service ]; then
++              while [ ! -f /dev/.coldboot_done ]; do sleep 1; done
++            fi
++          ''}"
++          "-${pkgs.bash}/bin/bash -c 'echo QUIT > /run/psplash_fifo 2>/dev/null || true'"
++        ];
+         ExecStart = "${config.security.wrapperDir}/asteroid-launcher $LIPSTICK_OPTIONS -plugin evdevtouch --systemd";
++        TimeoutStopSec = "3s";
+         Restart = "always";
+         RestartSec = "2s";
+       };
 diff --git a/examples/asteroid/configuration.nix b/examples/asteroid/configuration.nix
 index 781f4217..8b1b32c3 100644
 --- a/examples/asteroid/configuration.nix

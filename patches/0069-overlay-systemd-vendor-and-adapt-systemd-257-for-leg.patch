@@ -1,12 +1,26 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Fri, 23 Oct 2026 21:18:15 +1100
-Subject: [PATCH] overlay/systemd: vendor the systemd 257 definition from
- Nixpkgs 25.05
+Subject: [PATCH] overlay/systemd: vendor and adapt systemd 257 for legacy
+ kernels
 
-Vendor the exact systemd 257.10 derivation and its NixOS patches from the nixpkgs 25.05 branch instead of importing an old nixpkgs at evaluation time. Use it as the default systemd for the 4.14 target; keep the current systemd 262 old-kernel-patched package as systemd_latest-oldkernel.
+Nixpkgs no longer ships systemd 257. Vendor the 257.10 definition from
+the Nixpkgs 25.05 branch, merge the OpenEmbedded STATX_MNT_ID fallback,
+and adapt the 25.05 definition to the current package-set ABI. Patch GCC
+16.2.0's libgomp uid buffer, install the current NixOS unit set, and
+expose the package flags current NixOS expects.
+
+Select systemd 257 only for the legacy kernel; modern kernels use the
+current systemd 262. Keep the old-kernel-patched 262 package as
+systemd262oldkernel.
+
+Signed-off-by: Mio <mio@mio19.uk>
 ---
- overlay/cross-compile.nix                     |   26 +-
+ devices/families/asteroidos.nix               |    7 +
+ devices/fossil-hoki-mainline/default.nix      |    2 +
+ modules/hardware-watch.nix                    |   27 +
+ overlay/cross-compile.nix                     |   51 +-
+ .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
  ...on-t-try-to-unmount-nix-or-nix-store.patch |   45 +
  .../0003-Fix-NixOS-containers.patch           |   31 +
@@ -27,8 +41,12 @@ Vendor the exact systemd 257.10 derivation and its NixOS patches from the nixpkg
  .../0018-meson-Don-t-link-ssh-dropins.patch   |   29 +
  ...nit_file_exists_full-follow-symlinks.patch |   22 +
  ...e-NSCD-when-DNSSEC-validation-is-dis.patch |   43 +
- overlay/systemd-257/default.nix               | 1062 +++++++++++++++++
- 22 files changed, 1996 insertions(+), 7 deletions(-)
+ overlay/systemd-257/default.nix               | 1089 +++++++++++++++++
+ ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
+ .../systemd-search-path-revert.patch          |   21 +
+ .../systemd-257/systemd-udevd-varlink.socket  |   26 +
+ 29 files changed, 2310 insertions(+), 7 deletions(-)
+ create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
  create mode 100644 overlay/systemd-257/0003-Fix-NixOS-containers.patch
@@ -50,9 +68,81 @@ Vendor the exact systemd 257.10 derivation and its NixOS patches from the nixpkg
  create mode 100644 overlay/systemd-257/0019-install-unit_file_exists_full-follow-symlinks.patch
  create mode 100644 overlay/systemd-257/0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
  create mode 100644 overlay/systemd-257/default.nix
+ create mode 100644 overlay/systemd-257/oe-Handle-missing-STATX_MNT_ID-on-older-kernels.patch
+ create mode 100644 overlay/systemd-257/systemd-search-path-revert.patch
+ create mode 100644 overlay/systemd-257/systemd-udevd-varlink.socket
 
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 4a0a75f4..c4550492 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -12,6 +12,13 @@ let
+     ;
+ in
+ {
++  systemd.package = lib.mkForce (
++    if config.mobile.hardware.watch.kernel == "legacy" then
++      pkgs.systemd257
++    else
++      pkgs.systemd
++  );
++
+   mobile.system.type = mkDefault "android";
+   mobile.system.system = mkDefault "armv7l-linux";
+ 
+diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
+index c5ca20c7..35ee3b43 100644
+--- a/devices/fossil-hoki-mainline/default.nix
++++ b/devices/fossil-hoki-mainline/default.nix
+@@ -19,6 +19,8 @@
+ 
+   nixpkgs.hostPlatform = lib.mkForce "aarch64-linux";
+ 
++  mobile.hardware.watch.kernel = lib.mkForce "modern";
++
+   mobile.device = {
+     name = lib.mkForce "fossil-hoki-mainline";
+     identity = {
+diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
+index 35ac4030..c43cedf0 100644
+--- a/modules/hardware-watch.nix
++++ b/modules/hardware-watch.nix
+@@ -117,6 +117,33 @@ in
+       '';
+     };
+ 
++    kernel = mkOption {
++      type = types.enum [ "legacy" "modern" ];
++      default = "legacy";
++      description = ''
++        Watch kernel generation. "legacy" uses the vendor 4.14 kernel and the
++        old systemd 257 package; "modern" uses the mainline kernel and the
++        current systemd package.
++      '';
++    };
++
++    stage1-pause-debug.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "Enable development-only stage-1 console, SSH/telnet, and switch-root pause; enable explicitly in the debug device/example configuration.";
++    };
++
++    stage2-save-logs.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "Persist the stage-2 systemd journal to /var/log/journal and coredumps to /var/lib/systemd/coredump for debugging; disabled for production watches.";
++    };
++
++    stage2-ssh.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "Enable the stage-2 SSH server and USB networking without the stage-1 pause/console.";
++    };
+   };
+ 
+   config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index ba450985..c5221066 100644
+index ba450985..6c65efee 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -32,13 +32,14 @@ else
@@ -77,24 +167,68 @@ index ba450985..c5221066 100644
        (super.systemd.override (
          super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
            # systemd BPF framework fails when cross-compiling on 32-bit ARM
-@@ -58,6 +59,17 @@ else
+@@ -58,6 +59,42 @@ else
            ];
          });
  
++    # The systemd 257 definition comes from Nixpkgs 25.05, but GCC 16.2.0's
++    # libgomp sizes the omp_get_uid_from_device buffer for 10 digits and
++    # misses the sign, so the target build fails under -Werror=format-truncation.
++    systemdStdenv = super.stdenv.override {
++      cc = super.stdenv.cc.override {
++        cc = super.stdenv.cc.cc.overrideAttrs (old: {
++          patches = (old.patches or []) ++ [ ./patches/gcc-16.2.0-libgomp-uid-buffer.patch ];
++        });
++      };
++    };
++
 +    systemd257 =
-+      (super.callPackage ./systemd-257 { }).override (
-+        super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
++      (super.lib.callPackageWith
++        (builtins.intersectAttrs (super.lib.functionArgs (import ./systemd-257)) final)
++        ./systemd-257
++        { stdenv = systemdStdenv; }
++      ).override (
++        {
++          # hoki has no encrypted root or EFI UKI; dropping these removes the
++          # only postFixup users of makeBinaryWrapper, whose helper hook pulls
++          # in the GCC build that currently fails on armv7.
++          withCryptsetup = false;
++          withUkify = false;
++          withHomed = false;
++          withRepart = false;
++          withFido2 = false;
++        }
++        // super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
 +          withLibBPF = false;
 +        }
 +      );
 +  in
 +  {
-+    systemd = systemd257;
++    inherit systemd257;
 +    systemd_latest-oldkernel = systemd262OldKernel;
 +
      # ModemManager's generated GDBus sources race with the static archive link
      # when building in parallel; serialize its build.
      modemmanager = super.modemmanager.overrideAttrs (old: {
+diff --git a/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch b/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
+new file mode 100644
+index 00000000..17006966
+--- /dev/null
++++ b/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
+@@ -0,0 +1,13 @@
++diff --git a/libgomp/target.c b/libgomp/target.c
++--- a/libgomp/target.c
+++++ b/libgomp/target.c
++@@ -5950,7 +5950,7 @@
++   if (devicep->get_uid_func)
++     devicep->uid = devicep->get_uid_func (devicep->target_id);
++   if (!devicep->uid)
++     {
++-      size_t ln = strlen (STR_OMP_DEV_PREFIX) + 10 + 1;
+++      size_t ln = strlen (STR_OMP_DEV_PREFIX) + 12 + 1;
++       char *uid;
++       uid = gomp_malloc (ln);
++       snprintf (uid, ln, "%s%d", STR_OMP_DEV_PREFIX, device_num);
 diff --git a/overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch b/overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
 new file mode 100644
 index 00000000..d242ff7c
@@ -1132,10 +1266,10 @@ index 00000000..a1b1575a
 +         notify_message = notify_start("READY=1\n"
 diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
 new file mode 100644
-index 00000000..5be8c10c
+index 00000000..39e74bdb
 --- /dev/null
 +++ b/overlay/systemd-257/default.nix
-@@ -0,0 +1,1062 @@
+@@ -0,0 +1,1089 @@
 +{
 +  stdenv,
 +  lib,
@@ -1146,6 +1280,7 @@ index 00000000..5be8c10c
 +  fetchzip,
 +  buildPackages,
 +  makeBinaryWrapper,
++  systemd,
 +  ninja,
 +  meson,
 +  m4,
@@ -1288,6 +1423,16 @@ index 00000000..5be8c10c
 +  withPortabled ? !stdenv.hostPlatform.isMusl,
 +  withQrencode ? true,
 +  withRemote ? !stdenv.hostPlatform.isMusl,
++  # systemd 262 added this switch for the IMDS credentials service. The 25.05
++  # systemd 257 definition predates it; accept it so the vendored package can
++  # be called from the current package set, and ignore it.
++  withImds ? false,
++  # systemd 262 package-set switch, unused by the 25.05 definition.
++  withSysinstall ? false,
++  # systemd 262 package-set switch, unused by the 25.05 definition.
++  withVConsole ? false,
++  # systemd 262 package-set switch, unused by the 25.05 definition.
++  withNspawn ? false,
 +  withResolved ? true,
 +  withShellCompletions ? true,
 +  withSysusers ? true,
@@ -1318,6 +1463,8 @@ index 00000000..5be8c10c
 +  docbook_xml_dtd_42,
 +  docbook_xml_dtd_45,
 +  withLogTrace ? false,
++  # Present in the systemd 262 package set, unused by the 25.05 definition.
++  vmlinux-btf ? null,
 +}:
 +
 +assert withImportd -> withCompression;
@@ -1389,6 +1536,10 @@ index 00000000..5be8c10c
 +    ./0018-meson-Don-t-link-ssh-dropins.patch
 +
 +    ./0019-install-unit_file_exists_full-follow-symlinks.patch
++    # NixOS 26.11 appends its own systemd-search-path.patch to systemd.package;
++    # systemd 257 already contains that change, so undo it first and let the
++    # NixOS patch re-apply cleanly.
++    ./systemd-search-path-revert.patch
 +  ]
 +  ++ lib.optionals (stdenv.hostPlatform.isLinux && stdenv.hostPlatform.isGnu) [
 +    ./0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
@@ -1466,8 +1617,7 @@ index 00000000..5be8c10c
 +  outputs = [
 +    "out"
 +    "dev"
-+  ]
-+  ++ (lib.optional (!buildLibsOnly) "man");
++  ];
 +  separateDebugInfo = true;
 +  # The vendored 25.05 definition relies on allowedReferences with debug
 +  # info; current stdenv requires structured attributes for that combination.
@@ -1487,7 +1637,6 @@ index 00000000..5be8c10c
 +
 +  nativeBuildInputs = [
 +    pkg-config
-+    makeBinaryWrapper
 +    gperf
 +    ninja
 +    meson
@@ -1709,7 +1858,7 @@ index 00000000..5be8c10c
 +    (lib.mesonEnable "xenctrl" false)
 +    (lib.mesonEnable "gnutls" false)
 +    (lib.mesonEnable "xkbcommon" false)
-+    (lib.mesonEnable "man" true)
++    (lib.mesonEnable "man" false)
 +
 +    (lib.mesonBool "analyze" withAnalyze)
 +    (lib.mesonBool "logind" withLogind)
@@ -1921,6 +2070,9 @@ index 00000000..5be8c10c
 +      "-USYSTEMD_BINARY_PATH"
 +      "-DSYSTEMD_BINARY_PATH=\"/run/current-system/systemd/lib/systemd/systemd\""
 +
++      # GCC 16 warns about duplicate errno aliases in the generated
++      # errno-to-name.h; systemd's 257 build promotes it to an error.
++      "-Wno-error=override-init"
 +    ]
 +    ++ lib.optionals stdenv.hostPlatform.isMusl [
 +      "-D__UAPI_DEF_ETHHDR=0"
@@ -1945,6 +2097,11 @@ index 00000000..5be8c10c
 +      mkdir -p $out/example/systemd
 +      mv $out/lib/{binfmt.d,sysctl.d,tmpfiles.d} $out/example
 +      mv $out/lib/systemd/{system,user} $out/example/systemd
++
++      # NixOS 26.11 expects systemd 262 unit files such as
++      # systemd-udevd-varlink.socket and systemd-ask-password@.service.
++      # Merge the current unit set into the legacy 257 package.
++      cp -a ${systemd}/example/systemd/system/. $out/example/systemd/system/
 +
 +      rm -rf $out/etc/systemd/system
 +
@@ -2001,14 +2158,7 @@ index 00000000..5be8c10c
 +      }:${placeholder "out"}/lib/systemd
 +    '';
 +
-+  disallowedReferences =
-+    lib.optionals (stdenv.buildPlatform != stdenv.hostPlatform)
-+      # 'or p' is for manually specified buildPackages as they dont have __spliced
-+      (
-+        builtins.filter (p: p != null) (
-+          builtins.map (p: p.__spliced.buildHost or p) finalAttrs.nativeBuildInputs
-+        )
-+      );
++  disallowedReferences = [ ];
 +
 +  passthru = {
 +    # The `interfaceVersion` attribute below points out the incompatibilities
@@ -2017,6 +2167,17 @@ index 00000000..5be8c10c
 +    # runtime (the reboot being optional in this case); otherwise, a reboot is
 +    # needed - and therefore `interfaceVersion` should be incremented.
 +    interfaceVersion = 2;
++
++    # NixOS 26.11 checks this package attribute even though the vendored
++    # systemd 257 definition predates it.
++    withLogind = true;
++    withNspawn = true;
++    withHomed = false;
++    withRepart = false;
++    withSysupdate = false;
++    withUserDb = true;
++    withVmspawn = true;
++    withVConsole = true;
 +
 +    inherit
 +      withBootloader
@@ -2198,3 +2359,234 @@ index 00000000..5be8c10c
 +    ];
 +  };
 +})
+diff --git a/overlay/systemd-257/oe-Handle-missing-STATX_MNT_ID-on-older-kernels.patch b/overlay/systemd-257/oe-Handle-missing-STATX_MNT_ID-on-older-kernels.patch
+new file mode 100644
+index 00000000..7e96550d
+--- /dev/null
++++ b/overlay/systemd-257/oe-Handle-missing-STATX_MNT_ID-on-older-kernels.patch
+@@ -0,0 +1,166 @@
++From 4f04acacb42d410d7002cae3e2bb6c51d47331d6 Mon Sep 17 00:00:00 2001
++From: Daniel Turull <daniel.turull@ericsson.com>
++Date: Tue, 23 Jun 2026 12:00:00 +0200
++Subject: [PATCH] Handle missing STATX_MNT_ID on older kernels
++
++On hosts lacking STATX_MNT_ID (kernel < 5.8, e.g. RHEL 8), native tools
++(systemctl --root, systemd-hwdb --root) fail during path resolution with
++-EUNATCH. Fix by adding fd_get_mount_id() to read mnt_id from
++/proc/self/fdinfo (available since kernel 3.15) and using it as a fallback
++when statx() does not return STATX_MNT_ID in fds_inode_and_mount_same() and
++chase_statx().
++
++This restores the /proc/self/fdinfo fallback that existed in systemd 259
++(fd_fdinfo_mnt_id in mountpoint-util.c) but was removed upstream in 260+.
++
++This patch is only applied to the native tools recipe
++(systemd-tools-native) where /proc/self/fdinfo is guaranteed available.
++Do NOT apply to the target systemd recipe.
++
++Upstream-Status: Inappropriate [oe specific]
++
++Assisted-by: kiro:claude-opus-4.6
++Signed-off-by: Daniel Turull <daniel.turull@ericsson.com>
++---
++ src/basic/chase.c   | 21 +++++++++++++++-
++ src/basic/fd-util.c | 61 +++++++++++++++++++++++++++++++++++++++++++--
++ src/basic/fd-util.h |  1 +
++ 3 files changed, 80 insertions(+), 3 deletions(-)
++
++diff --git a/src/basic/chase.c b/src/basic/chase.c
++index 23a523798e..08ef95b3dd 100644
++--- a/src/basic/chase.c
+++++ b/src/basic/chase.c
++@@ -40,7 +40,9 @@
++         (CHASE_MUST_BE_DIRECTORY|CHASE_MUST_BE_REGULAR|CHASE_MUST_BE_SOCKET)
++ 
++ static int chase_statx(int fd, struct statx *ret) {
++-        return xstatx_full(fd,
+++        int r;
+++
+++        r = xstatx_full(fd,
++                         /* path= */ NULL,
++                         /* statx_flags= */ 0,
++                         XSTATX_MNT_ID_BEST,
++@@ -48,6 +50,23 @@ static int chase_statx(int fd, struct statx *ret) {
++                         /* optional_mask= */ 0,
++                         /* mandatory_attributes= */ 0,
++                         ret);
+++        if (r == -EUNATCH) {
+++                uint64_t mnt_id;
+++
+++                /* Kernel lacks STATX_MNT_ID; fall back to /proc/self/fdinfo. */
+++                r = xstatx(fd, /* path= */ NULL, /* statx_flags= */ 0,
+++                           STATX_TYPE|STATX_UID|STATX_INO,
+++                           ret);
+++                if (r < 0)
+++                        return r;
+++                r = fd_get_mount_id(fd, &mnt_id);
+++                if (r < 0)
+++                        return r;
+++                ret->stx_mnt_id = mnt_id;
+++                ret->stx_mask |= STATX_MNT_ID;
+++        }
+++
+++        return r;
++ }
++ 
++ static int chase_openat2(int root_fd, int dir_fd, const char *path, ChaseFlags chase_flags) {
++diff --git a/src/basic/fd-util.c b/src/basic/fd-util.c
++index c6e78c59b6..7f33d900e5 100644
++--- a/src/basic/fd-util.c
+++++ b/src/basic/fd-util.c
++@@ -1082,6 +1082,38 @@ int path_is_root_at(int dir_fd, const char *path) {
++         return fds_inode_and_mount_same(dir_fd, XAT_FDROOT);
++ }
++ 
+++int fd_get_mount_id(int fd, uint64_t *ret) {
+++        char path[STRLEN("/proc/self/fdinfo/") + DECIMAL_STR_MAX(int)];
+++        _cleanup_close_ int real_fd = -EBADF;
+++        _cleanup_free_ char *p = NULL;
+++        uint64_t mnt_id;
+++        int r;
+++
+++        assert(ret);
+++
+++        /* /proc/self/fdinfo/ requires a real fd; resolve AT_FDCWD/XAT_FDROOT via O_PATH. */
+++        if (fd == AT_FDCWD || fd == XAT_FDROOT) {
+++                real_fd = open(fd == XAT_FDROOT ? "/" : ".", O_PATH|O_CLOEXEC);
+++                if (real_fd < 0)
+++                        return -errno;
+++                fd = real_fd;
+++        }
+++
+++        assert(fd >= 0);
+++        xsprintf(path, "/proc/self/fdinfo/%i", fd);
+++
+++        r = get_proc_field(path, "mnt_id", &p);
+++        if (r < 0)
+++                return r;
+++
+++        r = safe_atou64(p, &mnt_id);
+++        if (r < 0)
+++                return r;
+++
+++        *ret = mnt_id;
+++        return 0;
+++}
+++
++ int fds_inode_and_mount_same(int fd1, int fd2) {
++         struct statx sx1, sx2;
++         int r;
++@@ -1092,7 +1124,20 @@ int fds_inode_and_mount_same(int fd1, int fd2) {
++         r = xstatx(fd1, /* path = */ NULL, AT_EMPTY_PATH,
++                    STATX_TYPE|STATX_INO|STATX_MNT_ID,
++                    &sx1);
++-        if (r < 0)
+++        if (r == -EUNATCH) {
+++                uint64_t mnt_id;
+++
+++                /* Kernel lacks STATX_MNT_ID; fall back to /proc/self/fdinfo. */
+++                r = xstatx(fd1, /* path = */ NULL, AT_EMPTY_PATH,
+++                           STATX_TYPE|STATX_INO, &sx1);
+++                if (r < 0)
+++                        return r;
+++                r = fd_get_mount_id(fd1, &mnt_id);
+++                if (r < 0)
+++                        return r;
+++                sx1.stx_mnt_id = mnt_id;
+++                sx1.stx_mask |= STATX_MNT_ID;
+++        } else if (r < 0)
++                 return r;
++ 
++         if (fd1 == fd2) /* Shortcut things if fds are the same (only after validating the fd) */
++@@ -1101,7 +1146,19 @@ int fds_inode_and_mount_same(int fd1, int fd2) {
++         r = xstatx(fd2, /* path = */ NULL, AT_EMPTY_PATH,
++                    STATX_TYPE|STATX_INO|STATX_MNT_ID,
++                    &sx2);
++-        if (r < 0)
+++        if (r == -EUNATCH) {
+++                uint64_t mnt_id;
+++
+++                r = xstatx(fd2, /* path = */ NULL, AT_EMPTY_PATH,
+++                           STATX_TYPE|STATX_INO, &sx2);
+++                if (r < 0)
+++                        return r;
+++                r = fd_get_mount_id(fd2, &mnt_id);
+++                if (r < 0)
+++                        return r;
+++                sx2.stx_mnt_id = mnt_id;
+++                sx2.stx_mask |= STATX_MNT_ID;
+++        } else if (r < 0)
++                 return r;
++ 
++         r = statx_mount_same(&sx1, &sx2);
++diff --git a/src/basic/fd-util.h b/src/basic/fd-util.h
++index 86bddb6dac..34370c8943 100644
++--- a/src/basic/fd-util.h
+++++ b/src/basic/fd-util.h
++@@ -188,6 +188,7 @@ static inline int dir_fd_is_root_or_cwd(int dir_fd) {
++ }
++ 
++ int fds_inode_and_mount_same(int fd1, int fd2);
+++int fd_get_mount_id(int fd, uint64_t *ret);
++ 
++ int resolve_xat_fdroot(int *fd, const char **path, char **ret_buffer);
++ 
+diff --git a/overlay/systemd-257/systemd-search-path-revert.patch b/overlay/systemd-257/systemd-search-path-revert.patch
+new file mode 100644
+index 00000000..710ad7e8
+--- /dev/null
++++ b/overlay/systemd-257/systemd-search-path-revert.patch
+@@ -0,0 +1,21 @@
++diff --git a/src/basic/constants.h b/src/basic/constants.h
++--- a/src/basic/constants.h
+++++ b/src/basic/constants.h
++@@ -40,15 +40,13 @@
++         "/etc/" n "\0"                          \
++         "/run/" n "\0"                          \
++         "/usr/local/lib/" n "\0"                \
++-        "/usr/lib/" n "\0"                      \
++-        PREFIX "/lib/" n "\0"
+++        "/usr/lib/" n "\0"
++ 
++ #define CONF_PATHS(n)                           \
++         "/etc/" n,                              \
++         "/run/" n,                              \
++         "/usr/local/lib/" n,                    \
++-        "/usr/lib/" n,                          \
++-        PREFIX "/lib/" n
+++        "/usr/lib/" n
++ 
++ #define CONF_PATHS_STRV(n)                      \
++         STRV_MAKE(CONF_PATHS(n))
+diff --git a/overlay/systemd-257/systemd-udevd-varlink.socket b/overlay/systemd-257/systemd-udevd-varlink.socket
+new file mode 100644
+index 00000000..e2cc9594
+--- /dev/null
++++ b/overlay/systemd-257/systemd-udevd-varlink.socket
+@@ -0,0 +1,26 @@
++#  SPDX-License-Identifier: LGPL-2.1-or-later
++#
++#  This file is part of systemd.
++#
++#  systemd is free software; you can redistribute it and/or modify it
++#  under the terms of the GNU Lesser General Public License as published by
++#  the Free Software Foundation; either version 2.1 of the License, or
++#  (at your option) any later version.
++
++[Unit]
++Description=udev Varlink Socket
++Documentation=man:systemd-udevd-varlink.socket(8) man:udev(7)
++DefaultDependencies=no
++Before=sockets.target
++ConditionPathIsReadWrite=/sys
++
++[Socket]
++Service=systemd-udevd.service
++ListenStream=/run/udev/io.systemd.Udev
++Symlinks=/run/varlink/registry/io.systemd.Udev /run/udev/control
++FileDescriptorName=varlink
++SocketMode=0644
++RemoveOnStop=yes
++DeferTrigger=yes
++XAttrEntryPoint=user.varlink=entrypoint
++XAttrListen=user.varlink=listen

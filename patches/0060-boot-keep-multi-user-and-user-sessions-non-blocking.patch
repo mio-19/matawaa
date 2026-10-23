@@ -1,13 +1,17 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Fri, 23 Oct 2026 17:07:34 +1100
-Subject: [PATCH] boot/stage-1: create /var/run and /var/lock in target root
+Subject: [PATCH] boot: keep multi-user and user sessions non-blocking
 
-The generated rootfs image does not provide the standard /var/run -> /run and /var/lock -> /run/lock symlinks, and relying on stage-2 tmpfiles is too late for dhcpcd/nscd/logind. Create both symlinks in the target root immediately before switch_root.
+Create /var/run and /var/lock in the target root, run dhcpcd in the
+background, and use explicit drop-ins for nscd and systemd-user-sessions
+so nss-user-lookup cannot hold multi-user.target on the vendor kernel.
+
+Signed-off-by: Mio <mio@mio19.uk>
 ---
- boot/init/tasks/switch_root.rb  | 8 ++++++++
- devices/families/asteroidos.nix | 7 +++++++
- 2 files changed, 15 insertions(+)
+ boot/init/tasks/switch_root.rb  |  8 ++++++++
+ devices/families/asteroidos.nix | 16 ++++++++++++++++
+ 2 files changed, 24 insertions(+)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
 index b3a6045b..8f5c877d 100644
@@ -29,19 +33,28 @@ index b3a6045b..8f5c877d 100644
      # This is still helpful to take vertical real estate when visually looking
      # through the log.
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 2667e25b..39d66a6f 100644
+index 2667e25b..01323613 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
-@@ -75,6 +75,13 @@ in
+@@ -75,6 +75,22 @@ in
      nixos.enable = mkDefault false;
    };
  
-+  # The watch has no DHCP-capable interface at stage-2 boot. dhcpcd reports
-+  # "no valid interfaces found" and stays activating, holding
-+  # multi-user.target and preventing the user session and launcher from
-+  # starting. NetworkManager/static configurations manage their own links.
-+  networking.useDHCP = lib.mkDefault false;
-+  systemd.services.dhcpcd.enable = lib.mkDefault false;
++  # nsncd's generated nscd.service is Type=notify but the daemon never sends
++  # READY. Use an explicit drop-in so the setting applies to the nscd unit that
++  # nss-user-lookup.target requires, not only to a newly generated unit. With
++  # nscd actually active, nss-user-lookup and systemd-user-sessions can complete
++  # normally without bypassing the user-sessions gate.
++  systemd.services.nscd = {
++    overrideStrategy = "asDropin";
++    serviceConfig.Type = lib.mkForce "simple";
++  };
++
++  # Keep DHCP available but do not let it hold boot. There is no guaranteed
++  # DHCP-capable interface at stage-2 startup, and dhcpcd otherwise waits for
++  # an address, holding multi-user.target. Forking to background lets the user
++  # session and launcher start while dhcpcd continues to watch for links.
++  networking.dhcpcd.wait = lib.mkDefault "background";
 +
    # Disable heavy desktop/server utilities and editors not used on smartwatches
    programs.nano.enable = mkDefault false;

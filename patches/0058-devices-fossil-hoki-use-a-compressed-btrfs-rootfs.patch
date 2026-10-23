@@ -1,43 +1,37 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
-Date: Fri, 23 Oct 2026 16:09:55 +1100
-Subject: [PATCH] devices/fossil-hoki: use btrfs with 4.14-compatible options
+Date: Fri, 23 Oct 2026 15:50:57 +1100
+Subject: [PATCH] devices/fossil-hoki: use a compressed btrfs rootfs
 
-Re-enable btrfs now that the 4.14 mount options are known: compress=zstd without a level, noatime, and space_cache=v2. The vendor kernel rejects compress=zstd:3, zstd3, and space_cache v1. Keep the image builder's block-group-tree disable for this kernel and retain btrfs-progs for resize.
+Use btrfs with zstd compression and 4.14-supported mount options
+(noatime, space_cache=v2), enable automatic resize, and create the
+standard /var symlinks in the generated image. Fold the earlier ext4
+and btrfs mount-option experiments into the final btrfs configuration.
+
+Signed-off-by: Mio <mio@mio19.uk>
 ---
- devices/fossil-hoki/default.nix | 10 ++++++----
+ devices/fossil-hoki/default.nix |  5 ++++-
  modules/rootfs.nix              | 10 ++++++++--
- 2 files changed, 14 insertions(+), 6 deletions(-)
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 5b00319e..cb03a636 100644
+index 714d7a08..cb03a636 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -18,11 +18,12 @@
+@@ -18,9 +18,12 @@
  
    mobile.device.supportLevel = "supported";
  
--  # The 4.14 vendor kernel rejects the btrfs zstd level syntax used by
--  # current NixOS. Use ext4 for the rootfs until the btrfs mount options are
--  # compatible with this kernel. Btrfs module support remains available.
 +  # Linux 4.14 btrfs supports compress=zstd (without a level), noatime and
 +  # space_cache=v2. It rejects compress=zstd:3 / zstd3 and space_cache v1.
 +  # The image builder disables block-group-tree for this kernel.
    mobile.generatedFilesystems.rootfs = {
--    filesystem = lib.mkForce "ext4";
-+    filesystem = lib.mkForce "btrfs";
+     filesystem = lib.mkForce "btrfs";
+-    btrfs.compression = "zstd:3";
 +    btrfs.compression = "zstd";
    };
  
    # btrfs-progs provides `btrfs filesystem resize` for rootfs growth and
-@@ -97,6 +98,7 @@
- 
-   environment.systemPackages = [
-     pkgs.alsa-utils
-+    pkgs.btrfs-progs
-   ];
- 
-   # Hardware audio mixer DAI link routing for NXP TFA98xx speaker amplifier & digital mic
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
 index 0af0c136..31ea82da 100644
 --- a/modules/rootfs.nix
