@@ -1,0 +1,54 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 20:34:51 +1100
+Subject: [PATCH] devices/fossil-hoki-mainline: add draft aarch64 mainline
+ target
+
+Add a DRAFT hoki target that reuses the hoki hardware definition but builds both stage 1 and userspace for aarch64-linux and replaces the vendor 4.14 kernel with Linux 6.18 LTS mainline. Mainline hoki drivers and the vendor DTB are not ported, so the target is best-effort and expected not to boot; this is not a production device.
+---
+ devices/fossil-hoki-mainline/default.nix | 36 ++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 devices/fossil-hoki-mainline/default.nix
+
+diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
+new file mode 100644
+index 00000000..c5ca20c7
+--- /dev/null
++++ b/devices/fossil-hoki-mainline/default.nix
+@@ -0,0 +1,36 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++# DRAFT: all-AArch64 hoki target.
++#
++# This reuses the existing hoki hardware description, but swaps the 32-bit
++# vendor 4.14 kernel for Linux 6.18 LTS mainline and builds both the kernel and
++# userspace for aarch64-linux. Mainline hoki display, touch, modem, WLAN, and
++# the vendor boot DTB are not ported; this target is expected to be
++# non-bootable for now and is intentionally best-effort, not supported.
++{
++  imports = [
++    ../fossil-hoki
++  ];
++
++  nixpkgs.hostPlatform = lib.mkForce "aarch64-linux";
++
++  mobile.device = {
++    name = lib.mkForce "fossil-hoki-mainline";
++    identity = {
++      name = lib.mkForce "Gen 6 (mainline draft)";
++      manufacturer = lib.mkForce "Fossil";
++    };
++    supportLevel = lib.mkForce "best-effort";
++  };
++
++  # Linux 6.18 LTS mainline; no vendor 4.14 tree or vendor patch set.
++  mobile.boot.stage-1.kernel.package = lib.mkForce pkgs.linuxPackages_6_18.kernel;
++
++  # Mainline hoki has no appended vendor DTB in this draft.
++  mobile.system.android.appendDTB = lib.mkForce [ ];
++}
