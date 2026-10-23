@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 17:07:34 +1100
+Subject: [PATCH] boot/stage-1: create /var/run and /var/lock in target root
+
+The generated rootfs image does not provide the standard /var/run -> /run and /var/lock -> /run/lock symlinks, and relying on stage-2 tmpfiles is too late for dhcpcd/nscd/logind. Create both symlinks in the target root immediately before switch_root.
+---
+ boot/init/tasks/switch_root.rb | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
+index b3a6045b..8f5c877d 100644
+--- a/boot/init/tasks/switch_root.rb
++++ b/boot/init/tasks/switch_root.rb
+@@ -386,6 +386,14 @@ class Tasks::SwitchRoot < SingletonTask
+   def run()
+     init = File.join(selected_generation.path, "init")
+ 
++    # The generated rootfs image does not populate the standard /var/run and
++    # /var/lock symlinks. Create them in the target root before systemd starts;
++    # otherwise dhcpcd/nscd fail and multi-user.target stays held.
++    system_var = File.join(SYSTEM_MOUNT_POINT, "var")
++    System.run("mkdir", "-p", system_var)
++    System.run("ln", "-sfn", "/run", File.join(system_var, "run"))
++    System.run("ln", "-sfn", "/run/lock", File.join(system_var, "lock"))
++
+     # This is the traditional way we printed the init path.
+     # This is still helpful to take vertical real estate when visually looking
+     # through the log.
