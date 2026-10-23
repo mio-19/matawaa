@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 15:50:57 +1100
+Subject: [PATCH] devices/fossil-hoki: use ext4 rootfs
+
+The 4.14 vendor kernel rejects the btrfs zstd level syntax used by current NixOS, so switch the hoki rootfs back to ext4. Keep the generic btrfs support in modules/rootfs.nix available for kernels that accept the options.
+---
+ devices/fossil-hoki/default.nix | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 714d7a08..5b00319e 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -18,9 +18,11 @@
+ 
+   mobile.device.supportLevel = "supported";
+ 
++  # The 4.14 vendor kernel rejects the btrfs zstd level syntax used by
++  # current NixOS. Use ext4 for the rootfs until the btrfs mount options are
++  # compatible with this kernel. Btrfs module support remains available.
+   mobile.generatedFilesystems.rootfs = {
+-    filesystem = lib.mkForce "btrfs";
+-    btrfs.compression = "zstd:3";
++    filesystem = lib.mkForce "ext4";
+   };
+ 
+   # btrfs-progs provides `btrfs filesystem resize` for rootfs growth and
+@@ -95,7 +97,6 @@
+ 
+   environment.systemPackages = [
+     pkgs.alsa-utils
+-    pkgs.btrfs-progs
+   ];
+ 
+   # Hardware audio mixer DAI link routing for NXP TFA98xx speaker amplifier & digital mic
