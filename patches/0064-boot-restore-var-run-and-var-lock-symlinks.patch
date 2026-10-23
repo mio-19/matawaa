@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 16:54:55 +1100
+Subject: [PATCH] boot: restore /var/run and /var/lock symlinks
+
+The generated rootfs image does not contain the standard /var/run -> /run and /var/lock -> /run/lock symlinks. Without them dhcpcd and nscd fail to create their runtime directories, nss-user-lookup.target stays pending, and multi-user.target remains held, so the user session and launcher never start. Create both symlinks via tmpfiles at early boot.
+---
+ devices/families/asteroidos.nix | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 46ce2d83..2667e25b 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -27,6 +27,15 @@ in
+   # growPartition must be disabled to avoid pulling 64-bit qemu-utils into 32-bit ARMv7 targets.
+   boot.growPartition = lib.mkForce false;
+ 
++  # The generated rootfs image does not include the standard /var/run and
++  # /var/lock symlinks. Without them dhcpcd and nscd fail to create their
++  # runtime directories, nss-user-lookup.target stays pending, and
++  # multi-user.target remains held, so the user session and launcher never start.
++  systemd.tmpfiles.rules = lib.mkAfter [
++    "L+ /var/run - - - - /run"
++    "L+ /var/lock - - - - /run/lock"
++  ];
++
+   # Display quirks for Qualcomm MDSS framebuffer and DSI command-mode panels
+   mobile.quirks.fb-refresher.enable = mkDefault true;
+   mobile.quirks.fb-refresher.stage-1.enable = mkDefault true;
