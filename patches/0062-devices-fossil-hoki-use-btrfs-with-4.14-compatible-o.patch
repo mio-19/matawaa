@@ -1,0 +1,68 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 16:09:55 +1100
+Subject: [PATCH] devices/fossil-hoki: use btrfs with 4.14-compatible options
+
+Re-enable btrfs now that the 4.14 mount options are known: compress=zstd without a level, noatime, and space_cache=v2. The vendor kernel rejects compress=zstd:3, zstd3, and space_cache v1. Keep the image builder's block-group-tree disable for this kernel and retain btrfs-progs for resize.
+---
+ devices/fossil-hoki/default.nix | 10 ++++++----
+ modules/rootfs.nix              | 10 ++++++++--
+ 2 files changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 5b00319e..cb03a636 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -18,11 +18,12 @@
+ 
+   mobile.device.supportLevel = "supported";
+ 
+-  # The 4.14 vendor kernel rejects the btrfs zstd level syntax used by
+-  # current NixOS. Use ext4 for the rootfs until the btrfs mount options are
+-  # compatible with this kernel. Btrfs module support remains available.
++  # Linux 4.14 btrfs supports compress=zstd (without a level), noatime and
++  # space_cache=v2. It rejects compress=zstd:3 / zstd3 and space_cache v1.
++  # The image builder disables block-group-tree for this kernel.
+   mobile.generatedFilesystems.rootfs = {
+-    filesystem = lib.mkForce "ext4";
++    filesystem = lib.mkForce "btrfs";
++    btrfs.compression = "zstd";
+   };
+ 
+   # btrfs-progs provides `btrfs filesystem resize` for rootfs growth and
+@@ -97,6 +98,7 @@
+ 
+   environment.systemPackages = [
+     pkgs.alsa-utils
++    pkgs.btrfs-progs
+   ];
+ 
+   # Hardware audio mixer DAI link routing for NXP TFA98xx speaker amplifier & digital mic
+diff --git a/modules/rootfs.nix b/modules/rootfs.nix
+index 0af0c136..31ea82da 100644
+--- a/modules/rootfs.nix
++++ b/modules/rootfs.nix
+@@ -41,7 +41,11 @@ in
+       label = lib.mkDefault "NIXOS_SYSTEM";
+       ext4.partitionID = "44444444-4444-4444-8888-888888888888";
+       btrfs.partitionID = "44444444-4444-4444-8888-888888888888";
+-      btrfs.compression = "zstd:3";
++      # Linux 4.14 btrfs accepts compress=zstd (default level), compress=zlib,
++      # noatime and space_cache=v2. It rejects the level syntax
++      # (compress=zstd:3 / zstd3) and the v1 space_cache option. The image
++      # builder disables block-group-tree for these older kernels.
++      btrfs.compression = "zstd";
+ 
+       populateCommands =
+       let
+@@ -121,7 +125,9 @@ in
+         options =
+           if config.mobile.generatedFilesystems.rootfs.filesystem == "btrfs" then
+             [
+-              "compress=zstd:3"
++              # 4.14-compatible btrfs options. Do not use compress=zstd:3 or
++              # space_cache (v1); the vendor kernel rejects both.
++              "compress=${config.mobile.generatedFilesystems.rootfs.btrfs.compression}"
+               "noatime"
+               "space_cache=v2"
+             ]
