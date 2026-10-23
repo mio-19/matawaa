@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 18:38:19 +1100
+Subject: [PATCH] devices/fossil-hoki: do not hold multi-user for underclock
+
+The underclock service used a oneshot ExecStartPre sleep 20, so multi-user.target waited 20 seconds and the launcher did not start. Keep the tuning delay inside a Type=simple service so it runs after boot settles without blocking the user session.
+---
+ devices/fossil-hoki/default.nix | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index cb03a636..414535bb 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -257,10 +257,12 @@
+     description = "Fossil Gen 6 low power collapse and CPU underclocking";
+     wantedBy = [ "multi-user.target" ];
+     serviceConfig = {
+-      Type = "oneshot";
+-      RemainAfterExit = true;
+-      ExecStartPre = "${pkgs.coreutils}/bin/sleep 20";
++      Type = "simple";
+       ExecStart = pkgs.writeShellScript "underclock-hoki" ''
++        # Delay tuning until the boot has settled, but do not hold
++        # multi-user.target while waiting.
++        ${pkgs.coreutils}/bin/sleep 20
++
+         # Enable low power mode & allow system-pc
+         if [ -f /sys/module/lpm_levels/parameters/sleep_disabled ]; then
+           echo 0 > /sys/module/lpm_levels/parameters/sleep_disabled 2>/dev/null || true
