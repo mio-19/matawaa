@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 17:21:35 +1100
+Subject: [PATCH] boot: disable dhcpcd on smartwatch images
+
+There is no DHCP-capable interface at stage-2 boot. dhcpcd reports no valid interfaces and stays activating, holding multi-user.target and preventing the user session and launcher from starting. Disable the DHCP client; NetworkManager or static configuration can manage links when needed.
+---
+ devices/families/asteroidos.nix | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 2667e25b..39d66a6f 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -75,6 +75,13 @@ in
+     nixos.enable = mkDefault false;
+   };
+ 
++  # The watch has no DHCP-capable interface at stage-2 boot. dhcpcd reports
++  # "no valid interfaces found" and stays activating, holding
++  # multi-user.target and preventing the user session and launcher from
++  # starting. NetworkManager/static configurations manage their own links.
++  networking.useDHCP = lib.mkDefault false;
++  systemd.services.dhcpcd.enable = lib.mkDefault false;
++
+   # Disable heavy desktop/server utilities and editors not used on smartwatches
+   programs.nano.enable = mkDefault false;
+   programs.command-not-found.enable = mkDefault false;

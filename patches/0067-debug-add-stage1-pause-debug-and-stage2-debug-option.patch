@@ -57,7 +57,7 @@ index 8f5c877d..27b46ce2 100644
  
      Tasks::UDev.instance.teardown()
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 2667e25b..19c60ea1 100644
+index 39d66a6f..f978ecc1 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -10,8 +10,19 @@ let
@@ -80,7 +80,7 @@ index 2667e25b..19c60ea1 100644
    mobile.system.type = mkDefault "android";
    mobile.system.system = mkDefault "armv7l-linux";
  
-@@ -107,6 +118,8 @@ in
+@@ -114,6 +125,8 @@ in
      memoryPercent = lib.mkOptionDefault 50;
    };
  
@@ -89,7 +89,7 @@ index 2667e25b..19c60ea1 100644
    # AsteroidOS credits the saved random seed as entropy to avoid slow boots on
    # pre-5.4 watch kernels.
    # Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
-@@ -132,4 +145,88 @@ in
+@@ -139,4 +152,88 @@ in
    boot.kernelParams = [
      "loop.max_part=7"
    ];
