@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 24 Oct 2026 10:32:25 +1100
+Subject: [PATCH] overlay/cross-compile: expose systemd262oldkernel
+
+Keep the patched systemd 262 old-kernel package available as systemd262oldkernel while legacy devices select systemd 257; preserve the existing systemd_latest-oldkernel alias.
+---
+ overlay/cross-compile.nix | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index 6c65efee..87e0ec16 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -93,6 +93,9 @@ else
+   in
+   {
+     inherit systemd257;
++    # Keep the patched systemd 262 for old kernels available for debugging
++    # or fallback even when the legacy profile selects systemd 257.
++    systemd262oldkernel = systemd262OldKernel;
+     systemd_latest-oldkernel = systemd262OldKernel;
+ 
+     # ModemManager's generated GDBus sources race with the static archive link
