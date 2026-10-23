@@ -9,18 +9,18 @@ Mobile-NixOS overlay with the cross-compilation hooks.
 
 Signed-off-by: Mio <mio@mio19.uk>
 ---
- overlay/cross-compile.nix | 246 ++++++++++++++++++++++++++++++++++++++
+ overlay/cross-compile.nix | 256 ++++++++++++++++++++++++++++++++++++++
  overlay/default.nix       |   8 ++
- 2 files changed, 254 insertions(+)
+ 2 files changed, 264 insertions(+)
  create mode 100644 overlay/cross-compile.nix
  create mode 100644 overlay/default.nix
 
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
 new file mode 100644
-index 00000000..bd95fdc6
+index 00000000..c111af81
 --- /dev/null
 +++ b/overlay/cross-compile.nix
-@@ -0,0 +1,246 @@
+@@ -0,0 +1,256 @@
 +# Overlays and package workarounds that only make sense during cross-compilation.
 +#
 +# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
@@ -72,6 +72,16 @@ index 00000000..bd95fdc6
 +    # when building in parallel; serialize its build.
 +    modemmanager = super.modemmanager.overrideAttrs (old: {
 +      enableParallelBuilding = false;
++    });
++
++    # libtool relinks the libcanberra-multi plugin before make install creates
++    # the libcanberra.so symlink, so the linker cannot resolve -lcanberra with
++    # current binutils. Pre-create the symlink from the build tree.
++    libcanberra = super.libcanberra.overrideAttrs (old: {
++      preInstall = (old.preInstall or "") + ''
++        mkdir -p $out/lib
++        ln -sf "$PWD/src/.libs/libcanberra.so.0.2.5" "$out/lib/libcanberra.so"
++      '';
 +    });
 +
 +    # Upstream nixpkgs Qt6 modules skip QtQuick integration during cross-compilation
