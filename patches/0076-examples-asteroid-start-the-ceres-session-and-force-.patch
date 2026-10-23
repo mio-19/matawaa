@@ -1,0 +1,53 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 19:31:06 +1100
+Subject: [PATCH] examples/asteroid: start the ceres session and force
+ hwcomposer QPA
+
+The user journal shows asteroid-launcher selecting the xcb platform because QT_QPA_PLATFORM was not present in the service environment. Set EGL_PLATFORM and QT_QPA_PLATFORM to hwcomposer directly, and create the linger marker before switch_root so logind starts user@1000 without a manual touch.
+---
+ boot/init/tasks/switch_root.rb         | 6 ++++++
+ examples/asteroid/asteroid-desktop.nix | 6 ++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
+index 8f5c877d..a9c15aab 100644
+--- a/boot/init/tasks/switch_root.rb
++++ b/boot/init/tasks/switch_root.rb
+@@ -394,6 +394,12 @@ class Tasks::SwitchRoot < SingletonTask
+     System.run("ln", "-sfn", "/run", File.join(system_var, "run"))
+     System.run("ln", "-sfn", "/run/lock", File.join(system_var, "lock"))
+ 
++    # logind only starts the linger user manager when this marker exists.
++    # Create it before switch_root so it is visible during early boot.
++    linger_dir = File.join(SYSTEM_MOUNT_POINT, "var/lib/systemd/linger")
++    System.run("mkdir", "-p", linger_dir)
++    System.run("touch", File.join(linger_dir, "ceres"))
++
+     # This is the traditional way we printed the init path.
+     # This is still helpful to take vertical real estate when visually looking
+     # through the log.
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 5321cee2..841500d3 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -96,6 +96,7 @@ in
+ 
+     systemd.tmpfiles.rules = [
+       "d /var/lib/kiwix 0775 ceres users -"
++      "d /var/lib/systemd/linger 0755 root root -"
+       "f /var/lib/systemd/linger/ceres 0644 root root -"
+     ];
+ 
+@@ -160,6 +161,11 @@ in
+         QT_VIRTUALKEYBOARD_STYLE = "watch";
+         QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+         RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
++        # The launcher is the compositor: use the hwcomposer QPA, not xcb.
++        EGL_PLATFORM = "hwcomposer";
++        QT_QPA_PLATFORM = "hwcomposer";
++        QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
++        QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
+       }
+       // config.environment.variables;
+       serviceConfig = {
