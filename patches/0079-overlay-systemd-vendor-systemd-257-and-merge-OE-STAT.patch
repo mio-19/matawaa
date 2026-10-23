@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 21:25:48 +1100
+Subject: [PATCH] overlay/systemd: vendor systemd 257 and merge OE STATX
+ fallback
+
+Vendor the NixOS 25.05 systemd 257.10 definition and its patches, add the OpenEmbedded fdinfo STATX_MNT_ID fallback, and keep systemd 262 under systemd_latest-oldkernel. The vendored 25.05 definition still expects the 25.05 package-set ABI; current nixpkgs passes newer switches, so this remains a work-in-progress pin rather than a completed build.
+---
+ overlay/cross-compile.nix       |  6 +++++-
+ overlay/systemd-257/default.nix | 10 ++++++++++
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index c5221066..e2a1e205 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -60,7 +60,11 @@ else
+         });
+ 
+     systemd257 =
+-      (super.callPackage ./systemd-257 { }).override (
++      (super.lib.callPackageWith
++        (builtins.intersectAttrs (super.lib.functionArgs (import ./systemd-257)) super)
++        ./systemd-257
++        { }
++      ).override (
+         super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
+           withLibBPF = false;
+         }
+diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
+index 9eb6c01b..132d1dcd 100644
+--- a/overlay/systemd-257/default.nix
++++ b/overlay/systemd-257/default.nix
+@@ -150,6 +150,14 @@
+   withPortabled ? !stdenv.hostPlatform.isMusl,
+   withQrencode ? true,
+   withRemote ? !stdenv.hostPlatform.isMusl,
++  # systemd 262 added this switch for the IMDS credentials service. The 25.05
++  # systemd 257 definition predates it; accept it so the vendored package can
++  # be called from the current package set, and ignore it.
++  withImds ? false,
++  # systemd 262 package-set switch, unused by the 25.05 definition.
++  withSysinstall ? false,
++  # systemd 262 package-set switch, unused by the 25.05 definition.
++  withVConsole ? false,
+   withResolved ? true,
+   withShellCompletions ? true,
+   withSysusers ? true,
+@@ -180,6 +188,8 @@
+   docbook_xml_dtd_42,
+   docbook_xml_dtd_45,
+   withLogTrace ? false,
++  # Present in the systemd 262 package set, unused by the 25.05 definition.
++  vmlinux-btf ? null,
+ }:
+ 
+ assert withImportd -> withCompression;

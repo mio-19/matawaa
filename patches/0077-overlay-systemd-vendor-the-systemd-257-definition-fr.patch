@@ -1,0 +1,2200 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 21:18:15 +1100
+Subject: [PATCH] overlay/systemd: vendor the systemd 257 definition from
+ Nixpkgs 25.05
+
+Vendor the exact systemd 257.10 derivation and its NixOS patches from the nixpkgs 25.05 branch instead of importing an old nixpkgs at evaluation time. Use it as the default systemd for the 4.14 target; keep the current systemd 262 old-kernel-patched package as systemd_latest-oldkernel.
+---
+ overlay/cross-compile.nix                     |   26 +-
+ ...ts-for-uninitialised-encrypted-devic.patch |   29 +
+ ...on-t-try-to-unmount-nix-or-nix-store.patch |   45 +
+ .../0003-Fix-NixOS-containers.patch           |   31 +
+ ...some-NixOS-specific-unit-directories.patch |  129 ++
+ ...f-a-useless-message-in-user-sessions.patch |   28 +
+ ...d-timedated-disable-methods-that-cha.patch |  105 ++
+ ...e-usr-share-zoneinfo-to-etc-zoneinfo.patch |  138 +++
+ ...calectl-use-etc-X11-xkb-for-list-x11.patch |   24 +
+ ...9-add-rootprefix-to-lookup-dir-paths.patch |   35 +
+ ...-execute-scripts-in-etc-systemd-syst.patch |   23 +
+ ...ecute-scripts-in-etc-systemd-system-.patch |   22 +
+ ...-placeholder-for-DEFAULT_PATH_NORMAL.patch |   29 +
+ ...-environment-when-calling-generators.patch |   39 +
+ ...014-core-don-t-taint-on-unmerged-usr.patch |   37 +
+ ...ontext_init-fix-driver-name-checking.patch |   41 +
+ ...uggest-systemdctl-edit-runtime-on-sy.patch |   45 +
+ ....build-do-not-create-systemdstatedir.patch |   21 +
+ .../0018-meson-Don-t-link-ssh-dropins.patch   |   29 +
+ ...nit_file_exists_full-follow-symlinks.patch |   22 +
+ ...e-NSCD-when-DNSSEC-validation-is-dis.patch |   43 +
+ overlay/systemd-257/default.nix               | 1062 +++++++++++++++++
+ 22 files changed, 1996 insertions(+), 7 deletions(-)
+ create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
+ create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
+ create mode 100644 overlay/systemd-257/0003-Fix-NixOS-containers.patch
+ create mode 100644 overlay/systemd-257/0004-Add-some-NixOS-specific-unit-directories.patch
+ create mode 100644 overlay/systemd-257/0005-Get-rid-of-a-useless-message-in-user-sessions.patch
+ create mode 100644 overlay/systemd-257/0006-hostnamed-localed-timedated-disable-methods-that-cha.patch
+ create mode 100644 overlay/systemd-257/0007-Change-usr-share-zoneinfo-to-etc-zoneinfo.patch
+ create mode 100644 overlay/systemd-257/0008-localectl-use-etc-X11-xkb-for-list-x11.patch
+ create mode 100644 overlay/systemd-257/0009-add-rootprefix-to-lookup-dir-paths.patch
+ create mode 100644 overlay/systemd-257/0010-systemd-shutdown-execute-scripts-in-etc-systemd-syst.patch
+ create mode 100644 overlay/systemd-257/0011-systemd-sleep-execute-scripts-in-etc-systemd-system-.patch
+ create mode 100644 overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch
+ create mode 100644 overlay/systemd-257/0013-inherit-systemd-environment-when-calling-generators.patch
+ create mode 100644 overlay/systemd-257/0014-core-don-t-taint-on-unmerged-usr.patch
+ create mode 100644 overlay/systemd-257/0015-tpm2_context_init-fix-driver-name-checking.patch
+ create mode 100644 overlay/systemd-257/0016-systemctl-edit-suggest-systemdctl-edit-runtime-on-sy.patch
+ create mode 100644 overlay/systemd-257/0017-meson.build-do-not-create-systemdstatedir.patch
+ create mode 100644 overlay/systemd-257/0018-meson-Don-t-link-ssh-dropins.patch
+ create mode 100644 overlay/systemd-257/0019-install-unit_file_exists_full-follow-symlinks.patch
+ create mode 100644 overlay/systemd-257/0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
+ create mode 100644 overlay/systemd-257/default.nix
+
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index ba450985..c5221066 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -32,13 +32,14 @@ else
+       url = "https://raw.githubusercontent.com/openembedded/openembedded-core/99c96202a2c9aea84f5ceb267a8c63c0cff58b1e/meta/recipes-core/systemd/systemd/Handle-missing-STATX_MNT_ID-on-older-kernels.patch";
+       hash = "sha256-griFG/VhaG1Y5CJeWPuwIo2tCFF5EN9R1YE6T7b80gQ=";
+     };
+-  in
+-  {
+-    # systemd 261 requires STATX_ATTR_MOUNT_ROOT (Linux 5.8+) for mount point
+-    # detection. Backport the v257 name_to_handle_at()/fstat() fallback for
+-    # vendor kernels older than that.
+-    # Reference: https://github.com/systemd/systemd/blob/v257/src/basic/mountpoint-util.c
+-    systemd =
++
++    # systemd 261/262 require newer kernel primitives. Keep the current
++    # old-kernel-patched package under the explicit fallback name, but use
++    # systemd 257 from the NixOS 25.05 nixpkgs for the 4.14 target. 25.05 was
++    # the last nixpkgs release building systemd 257 (257.10).
++    #
++    # Reference: https://github.com/systemd/systemd/blob/v257/NEWS
++    systemd262OldKernel =
+       (super.systemd.override (
+         super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
+           # systemd BPF framework fails when cross-compiling on 32-bit ARM
+@@ -58,6 +59,17 @@ else
+           ];
+         });
+ 
++    systemd257 =
++      (super.callPackage ./systemd-257 { }).override (
++        super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
++          withLibBPF = false;
++        }
++      );
++  in
++  {
++    systemd = systemd257;
++    systemd_latest-oldkernel = systemd262OldKernel;
++
+     # ModemManager's generated GDBus sources race with the static archive link
+     # when building in parallel; serialize its build.
+     modemmanager = super.modemmanager.overrideAttrs (old: {
+diff --git a/overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch b/overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
+new file mode 100644
+index 00000000..d242ff7c
+--- /dev/null
++++ b/overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
+@@ -0,0 +1,29 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Eelco Dolstra <eelco.dolstra@logicblox.com>
++Date: Tue, 8 Jan 2013 15:46:30 +0100
++Subject: [PATCH] Start device units for uninitialised encrypted devices
++
++This is necessary because the NixOS service that initialises the
++filesystem depends on the appearance of the device unit.  Also, this
++makes more sense to me: the device is ready; it's the filesystem
++that's not, but taking care of that is the responsibility of the mount
++unit.  (However, this ignores the fsck unit, so it's not perfect...)
++---
++ rules.d/99-systemd.rules.in | 4 ----
++ 1 file changed, 4 deletions(-)
++
++diff --git a/rules.d/99-systemd.rules.in b/rules.d/99-systemd.rules.in
++index 882cda0dcd..8e8d1f04ce 100644
++--- a/rules.d/99-systemd.rules.in
+++++ b/rules.d/99-systemd.rules.in
++@@ -30,10 +30,6 @@ SUBSYSTEM=="block", ACTION=="add", KERNEL=="dm-*", ENV{DM_NAME}!="?*", ENV{SYSTE
++ # Import previous SYSTEMD_READY state.
++ SUBSYSTEM=="block", ENV{DM_UDEV_DISABLE_OTHER_RULES_FLAG}=="1", ENV{SYSTEMD_READY}=="", IMPORT{db}="SYSTEMD_READY"
++ 
++-# Ignore encrypted devices with no identified superblock on it, since
++-# we are probably still calling mke2fs or mkswap on it.
++-SUBSYSTEM=="block", ENV{DM_UUID}=="CRYPT-*", ENV{ID_PART_TABLE_TYPE}=="", ENV{ID_FS_USAGE}=="", ENV{SYSTEMD_READY}="0"
++-
++ # add symlink to GPT root disk
++ SUBSYSTEM=="block", ENV{ID_PART_GPT_AUTO_ROOT}=="1", ENV{ID_FS_TYPE}!="crypto_LUKS", SYMLINK+="gpt-auto-root"
++ SUBSYSTEM=="block", ENV{ID_PART_GPT_AUTO_ROOT}=="1", ENV{ID_FS_TYPE}=="crypto_LUKS", SYMLINK+="gpt-auto-root-luks"
+diff --git a/overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch b/overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
+new file mode 100644
+index 00000000..9e349698
+--- /dev/null
++++ b/overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
+@@ -0,0 +1,45 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Raito Bezarius <masterancpp@gmail.com>
++Date: Mon, 19 Jun 2023 02:11:35 +0200
++Subject: [PATCH] Don't try to unmount /nix or /nix/store
++
++They'll still be remounted read-only.
++
++https://github.com/NixOS/nixos/issues/126
++
++Original-Author: Eelco Dolstra <eelco.dolstra@logicblox.com>
++---
++ src/shared/fstab-util.c | 2 ++
++ src/shutdown/umount.c   | 6 ++++--
++ 2 files changed, 6 insertions(+), 2 deletions(-)
++
++diff --git a/src/shared/fstab-util.c b/src/shared/fstab-util.c
++index d6a256c4a7..f74d5198f1 100644
++--- a/src/shared/fstab-util.c
+++++ b/src/shared/fstab-util.c
++@@ -66,6 +66,8 @@ bool fstab_is_extrinsic(const char *mount, const char *opts) {
++         /* Don't bother with the OS data itself */
++         if (PATH_IN_SET(mount,
++                         "/",
+++                        "/nix",
+++                        "/nix/store",
++                         "/usr",
++                         "/etc"))
++                 return true;
++diff --git a/src/shutdown/umount.c b/src/shutdown/umount.c
++index 84da5eed63..d6e2f36d52 100644
++--- a/src/shutdown/umount.c
+++++ b/src/shutdown/umount.c
++@@ -175,8 +175,10 @@ int mount_points_list_get(const char *mountinfo, MountPoint **head) {
++ static bool nonunmountable_path(const char *path) {
++         assert(path);
++ 
++-        return PATH_IN_SET(path, "/", "/usr") ||
++-                path_startswith(path, "/run/initramfs");
+++        return PATH_IN_SET(path, "/", "/usr")
+++                || path_equal(path, "/nix")
+++                || path_equal(path, "/nix/store")
+++                || path_startswith(path, "/run/initramfs");
++ }
++ 
++ static void log_umount_blockers(const char *mnt) {
+diff --git a/overlay/systemd-257/0003-Fix-NixOS-containers.patch b/overlay/systemd-257/0003-Fix-NixOS-containers.patch
+new file mode 100644
+index 00000000..7cc2804a
+--- /dev/null
++++ b/overlay/systemd-257/0003-Fix-NixOS-containers.patch
+@@ -0,0 +1,31 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Eelco Dolstra <eelco.dolstra@logicblox.com>
++Date: Wed, 16 Apr 2014 10:59:28 +0200
++Subject: [PATCH] Fix NixOS containers
++
++In NixOS containers, the init script is bind-mounted into the
++container, so checking early whether it exists will fail.
++---
++ src/nspawn/nspawn.c | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/src/nspawn/nspawn.c b/src/nspawn/nspawn.c
++index 6f90f2f418..74b2a237d3 100644
++--- a/src/nspawn/nspawn.c
+++++ b/src/nspawn/nspawn.c
++@@ -6189,6 +6189,7 @@ static int run(int argc, char *argv[]) {
++                                 goto finish;
++                         }
++                 } else {
+++#if 0
++                         _cleanup_free_ char *p = NULL;
++ 
++                         if (arg_pivot_root_new)
++@@ -6208,6 +6209,7 @@ static int run(int argc, char *argv[]) {
++                                 log_error_errno(r, "Unable to determine if %s looks like it has an OS tree (i.e. whether /usr/ exists): %m", arg_directory);
++                                 goto finish;
++                         }
+++#endif
++                 }
++ 
++         } else {
+diff --git a/overlay/systemd-257/0004-Add-some-NixOS-specific-unit-directories.patch b/overlay/systemd-257/0004-Add-some-NixOS-specific-unit-directories.patch
+new file mode 100644
+index 00000000..2657eb90
+--- /dev/null
++++ b/overlay/systemd-257/0004-Add-some-NixOS-specific-unit-directories.patch
+@@ -0,0 +1,129 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Raito Bezarius <masterancpp@gmail.com>
++Date: Mon, 19 Jun 2023 02:13:42 +0200
++Subject: [PATCH] Add some NixOS-specific unit directories
++
++Look in `/nix/var/nix/profiles/default/lib/systemd/{system,user}` for
++units provided by packages installed into the default profile via
++`nix-env -iA nixos.$package`.
++
++Also, remove /usr and /lib as these don't exist on NixOS.
++
++Original-Author: Eelco Dolstra <eelco.dolstra@logicblox.com>
++---
++ src/core/systemd.pc.in               |  8 ++++----
++ src/libsystemd/sd-path/path-lookup.c | 20 +++-----------------
++ 2 files changed, 7 insertions(+), 21 deletions(-)
++
++diff --git a/src/core/systemd.pc.in b/src/core/systemd.pc.in
++index f3b85b0190..f7aa5fca50 100644
++--- a/src/core/systemd.pc.in
+++++ b/src/core/systemd.pc.in
++@@ -43,10 +43,10 @@ systemdsystemconfdir=${systemd_system_conf_dir}
++ systemd_user_conf_dir=${sysconfdir}/systemd/user
++ systemduserconfdir=${systemd_user_conf_dir}
++ 
++-systemd_system_unit_path=${systemd_system_conf_dir}:/etc/systemd/system:/run/systemd/system:/usr/local/lib/systemd/system:${systemd_system_unit_dir}:/usr/lib/systemd/system:/lib/systemd/system
+++systemd_system_unit_path=${systemd_system_conf_dir}:/etc/systemd/system:/nix/var/nix/profiles/default/lib/systemd/system:/run/systemd/system:${systemd_system_unit_dir}
++ systemdsystemunitpath=${systemd_system_unit_path}
++ 
++-systemd_user_unit_path=${systemd_user_conf_dir}:/etc/systemd/user:/run/systemd/user:/usr/local/lib/systemd/user:/usr/local/share/systemd/user:${systemd_user_unit_dir}:/usr/lib/systemd/user:/usr/share/systemd/user
+++systemd_user_unit_path=${systemd_user_conf_dir}:/etc/systemd/user:/nix/var/nix/profiles/default/lib/systemd/user:/run/systemd/user:${systemd_user_unit_dir}
++ systemduserunitpath=${systemd_user_unit_path}
++ 
++ systemd_system_generator_dir=${prefix}/lib/systemd/system-generators
++@@ -55,10 +55,10 @@ systemdsystemgeneratordir=${systemd_system_generator_dir}
++ systemd_user_generator_dir=${prefix}/lib/systemd/user-generators
++ systemdusergeneratordir=${systemd_user_generator_dir}
++ 
++-systemd_system_generator_path=/run/systemd/system-generators:/etc/systemd/system-generators:/usr/local/lib/systemd/system-generators:${systemd_system_generator_dir}
+++systemd_system_generator_path=/run/systemd/system-generators:/etc/systemd/system-generators:${systemd_system_generator_dir}
++ systemdsystemgeneratorpath=${systemd_system_generator_path}
++ 
++-systemd_user_generator_path=/run/systemd/user-generators:/etc/systemd/user-generators:/usr/local/lib/systemd/user-generators:${systemd_user_generator_dir}
+++systemd_user_generator_path=/run/systemd/user-generators:/etc/systemd/user-generators:${systemd_user_generator_dir}
++ systemdusergeneratorpath=${systemd_user_generator_path}
++ 
++ systemd_sleep_dir=${prefix}/lib/systemd/system-sleep
++diff --git a/src/libsystemd/sd-path/path-lookup.c b/src/libsystemd/sd-path/path-lookup.c
++index a3b09208cb..91a085c6bc 100644
++--- a/src/libsystemd/sd-path/path-lookup.c
+++++ b/src/libsystemd/sd-path/path-lookup.c
++@@ -69,11 +69,7 @@ int runtime_directory(RuntimeScope scope, const char *suffix, char **ret) {
++ }
++ 
++ static const char* const user_data_unit_paths[] = {
++-        "/usr/local/lib/systemd/user",
++-        "/usr/local/share/systemd/user",
++         USER_DATA_UNIT_DIR,
++-        "/usr/lib/systemd/user",
++-        "/usr/share/systemd/user",
++         NULL
++ };
++ 
++@@ -481,16 +477,13 @@ int lookup_paths_init(
++                                        persistent_config,
++                                        SYSTEM_CONFIG_UNIT_DIR,
++                                        "/etc/systemd/system",
+++                                       "/nix/var/nix/profiles/default/lib/systemd/system",
++                                        ASSERT_PTR(persistent_attached),
++                                        ASSERT_PTR(runtime_config),
++                                        "/run/systemd/system",
++                                        ASSERT_PTR(runtime_attached),
++                                        STRV_IFNOTNULL(generator),
++-                                       "/usr/local/lib/systemd/system",
++                                        SYSTEM_DATA_UNIT_DIR,
++-                                       "/usr/lib/systemd/system",
++-                                       /* To be used ONLY for images which might be legacy split-usr */
++-                                       FLAGS_SET(flags, LOOKUP_PATHS_SPLIT_USR) ? "/lib/systemd/system" : STRV_IGNORE,
++                                        STRV_IFNOTNULL(generator_late));
++                         break;
++ 
++@@ -508,13 +501,10 @@ int lookup_paths_init(
++                         add = strv_new(persistent_config,
++                                        USER_CONFIG_UNIT_DIR,
++                                        "/etc/systemd/user",
+++                                       "/nix/var/nix/profiles/default/lib/systemd/user",
++                                        ASSERT_PTR(runtime_config),
++                                        "/run/systemd/user",
++-                                       "/usr/local/share/systemd/user",
++-                                       "/usr/share/systemd/user",
++-                                       "/usr/local/lib/systemd/user",
++-                                       USER_DATA_UNIT_DIR,
++-                                       "/usr/lib/systemd/user");
+++                                       USER_DATA_UNIT_DIR);
++                         break;
++ 
++                 case RUNTIME_SCOPE_USER:
++@@ -653,7 +643,6 @@ void lookup_paths_log(LookupPaths *lp) {
++ static const char* const system_generator_paths[] = {
++         "/run/systemd/system-generators",
++         "/etc/systemd/system-generators",
++-        "/usr/local/lib/systemd/system-generators",
++         SYSTEM_GENERATOR_DIR,
++         NULL,
++ };
++@@ -661,7 +650,6 @@ static const char* const system_generator_paths[] = {
++ static const char* const user_generator_paths[] = {
++         "/run/systemd/user-generators",
++         "/etc/systemd/user-generators",
++-        "/usr/local/lib/systemd/user-generators",
++         USER_GENERATOR_DIR,
++         NULL,
++ };
++@@ -669,7 +657,6 @@ static const char* const user_generator_paths[] = {
++ static const char* const system_env_generator_paths[] = {
++         "/run/systemd/system-environment-generators",
++         "/etc/systemd/system-environment-generators",
++-        "/usr/local/lib/systemd/system-environment-generators",
++         SYSTEM_ENV_GENERATOR_DIR,
++         NULL,
++ };
++@@ -677,7 +664,6 @@ static const char* const system_env_generator_paths[] = {
++ static const char* const user_env_generator_paths[] = {
++         "/run/systemd/user-environment-generators",
++         "/etc/systemd/user-environment-generators",
++-        "/usr/local/lib/systemd/user-environment-generators",
++         USER_ENV_GENERATOR_DIR,
++         NULL,
++ };
+diff --git a/overlay/systemd-257/0005-Get-rid-of-a-useless-message-in-user-sessions.patch b/overlay/systemd-257/0005-Get-rid-of-a-useless-message-in-user-sessions.patch
+new file mode 100644
+index 00000000..6c4a41ab
+--- /dev/null
++++ b/overlay/systemd-257/0005-Get-rid-of-a-useless-message-in-user-sessions.patch
+@@ -0,0 +1,28 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Eelco Dolstra <eelco.dolstra@logicblox.com>
++Date: Mon, 11 May 2015 15:39:38 +0200
++Subject: [PATCH] Get rid of a useless message in user sessions
++
++Namely lots of variants of
++
++  Unit nix-var-nix-db.mount is bound to inactive unit dev-disk-by\x2dlabel-nixos.device. Stopping, too.
++
++in containers.
++---
++ src/core/manager.c | 3 ++-
++ 1 file changed, 2 insertions(+), 1 deletion(-)
++
++diff --git a/src/core/manager.c b/src/core/manager.c
++index 4ccaba9054..9577b89783 100644
++--- a/src/core/manager.c
+++++ b/src/core/manager.c
++@@ -1672,7 +1672,8 @@ static unsigned manager_dispatch_stop_when_bound_queue(Manager *m) {
++                 if (!unit_is_bound_by_inactive(u, &culprit))
++                         continue;
++ 
++-                log_unit_debug(u, "Unit is stopped because bound to inactive unit %s.", culprit->id);
+++                if (u->type != UNIT_MOUNT || detect_container() <= 0)
+++                        log_unit_debug(u, "Unit is stopped because bound to inactive unit %s.", culprit->id);
++ 
++                 /* If stopping a unit fails continuously we might enter a stop loop here, hence stop acting on the
++                  * service being unnecessary after a while. */
+diff --git a/overlay/systemd-257/0006-hostnamed-localed-timedated-disable-methods-that-cha.patch b/overlay/systemd-257/0006-hostnamed-localed-timedated-disable-methods-that-cha.patch
+new file mode 100644
+index 00000000..44bd2263
+--- /dev/null
++++ b/overlay/systemd-257/0006-hostnamed-localed-timedated-disable-methods-that-cha.patch
+@@ -0,0 +1,105 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Gabriel Ebner <gebner@gebner.org>
++Date: Sun, 6 Dec 2015 14:26:36 +0100
++Subject: [PATCH] hostnamed, localed, timedated: disable methods that change
++ system settings.
++
++---
++ src/hostname/hostnamed.c |  6 ++++++
++ src/locale/localed.c     |  9 +++++++++
++ src/timedate/timedated.c | 10 ++++++++++
++ 3 files changed, 25 insertions(+)
++
++diff --git a/src/hostname/hostnamed.c b/src/hostname/hostnamed.c
++index ba50b59f92..9827487453 100644
++--- a/src/hostname/hostnamed.c
+++++ b/src/hostname/hostnamed.c
++@@ -1115,6 +1115,9 @@ static int method_set_static_hostname(sd_bus_message *m, void *userdata, sd_bus_
++         if (r < 0)
++                 return r;
++ 
+++        return sd_bus_error_setf(error, SD_BUS_ERROR_NOT_SUPPORTED,
+++            "Changing system settings via systemd is not supported on NixOS.");
+++
++         name = empty_to_null(name);
++ 
++         context_read_etc_hostname(c);
++@@ -1177,6 +1180,9 @@ static int set_machine_info(Context *c, sd_bus_message *m, int prop, sd_bus_mess
++         if (r < 0)
++                 return r;
++ 
+++        return sd_bus_error_setf(error, SD_BUS_ERROR_NOT_SUPPORTED,
+++            "Changing system settings via systemd is not supported on NixOS.");
+++
++         name = empty_to_null(name);
++ 
++         context_read_machine_info(c);
++diff --git a/src/locale/localed.c b/src/locale/localed.c
++index 062744519d..95bde4b1c3 100644
++--- a/src/locale/localed.c
+++++ b/src/locale/localed.c
++@@ -226,6 +226,9 @@ static int method_set_locale(sd_bus_message *m, void *userdata, sd_bus_error *er
++ 
++         use_localegen = locale_gen_check_available();
++ 
+++        return sd_bus_error_setf(error, SD_BUS_ERROR_NOT_SUPPORTED,
+++            "Changing system settings via systemd is not supported on NixOS.");
+++
++         /* If single locale without variable name is provided, then we assume it is LANG=. */
++         if (strv_length(l) == 1 && !strchr(l[0], '=')) {
++                 if (!locale_is_valid(l[0]))
++@@ -343,6 +346,9 @@ static int method_set_vc_keyboard(sd_bus_message *m, void *userdata, sd_bus_erro
++         if (r < 0)
++                 return bus_log_parse_error(r);
++ 
+++        return sd_bus_error_setf(error, SD_BUS_ERROR_NOT_SUPPORTED,
+++            "Changing system settings via systemd is not supported on NixOS.");
+++
++         vc_context_empty_to_null(&in);
++ 
++         r = vc_context_verify_and_warn(&in, LOG_ERR, error);
++@@ -460,6 +466,9 @@ static int method_set_x11_keyboard(sd_bus_message *m, void *userdata, sd_bus_err
++         if (r < 0)
++                 return bus_log_parse_error(r);
++ 
+++        return sd_bus_error_setf(error, SD_BUS_ERROR_NOT_SUPPORTED,
+++            "Changing system settings via systemd is not supported on NixOS.");
+++
++         x11_context_empty_to_null(&in);
++ 
++         r = x11_context_verify_and_warn(&in, LOG_ERR, error);
++diff --git a/src/timedate/timedated.c b/src/timedate/timedated.c
++index c79bb864df..cbd30214b7 100644
++--- a/src/timedate/timedated.c
+++++ b/src/timedate/timedated.c
++@@ -676,6 +676,10 @@ static int method_set_timezone(sd_bus_message *m, void *userdata, sd_bus_error *
++         if (r < 0)
++                 return r;
++ 
+++        if (getenv("NIXOS_STATIC_TIMEZONE"))
+++                return sd_bus_error_setf(error, SD_BUS_ERROR_NOT_SUPPORTED,
+++                    "Changing timezone via systemd is not supported when it is set in NixOS configuration.");
+++
++         if (!timezone_is_valid(z, LOG_DEBUG))
++                 return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Invalid or not installed time zone '%s'", z);
++ 
++@@ -754,6 +758,9 @@ static int method_set_local_rtc(sd_bus_message *m, void *userdata, sd_bus_error
++         if (r < 0)
++                 return r;
++ 
+++        return sd_bus_error_setf(error, SD_BUS_ERROR_NOT_SUPPORTED,
+++            "Changing system settings via systemd is not supported on NixOS.");
+++
++         if (lrtc == c->local_rtc && !fix_system)
++                 return sd_bus_reply_method_return(m, NULL);
++ 
++@@ -948,6 +955,9 @@ static int method_set_ntp(sd_bus_message *m, void *userdata, sd_bus_error *error
++         if (r < 0)
++                 return r;
++ 
+++        return sd_bus_error_setf(error, SD_BUS_ERROR_NOT_SUPPORTED,
+++            "Changing system settings via systemd is not supported on NixOS.");
+++
++         r = context_update_ntp_status(c, bus, m);
++         if (r < 0)
++                 return r;
+diff --git a/overlay/systemd-257/0007-Change-usr-share-zoneinfo-to-etc-zoneinfo.patch b/overlay/systemd-257/0007-Change-usr-share-zoneinfo-to-etc-zoneinfo.patch
+new file mode 100644
+index 00000000..1f4184e9
+--- /dev/null
++++ b/overlay/systemd-257/0007-Change-usr-share-zoneinfo-to-etc-zoneinfo.patch
+@@ -0,0 +1,138 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Nikolay Amiantov <ab@fmap.me>
++Date: Tue, 11 Oct 2016 13:12:08 +0300
++Subject: [PATCH] Change /usr/share/zoneinfo to /etc/zoneinfo
++
++NixOS uses this path.
++---
++ man/localtime.xml         | 4 ++--
++ src/basic/time-util.c     | 8 ++++----
++ src/firstboot/firstboot.c | 2 +-
++ src/nspawn/nspawn.c       | 4 ++--
++ src/timedate/timedated.c  | 8 ++++----
++ 5 files changed, 13 insertions(+), 13 deletions(-)
++
++diff --git a/man/localtime.xml b/man/localtime.xml
++index 3a13e04a27..4fd58068a1 100644
++--- a/man/localtime.xml
+++++ b/man/localtime.xml
++@@ -20,7 +20,7 @@
++   </refnamediv>
++ 
++   <refsynopsisdiv>
++-    <para><filename>/etc/localtime</filename> -&gt; <filename>../usr/share/zoneinfo/…</filename></para>
+++    <para><filename>/etc/localtime</filename> -&gt; <filename>zoneinfo/…</filename></para>
++   </refsynopsisdiv>
++ 
++   <refsect1>
++@@ -30,7 +30,7 @@
++     system-wide timezone of the local system that is used by
++     applications for presentation to the user. It should be an
++     absolute or relative symbolic link pointing to
++-    <filename>/usr/share/zoneinfo/</filename>, followed by a timezone
+++    <filename>/etc/zoneinfo/</filename>, followed by a timezone
++     identifier such as <literal>Europe/Berlin</literal> or
++     <literal>Etc/UTC</literal>. The resulting link should lead to the
++     corresponding binary
++diff --git a/src/basic/time-util.c b/src/basic/time-util.c
++index 29afb08ebc..398ff340cd 100644
++--- a/src/basic/time-util.c
+++++ b/src/basic/time-util.c
++@@ -1418,7 +1418,7 @@ static int get_timezones_from_zone1970_tab(char ***ret) {
++ 
++         assert(ret);
++ 
++-        f = fopen("/usr/share/zoneinfo/zone1970.tab", "re");
+++        f = fopen("/etc/zoneinfo/zone1970.tab", "re");
++         if (!f)
++                 return -errno;
++ 
++@@ -1459,7 +1459,7 @@ static int get_timezones_from_tzdata_zi(char ***ret) {
++ 
++         assert(ret);
++ 
++-        f = fopen("/usr/share/zoneinfo/tzdata.zi", "re");
+++        f = fopen("/etc/zoneinfo/tzdata.zi", "re");
++         if (!f)
++                 return -errno;
++ 
++@@ -1570,7 +1570,7 @@ int verify_timezone(const char *name, int log_level) {
++         if (p - name >= PATH_MAX)
++                 return -ENAMETOOLONG;
++ 
++-        t = strjoina("/usr/share/zoneinfo/", name);
+++        t = strjoina("/etc/zoneinfo/", name);
++ 
++         fd = open(t, O_RDONLY|O_CLOEXEC);
++         if (fd < 0)
++@@ -1622,7 +1622,7 @@ int get_timezone(char **ret) {
++         if (r < 0)
++                 return r; /* Return EINVAL if not a symlink */
++ 
++-        const char *e = PATH_STARTSWITH_SET(t, "/usr/share/zoneinfo/", "../usr/share/zoneinfo/");
+++        const char *e = PATH_STARTSWITH_SET(t, "/etc/zoneinfo/", "../etc/zoneinfo/");
++         if (!e)
++                 return -EINVAL;
++         if (!timezone_is_valid(e, LOG_DEBUG))
++diff --git a/src/firstboot/firstboot.c b/src/firstboot/firstboot.c
++index a389eeae10..c817e91991 100644
++--- a/src/firstboot/firstboot.c
+++++ b/src/firstboot/firstboot.c
++@@ -598,7 +598,7 @@ static int process_timezone(int rfd) {
++         if (isempty(arg_timezone))
++                 return 0;
++ 
++-        e = strjoina("../usr/share/zoneinfo/", arg_timezone);
+++        e = strjoina("zoneinfo/", arg_timezone);
++ 
++         r = symlinkat_atomic_full(e, pfd, f, /* make_relative= */ false);
++         if (r < 0)
++diff --git a/src/nspawn/nspawn.c b/src/nspawn/nspawn.c
++index 74b2a237d3..cf9eabf0f2 100644
++--- a/src/nspawn/nspawn.c
+++++ b/src/nspawn/nspawn.c
++@@ -1851,8 +1851,8 @@ int userns_mkdir(const char *root, const char *path, mode_t mode, uid_t uid, gid
++ static const char *timezone_from_path(const char *path) {
++         return PATH_STARTSWITH_SET(
++                         path,
++-                        "../usr/share/zoneinfo/",
++-                        "/usr/share/zoneinfo/");
+++                        "../etc/zoneinfo/",
+++                        "/etc/zoneinfo/");
++ }
++ 
++ static bool etc_writable(void) {
++diff --git a/src/timedate/timedated.c b/src/timedate/timedated.c
++index cbd30214b7..b9b2f533a4 100644
++--- a/src/timedate/timedated.c
+++++ b/src/timedate/timedated.c
++@@ -280,7 +280,7 @@ static int context_read_data(Context *c) {
++ 
++         r = get_timezone(&t);
++         if (r == -EINVAL)
++-                log_warning_errno(r, "/etc/localtime should be a symbolic link to a time zone data file in /usr/share/zoneinfo/.");
+++                log_warning_errno(r, "/etc/localtime should be a symbolic link to a time zone data file in /etc/zoneinfo/.");
++         else if (r < 0)
++                 log_warning_errno(r, "Failed to get target of /etc/localtime: %m");
++ 
++@@ -304,7 +304,7 @@ static int context_write_data_timezone(Context *c) {
++ 
++         if (isempty(c->zone) || streq(c->zone, "UTC")) {
++ 
++-                if (access("/usr/share/zoneinfo/UTC", F_OK) < 0) {
+++                if (access("/etc/zoneinfo/UTC", F_OK) < 0) {
++ 
++                         if (unlink("/etc/localtime") < 0 && errno != ENOENT)
++                                 return -errno;
++@@ -312,9 +312,9 @@ static int context_write_data_timezone(Context *c) {
++                         return 0;
++                 }
++ 
++-                source = "../usr/share/zoneinfo/UTC";
+++                source = "../etc/zoneinfo/UTC";
++         } else {
++-                p = path_join("../usr/share/zoneinfo", c->zone);
+++                p = path_join("../etc/zoneinfo", c->zone);
++                 if (!p)
++                         return -ENOMEM;
++ 
+diff --git a/overlay/systemd-257/0008-localectl-use-etc-X11-xkb-for-list-x11.patch b/overlay/systemd-257/0008-localectl-use-etc-X11-xkb-for-list-x11.patch
+new file mode 100644
+index 00000000..c670f076
+--- /dev/null
++++ b/overlay/systemd-257/0008-localectl-use-etc-X11-xkb-for-list-x11.patch
+@@ -0,0 +1,24 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Imuli <i@imu.li>
++Date: Wed, 19 Oct 2016 08:46:47 -0400
++Subject: [PATCH] localectl: use /etc/X11/xkb for list-x11-*
++
++NixOS has an option to link the xkb data files to /etc/X11, but not to
++/usr/share/X11.
++---
++ src/locale/localectl.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/src/locale/localectl.c b/src/locale/localectl.c
++index 36dbeb9daa..265eda2751 100644
++--- a/src/locale/localectl.c
+++++ b/src/locale/localectl.c
++@@ -301,7 +301,7 @@ static int list_x11_keymaps(int argc, char **argv, void *userdata) {
++         } state = NONE, look_for;
++         int r;
++ 
++-        f = fopen("/usr/share/X11/xkb/rules/base.lst", "re");
+++        f = fopen("/etc/X11/xkb/rules/base.lst", "re");
++         if (!f)
++                 return log_error_errno(errno, "Failed to open keyboard mapping list. %m");
++ 
+diff --git a/overlay/systemd-257/0009-add-rootprefix-to-lookup-dir-paths.patch b/overlay/systemd-257/0009-add-rootprefix-to-lookup-dir-paths.patch
+new file mode 100644
+index 00000000..bf9f028d
+--- /dev/null
++++ b/overlay/systemd-257/0009-add-rootprefix-to-lookup-dir-paths.patch
+@@ -0,0 +1,35 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Andreas Rammhold <andreas@rammhold.de>
++Date: Thu, 9 May 2019 11:15:22 +0200
++Subject: [PATCH] add rootprefix to lookup dir paths
++
++systemd does not longer use the UDEVLIBEXEC directory as root for
++discovery default udev rules. By adding `$out/lib` to the lookup paths
++we should again be able to discover the udev rules amongst other default
++files that I might have missed.
++---
++ src/basic/constants.h | 6 ++++--
++ 1 file changed, 4 insertions(+), 2 deletions(-)
++
++diff --git a/src/basic/constants.h b/src/basic/constants.h
++index 5aaf8f535c..934175fb51 100644
++--- a/src/basic/constants.h
+++++ b/src/basic/constants.h
++@@ -62,13 +62,15 @@
++         "/etc/" n "\0"                          \
++         "/run/" n "\0"                          \
++         "/usr/local/lib/" n "\0"                \
++-        "/usr/lib/" n "\0"
+++        "/usr/lib/" n "\0"                      \
+++        PREFIX "/lib/" n "\0"
++ 
++ #define CONF_PATHS(n)                           \
++         "/etc/" n,                              \
++         "/run/" n,                              \
++         "/usr/local/lib/" n,                    \
++-        "/usr/lib/" n
+++        "/usr/lib/" n,                          \
+++        PREFIX "/lib/" n
++ 
++ #define CONF_PATHS_STRV(n)                      \
++         STRV_MAKE(CONF_PATHS(n))
+diff --git a/overlay/systemd-257/0010-systemd-shutdown-execute-scripts-in-etc-systemd-syst.patch b/overlay/systemd-257/0010-systemd-shutdown-execute-scripts-in-etc-systemd-syst.patch
+new file mode 100644
+index 00000000..20b4641a
+--- /dev/null
++++ b/overlay/systemd-257/0010-systemd-shutdown-execute-scripts-in-etc-systemd-syst.patch
+@@ -0,0 +1,23 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Nikolay Amiantov <ab@fmap.me>
++Date: Thu, 25 Jul 2019 20:45:55 +0300
++Subject: [PATCH] systemd-shutdown: execute scripts in
++ /etc/systemd/system-shutdown
++
++This is needed for NixOS to use such scripts as systemd directory is immutable.
++---
++ src/shutdown/shutdown.c | 1 +
++ 1 file changed, 1 insertion(+)
++
++diff --git a/src/shutdown/shutdown.c b/src/shutdown/shutdown.c
++index e26a8579c5..af814cd551 100644
++--- a/src/shutdown/shutdown.c
+++++ b/src/shutdown/shutdown.c
++@@ -358,6 +358,7 @@ static void notify_supervisor(void) {
++ int main(int argc, char *argv[]) {
++         static const char* const dirs[] = {
++                 SYSTEM_SHUTDOWN_PATH,
+++                "/etc/systemd/system-shutdown",
++                 NULL
++         };
++         _cleanup_free_ char *cgroup = NULL;
+diff --git a/overlay/systemd-257/0011-systemd-sleep-execute-scripts-in-etc-systemd-system-.patch b/overlay/systemd-257/0011-systemd-sleep-execute-scripts-in-etc-systemd-system-.patch
+new file mode 100644
+index 00000000..13578115
+--- /dev/null
++++ b/overlay/systemd-257/0011-systemd-sleep-execute-scripts-in-etc-systemd-system-.patch
+@@ -0,0 +1,22 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Nikolay Amiantov <ab@fmap.me>
++Date: Thu, 25 Jul 2019 20:46:58 +0300
++Subject: [PATCH] systemd-sleep: execute scripts in /etc/systemd/system-sleep
++
++This is needed for NixOS to use such scripts as systemd directory is immutable.
++---
++ src/sleep/sleep.c | 1 +
++ 1 file changed, 1 insertion(+)
++
++diff --git a/src/sleep/sleep.c b/src/sleep/sleep.c
++index 181bb4ccef..2b1410d8a1 100644
++--- a/src/sleep/sleep.c
+++++ b/src/sleep/sleep.c
++@@ -218,6 +218,7 @@ static int execute(
++         };
++         static const char* const dirs[] = {
++                 SYSTEM_SLEEP_PATH,
+++                "/etc/systemd/system-sleep",
++                 NULL
++         };
++ 
+diff --git a/overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch b/overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch
+new file mode 100644
+index 00000000..9e29c34e
+--- /dev/null
++++ b/overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch
+@@ -0,0 +1,29 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Florian Klink <flokli@flokli.de>
++Date: Sun, 8 Mar 2020 01:05:54 +0100
++Subject: [PATCH] path-util.h: add placeholder for DEFAULT_PATH_NORMAL
++
++This will be the $PATH used to lookup ExecStart= etc. options, which
++systemd itself uses extensively.
++---
++ src/basic/path-util.h | 6 +++---
++ 1 file changed, 3 insertions(+), 3 deletions(-)
++
++diff --git a/src/basic/path-util.h b/src/basic/path-util.h
++index dff5a3a549..01344e5cf6 100644
++--- a/src/basic/path-util.h
+++++ b/src/basic/path-util.h
++@@ -17,10 +17,10 @@
++ #define PATH_MERGED_BIN(x) x "bin"
++ #define PATH_MERGED_BIN_NULSTR(x) x "bin\0"
++ 
++-#define DEFAULT_PATH_WITH_SBIN PATH_SPLIT_BIN("/usr/local/") ":" PATH_SPLIT_BIN("/usr/")
++-#define DEFAULT_PATH_WITHOUT_SBIN PATH_MERGED_BIN("/usr/local/") ":" PATH_MERGED_BIN("/usr/")
+++#define DEFAULT_PATH_WITH_SBIN "@defaultPathNormal@"
+++#define DEFAULT_PATH_WITHOUT_SBIN DEFAULT_PATH_WITH_SBIN
++ 
++-#define DEFAULT_PATH_COMPAT PATH_SPLIT_BIN("/usr/local/") ":" PATH_SPLIT_BIN("/usr/") ":" PATH_SPLIT_BIN("/")
+++#define DEFAULT_PATH_COMPAT DEFAULT_PATH_WITH_SBIN
++ 
++ const char* default_PATH(void);
++ 
+diff --git a/overlay/systemd-257/0013-inherit-systemd-environment-when-calling-generators.patch b/overlay/systemd-257/0013-inherit-systemd-environment-when-calling-generators.patch
+new file mode 100644
+index 00000000..856fdee9
+--- /dev/null
++++ b/overlay/systemd-257/0013-inherit-systemd-environment-when-calling-generators.patch
+@@ -0,0 +1,39 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Yuriy Taraday <yorik.sar@gmail.com>
++Date: Fri, 17 Jun 2022 12:45:10 +0000
++Subject: [PATCH] inherit systemd environment when calling generators.
++
++Systemd generators need access to the environment configured in
++stage-2-init.sh since it schedules fsck and mkfs executions based on
++being able to find an appropriate binary for the target filesystem.
++
++With this commit I am altering the systemd behaviour since upstream
++tries to gather environments with that they call
++"environment-generators" and then seems to pass that on to all the other
++executables that are being called from managers.
++---
++ src/core/manager.c | 8 ++++++++
++ 1 file changed, 8 insertions(+)
++
++diff --git a/src/core/manager.c b/src/core/manager.c
++index 9577b89783..9cfd2798b9 100644
++--- a/src/core/manager.c
+++++ b/src/core/manager.c
++@@ -4158,9 +4158,17 @@ static int build_generator_environment(Manager *m, char ***ret) {
++          * adjust generated units to that. Let's pass down some bits of information that are easy for us to
++          * determine (but a bit harder for generator scripts to determine), as environment variables. */
++ 
+++        // On NixOS we must propagate PATH to generators so they are
+++        // able to find binaries such as `fsck.${fstype}` and
+++        // `mkfs.${fstype}`. That is why we ignore transient_environment that
+++        // overrides the PATH variable. This propagates systemd's
+++        // environment (e.g. PATH) that was setup
+++        // before calling systemd from stage-2-init.sh.
+++#if 0
++         nl = strv_copy(m->transient_environment);
++         if (!nl)
++                 return -ENOMEM;
+++#endif
++ 
++         r = strv_env_assign(&nl, "SYSTEMD_SCOPE", runtime_scope_to_string(m->runtime_scope));
++         if (r < 0)
+diff --git a/overlay/systemd-257/0014-core-don-t-taint-on-unmerged-usr.patch b/overlay/systemd-257/0014-core-don-t-taint-on-unmerged-usr.patch
+new file mode 100644
+index 00000000..fbaaed99
+--- /dev/null
++++ b/overlay/systemd-257/0014-core-don-t-taint-on-unmerged-usr.patch
+@@ -0,0 +1,37 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: oxalica <oxalicc@pm.me>
++Date: Tue, 4 Oct 2022 09:18:07 +0800
++Subject: [PATCH] core: don't taint on unmerged /usr
++
++NixOS has very different approach towards /bin and /sbin - they don't
++really exist (except for /bin/sh and /usr/bin/env, because these are used
++heavily in shebangs around the world). The concept of merged or unmerged
++usr doesn't really apply here at all, it's neither of the two.
++Users don't execute things from /bin or /sbin, there's nothing else in
++there. In all cases, systemd doesn't look things up from /usr/bin or /bin,
++so showing the taint isn't really helpful.
++
++See also: https://github.com/systemd/systemd/issues/24191
++---
++ src/core/taint.c | 8 --------
++ 1 file changed, 8 deletions(-)
++
++diff --git a/src/core/taint.c b/src/core/taint.c
++index b7a1c647a2..c04864c478 100644
++--- a/src/core/taint.c
+++++ b/src/core/taint.c
++@@ -41,14 +41,6 @@ char** taint_strv(void) {
++ 
++         _cleanup_free_ char *bin = NULL, *usr_sbin = NULL, *var_run = NULL;
++ 
++-        if (readlink_malloc("/bin", &bin) < 0 || !PATH_IN_SET(bin, "usr/bin", "/usr/bin"))
++-                stage[n++] = "unmerged-usr";
++-
++-        /* Note that the check is different from default_PATH(), as we want to taint on uncanonical symlinks
++-         * too. */
++-        if (readlink_malloc("/usr/sbin", &usr_sbin) < 0 || !PATH_IN_SET(usr_sbin, "bin", "/usr/bin"))
++-                stage[n++] = "unmerged-bin";
++-
++         if (readlink_malloc("/var/run", &var_run) < 0 || !PATH_IN_SET(var_run, "../run", "/run"))
++                 stage[n++] = "var-run-bad";
++ 
+diff --git a/overlay/systemd-257/0015-tpm2_context_init-fix-driver-name-checking.patch b/overlay/systemd-257/0015-tpm2_context_init-fix-driver-name-checking.patch
+new file mode 100644
+index 00000000..fe8ac0dd
+--- /dev/null
++++ b/overlay/systemd-257/0015-tpm2_context_init-fix-driver-name-checking.patch
+@@ -0,0 +1,41 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Nick Cao <nickcao@nichi.co>
++Date: Sun, 15 Jan 2023 20:15:55 +0800
++Subject: [PATCH] tpm2_context_init: fix driver name checking
++
++https://github.com/systemd/systemd/commit/542dbc623e introduced
++additional checks for tpm2 driver names, namely ensuring the driver
++name, when concated with "libtss2-tcti-" and ".so.0", generates a valid
++filename (with no '/' inside).
++
++For example, if the driver is name "device", the line
++  fn = strjoina("libtss2-tcti-", driver, ".so.0")
++would yield "libtss2-tcti-device.so.0", passing the check. And the
++filename is then passed to dlopen for loading the driver.
++
++Our current approach for systemd to correctly locate these dynamically
++loaded libraries is to patch the filenames to include their absolute
++path. Thus the line mentioned above is patched into
++  fn = strjoina("/nix/store/xxxxxxx-tpm2-tss-3.2.0/lib/libtss2-tcti-", driver, ".so.0")
++yielding "/nix/store/xxxxxxx-tpm2-tss-3.2.0/lib/libtss2-tcti-device.so.0",
++tripping the check.
++
++This patch relaxes the check to also accept absolute paths, by replacing
++filename_is_valid with path_is_valid.
++---
++ src/shared/tpm2-util.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/src/shared/tpm2-util.c b/src/shared/tpm2-util.c
++index 5b6b3ea93c..8ab04241b6 100644
++--- a/src/shared/tpm2-util.c
+++++ b/src/shared/tpm2-util.c
++@@ -721,7 +721,7 @@ int tpm2_context_new(const char *device, Tpm2Context **ret_context) {
++                 fn = strjoina("libtss2-tcti-", driver, ".so.0");
++ 
++                 /* Better safe than sorry, let's refuse strings that cannot possibly be valid driver early, before going to disk. */
++-                if (!filename_is_valid(fn))
+++                if (!path_is_valid(fn))
++                         return log_debug_errno(SYNTHETIC_ERRNO(EINVAL), "TPM2 driver name '%s' not valid, refusing.", driver);
++ 
++                 context->tcti_dl = dlopen(fn, RTLD_NOW|RTLD_NODELETE);
+diff --git a/overlay/systemd-257/0016-systemctl-edit-suggest-systemdctl-edit-runtime-on-sy.patch b/overlay/systemd-257/0016-systemctl-edit-suggest-systemdctl-edit-runtime-on-sy.patch
+new file mode 100644
+index 00000000..50dd842c
+--- /dev/null
++++ b/overlay/systemd-257/0016-systemctl-edit-suggest-systemdctl-edit-runtime-on-sy.patch
+@@ -0,0 +1,45 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Maximilian Bosch <maximilian@mbosch.me>
++Date: Fri, 1 Sep 2023 09:57:02 +0200
++Subject: [PATCH] systemctl-edit: suggest `systemdctl edit --runtime` on system
++ scope
++
++This is a NixOS-specific change. When trying to modify a unit with
++`systemctl edit` on NixOS, it'll fail with "Read-only file system":
++
++    $ systemctl edit libvirtd
++    Failed to open "/etc/systemd/system/libvirtd.service.d/.#override.conffa9825a0c9a249eb": Read-only file system
++
++This is because `/etc/systemd/system` is a symlink into the store. In
++fact, I'd consider this a feature rather than a bug since this ensures I
++don't introduce state imperatively.
++
++However, people wrongly assume that it's not possible to edit units
++ad-hoc and re-deploy their system for quick&dirty debugging where this
++would be absolutely fine (and doable with `--runtime` which adds a
++transient and non-persistent unit override in `/run`).
++
++To make sure that people learn about it quicker, this patch
++throws an error which suggests using `--runtime` when running
++`systemctl edit` on the system scope.
++
++For the user scope this isn't needed because user-level unit overrides
++are written into `$XDG_CONFIG_HOME/systemd/user`.
++---
++ src/systemctl/systemctl-edit.c | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/src/systemctl/systemctl-edit.c b/src/systemctl/systemctl-edit.c
++index 7165fa1cf7..7498cf9f4c 100644
++--- a/src/systemctl/systemctl-edit.c
+++++ b/src/systemctl/systemctl-edit.c
++@@ -323,6 +323,9 @@ int verb_edit(int argc, char *argv[], void *userdata) {
++         sd_bus *bus;
++         int r;
++ 
+++        if (!arg_runtime && arg_runtime_scope == RUNTIME_SCOPE_SYSTEM)
+++                return log_error_errno(SYNTHETIC_ERRNO(EINVAL), "The unit-directory '/etc/systemd/system' is read-only on NixOS, so it's not possible to edit system-units directly. Use 'systemctl edit --runtime' instead.");
+++
++         if (!on_tty() && !arg_stdin)
++                 return log_error_errno(SYNTHETIC_ERRNO(EINVAL), "Cannot edit units interactively if not on a tty.");
++ 
+diff --git a/overlay/systemd-257/0017-meson.build-do-not-create-systemdstatedir.patch b/overlay/systemd-257/0017-meson.build-do-not-create-systemdstatedir.patch
+new file mode 100644
+index 00000000..65cd257a
+--- /dev/null
++++ b/overlay/systemd-257/0017-meson.build-do-not-create-systemdstatedir.patch
+@@ -0,0 +1,21 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: nikstur <nikstur@outlook.com>
++Date: Mon, 6 Nov 2023 22:51:38 +0100
++Subject: [PATCH] meson.build: do not create systemdstatedir
++
++---
++ meson.build | 1 -
++ 1 file changed, 1 deletion(-)
++
++diff --git a/meson.build b/meson.build
++index a4730f0570..b5aaecd669 100644
++--- a/meson.build
+++++ b/meson.build
++@@ -2815,7 +2815,6 @@ install_data('LICENSE.GPL2',
++ install_subdir('LICENSES',
++                install_dir : docdir)
++ 
++-install_emptydir(systemdstatedir)
++ 
++ #####################################################################
++ 
+diff --git a/overlay/systemd-257/0018-meson-Don-t-link-ssh-dropins.patch b/overlay/systemd-257/0018-meson-Don-t-link-ssh-dropins.patch
+new file mode 100644
+index 00000000..da170d86
+--- /dev/null
++++ b/overlay/systemd-257/0018-meson-Don-t-link-ssh-dropins.patch
+@@ -0,0 +1,29 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Marie Ramlow <me@nycode.dev>
++Date: Sun, 24 Nov 2024 20:04:35 +0100
++Subject: [PATCH] meson: Don't link ssh dropins
++
++---
++ meson.build | 4 ++--
++ 1 file changed, 2 insertions(+), 2 deletions(-)
++
++diff --git a/meson.build b/meson.build
++index b5aaecd669..91b23f2d72 100644
++--- a/meson.build
+++++ b/meson.build
++@@ -207,13 +207,13 @@ sshconfdir = get_option('sshconfdir')
++ if sshconfdir == ''
++         sshconfdir = sysconfdir / 'ssh/ssh_config.d'
++ endif
++-conf.set10('LINK_SSH_PROXY_DROPIN', sshconfdir != 'no' and not sshconfdir.startswith('/usr/'))
+++conf.set10('LINK_SSH_PROXY_DROPIN', 0)
++ 
++ sshdconfdir = get_option('sshdconfdir')
++ if sshdconfdir == ''
++         sshdconfdir = sysconfdir / 'ssh/sshd_config.d'
++ endif
++-conf.set10('LINK_SSHD_USERDB_DROPIN', sshdconfdir != 'no' and not sshdconfdir.startswith('/usr/'))
+++conf.set10('LINK_SSHD_USERDB_DROPIN', 0)
++ 
++ sshdprivsepdir = get_option('sshdprivsepdir')
++ conf.set10('CREATE_SSHDPRIVSEPDIR', sshdprivsepdir != 'no' and not sshdprivsepdir.startswith('/usr/'))
+diff --git a/overlay/systemd-257/0019-install-unit_file_exists_full-follow-symlinks.patch b/overlay/systemd-257/0019-install-unit_file_exists_full-follow-symlinks.patch
+new file mode 100644
+index 00000000..4d7ceedc
+--- /dev/null
++++ b/overlay/systemd-257/0019-install-unit_file_exists_full-follow-symlinks.patch
+@@ -0,0 +1,22 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Marie Ramlow <me@nycode.dev>
++Date: Fri, 10 Jan 2025 15:51:33 +0100
++Subject: [PATCH] install: unit_file_exists_full: follow symlinks
++
++---
++ src/shared/install.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/src/shared/install.c b/src/shared/install.c
++index 6d87858a3c..8da022eb64 100644
++--- a/src/shared/install.c
+++++ b/src/shared/install.c
++@@ -3226,7 +3226,7 @@ int unit_file_exists_full(RuntimeScope scope, const LookupPaths *lp, const char
++                         &c,
++                         lp,
++                         name,
++-                        /* flags= */ 0,
+++                        /* flags= */ SEARCH_FOLLOW_CONFIG_SYMLINKS,
++                         ret_path ? &info : NULL,
++                         /* changes= */ NULL,
++                         /* n_changes= */ NULL);
+diff --git a/overlay/systemd-257/0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch b/overlay/systemd-257/0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
+new file mode 100644
+index 00000000..a1b1575a
+--- /dev/null
++++ b/overlay/systemd-257/0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
+@@ -0,0 +1,43 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Yuri Nesterov <yuriy.nesterov@unikie.com>
++Date: Wed, 21 Jun 2023 17:17:38 +0300
++Subject: [PATCH] timesyncd: disable NSCD when DNSSEC validation is disabled
++
++Systemd-timesyncd sets SYSTEMD_NSS_RESOLVE_VALIDATE=0 in the unit file
++to disable DNSSEC validation but it doesn't work when NSCD is used in
++the system. This patch disabes NSCD in systemd-timesyncd when
++SYSTEMD_NSS_RESOLVE_VALIDATE is set to 0 so that it uses NSS libraries
++directly.
++---
++ src/timesync/timesyncd.c | 11 +++++++++++
++ 1 file changed, 11 insertions(+)
++
++diff --git a/src/timesync/timesyncd.c b/src/timesync/timesyncd.c
++index d002501d29..9b835dc031 100644
++--- a/src/timesync/timesyncd.c
+++++ b/src/timesync/timesyncd.c
++@@ -23,6 +23,11 @@
++ #include "timesyncd-conf.h"
++ #include "timesyncd-manager.h"
++ #include "user-util.h"
+++#include "env-util.h"
+++
+++struct traced_file;
+++extern void __nss_disable_nscd(void (*)(size_t, struct traced_file *));
+++static void register_traced_file(size_t dbidx, struct traced_file *finfo) {}
++ 
++ static int advance_tstamp(int fd, usec_t epoch) {
++         assert(fd >= 0);
++@@ -201,6 +206,12 @@ static int run(int argc, char *argv[]) {
++         if (r < 0)
++                 return log_error_errno(r, "Failed to parse fallback server strings: %m");
++ 
+++        r = secure_getenv_bool("SYSTEMD_NSS_RESOLVE_VALIDATE");
+++        if (r == 0) {
+++                log_info("Disabling NSCD because DNSSEC validation is turned off");
+++                __nss_disable_nscd(register_traced_file);
+++        }
+++
++         log_debug("systemd-timesyncd running as pid " PID_FMT, getpid_cached());
++ 
++         notify_message = notify_start("READY=1\n"
+diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
+new file mode 100644
+index 00000000..5be8c10c
+--- /dev/null
++++ b/overlay/systemd-257/default.nix
+@@ -0,0 +1,1062 @@
++{
++  stdenv,
++  lib,
++  nixosTests,
++  pkgsCross,
++  testers,
++  fetchFromGitHub,
++  fetchzip,
++  buildPackages,
++  makeBinaryWrapper,
++  ninja,
++  meson,
++  m4,
++  pkg-config,
++  coreutils,
++  gperf,
++  getent,
++  glibcLocales,
++  autoPatchelfHook,
++  fetchpatch,
++
++  # glib is only used during tests (test-bus-gvariant, test-bus-marshal)
++  glib,
++  gettext,
++  python3Packages,
++
++  # Mandatory dependencies
++  libcap,
++  util-linux,
++  kbd,
++  kmod,
++  libxcrypt,
++
++  # Optional dependencies
++  pam,
++  cryptsetup,
++  audit,
++  acl,
++  lz4,
++  openssl,
++  libgcrypt,
++  libgpg-error,
++  libidn2,
++  curl,
++  gnutar,
++  gnupg,
++  zlib,
++  xz,
++  zstd,
++  tpm2-tss,
++  libuuid,
++  libapparmor,
++  intltool,
++  bzip2,
++  pcre2,
++  elfutils,
++  linuxHeaders ? stdenv.cc.libc.linuxHeaders,
++  gnutls,
++  iptables,
++  withSelinux ? false,
++  libselinux,
++  withLibseccomp ? lib.meta.availableOn stdenv.hostPlatform libseccomp,
++  libseccomp,
++  withKexectools ? lib.meta.availableOn stdenv.hostPlatform kexec-tools,
++  kexec-tools,
++  bashInteractive,
++  bash,
++  libmicrohttpd,
++  libfido2,
++  p11-kit,
++  libpwquality,
++  qrencode,
++  libarchive,
++  llvmPackages,
++
++  # the (optional) BPF feature requires bpftool, libbpf, clang and llvm-strip to
++  # be available during build time.
++  # Only libbpf should be a runtime dependency.
++  # Note: llvmPackages is explicitly taken from buildPackages instead of relying
++  # on splicing. Splicing will evaluate the adjacent (pkgsHostTarget) llvmPackages
++  # which is sometimes problematic: llvmPackages.clang looks at targetPackages.stdenv.cc
++  # which, in the unfortunate case of pkgsCross.ghcjs, `throw`s. If we
++  # explicitly take buildPackages.llvmPackages, this is no problem because
++  # `buildPackages.targetPackages.stdenv.cc == stdenv.cc` relative to
++  # us. Working around this is important, because systemd is in the dependency
++  # closure of GHC via emscripten and jdk.
++  bpftools,
++  libbpf,
++
++  # Needed to produce a ukify that works for cross compiling UKIs.
++  targetPackages,
++
++  withAcl ? true,
++  withAnalyze ? true,
++  withApparmor ? true,
++  withAudit ? true,
++  # compiles systemd-boot, assumes EFI is available.
++  withBootloader ?
++    withEfi
++    && !stdenv.hostPlatform.isMusl
++    # "Unknown 64-bit data model"
++    && !stdenv.hostPlatform.isRiscV32,
++  # adds bzip2, lz4, xz and zstd
++  withCompression ? true,
++  withCoredump ? true,
++  withCryptsetup ? true,
++  withRepart ? true,
++  withDocumentation ? true,
++  withEfi ? stdenv.hostPlatform.isEfi,
++  withFido2 ? true,
++  withFirstboot ? true,
++  withGcrypt ? true,
++  withHomed ? !stdenv.hostPlatform.isMusl,
++  withHostnamed ? true,
++  withHwdb ? true,
++  withImportd ? !stdenv.hostPlatform.isMusl,
++  withIptables ? true,
++  withKmod ? true,
++  withLibBPF ?
++    lib.versionAtLeast buildPackages.llvmPackages.clang.version "10.0"
++    # assumes hard floats
++    && (
++      stdenv.hostPlatform.isAarch
++      ->
++        stdenv.hostPlatform.parsed.cpu ? version
++        && lib.versionAtLeast stdenv.hostPlatform.parsed.cpu.version "6"
++    )
++    # see https://github.com/NixOS/nixpkgs/pull/194149#issuecomment-1266642211
++    && !stdenv.hostPlatform.isMips64
++    # can't find gnu/stubs-32.h
++    && (stdenv.hostPlatform.isPower64 -> stdenv.hostPlatform.isBigEndian)
++    # https://reviews.llvm.org/D43106#1019077
++    && (stdenv.hostPlatform.isRiscV32 -> stdenv.cc.isClang)
++    # buildPackages.targetPackages.llvmPackages is the same as llvmPackages,
++    # but we do it this way to avoid taking llvmPackages as an input, and
++    # risking making it too easy to ignore the above comment about llvmPackages.
++    && lib.meta.availableOn stdenv.hostPlatform buildPackages.targetPackages.llvmPackages.compiler-rt,
++  withLibidn2 ? true,
++  withLocaled ? true,
++  withLogind ? true,
++  withMachined ? true,
++  withNetworkd ? true,
++  withNss ? !stdenv.hostPlatform.isMusl,
++  withOomd ? true,
++  withOpenSSL ? true,
++  withPam ? true,
++  withPasswordQuality ? true,
++  withPCRE2 ? true,
++  withPolkit ? true,
++  withPortabled ? !stdenv.hostPlatform.isMusl,
++  withQrencode ? true,
++  withRemote ? !stdenv.hostPlatform.isMusl,
++  withResolved ? true,
++  withShellCompletions ? true,
++  withSysusers ? true,
++  withSysupdate ? true,
++  withTimedated ? true,
++  withTimesyncd ? true,
++  withTpm2Tss ? true,
++  # adds python to closure which is too much by default
++  withUkify ? false,
++  withUserDb ? true,
++  withUtmp ? !stdenv.hostPlatform.isMusl,
++  withVmspawn ? true,
++  # kernel-install shouldn't usually be used on NixOS, but can be useful, e.g. for
++  # building disk images for non-NixOS systems. To save users from trying to use it
++  # on their live NixOS system, we disable it by default.
++  withKernelInstall ? false,
++  withLibarchive ? true,
++  # tests assume too much system access for them to be feasible for us right now
++  withTests ? false,
++  # build only libudev and libsystemd
++  buildLibsOnly ? false,
++
++  # yes, pname is an argument here
++  pname ? "systemd",
++
++  libxslt,
++  docbook_xsl,
++  docbook_xml_dtd_42,
++  docbook_xml_dtd_45,
++  withLogTrace ? false,
++}:
++
++assert withImportd -> withCompression;
++assert withCoredump -> withCompression;
++assert withHomed -> withCryptsetup;
++assert withHomed -> withPam;
++assert withHomed -> withOpenSSL;
++assert withFido2 -> withOpenSSL;
++assert withSysupdate -> withOpenSSL;
++assert withImportd -> (withGcrypt || withOpenSSL);
++assert withUkify -> (withEfi && withBootloader);
++assert withRepart -> withCryptsetup;
++assert withBootloader -> withEfi;
++
++let
++  wantCurl = withRemote || withImportd;
++
++  version = "257.10";
++
++  # Use the command below to update `releaseTimestamp` on every (major) version
++  # change. More details in the commentary at mesonFlags.
++  # command:
++  #  $ curl -s https://api.github.com/repos/systemd/systemd/releases/latest | \
++  #     jq '.created_at|strptime("%Y-%m-%dT%H:%M:%SZ")|mktime'
++  releaseTimestamp = "1734643670";
++in
++stdenv.mkDerivation (finalAttrs: {
++  inherit pname version;
++
++  # We use systemd/systemd-stable for src, and ship NixOS-specific patches inside nixpkgs directly
++  # This has proven to be less error-prone than the previous systemd fork.
++  src = fetchFromGitHub {
++    owner = "systemd";
++    repo = "systemd";
++    rev = "v${version}";
++    hash = "sha256-08zGfnHzHjTupg7xjyGrauVxPwj5hNQDPHkuFNjNjec=";
++  };
++
++  # On major changes, or when otherwise required, you *must* :
++  # 1. reformat the patches,
++  # 2. `git am path/to/00*.patch` them into a systemd worktree,
++  # 3. rebase to the more recent systemd version,
++  # 4. and export the patches again via
++  #   `git -c format.signoff=false format-patch v${version} --no-numbered --zero-commit --no-signature`.
++  # Use `find . -name "*.patch" | sort` to get an up-to-date listing of all
++  # patches
++  patches = [
++    ./0001-Start-device-units-for-uninitialised-encrypted-devic.patch
++    ./0002-Don-t-try-to-unmount-nix-or-nix-store.patch
++    ./0003-Fix-NixOS-containers.patch
++    ./0004-Add-some-NixOS-specific-unit-directories.patch
++    ./0005-Get-rid-of-a-useless-message-in-user-sessions.patch
++    ./0006-hostnamed-localed-timedated-disable-methods-that-cha.patch
++    ./0007-Change-usr-share-zoneinfo-to-etc-zoneinfo.patch
++    ./0008-localectl-use-etc-X11-xkb-for-list-x11.patch
++    ./0009-add-rootprefix-to-lookup-dir-paths.patch
++    ./0010-systemd-shutdown-execute-scripts-in-etc-systemd-syst.patch
++    ./0011-systemd-sleep-execute-scripts-in-etc-systemd-system-.patch
++    ./0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch
++    ./0013-inherit-systemd-environment-when-calling-generators.patch
++    ./0014-core-don-t-taint-on-unmerged-usr.patch
++    ./0015-tpm2_context_init-fix-driver-name-checking.patch
++    ./0016-systemctl-edit-suggest-systemdctl-edit-runtime-on-sy.patch
++    ./0017-meson.build-do-not-create-systemdstatedir.patch
++
++    # systemd tries to link the systemd-ssh-proxy ssh config snippet with tmpfiles
++    # if the install prefix is not /usr, but that does not work for us
++    # because we include the config snippet manually
++    ./0018-meson-Don-t-link-ssh-dropins.patch
++
++    ./0019-install-unit_file_exists_full-follow-symlinks.patch
++  ]
++  ++ lib.optionals (stdenv.hostPlatform.isLinux && stdenv.hostPlatform.isGnu) [
++    ./0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isMusl (
++    let
++      # NOTE: the master-next branch does not have stable URLs.
++      # If we need patches that aren't in master yet, they'll have to be
++      # vendored.
++      oe-core = fetchzip {
++        url = "https://git.openembedded.org/openembedded-core/snapshot/openembedded-core-4891f47cdaf919033bf1c02cc12e4805e5db99a0.tar.gz";
++        hash = "sha256-YKL/oC+rPZ2EEVNidEV+pJihZgUv7vLb0OASplgktn4=";
++      };
++    in
++    map (patch: "${oe-core}/meta/recipes-core/systemd/systemd/${patch}") [
++      "0003-missing_type.h-add-comparison_fn_t.patch"
++      "0004-add-fallback-parse_printf_format-implementation.patch"
++      "0005-don-t-fail-if-GLOB_BRACE-and-GLOB_ALTDIRFUNC-is-not-.patch"
++      "0006-add-missing-FTW_-macros-for-musl.patch"
++      "0007-Use-uintmax_t-for-handling-rlim_t.patch"
++      "0008-Define-glibc-compatible-basename-for-non-glibc-syste.patch"
++      "0009-Do-not-disable-buffering-when-writing-to-oom_score_a.patch"
++      "0010-distinguish-XSI-compliant-strerror_r-from-GNU-specif.patch"
++      "0011-avoid-redefinition-of-prctl_mm_map-structure.patch"
++      "0012-do-not-disable-buffer-in-writing-files.patch"
++      "0013-Handle-__cpu_mask-usage.patch"
++      "0014-Handle-missing-gshadow.patch"
++      "0015-missing_syscall.h-Define-MIPS-ABI-defines-for-musl.patch"
++      "0016-pass-correct-parameters-to-getdents64.patch"
++      "0017-Adjust-for-musl-headers.patch"
++      "0018-test-bus-error-strerror-is-assumed-to-be-GNU-specifi.patch"
++      "0019-errno-util-Make-STRERROR-portable-for-musl.patch"
++      "0020-sd-event-Make-malloc_trim-conditional-on-glibc.patch"
++      "0021-shared-Do-not-use-malloc_info-on-musl.patch"
++      "0022-avoid-missing-LOCK_EX-declaration.patch"
++      "0023-include-signal.h-to-avoid-the-undeclared-error.patch"
++      "0024-undef-stdin-for-references-using-stdin-as-a-struct-m.patch"
++      "0025-adjust-header-inclusion-order-to-avoid-redeclaration.patch"
++      "0026-build-path.c-avoid-boot-time-segfault-for-musl.patch"
++    ]
++    ++ [
++      # add a missing include
++      (fetchpatch {
++        url = "https://github.com/systemd/systemd/commit/34fcd3638817060c79e1186b370e46d9b3a7409f.patch";
++        hash = "sha256-Uaewo3jPrZGJttlLcqO6cCj1w3IGZmvbur4+TBdIPxc=";
++        excludes = [ "src/udev/udevd.c" ];
++      })
++    ]
++  );
++
++  postPatch = ''
++    substituteInPlace src/basic/path-util.h --replace "@defaultPathNormal@" "${placeholder "out"}/bin/"
++  ''
++  + lib.optionalString withLibBPF ''
++    substituteInPlace meson.build \
++      --replace "find_program('clang'" "find_program('${stdenv.cc.targetPrefix}clang'"
++  ''
++  + lib.optionalString withUkify ''
++    substituteInPlace src/ukify/ukify.py \
++      --replace \
++      "'readelf'" \
++      "'${targetPackages.stdenv.cc.bintools.targetPrefix}readelf'" \
++      --replace \
++      "/usr/lib/systemd/boot/efi" \
++      "$out/lib/systemd/boot/efi"
++  ''
++  # Finally, patch shebangs in scripts used at build time. This must not patch
++  # scripts that will end up in the output, to avoid build platform references
++  # when cross-compiling.
++  + ''
++    shopt -s extglob
++    patchShebangs tools test src/!(rpm|kernel-install|ukify) src/kernel-install/test-kernel-install.sh
++  '';
++
++  outputs = [
++    "out"
++    "dev"
++  ]
++  ++ (lib.optional (!buildLibsOnly) "man");
++  separateDebugInfo = true;
++  # The vendored 25.05 definition relies on allowedReferences with debug
++  # info; current stdenv requires structured attributes for that combination.
++  __structuredAttrs = true;
++
++  hardeningDisable = [
++    # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=111523
++    "trivialautovarinit"
++  ]
++  ++ (lib.optionals withLibBPF [
++    # breaks clang -target bpf; should be fixed to not use
++    # a wrapped clang?
++    "zerocallusedregs"
++    "shadowstack"
++    "pacret"
++  ]);
++
++  nativeBuildInputs = [
++    pkg-config
++    makeBinaryWrapper
++    gperf
++    ninja
++    meson
++    glibcLocales
++    getent
++    m4
++    autoPatchelfHook
++
++    intltool
++    gettext
++
++    libxslt
++    docbook_xsl
++    docbook_xml_dtd_42
++    docbook_xml_dtd_45
++    bash
++    (buildPackages.python3Packages.python.withPackages (
++      ps:
++      with ps;
++      [
++        lxml
++        jinja2
++      ]
++      ++ lib.optional withEfi ps.pyelftools
++    ))
++  ]
++  ++ lib.optionals withLibBPF [
++    bpftools
++    buildPackages.llvmPackages.clang
++    buildPackages.llvmPackages.libllvm
++  ];
++
++  autoPatchelfFlags = [ "--keep-libc" ];
++
++  buildInputs = [
++    libxcrypt
++    libcap
++    libuuid
++    linuxHeaders
++    bashInteractive # for patch shebangs
++  ]
++
++  ++ lib.optionals withGcrypt [
++    libgcrypt
++    libgpg-error
++  ]
++  ++ lib.optionals withOpenSSL [ openssl ]
++  ++ lib.optional withTests glib
++  ++ lib.optional withAcl acl
++  ++ lib.optional withApparmor libapparmor
++  ++ lib.optional withAudit audit
++  ++ lib.optional wantCurl (lib.getDev curl)
++  ++ lib.optionals withCompression [
++    zlib
++    bzip2
++    lz4
++    xz
++    zstd
++  ]
++  ++ lib.optional withCoredump elfutils
++  ++ lib.optional withCryptsetup (lib.getDev cryptsetup.dev)
++  ++ lib.optional withKexectools kexec-tools
++  ++ lib.optional withKmod kmod
++  ++ lib.optional withLibidn2 libidn2
++  ++ lib.optional withLibseccomp libseccomp
++  ++ lib.optional withIptables iptables
++  ++ lib.optional withPam pam
++  ++ lib.optional withPCRE2 pcre2
++  ++ lib.optional withSelinux libselinux
++  ++ lib.optionals withRemote [
++    libmicrohttpd
++    gnutls
++  ]
++  ++ lib.optionals (withHomed || withCryptsetup) [ p11-kit ]
++  ++ lib.optionals (withHomed || withCryptsetup) [ libfido2 ]
++  ++ lib.optionals withLibBPF [ libbpf ]
++  ++ lib.optional withTpm2Tss tpm2-tss
++  ++ lib.optional withUkify (python3Packages.python.withPackages (ps: with ps; [ pefile ]))
++  ++ lib.optionals withPasswordQuality [ libpwquality ]
++  ++ lib.optionals withQrencode [ qrencode ]
++  ++ lib.optionals withLibarchive [ libarchive ]
++  ++ lib.optional (withBootloader && stdenv.targetPlatform.useLLVM or false) (
++    llvmPackages.compiler-rt.override {
++      doFakeLibgcc = true;
++    }
++  );
++
++  mesonBuildType = "release";
++
++  mesonFlags = [
++    # Options
++
++    # We bump this attribute on every (major) version change to ensure that we
++    # have known-good value for a timestamp that is in the (not so distant)
++    # past. This serves as a lower bound for valid system timestamps during
++    # startup. Systemd will reset the system timestamp if this date is +- 15
++    # years from the system time.
++    # See the systemd v250 release notes for further details:
++    #   https://github.com/systemd/systemd/blob/60e930fc3e6eb8a36fbc184773119eb8d2f30364/NEWS#L258-L266
++    (lib.mesonOption "time-epoch" releaseTimestamp)
++
++    (lib.mesonOption "version-tag" version)
++    (lib.mesonOption "mode" "release")
++    (lib.mesonOption "tty-gid" "3") # tty in NixOS has gid 3
++    (lib.mesonOption "debug-shell" "${bashInteractive}/bin/bash")
++    (lib.mesonOption "pamconfdir" "${placeholder "out"}/etc/pam.d")
++    (lib.mesonOption "shellprofiledir" "${placeholder "out"}/etc/profile.d")
++    (lib.mesonOption "kmod-path" "${kmod}/bin/kmod")
++
++    # Attempts to check /usr/sbin and that fails in macOS sandbox because
++    # permission is denied. If /usr/sbin is not a symlink, it defaults to true.
++    # We set it to false since stdenv moves sbin/* to bin and creates a symlink,
++    # that is, we do not have split bin.
++    (lib.mesonOption "split-bin" "false")
++
++    # D-Bus
++    (lib.mesonOption "dbuspolicydir" "${placeholder "out"}/share/dbus-1/system.d")
++    (lib.mesonOption "dbussessionservicedir" "${placeholder "out"}/share/dbus-1/services")
++    (lib.mesonOption "dbussystemservicedir" "${placeholder "out"}/share/dbus-1/system-services")
++
++    # pkgconfig
++    (lib.mesonOption "pkgconfiglibdir" "${placeholder "dev"}/lib/pkgconfig")
++    (lib.mesonOption "pkgconfigdatadir" "${placeholder "dev"}/share/pkgconfig")
++
++    # Keyboard
++    (lib.mesonOption "loadkeys-path" "${kbd}/bin/loadkeys")
++    (lib.mesonOption "setfont-path" "${kbd}/bin/setfont")
++
++    # SBAT
++    (lib.mesonOption "sbat-distro" "nixos")
++    (lib.mesonOption "sbat-distro-summary" "NixOS")
++    (lib.mesonOption "sbat-distro-url" "https://nixos.org/")
++    (lib.mesonOption "sbat-distro-pkgname" pname)
++    (lib.mesonOption "sbat-distro-version" version)
++
++    # Users
++    (lib.mesonOption "system-uid-max" "999")
++    (lib.mesonOption "system-gid-max" "999")
++
++    # SysVinit
++    (lib.mesonOption "sysvinit-path" "")
++    (lib.mesonOption "sysvrcnd-path" "")
++
++    # Login
++    (lib.mesonOption "sulogin-path" "${util-linux.login}/bin/sulogin")
++    (lib.mesonOption "nologin-path" "${util-linux.login}/bin/nologin")
++
++    # Mount
++    (lib.mesonOption "mount-path" "${lib.getOutput "mount" util-linux}/bin/mount")
++    (lib.mesonOption "umount-path" "${lib.getOutput "mount" util-linux}/bin/umount")
++
++    # SSH
++    (lib.mesonOption "sshconfdir" "")
++    (lib.mesonOption "sshdconfdir" "no")
++
++    # Features
++
++    # Tests
++    (lib.mesonBool "tests" withTests)
++    (lib.mesonEnable "glib" withTests)
++    (lib.mesonEnable "dbus" withTests)
++
++    # Compression
++    (lib.mesonEnable "bzip2" withCompression)
++    (lib.mesonEnable "lz4" withCompression)
++    (lib.mesonEnable "xz" withCompression)
++    (lib.mesonEnable "zstd" withCompression)
++    (lib.mesonEnable "zlib" withCompression)
++
++    # NSS
++    (lib.mesonEnable "nss-mymachines" (withNss && withMachined))
++    (lib.mesonEnable "nss-resolve" withNss)
++    (lib.mesonBool "nss-myhostname" withNss)
++    (lib.mesonBool "nss-systemd" withNss)
++
++    # Cryptsetup
++    (lib.mesonEnable "libcryptsetup" withCryptsetup)
++    (lib.mesonEnable "libcryptsetup-plugins" withCryptsetup)
++    (lib.mesonEnable "p11kit" (withHomed || withCryptsetup))
++
++    # FIDO2
++    (lib.mesonEnable "libfido2" withFido2)
++    (lib.mesonEnable "openssl" withOpenSSL)
++
++    # Password Quality
++    (lib.mesonEnable "pwquality" withPasswordQuality)
++    (lib.mesonEnable "passwdqc" false)
++
++    # Remote
++    (lib.mesonEnable "remote" withRemote)
++    (lib.mesonEnable "microhttpd" withRemote)
++
++    (lib.mesonEnable "pam" withPam)
++    (lib.mesonEnable "acl" withAcl)
++    (lib.mesonEnable "audit" withAudit)
++    (lib.mesonEnable "apparmor" withApparmor)
++    (lib.mesonEnable "gcrypt" withGcrypt)
++    (lib.mesonEnable "importd" withImportd)
++    (lib.mesonEnable "homed" withHomed)
++    (lib.mesonEnable "polkit" withPolkit)
++    (lib.mesonEnable "elfutils" withCoredump)
++    (lib.mesonEnable "libcurl" wantCurl)
++    (lib.mesonEnable "libidn" false)
++    (lib.mesonEnable "libidn2" withLibidn2)
++    (lib.mesonEnable "libiptc" withIptables)
++    (lib.mesonEnable "repart" withRepart)
++    (lib.mesonEnable "sysupdate" withSysupdate)
++    (lib.mesonEnable "seccomp" withLibseccomp)
++    (lib.mesonEnable "selinux" withSelinux)
++    (lib.mesonEnable "tpm2" withTpm2Tss)
++    (lib.mesonEnable "pcre2" withPCRE2)
++    (lib.mesonEnable "bpf-framework" withLibBPF)
++    (lib.mesonEnable "bootloader" withBootloader)
++    (lib.mesonEnable "ukify" withUkify)
++    (lib.mesonEnable "kmod" withKmod)
++    (lib.mesonEnable "qrencode" withQrencode)
++    (lib.mesonEnable "vmspawn" withVmspawn)
++    (lib.mesonEnable "libarchive" withLibarchive)
++    (lib.mesonEnable "xenctrl" false)
++    (lib.mesonEnable "gnutls" false)
++    (lib.mesonEnable "xkbcommon" false)
++    (lib.mesonEnable "man" true)
++
++    (lib.mesonBool "analyze" withAnalyze)
++    (lib.mesonBool "logind" withLogind)
++    (lib.mesonBool "localed" withLocaled)
++    (lib.mesonBool "hostnamed" withHostnamed)
++    (lib.mesonBool "machined" withMachined)
++    (lib.mesonBool "networkd" withNetworkd)
++    (lib.mesonBool "oomd" withOomd)
++    (lib.mesonBool "portabled" withPortabled)
++    (lib.mesonBool "hwdb" withHwdb)
++    (lib.mesonBool "timedated" withTimedated)
++    (lib.mesonBool "timesyncd" withTimesyncd)
++    (lib.mesonBool "userdb" withUserDb)
++    (lib.mesonBool "coredump" withCoredump)
++    (lib.mesonBool "firstboot" withFirstboot)
++    (lib.mesonBool "resolve" withResolved)
++    (lib.mesonBool "sysusers" withSysusers)
++    (lib.mesonBool "efi" withEfi)
++    (lib.mesonBool "utmp" withUtmp)
++    (lib.mesonBool "log-trace" withLogTrace)
++    (lib.mesonBool "kernel-install" withKernelInstall)
++    (lib.mesonBool "quotacheck" false)
++    (lib.mesonBool "ldconfig" false)
++    (lib.mesonBool "install-sysconfdir" false)
++    (lib.mesonBool "create-log-dirs" false)
++    (lib.mesonBool "smack" true)
++    (lib.mesonBool "b_pie" true)
++
++  ]
++  ++ lib.optionals (withShellCompletions == false) [
++    (lib.mesonOption "bashcompletiondir" "no")
++    (lib.mesonOption "zshcompletiondir" "no")
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isMusl [
++    (lib.mesonBool "gshadow" false)
++    (lib.mesonBool "idn" false)
++  ];
++  preConfigure =
++    let
++      # A list of all the runtime binaries referenced by the source code (plus
++      # scripts and unit files) of systemd executables, tests and libraries.
++      # As soon as a dependency is lo longer required we should remove it from
++      # the list.
++      # The `where` attribute for each of the replacement patterns must be
++      # exhaustive. If another (unhandled) case is found in the source code the
++      # build fails with an error message.
++      binaryReplacements = [
++        {
++          search = "/usr/bin/getent";
++          replacement = "${getent}/bin/getent";
++          where = [ "src/nspawn/nspawn-setuid.c" ];
++        }
++        {
++          search = "/sbin/mkswap";
++          replacement = "${lib.getBin util-linux}/sbin/mkswap";
++          where = [
++            "man/systemd-makefs@.service.xml"
++          ];
++        }
++        {
++          search = "/sbin/swapon";
++          replacement = "${lib.getOutput "swap" util-linux}/sbin/swapon";
++          where = [
++            "src/core/swap.c"
++            "src/basic/unit-def.h"
++          ];
++        }
++        {
++          search = "/sbin/swapoff";
++          replacement = "${lib.getOutput "swap" util-linux}/sbin/swapoff";
++          where = [ "src/core/swap.c" ];
++        }
++        {
++          search = "/bin/echo";
++          replacement = "${coreutils}/bin/echo";
++          where = [
++            "man/systemd-analyze.xml"
++            "man/systemd.service.xml"
++            "man/systemd-run.xml"
++            "src/analyze/test-verify.c"
++            "src/test/test-env-file.c"
++            "src/test/test-fileio.c"
++            "src/test/test-load-fragment.c"
++          ];
++        }
++        {
++          search = "/bin/cat";
++          replacement = "${coreutils}/bin/cat";
++          where = [
++            "test/test-execute/exec-noexecpaths-simple.service"
++            "src/journal/cat.c"
++          ];
++        }
++        {
++          search = "/usr/lib/systemd/systemd-fsck";
++          replacement = "$out/lib/systemd/systemd-fsck";
++          where = [ "man/systemd-fsck@.service.xml" ];
++        }
++      ]
++      ++ lib.optionals withImportd [
++        {
++          search = "\"gpg\"";
++          replacement = "\\\"${gnupg}/bin/gpg\\\"";
++          where = [ "src/import/pull-common.c" ];
++        }
++        {
++          search = "\"tar\"";
++          replacement = "\\\"${gnutar}/bin/tar\\\"";
++          where = [
++            "src/import/export-tar.c"
++            "src/import/import-common.c"
++            "src/import/import-tar.c"
++          ];
++          ignore = [
++            # occurrences here refer to the tar sub command
++            "src/sysupdate/sysupdate-resource.c"
++            "src/sysupdate/sysupdate-transfer.c"
++            "src/import/pull.c"
++            "src/import/export.c"
++            "src/import/import.c"
++            "src/import/importd.c"
++            # runs `tar` but also also creates a temporary directory with the string
++            "src/import/pull-tar.c"
++            # tar referenced as file suffix
++            "src/shared/import-util.c"
++          ];
++        }
++      ]
++      ++ lib.optionals withKmod [
++        {
++          search = "/sbin/modprobe";
++          replacement = "${lib.getBin kmod}/sbin/modprobe";
++          where = [ "units/modprobe@.service" ];
++        }
++      ];
++
++      # { replacement, search, where, ignore } -> List[str]
++      mkSubstitute =
++        {
++          replacement,
++          search,
++          where,
++          ignore ? [ ],
++        }:
++        map (path: "substituteInPlace ${path} --replace '${search}' \"${replacement}\"") where;
++      mkEnsureSubstituted =
++        {
++          replacement,
++          search,
++          where,
++          ignore ? [ ],
++        }:
++        let
++          ignore' = lib.concatStringsSep "|" (
++            ignore
++            ++ [
++              "^test"
++              "NEWS"
++            ]
++          );
++        in
++        ''
++          set +e
++          search=$(grep '${search}' -r | grep -v "${replacement}" | grep -Ev "${ignore'}")
++          set -e
++          if [[ -n "$search" ]]; then
++            echo "Not all references to '${search}' have been replaced. Found the following matches:"
++            echo "$search"
++            exit 1
++          fi
++        '';
++    in
++    ''
++      mesonFlagsArray+=(-Dntp-servers="0.nixos.pool.ntp.org 1.nixos.pool.ntp.org 2.nixos.pool.ntp.org 3.nixos.pool.ntp.org")
++      export LC_ALL="en_US.UTF-8";
++
++      ${lib.concatStringsSep "\n" (lib.flatten (map mkSubstitute binaryReplacements))}
++      ${lib.concatMapStringsSep "\n" mkEnsureSubstituted binaryReplacements}
++
++      substituteInPlace src/libsystemd/sd-journal/catalog.c \
++        --replace /usr/lib/systemd/catalog/ $out/lib/systemd/catalog/
++
++      substituteInPlace src/import/pull-tar.c \
++        --replace 'wait_for_terminate_and_check("tar"' 'wait_for_terminate_and_check("${gnutar}/bin/tar"'
++    '';
++
++  # These defines are overridden by CFLAGS and would trigger annoying
++  # warning messages
++  postConfigure = ''
++    substituteInPlace config.h \
++      --replace "POLKIT_AGENT_BINARY_PATH" "_POLKIT_AGENT_BINARY_PATH" \
++      --replace "SYSTEMD_BINARY_PATH" "_SYSTEMD_BINARY_PATH" \
++      --replace "SYSTEMD_CGROUP_AGENTS_PATH" "_SYSTEMD_CGROUP_AGENT_PATH"
++  '';
++
++  env.NIX_CFLAGS_COMPILE = toString (
++    [
++      # Can't say ${polkit.bin}/bin/pkttyagent here because that would
++      # lead to a cyclic dependency.
++      "-UPOLKIT_AGENT_BINARY_PATH"
++      "-DPOLKIT_AGENT_BINARY_PATH=\"/run/current-system/sw/bin/pkttyagent\""
++
++      # Set the release_agent on /sys/fs/cgroup/systemd to the
++      # currently running systemd (/run/current-system/systemd) so
++      # that we don't use an obsolete/garbage-collected release agent.
++      "-USYSTEMD_CGROUP_AGENTS_PATH"
++      "-DSYSTEMD_CGROUP_AGENTS_PATH=\"/run/current-system/systemd/lib/systemd/systemd-cgroups-agent\""
++
++      "-USYSTEMD_BINARY_PATH"
++      "-DSYSTEMD_BINARY_PATH=\"/run/current-system/systemd/lib/systemd/systemd\""
++
++    ]
++    ++ lib.optionals stdenv.hostPlatform.isMusl [
++      "-D__UAPI_DEF_ETHHDR=0"
++    ]
++  );
++
++  doCheck = false; # fails a bunch of tests
++
++  # trigger the test -n "$DESTDIR" || mutate in upstreams build system
++  preInstall = ''
++    export DESTDIR=/
++  '';
++
++  mesonInstallTags = lib.optionals buildLibsOnly [
++    "devel"
++    "libudev"
++    "libsystemd"
++  ];
++
++  postInstall =
++    lib.optionalString (!buildLibsOnly) ''
++      mkdir -p $out/example/systemd
++      mv $out/lib/{binfmt.d,sysctl.d,tmpfiles.d} $out/example
++      mv $out/lib/systemd/{system,user} $out/example/systemd
++
++      rm -rf $out/etc/systemd/system
++
++      # Fix reference to /bin/false in the D-Bus services.
++      for i in $out/share/dbus-1/system-services/*.service; do
++        substituteInPlace $i --replace /bin/false ${coreutils}/bin/false
++      done
++
++      # For compatibility with dependents that use sbin instead of bin.
++      ln -s bin "$out/sbin"
++
++      rm -rf $out/etc/rpm
++    ''
++    + lib.optionalString (!withKernelInstall) ''
++      # "kernel-install" shouldn't be used on NixOS.
++      find $out -name "*kernel-install*" -exec rm {} \;
++    ''
++    + lib.optionalString (!withDocumentation) ''
++      rm -rf $out/share/doc
++    ''
++    + lib.optionalString (withKmod && !buildLibsOnly) ''
++      mv $out/lib/modules-load.d $out/example
++    ''
++    + lib.optionalString withSysusers ''
++      mv $out/lib/sysusers.d $out/example
++    '';
++
++  # Avoid *.EFI binary stripping.
++  # At least on aarch64-linux strip removes too much from PE32+ files:
++  #   https://github.com/NixOS/nixpkgs/issues/169693
++  # The hack is to move EFI file out of lib/ before doStrip run and return it
++  # after doStrip run.
++  preFixup = lib.optionalString withBootloader ''
++    mv $out/lib/systemd/boot/efi $out/dont-strip-me
++  '';
++
++  # Wrap in the correct path for LUKS2 tokens.
++  postFixup =
++    lib.optionalString withCryptsetup ''
++      for f in bin/systemd-cryptsetup bin/systemd-cryptenroll; do
++        # This needs to be in LD_LIBRARY_PATH because rpath on a binary is not propagated to libraries using dlopen, in this case `libcryptsetup.so`
++        wrapProgram $out/$f --prefix LD_LIBRARY_PATH : ${placeholder "out"}/lib/cryptsetup
++      done
++    ''
++    + lib.optionalString withBootloader ''
++      mv $out/dont-strip-me $out/lib/systemd/boot/efi
++    ''
++    + lib.optionalString withUkify ''
++      # To cross compile a derivation that builds a UKI with ukify, we need to wrap
++      # ukify with the correct binutils. When wrapping, no splicing happens so we
++      # have to explicitly pull binutils from targetPackages.
++      wrapProgram $out/bin/ukify --prefix PATH : ${
++        lib.makeBinPath [ targetPackages.stdenv.cc.bintools ]
++      }:${placeholder "out"}/lib/systemd
++    '';
++
++  disallowedReferences =
++    lib.optionals (stdenv.buildPlatform != stdenv.hostPlatform)
++      # 'or p' is for manually specified buildPackages as they dont have __spliced
++      (
++        builtins.filter (p: p != null) (
++          builtins.map (p: p.__spliced.buildHost or p) finalAttrs.nativeBuildInputs
++        )
++      );
++
++  passthru = {
++    # The `interfaceVersion` attribute below points out the incompatibilities
++    # between systemd versions. When the new systemd build is
++    # backwards-compatible with the previous one, then they can be switched at
++    # runtime (the reboot being optional in this case); otherwise, a reboot is
++    # needed - and therefore `interfaceVersion` should be incremented.
++    interfaceVersion = 2;
++
++    inherit
++      withBootloader
++      withCryptsetup
++      withEfi
++      withFido2
++      withHostnamed
++      withImportd
++      withKmod
++      withLocaled
++      withMachined
++      withNetworkd
++      withPortabled
++      withTimedated
++      withTpm2Tss
++      withUtmp
++      util-linux
++      kmod
++      kbd
++      ;
++
++    # Many TPM2-related units are only installed if this trio of features are
++    # enabled. See https://github.com/systemd/systemd/blob/876ee10e0eb4bbb0920bdab7817a9f06cc34910f/units/meson.build#L521
++    withTpm2Units = withTpm2Tss && withBootloader && withOpenSSL;
++
++    tests =
++      let
++        # Some entries in the `nixosTests.systemd-*` set of attributes are collections of tests,
++        # not individual tests themselves. Let's gather them into one set.
++        gatherNixosTestsFromCollection =
++          prefix: collection:
++          lib.mapAttrs' (name: value: {
++            name = "${prefix}-${name}";
++            inherit value;
++          }) collection;
++
++        # Here's all the nixosTests that are collections of tests, rather than individual tests.
++        collectedNixosTests = lib.mergeAttrsList (
++          lib.mapAttrsToList gatherNixosTestsFromCollection {
++            inherit (nixosTests)
++              systemd-binfmt
++              systemd-boot
++              systemd-initrd-networkd
++              systemd-repart
++              installer-systemd-stage-1
++              ;
++          }
++        );
++
++        # ... and here's all the individual tests.
++        individualNixosTests = {
++          inherit (nixosTests)
++            fsck-systemd-stage-1
++            hibernate-systemd-stage-1
++            switchTest
++            systemd
++            systemd-analyze
++            systemd-bpf
++            systemd-confinement
++            systemd-coredump
++            systemd-cryptenroll
++            systemd-credentials-tpm2
++            systemd-escaping
++            systemd-initrd-btrfs-raid
++            systemd-initrd-luks-fido2
++            systemd-initrd-luks-keyfile
++            systemd-initrd-luks-empty-passphrase
++            systemd-initrd-luks-password
++            systemd-initrd-luks-tpm2
++            systemd-initrd-luks-unl0kr
++            systemd-initrd-modprobe
++            systemd-initrd-shutdown
++            systemd-initrd-simple
++            systemd-initrd-swraid
++            systemd-initrd-vconsole
++            systemd-initrd-networkd-ssh
++            systemd-initrd-networkd-openvpn
++            systemd-initrd-vlan
++            systemd-journal
++            systemd-journal-gateway
++            systemd-journal-upload
++            systemd-lock-handler
++            systemd-machinectl
++            systemd-networkd
++            systemd-networkd-bridge
++            systemd-networkd-dhcpserver
++            systemd-networkd-dhcpserver-static-leases
++            systemd-networkd-ipv6-prefix-delegation
++            systemd-networkd-vrf
++            systemd-no-tainted
++            systemd-nspawn
++            systemd-nspawn-configfile
++            systemd-oomd
++            systemd-portabled
++            systemd-resolved
++            systemd-shutdown
++            systemd-sysupdate
++            systemd-sysusers-mutable
++            systemd-sysusers-immutable
++            systemd-sysusers-password-option-override-ordering
++            systemd-timesyncd
++            systemd-timesyncd-nscd-dnssec
++            systemd-user-linger
++            systemd-user-tmpfiles-rules
++            systemd-misc
++            systemd-userdbd
++            systemd-homed
++            ;
++        };
++
++        # Finally, make an attrset we're fairly sure is just tests.
++        relevantNixosTests = lib.mapAttrs (
++          name: value:
++          assert lib.assertMsg (lib.isDerivation value) "${name} is not a derivation";
++          value
++        ) (individualNixosTests // collectedNixosTests);
++      in
++      relevantNixosTests
++      // {
++        cross =
++          let
++            systemString = if stdenv.buildPlatform.isAarch64 then "gnu64" else "aarch64-multiplatform";
++          in
++          pkgsCross.${systemString}.systemd;
++
++        pkg-config = testers.testMetaPkgConfig finalAttrs.finalPackage;
++      };
++  };
++
++  meta = {
++    homepage = "https://www.freedesktop.org/wiki/Software/systemd/";
++    description = "System and service manager for Linux";
++    longDescription = ''
++      systemd is a suite of basic building blocks for a Linux system. It
++      provides a system and service manager that runs as PID 1 and starts the
++      rest of the system. systemd provides aggressive parallelization
++      capabilities, uses socket and D-Bus activation for starting services,
++      offers on-demand starting of daemons, keeps track of processes using Linux
++      control groups, maintains mount and automount points, and implements an
++      elaborate transactional dependency-based service control logic. systemd
++      supports SysV and LSB init scripts and works as a replacement for
++      sysvinit. Other parts include a logging daemon, utilities to control basic
++      system configuration like the hostname, date, locale, maintain a list of
++      logged-in users and running containers and virtual machines, system
++      accounts, runtime directories and settings, and daemons to manage simple
++      network configuration, network time synchronization, log forwarding, and
++      name resolution.
++    '';
++    license = with lib.licenses; [
++      # Taken from https://raw.githubusercontent.com/systemd/systemd-stable/${finalAttrs.src.rev}/LICENSES/README.md
++      bsd2
++      bsd3
++      cc0
++      lgpl21Plus
++      lgpl2Plus
++      mit
++      mit0
++      ofl
++      publicDomain
++    ];
++    maintainers = with lib.maintainers; [
++      flokli
++      kloenk
++    ];
++    pkgConfigModules = [
++      "libsystemd"
++      "libudev"
++      "systemd"
++      "udev"
++    ];
++    # See src/basic/missing_syscall_def.h
++    platforms =
++      with lib.platforms;
++      lib.intersectLists linux (aarch ++ x86 ++ loongarch64 ++ m68k ++ mips ++ power ++ riscv ++ s390);
++    priority = 10;
++    badPlatforms = [
++      # https://github.com/systemd/systemd/issues/20600#issuecomment-912338965
++      lib.systems.inspect.platformPatterns.isStatic
++    ];
++  };
++})
