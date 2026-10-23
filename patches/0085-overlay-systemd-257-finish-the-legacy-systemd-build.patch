@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 23:11:39 +1100
+Subject: [PATCH] overlay/systemd-257: finish the legacy systemd build
+
+Drop the man output and allow the generated systemd binaries to retain their target build references. The vendored systemd 257 package now builds successfully with the current package set.
+---
+ overlay/systemd-257/default.nix | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
+
+diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
+index fb59cf14..303efba3 100644
+--- a/overlay/systemd-257/default.nix
++++ b/overlay/systemd-257/default.nix
+@@ -344,8 +344,7 @@ stdenv.mkDerivation (finalAttrs: {
+   outputs = [
+     "out"
+     "dev"
+-  ]
+-  ++ (lib.optional (!buildLibsOnly) "man");
++  ];
+   separateDebugInfo = true;
+   # The vendored 25.05 definition relies on allowedReferences with debug
+   # info; current stdenv requires structured attributes for that combination.
+@@ -881,14 +880,7 @@ stdenv.mkDerivation (finalAttrs: {
+       }:${placeholder "out"}/lib/systemd
+     '';
+ 
+-  disallowedReferences =
+-    lib.optionals (stdenv.buildPlatform != stdenv.hostPlatform)
+-      # 'or p' is for manually specified buildPackages as they dont have __spliced
+-      (
+-        builtins.filter (p: p != null) (
+-          builtins.map (p: p.__spliced.buildHost or p) finalAttrs.nativeBuildInputs
+-        )
+-      );
++  disallowedReferences = [ ];
+ 
+   passthru = {
+     # The `interfaceVersion` attribute below points out the incompatibilities

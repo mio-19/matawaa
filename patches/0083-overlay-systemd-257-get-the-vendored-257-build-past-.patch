@@ -1,0 +1,88 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 22:24:48 +1100
+Subject: [PATCH] overlay/systemd-257: get the vendored 257 build past current
+ NixOS
+
+Drop the 262-only OE STATX patch, remove makeBinaryWrapper from nativeBuildInputs after disabling the cryptsetup/ukify/homed/repart postFixup users, and revert the 257-incompatible systemd-search-path hunk so the NixOS 26.11 module patch can reapply cleanly. The GCC libgomp patch remains in the targeted stdenv.
+---
+ overlay/cross-compile.nix                     | 11 +++++++++-
+ overlay/systemd-257/default.nix               |  7 ++++---
+ .../systemd-search-path-revert.patch          | 21 +++++++++++++++++++
+ 3 files changed, 35 insertions(+), 4 deletions(-)
+ create mode 100644 overlay/systemd-257/systemd-search-path-revert.patch
+
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index c70ace44..b83b47f0 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -76,7 +76,16 @@ else
+         ./systemd-257
+         { stdenv = systemdStdenv; }
+       ).override (
+-        super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
++        {
++          # hoki has no encrypted root or EFI UKI; dropping these removes the
++          # only postFixup users of makeBinaryWrapper, whose helper hook pulls
++          # in the GCC build that currently fails on armv7.
++          withCryptsetup = false;
++          withUkify = false;
++          withHomed = false;
++          withRepart = false;
++        }
++        // super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
+           withLibBPF = false;
+         }
+       );
+diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
+index 60d79db9..03519861 100644
+--- a/overlay/systemd-257/default.nix
++++ b/overlay/systemd-257/default.nix
+@@ -263,8 +263,10 @@ stdenv.mkDerivation (finalAttrs: {
+     ./0018-meson-Don-t-link-ssh-dropins.patch
+ 
+     ./0019-install-unit_file_exists_full-follow-symlinks.patch
+-    # OpenEmbedded's fdinfo-based STATX_MNT_ID fallback for kernels < 5.8.
+-    ./oe-Handle-missing-STATX_MNT_ID-on-older-kernels.patch
++    # NixOS 26.11 appends its own systemd-search-path.patch to systemd.package;
++    # systemd 257 already contains that change, so undo it first and let the
++    # NixOS patch re-apply cleanly.
++    ./systemd-search-path-revert.patch
+   ]
+   ++ lib.optionals (stdenv.hostPlatform.isLinux && stdenv.hostPlatform.isGnu) [
+     ./0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
+@@ -363,7 +365,6 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   nativeBuildInputs = [
+     pkg-config
+-    makeBinaryWrapper
+     gperf
+     ninja
+     meson
+diff --git a/overlay/systemd-257/systemd-search-path-revert.patch b/overlay/systemd-257/systemd-search-path-revert.patch
+new file mode 100644
+index 00000000..710ad7e8
+--- /dev/null
++++ b/overlay/systemd-257/systemd-search-path-revert.patch
+@@ -0,0 +1,21 @@
++diff --git a/src/basic/constants.h b/src/basic/constants.h
++--- a/src/basic/constants.h
+++++ b/src/basic/constants.h
++@@ -40,15 +40,13 @@
++         "/etc/" n "\0"                          \
++         "/run/" n "\0"                          \
++         "/usr/local/lib/" n "\0"                \
++-        "/usr/lib/" n "\0"                      \
++-        PREFIX "/lib/" n "\0"
+++        "/usr/lib/" n "\0"
++ 
++ #define CONF_PATHS(n)                           \
++         "/etc/" n,                              \
++         "/run/" n,                              \
++         "/usr/local/lib/" n,                    \
++-        "/usr/lib/" n,                          \
++-        PREFIX "/lib/" n
+++        "/usr/lib/" n
++ 
++ #define CONF_PATHS_STRV(n)                      \
++         STRV_MAKE(CONF_PATHS(n))
