@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 20:40:54 +1100
+Subject: [PATCH] examples/asteroid: disable polkit private namespaces on 4.14
+
+polkitd exits with status=226/NAMESPACE because the vendor kernel has no /dev/mqueue or /dev/hugepages for the private-device namespace. Disable PrivateDevices and PrivateTmp for polkit so it can start and authorize loginctl SetUserLinger.
+---
+ examples/asteroid/asteroid-desktop.nix | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 9036a0a4..082ca472 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -203,6 +203,13 @@ in
+     systemd.services.polkit = {
+       wantedBy = lib.mkForce [ "multi-user.target" ];
+       before = [ "linger-users.service" ];
++      # The 4.14 vendor kernel has no /dev/mqueue or /dev/hugepages; systemd's
++      # private-device namespace setup exits 226/NAMESPACE. polkit does not
++      # need either, so disable the two private namespaces for this service.
++      serviceConfig = {
++        PrivateDevices = lib.mkForce false;
++        PrivateTmp = lib.mkForce false;
++      };
+     };
+ 
+     # Upstream AsteroidOS allows the ceres user to reboot and power off.
