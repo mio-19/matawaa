@@ -5,17 +5,31 @@ Subject: [PATCH] boot: do not let nscd hold nss-user-lookup
 
 nsncd's generated nscd.service is Type=notify but the daemon never sends READY. nss-user-lookup.target therefore stays incomplete, holding systemd-user-sessions.service and multi-user.target. Mark nscd as a simple service so name-service caching starts without blocking the user session.
 ---
- devices/families/asteroidos.nix | 6 ++++++
- 1 file changed, 6 insertions(+)
+ devices/families/asteroidos.nix | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index b4d0f237..672acff1 100644
+index b4d0f237..a1c798ff 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
-@@ -75,6 +75,12 @@ in
+@@ -75,6 +75,26 @@ in
      nixos.enable = mkDefault false;
    };
  
++  # Drop-in because overriding systemd-user-sessions' After= through
++  # systemd.services did not change the system closure. This unit only manages
++  # /run/nologin; it must not be ordered after the unresolved nss lookup target.
++  environment.etc."systemd/system/systemd-user-sessions.service.d/10-no-nss.conf".text = ''
++    [Unit]
++    After=
++  '';
++
++  # systemd-user-sessions only manages /run/nologin, but its upstream unit is
++  # ordered after nss-user-lookup.target. On this vendor kernel that ordering
++  # still holds multi-user.target even though nscd is running. Start the
++  # user-sessions gate without waiting on name-service lookup.
++  systemd.services.systemd-user-sessions.after = lib.mkForce [ ];
++
 +  # nsncd's generated nscd.service is Type=notify but the daemon does not send
 +  # READY. nss-user-lookup.target then never completes, which holds
 +  # systemd-user-sessions.service and therefore multi-user.target. Treat it as

@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 19:10:00 +1100
+Subject: [PATCH] devices/fossil-hoki: do not hold multi-user for wlan firmware
+
+WCNSS firmware loading can stall waiting for the modem, and wlan-firmware-hoki was a oneshot, so multi-user.target waited behind it. Keep it as a Type=simple setup service so WiFi initialization runs without blocking the user session.
+---
+ devices/fossil-hoki/default.nix        |  4 ++--
+ examples/asteroid/asteroid-desktop.nix | 16 ++++++++++++----
+ 2 files changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 414535bb..9d17da00 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -295,8 +295,8 @@
+       coreutils
+     ];
+     serviceConfig = {
+-      Type = "oneshot";
+-      RemainAfterExit = true;
++      # Firmware loading can stall waiting for WCNSS; do not hold multi-user.
++      Type = "simple";
+       ExecStart = "${pkgs.writeShellScript "wlan-firmware-hoki" (
+         builtins.readFile ./wlan-firmware-hoki.sh
+       )}";
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 5321cee2..1b32a327 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -96,7 +96,6 @@ in
+ 
+     systemd.tmpfiles.rules = [
+       "d /var/lib/kiwix 0775 ceres users -"
+-      "f /var/lib/systemd/linger/ceres 0644 root root -"
+     ];
+ 
+     # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
+@@ -121,9 +120,9 @@ in
+       enable = false;
+     };
+ 
+-    # Start the ceres user manager through logind's linger file instead of
+-    # relying on loginctl, which fails with EINVAL on this old kernel.
+-    systemd.services.linger-users.enable = false;
++    # users.users.ceres.linger generates NixOS's linger-users.service, which
++    # calls loginctl enable-linger after logind starts. Let the normal systemd
++    # linger mechanism own the marker; do not pre-seed it or override the unit.
+ 
+     # Smartwatch stem/power button should be handled by compositor/shell, not
+     # logind shutdown; match AsteroidOS systemd-conf powerkey.conf.
+@@ -160,6 +159,11 @@ in
+         QT_VIRTUALKEYBOARD_STYLE = "watch";
+         QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+         RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
++        # The launcher is the compositor: use the hwcomposer QPA, not xcb.
++        EGL_PLATFORM = "hwcomposer";
++        QT_QPA_PLATFORM = "hwcomposer";
++        QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
++        QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
+       }
+       // config.environment.variables;
+       serviceConfig = {
+@@ -196,6 +200,10 @@ in
+     # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-apps/files/30-org.freedesktop.login1.rules
+     security.polkit.extraConfig = ''
+       polkit.addRule(function(action, subject) {
++        if (action.id == "org.freedesktop.login1.set-user-linger" &&
++            (subject.user == "root" || subject.user == "ceres")) {
++          return polkit.Result.YES;
++        }
+         if ((action.id == "org.freedesktop.login1.set-reboot-parameter" ||
+              action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
+              action.id == "org.freedesktop.login1.reboot-multiple-sessions") &&
