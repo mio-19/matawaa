@@ -33,13 +33,16 @@ The Fossil Gen 6 utilizes Qualcomm A/B partition architecture on its internal eM
 | Partition / Partlabel | Mount Point | Filesystem | Mount Flags | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | `boot_a` / `boot_b` | — | Android Boot v0 | — | Linux 4.14 kernel with appended `sda429-hoki.dtb` + mobile-nixos stage-1 initrd |
-| `userdata` | `/` | ext4 | rw | Target for `system.img` (`LABEL=NIXOS_SYSTEM`). Automatically resized on first boot. |
+| `userdata` | `/` | btrfs | rw, compress=zstd, noatime, space_cache=v2 | Target for `system.img` (`LABEL=NIXOS_SYSTEM`). Automatically resized on first boot. |
 | `persist` | `/persist` | ext4 | nofail | Optical sensor calibration, board serials, and battery fuel-gauge profiles |
 | `modem` | `/vendor/firmware_mnt` | vfat | ro, nofail | Qualcomm Hexagon DSP firmware and Wi-Fi/GNSS binaries |
 | `bluetooth` | `/vendor/bt_firmware` | vfat | ro, nofail | Broadcom / Qualcomm Bluetooth controller firmware |
 
 > [!IMPORTANT]
 > The `/persist`, `/vendor/firmware_mnt`, and `/vendor/bt_firmware` mounts use `nofail` so that unformatted partitions or read-only stages do not block booting into emergency shell.
+
+> [!NOTE]
+> Linux 4.14 btrfs supports `compress=zstd` (without a level), `noatime`, and `space_cache=v2`. It rejects `compress=zstd:3`, `compress=zstd3`, and the older `space_cache` v1 option. The image builder disables `block-group-tree` for this kernel.
 
 ---
 
