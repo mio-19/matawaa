@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 22:08:08 +1100
+Subject: [PATCH] overlay/cross-compile: drop invalid makeBinaryWrapper
+ override
+
+makeBinaryWrapper is a binary package, not a stdenv-parameterized derivation; overriding it with stdenv was invalid. Keep the targeted GCC stdenv patch, but leave makeBinaryWrapper alone. The systemd 257 legacy build remains blocked by the GCC 16.2.0 libgomp failure.
+---
+ overlay/cross-compile.nix | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index 53820322..c70ace44 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -85,10 +85,6 @@ else
+     inherit systemd257;
+     systemd_latest-oldkernel = systemd262OldKernel;
+ 
+-    makeBinaryWrapper = super.makeBinaryWrapper.override {
+-      stdenv = systemdStdenv;
+-    };
+-
+     # ModemManager's generated GDBus sources race with the static archive link
+     # when building in parallel; serialize its build.
+     modemmanager = super.modemmanager.overrideAttrs (old: {
