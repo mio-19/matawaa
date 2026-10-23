@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 17:25:15 +1100
+Subject: [PATCH] boot: keep dhcpcd non-blocking
+
+Keep DHCP enabled, but make dhcpcd fork to background instead of waiting for an address. A watch may have no DHCP-capable link at stage-2 startup; waiting otherwise holds multi-user.target and prevents the user session and launcher from starting.
+---
+ devices/families/asteroidos.nix | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 39d66a6f..b4d0f237 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -75,12 +75,11 @@ in
+     nixos.enable = mkDefault false;
+   };
+ 
+-  # The watch has no DHCP-capable interface at stage-2 boot. dhcpcd reports
+-  # "no valid interfaces found" and stays activating, holding
+-  # multi-user.target and preventing the user session and launcher from
+-  # starting. NetworkManager/static configurations manage their own links.
+-  networking.useDHCP = lib.mkDefault false;
+-  systemd.services.dhcpcd.enable = lib.mkDefault false;
++  # Keep DHCP available but do not let it hold boot. There is no guaranteed
++  # DHCP-capable interface at stage-2 startup, and dhcpcd otherwise waits for
++  # an address, holding multi-user.target. Forking to background lets the user
++  # session and launcher start while dhcpcd continues to watch for links.
++  networking.dhcpcd.wait = lib.mkDefault "background";
+ 
+   # Disable heavy desktop/server utilities and editors not used on smartwatches
+   programs.nano.enable = mkDefault false;
