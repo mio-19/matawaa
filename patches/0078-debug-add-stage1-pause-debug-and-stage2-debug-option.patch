@@ -20,7 +20,7 @@ Signed-off-by: Mio <mio@mio19.uk>
  5 files changed, 202 insertions(+), 15 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
-index a9c15aab..2df2458f 100644
+index 8f5c877d..27b46ce2 100644
 --- a/boot/init/tasks/switch_root.rb
 +++ b/boot/init/tasks/switch_root.rb
 @@ -383,6 +383,23 @@ class Tasks::SwitchRoot < SingletonTask
@@ -47,7 +47,7 @@ index a9c15aab..2df2458f 100644
    def run()
      init = File.join(selected_generation.path, "init")
  
-@@ -415,6 +432,8 @@ class Tasks::SwitchRoot < SingletonTask
+@@ -409,6 +426,8 @@ class Tasks::SwitchRoot < SingletonTask
      log("***")
      log("")
  

@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 19:34:05 +1100
+Subject: [PATCH] examples/asteroid: use a real linger unit for ceres
+
+Replace the stage-1 hard-coded touch with a systemd linger-ceres unit ordered before systemd-logind. The unit creates /var/lib/systemd/linger/ceres at sysinit, so logind starts user@1000 normally and the stage-1 task stays generic.
+---
+ boot/init/tasks/switch_root.rb         |  6 ------
+ examples/asteroid/asteroid-desktop.nix | 19 +++++++++++++++++--
+ 2 files changed, 17 insertions(+), 8 deletions(-)
+
+diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
+index a9c15aab..8f5c877d 100644
+--- a/boot/init/tasks/switch_root.rb
++++ b/boot/init/tasks/switch_root.rb
+@@ -394,12 +394,6 @@ class Tasks::SwitchRoot < SingletonTask
+     System.run("ln", "-sfn", "/run", File.join(system_var, "run"))
+     System.run("ln", "-sfn", "/run/lock", File.join(system_var, "lock"))
+ 
+-    # logind only starts the linger user manager when this marker exists.
+-    # Create it before switch_root so it is visible during early boot.
+-    linger_dir = File.join(SYSTEM_MOUNT_POINT, "var/lib/systemd/linger")
+-    System.run("mkdir", "-p", linger_dir)
+-    System.run("touch", File.join(linger_dir, "ceres"))
+-
+     # This is the traditional way we printed the init path.
+     # This is still helpful to take vertical real estate when visually looking
+     # through the log.
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 841500d3..bbca20e6 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -122,8 +122,23 @@ in
+       enable = false;
+     };
+ 
+-    # Start the ceres user manager through logind's linger file instead of
+-    # relying on loginctl, which fails with EINVAL on this old kernel.
++    # Start the ceres user manager through a systemd unit that writes the
++    # logind linger marker before logind starts. This avoids the stage-1
++    # hard-coded touch and the loginctl EnableLinger EINVAL on this kernel.
++    systemd.services.linger-ceres = {
++      description = "Create the logind linger marker for ceres";
++      wantedBy = [ "sysinit.target" ];
++      before = [ "systemd-logind.service" "multi-user.target" ];
++      after = [ "systemd-tmpfiles-setup.service" ];
++      serviceConfig = {
++        Type = "oneshot";
++        RemainAfterExit = true;
++        ExecStart = "${pkgs.writeShellScript "linger-ceres" ''
++          ${pkgs.coreutils}/bin/mkdir -p /var/lib/systemd/linger
++          ${pkgs.coreutils}/bin/touch /var/lib/systemd/linger/ceres
++        ''}";
++      };
++    };
+     systemd.services.linger-users.enable = false;
+ 
+     # Smartwatch stem/power button should be handled by compositor/shell, not
