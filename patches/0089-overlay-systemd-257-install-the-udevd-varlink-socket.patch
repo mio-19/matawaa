@@ -1,0 +1,60 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 24 Oct 2026 08:05:42 +1100
+Subject: [PATCH] overlay/systemd-257: install the udevd varlink socket for
+ NixOS 26.11
+
+NixOS 26.11 enables systemd-udevd-varlink.socket even with the legacy 257 profile. The 257 package lacks that unit, so system-units fails. Install the 262 unit file into the package's example unit directory.
+---
+ overlay/systemd-257/default.nix               |  4 +++
+ .../systemd-257/systemd-udevd-varlink.socket  | 26 +++++++++++++++++++
+ 2 files changed, 30 insertions(+)
+ create mode 100644 overlay/systemd-257/systemd-udevd-varlink.socket
+
+diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
+index ade399df..0a9e4194 100644
+--- a/overlay/systemd-257/default.nix
++++ b/overlay/systemd-257/default.nix
+@@ -825,6 +825,10 @@ stdenv.mkDerivation (finalAttrs: {
+       mv $out/lib/{binfmt.d,sysctl.d,tmpfiles.d} $out/example
+       mv $out/lib/systemd/{system,user} $out/example/systemd
+ 
++      # NixOS 26.11 enables systemd-udevd-varlink.socket even on the legacy
++      # systemd 257 profile; install the unit so system-units can resolve it.
++      install -Dm644 ${./systemd-udevd-varlink.socket} $out/example/systemd/system/systemd-udevd-varlink.socket
++
+       rm -rf $out/etc/systemd/system
+ 
+       # Fix reference to /bin/false in the D-Bus services.
+diff --git a/overlay/systemd-257/systemd-udevd-varlink.socket b/overlay/systemd-257/systemd-udevd-varlink.socket
+new file mode 100644
+index 00000000..e2cc9594
+--- /dev/null
++++ b/overlay/systemd-257/systemd-udevd-varlink.socket
+@@ -0,0 +1,26 @@
++#  SPDX-License-Identifier: LGPL-2.1-or-later
++#
++#  This file is part of systemd.
++#
++#  systemd is free software; you can redistribute it and/or modify it
++#  under the terms of the GNU Lesser General Public License as published by
++#  the Free Software Foundation; either version 2.1 of the License, or
++#  (at your option) any later version.
++
++[Unit]
++Description=udev Varlink Socket
++Documentation=man:systemd-udevd-varlink.socket(8) man:udev(7)
++DefaultDependencies=no
++Before=sockets.target
++ConditionPathIsReadWrite=/sys
++
++[Socket]
++Service=systemd-udevd.service
++ListenStream=/run/udev/io.systemd.Udev
++Symlinks=/run/varlink/registry/io.systemd.Udev /run/udev/control
++FileDescriptorName=varlink
++SocketMode=0644
++RemoveOnStop=yes
++DeferTrigger=yes
++XAttrEntryPoint=user.varlink=entrypoint
++XAttrListen=user.varlink=listen

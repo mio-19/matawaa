@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 24 Oct 2026 08:14:58 +1100
+Subject: [PATCH] overlay/systemd-257: merge the current systemd unit set into
+ 257
+
+NixOS 26.11 system-units expects 262 units such as systemd-udevd-varlink.socket and systemd-ask-password@.service. Install the current systemd unit directory into the legacy 257 package.
+---
+ overlay/systemd-257/default.nix | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
+index 0a9e4194..aa678358 100644
+--- a/overlay/systemd-257/default.nix
++++ b/overlay/systemd-257/default.nix
+@@ -8,6 +8,7 @@
+   fetchzip,
+   buildPackages,
+   makeBinaryWrapper,
++  systemd,
+   ninja,
+   meson,
+   m4,
+@@ -825,6 +826,11 @@ stdenv.mkDerivation (finalAttrs: {
+       mv $out/lib/{binfmt.d,sysctl.d,tmpfiles.d} $out/example
+       mv $out/lib/systemd/{system,user} $out/example/systemd
+ 
++      # NixOS 26.11 expects systemd 262 unit files such as
++      # systemd-udevd-varlink.socket and systemd-ask-password@.service.
++      # Merge the current unit set into the legacy 257 package.
++      cp -a ${systemd}/example/systemd/system/. $out/example/systemd/system/
++
+       # NixOS 26.11 enables systemd-udevd-varlink.socket even on the legacy
+       # systemd 257 profile; install the unit so system-units can resolve it.
+       install -Dm644 ${./systemd-udevd-varlink.socket} $out/example/systemd/system/systemd-udevd-varlink.socket

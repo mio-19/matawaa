@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 24 Oct 2026 08:46:37 +1100
+Subject: [PATCH] overlay/systemd-257: drop the duplicate writable-unit install
+
+The current unit directory is copied wholesale; the separate install tried to overwrite a read-only copied unit and failed.
+---
+ overlay/systemd-257/default.nix | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
+index aa678358..39e74bdb 100644
+--- a/overlay/systemd-257/default.nix
++++ b/overlay/systemd-257/default.nix
+@@ -831,10 +831,6 @@ stdenv.mkDerivation (finalAttrs: {
+       # Merge the current unit set into the legacy 257 package.
+       cp -a ${systemd}/example/systemd/system/. $out/example/systemd/system/
+ 
+-      # NixOS 26.11 enables systemd-udevd-varlink.socket even on the legacy
+-      # systemd 257 profile; install the unit so system-units can resolve it.
+-      install -Dm644 ${./systemd-udevd-varlink.socket} $out/example/systemd/system/systemd-udevd-varlink.socket
+-
+       rm -rf $out/etc/systemd/system
+ 
+       # Fix reference to /bin/false in the D-Bus services.
