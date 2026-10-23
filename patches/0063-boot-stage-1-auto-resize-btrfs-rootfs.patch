@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 23 Oct 2026 16:31:38 +1100
+Subject: [PATCH] boot/stage-1: auto-resize btrfs rootfs
+
+Teach the stage-1 AutoResize task to handle btrfs. The root filesystem is not mounted yet when this task runs, so mount the btrfs device temporarily, run btrfs filesystem resize max, and unmount it before the real root mount. This gives btrfs the same first-boot growth behavior as ext4.
+---
+ boot/init/tasks/auto_resize.rb | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/boot/init/tasks/auto_resize.rb b/boot/init/tasks/auto_resize.rb
+index 3e7e33e5..8a1677e0 100644
+--- a/boot/init/tasks/auto_resize.rb
++++ b/boot/init/tasks/auto_resize.rb
+@@ -49,6 +49,26 @@ class Tasks::AutoResize < Task
+     filesystem_size < (partition_size - fudge)
+   end
+ 
++  def resize_btrfs()
++    mountpoint = "/run/auto-resize-btrfs"
++
++    System.run("mkdir", "-p", mountpoint)
++    begin
++      # btrfs can only resize a mounted filesystem. The rootfs is not mounted
++      # yet at this point, so mount it temporarily and grow it to the
++      # partition size before the real root mount.
++      System.run("mount", "-n", "-t", "btrfs", "-o", "rw", @device, mountpoint)
++      Progress.exec_with_message("Resizing #{@device}...") do
++        System.run_long_running("btrfs", "filesystem", "resize", "max", mountpoint)
++      end
++    rescue System::CommandError => e
++      $logger.warn("Could not auto-resize btrfs #{@device}: #{e.message}")
++    ensure
++      System.run("umount", mountpoint) rescue nil
++      System.run("rmdir", mountpoint) rescue nil
++    end
++  end
++
+   def run()
+     if @type.match(/^ext[234]$/)
+       if needs_resize?
+@@ -73,6 +93,8 @@ class Tasks::AutoResize < Task
+       else
+         log("No need to resize #{@device}...")
+       end
++    elsif @type == "btrfs"
++      resize_btrfs()
+     else
+       $logger.warn("Cannot resize #{@type}... filesystem left untouched.")
+     end
