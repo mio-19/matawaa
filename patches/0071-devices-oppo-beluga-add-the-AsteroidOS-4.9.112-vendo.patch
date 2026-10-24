@@ -2,18 +2,38 @@ From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Sat, 24 Oct 2026 13:37:18 +1100
 Subject: [PATCH] devices/oppo-beluga: add the AsteroidOS 4.9.112 vendor kernel
+ and image
 
-Import the beluga kernel from AsteroidOS meta-smartwatch at 085844a: source rev c9e8c2ec, the 17 upstream fix patches, the beluga defconfig, and the GCC 8 kernel builder. Match the img_info boot layout (2 KiB pages, kernel 0x8000, ramdisk 0x02000000, tags 0x01e00000) and the ttyHSL0 command line. The kernel appends its DTB via CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE, so no separate dtbs_install target is used.
+Add the OPPO Watch (beluga) port with the AsteroidOS 4.9.112 msm8909w
+vendor kernel, its 17 upstream kernel patches, the extracted defconfig,
+the correct qualcomm-msm8909w SoC metadata and the Android fastboot
+layout. Keep the device best-effort until it has been boot-tested.
+
+Signed-off-by: Mio <mio@mio19.uk>
 ---
- devices/oppo-beluga/default.nix        | 20 +++---
+ devices/oppo-beluga/default.nix        | 24 ++++---
  devices/oppo-beluga/kernel/default.nix | 87 ++++++++++++++++++++++++++
- 2 files changed, 100 insertions(+), 7 deletions(-)
+ 2 files changed, 102 insertions(+), 9 deletions(-)
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
-index c2cef490..e021f594 100644
+index c2cef490..deb217e2 100644
 --- a/devices/oppo-beluga/default.nix
 +++ b/devices/oppo-beluga/default.nix
+@@ -16,11 +16,11 @@
+     manufacturer = "OPPO";
+   };
+ 
+-  mobile.device.supportLevel = "supported";
++  mobile.device.supportLevel = "best-effort";
+ 
+   mobile.hardware = {
+     # Qualcomm Snapdragon Wear 3100
+-    soc = "qualcomm-sda429w";
++    soc = "qualcomm-msm8909w";
+     ram = 1024 * 1;
+     screen = {
+       width = 402;
 @@ -34,24 +34,30 @@
      };
    };
