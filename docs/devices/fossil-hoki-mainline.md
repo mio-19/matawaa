@@ -2,12 +2,14 @@
 
 **Status: DRAFT. Expected not to boot.**
 
-This target is a skeleton for an all-AArch64 hoki port:
+This target is a skeleton for an hoki mainline port:
 
 - kernel: Linux 6.18 LTS mainline (`linuxPackages_6_18.kernel`)
-- userspace and stage 1: `aarch64-linux`
+- userspace and stage 1: `armv7l-linux`
 - hardware description: reuses the existing `fossil-hoki` device definition
 - no vendor 4.14 kernel, vendor patches, or vendor boot DTB
+- the standalone vendor `sda429-hoki.dts` is added to the mainline qcom DTS
+  directory and appended to the boot image as `dtbs/sda429-hoki.dtb`
 
 Mainline hoki support is not complete. Display, touch, modem, WLAN, audio, and
 other vendor peripherals still need mainline drivers or DT bindings, so this
@@ -20,5 +22,5 @@ Build (the command resolves the draft device by directory name):
 nix-build examples/asteroid --argstr device fossil-hoki-mainline -A outputs.default
 ```
 
-The generated image is not expected to reach the launcher until the mainline
-device tree and peripheral drivers are ported.
+The generated image now builds with the vendor DTB, but it is not expected to
+reach the launcher until the mainline peripheral drivers are ported.
