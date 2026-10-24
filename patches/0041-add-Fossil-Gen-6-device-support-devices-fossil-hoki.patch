@@ -18,7 +18,7 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/android-init.nix      |  77 +++++
+ devices/fossil-hoki/android-init.nix      |  62 ++++
  devices/fossil-hoki/default.nix           | 351 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
  devices/fossil-hoki/hybris-android.nix    |  15 +
@@ -27,7 +27,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 10 files changed, 775 insertions(+)
+ 10 files changed, 760 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -103,30 +103,24 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..ffd575bf
+index 00000000..b629f53c
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,62 @@
 +{
 +  pkgs,
 +  ...
 +}:
 +
 +let
-+  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
-+
-+  # AsteroidOS hoki init.rc: starts servicemanager, hwservicemanager,
-+  # vndservicemanager and the core/hal service classes. The vendor HALs
-+  # (including android.hardware.graphics.composer) are defined in
-+  # /vendor/etc/init/hw/init.hoki.rc and are picked up by Android init.
-+  # Source: meta-smartwatch meta-hoki/recipes-android/android-init
++  # The hoki init.rc supplements the stock Android init with the Qualcomm
++  # subsystem setup and the Fossil extras. It must not import the stock
++  # hw/init.rc: the stock /system/bin/init already reads it.
 +  initRc = pkgs.fetchurl {
 +    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-hoki/recipes-android/android-init/android-init/init.rc";
 +    hash = "sha256-TBa60Z7PdgTjZYECheZYEA/6D/OZwpVx3bU70XwWJHU=";
 +  };
 +
-+  # hoki installs these at / in meta-smartwatch's android-init bbappend; the
-+  # property service needs them to label sys.boot_completed and the hwc props.
 +  platPropertyContexts = pkgs.fetchurl {
 +    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-hoki/recipes-android/android-init/android-init/plat_property_contexts";
 +    hash = "sha256-Je6T4SOA1vfc8bJOLBRwaBqIW4BCO+akXS7L+P1QYuo=";
@@ -138,10 +132,12 @@ index 00000000..ffd575bf
 +  };
 +in
 +{
-+  # Without Android init the vendor HIDL services never start, so libhybris
-+  # cannot reach android.hardware.graphics.composer and the hwcomposer QPA
-+  # aborts. AsteroidOS runs the hal-droid init, which reads /init.rc and the
-+  # vendor init rc files.
++  # The stock system/vendor on this device are Android 11 (system_ext, apex,
++  # AIDL apexd, AIDL HALs). The hybris tarball's hal-droid init is Android 9
++  # and cannot parse them, so use the stock Android 11 init instead. It sets up
++  # the property service, mounts the apexes (so /system/bin/linker resolves)
++  # and starts servicemanager, hwservicemanager and the vendor graphics
++  # composer. libhybris stays the Pie client that the hwcomposer QPA uses.
 +  systemd.services.android-init = {
 +    description = "/system/bin/init initializes the property service and launches servicemanager and logd";
 +    wantedBy = [
@@ -161,18 +157,7 @@ index 00000000..ffd575bf
 +    serviceConfig = {
 +      Type = "simple";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
-+        # The hal-droid init has /usr/libexec/hal-droid/system/etc/init
-+        # compiled in. Expose the stock /system bin/etc (apexd, servicemanager,
-+        # the linker) and the hybris libraries from the tarball.
-+        ${pkgs.coreutils}/bin/rm -rf /usr/libexec/hal-droid/system
-+        ${pkgs.coreutils}/bin/mkdir -p /usr/libexec/hal-droid/system
-+        ${pkgs.coreutils}/bin/ln -sfn /system/bin /usr/libexec/hal-droid/system/bin
-+        ${pkgs.coreutils}/bin/ln -sfn /system/etc /usr/libexec/hal-droid/system/etc
-+        ${pkgs.coreutils}/bin/ln -sfn ${hybrisAndroid}/usr/libexec/hal-droid/system/lib /usr/libexec/hal-droid/system/lib
 +        ${pkgs.coreutils}/bin/cp -f ${initRc} /init.rc
-+        # The stock Android init mounts /apex and starts apexd before anything
-+        # that needs /system/bin/linker.
-+        ${pkgs.coreutils}/bin/echo 'import /system/etc/init/hw/init.rc' >> /init.rc
 +        ${pkgs.coreutils}/bin/cp -f ${platPropertyContexts} /plat_property_contexts
 +        ${pkgs.coreutils}/bin/cp -f ${nonplatPropertyContexts} /nonplat_property_contexts
 +        if [ -f /vendor/etc/selinux/vendor_property_contexts ]; then
@@ -180,7 +165,7 @@ index 00000000..ffd575bf
 +        fi
 +        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
 +      '';
-+      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
++      ExecStart = "/system/bin/init";
 +    };
 +  };
 +}
