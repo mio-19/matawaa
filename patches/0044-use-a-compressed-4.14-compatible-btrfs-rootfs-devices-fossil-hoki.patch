@@ -11,10 +11,10 @@ Switch the hoki rootfs to btrfs with zstd compression and the 4.14-supported noa
  2 files changed, 20 insertions(+), 2 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 86062c2e..e1bbd1cd 100644
+index 81ca0ec8..b1a7d041 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -20,6 +20,17 @@
+@@ -23,6 +23,17 @@ in
  
    mobile.device.supportLevel = "supported";
  
@@ -32,7 +32,7 @@ index 86062c2e..e1bbd1cd 100644
    mobile.hardware = {
      # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), Cortex-A53.
      # The Android system image is the 32-bit armv7l ABI.
-@@ -90,6 +101,7 @@
+@@ -93,6 +104,7 @@ in
  
    environment.systemPackages = [
      pkgs.alsa-utils
@@ -41,7 +41,7 @@ index 86062c2e..e1bbd1cd 100644
  
    # Hardware audio mixer DAI link routing for NXP TFA98xx speaker amplifier & digital mic
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
-index 718c1b2d..7fe3237b 100644
+index 6c49de0b..2cc889fa 100644
 --- a/modules/rootfs.nix
 +++ b/modules/rootfs.nix
 @@ -41,7 +41,11 @@ in
@@ -57,7 +57,7 @@ index 718c1b2d..7fe3237b 100644
  
        populateCommands =
        let
-@@ -135,7 +139,9 @@ in
+@@ -126,7 +130,9 @@ in
          options =
            if config.mobile.generatedFilesystems.rootfs.filesystem == "btrfs" then
              [

@@ -18,16 +18,16 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/android-init.nix      |  62 ++++
- devices/fossil-hoki/default.nix           | 359 ++++++++++++++++++++++
+ devices/fossil-hoki/android-init.nix      |  63 +++++
+ devices/fossil-hoki/default.nix           | 312 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
- devices/fossil-hoki/hybris-android.nix    |  15 +
- devices/fossil-hoki/hybris.nix            |  34 ++
- devices/fossil-hoki/kernel/default.nix    | 109 +++++++
+ devices/fossil-hoki/hybris-android.nix    |  15 ++
+ devices/fossil-hoki/hybris.nix            |  34 +++
+ devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 10 files changed, 768 insertions(+)
+ 10 files changed, 722 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -103,16 +103,18 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..b629f53c
+index 00000000..7fe6bef7
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,63 @@
 +{
 +  pkgs,
 +  ...
 +}:
 +
 +let
++  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
++
 +  # The hoki init.rc supplements the stock Android init with the Qualcomm
 +  # subsystem setup and the Fossil extras. It must not import the stock
 +  # hw/init.rc: the stock /system/bin/init already reads it.
@@ -132,12 +134,11 @@ index 00000000..b629f53c
 +  };
 +in
 +{
-+  # The stock system/vendor on this device are Android 11 (system_ext, apex,
-+  # AIDL apexd, AIDL HALs). The hybris tarball's hal-droid init is Android 9
-+  # and cannot parse them, so use the stock Android 11 init instead. It sets up
-+  # the property service, mounts the apexes (so /system/bin/linker resolves)
-+  # and starts servicemanager, hwservicemanager and the vendor graphics
-+  # composer. libhybris stays the Pie client that the hwcomposer QPA uses.
++  # AsteroidOS-style Pie stack: /system is the hal-droid Android 9 tree from
++  # the hybris tarball and /vendor is the stock Pie vendor, so run the matching
++  # hal-droid Pie init. It parses the Pie system/vendor rc files (no apex or
++  # perform_apex_config) and starts servicemanager, hwservicemanager and the
++  # graphics composer that libhybris talks to.
 +  systemd.services.android-init = {
 +    description = "/system/bin/init initializes the property service and launches servicemanager and logd";
 +    wantedBy = [
@@ -165,16 +166,16 @@ index 00000000..b629f53c
 +        fi
 +        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
 +      '';
-+      ExecStart = "/system/bin/init";
++      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
 +    };
 +  };
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..010cd488
+index 00000000..ecdca7fd
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,359 @@
+@@ -0,0 +1,312 @@
 +{
 +  config,
 +  lib,
@@ -182,6 +183,9 @@ index 00000000..010cd488
 +  ...
 +}:
 +
++let
++  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
++in
 +{
 +  imports = [
 +    ../families/asteroidos.nix
@@ -334,62 +338,10 @@ index 00000000..010cd488
 +  mobile.quirks.fb-refresher.enable = lib.mkForce false;
 +
 +  fileSystems = {
-+    # p31 is the Android system-as-root: /system, /system_ext, /product and
-+    # /odm live below its root, and /apex is a tmpfs that apexd populates from
-+    # /system/apex. /system/bin/linker is a symlink into /apex, so apexd must
-+    # be able to mount there before servicemanager can exec.
-+    "/mnt/system_root" = {
-+      device = "/dev/disk/by-partlabel/system";
-+      fsType = "ext4";
-+      options = [
-+        "ro"
-+        "nofail"
-+      ];
-+    };
-+    "/system" = {
-+      device = "/mnt/system_root/system";
-+      fsType = "none";
-+      options = [
-+        "bind"
-+        "ro"
-+        "nofail"
-+      ];
-+      depends = [ "/mnt/system_root" ];
-+    };
-+    "/system_ext" = {
-+      device = "/mnt/system_root/system_ext";
-+      fsType = "none";
-+      options = [
-+        "bind"
-+        "ro"
-+        "nofail"
-+      ];
-+      depends = [ "/mnt/system_root" ];
-+    };
-+    "/product" = {
-+      device = "/mnt/system_root/product";
-+      fsType = "none";
-+      options = [
-+        "bind"
-+        "ro"
-+        "nofail"
-+      ];
-+      depends = [ "/mnt/system_root" ];
-+    };
-+    "/odm" = {
-+      device = "/mnt/system_root/odm";
-+      fsType = "none";
-+      options = [
-+        "bind"
-+        "ro"
-+        "nofail"
-+      ];
-+      depends = [ "/mnt/system_root" ];
-+    };
-+    "/apex" = {
-+      fsType = "tmpfs";
-+      options = [ "mode=0755" ];
-+    };
++    # AsteroidOS-style Pie stack: /system is the hal-droid Android 9 tree from
++    # the hybris tarball (installed as a rootfs symlink below) and the stock
++    # p32 vendor (also Pie) supplies the composer and the vendor HALs. The p31
++    # Android 11 system is no longer mounted.
 +    "/vendor" = {
 +      device = "/dev/disk/by-partlabel/vendor";
 +      fsType = "ext4";
@@ -430,8 +382,6 @@ index 00000000..010cd488
 +  # GNSS vendor service symlink PR: https://github.com/AsteroidOS/meta-smartwatch/pull/342
 +  systemd.tmpfiles.rules = [
 +    "d /var/lib/environment/compositor 0755 root root -"
-+    "L+ /system/lib/hw/gps.default.so - - - - /vendor/lib/hw/gps.default.so"
-+    "L+ /vendor/bin/hw/android.hardware.gnss@1.0-service - - - - /vendor/bin/hw/android.hardware.gnss@1.0-service-qti"
 +    "L+ /dev/graphics/fb0 - - - - /dev/fb0"
 +    "d /mnt/vendor 0755 root root -"
 +    "L+ /mnt/vendor/persist - - - - /persist"
@@ -445,6 +395,10 @@ index 00000000..010cd488
 +  # makes /var -> /var/lib an unsafe ownership transition. Install the file in
 +  # the image instead so the launcher always sees QPA_HWC_*.
 +  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
++    # AsteroidOS installs the hybris tarball's hal-droid system as /system and
++    # runs the hal-droid Android 9 init against it and the stock Pie vendor.
++    ln -sfn ${hybrisAndroid}/usr/libexec/hal-droid/system ./system
++
 +    mkdir -p ./var/lib/environment/compositor
 +    cp ${pkgs.writeText "20-device.conf" ''
 +      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"

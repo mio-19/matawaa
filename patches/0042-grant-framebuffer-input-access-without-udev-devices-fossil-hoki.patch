@@ -10,12 +10,12 @@ Set /dev/fb0 to root:video 0660 and /dev/input/event* to root:input 0660 with sy
  1 file changed, 2 insertions(+)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 010cd488..86062c2e 100644
+index ecdca7fd..81ca0ec8 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -256,6 +256,8 @@
-     "L+ /system/lib/hw/gps.default.so - - - - /vendor/lib/hw/gps.default.so"
-     "L+ /vendor/bin/hw/android.hardware.gnss@1.0-service - - - - /vendor/bin/hw/android.hardware.gnss@1.0-service-qti"
+@@ -205,6 +205,8 @@ in
+   systemd.tmpfiles.rules = [
+     "d /var/lib/environment/compositor 0755 root root -"
      "L+ /dev/graphics/fb0 - - - - /dev/fb0"
 +    "z /dev/fb0 0660 root video -"
 +    "z /dev/input/event* 0660 root input -"
