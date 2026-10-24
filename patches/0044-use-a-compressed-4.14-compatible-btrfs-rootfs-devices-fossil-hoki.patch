@@ -6,9 +6,9 @@ Subject: [PATCH] use a compressed, 4.14-compatible btrfs rootfs
 
 Switch the hoki rootfs to btrfs with zstd compression and the 4.14-supported noatime and space_cache=v2 mount options; the vendor kernel rejects the zstd level syntax and the v1 space cache. Keep btrfs-progs in both the stage-1 extraUtils and stage-2 system packages, since it provides btrfs filesystem resize for growing the rootfs after flashing.
 ---
- devices/fossil-hoki/default.nix | 12 ++++++++++++
- modules/rootfs.nix              | 10 ++++++++--
- 2 files changed, 20 insertions(+), 2 deletions(-)
+ devices/fossil-hoki/default.nix |  12 ++++
+ modules/rootfs.nix              | 120 ++++++++++++++++++--------------
+ 2 files changed, 81 insertions(+), 51 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 index 32a23ca3..5b086d7b 100644
@@ -41,10 +41,32 @@ index 32a23ca3..5b086d7b 100644
  
    # Hardware audio mixer DAI link routing for NXP TFA98xx speaker amplifier & digital mic
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
-index 6c49de0b..2cc889fa 100644
+index 6c49de0b..246aca44 100644
 --- a/modules/rootfs.nix
 +++ b/modules/rootfs.nix
-@@ -41,7 +41,11 @@ in
+@@ -1,9 +1,19 @@
+ # This provides `build.rootfs`, which is the rootfs image (ext4) built from
+ # the current configuration.
+-{ config, lib, pkgs, ... }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
+ 
+ let
+-  inherit (lib) mkIf mkOption optionalString types;
++  inherit (lib)
++    mkIf
++    mkOption
++    optionalString
++    types
++    ;
+   inherit (config.mobile._internal) compressLargeArtifacts;
+   inherit (pkgs) buildPackages;
+   rootfsLabel = config.mobile.generatedFilesystems.rootfs.label;
+@@ -41,40 +51,44 @@ in
        label = lib.mkDefault "NIXOS_SYSTEM";
        ext4.partitionID = "44444444-4444-4444-8888-888888888888";
        btrfs.partitionID = "44444444-4444-4444-8888-888888888888";
@@ -56,8 +78,115 @@ index 6c49de0b..2cc889fa 100644
 +      btrfs.compression = "zstd";
  
        populateCommands =
-       let
-@@ -126,7 +130,9 @@ in
+-      let
+-        closureInfo = pkgs.buildPackages.closureInfo { rootPaths = config.system.build.toplevel; };
+-      in
+-      ''
+-        mkdir -p ./nix/store
+-        # The generated rootfs must contain the standard /var symlinks before
+-        # systemd starts; creating them in stage 1 is too late for early units.
+-        mkdir -p ./var
+-        ln -sfn /run ./var/run
+-        ln -sfn /run/lock ./var/lock
+-        echo "Copying system closure..."
+-
+-        err=0
+-        while IFS= read -r path; do
+-          echo "  Copying $path"
+-          if test -e "$path"; then
+-            cp -prf "$path" ./nix/store
+-          else
+-            2>&1 printf "ERROR: path %q does not exist...\n" "$path"
+-            (( ++err ))
++        let
++          closureInfo = pkgs.buildPackages.closureInfo { rootPaths = config.system.build.toplevel; };
++        in
++        ''
++          mkdir -p ./nix/store
++          # The generated rootfs must contain the standard /var symlinks before
++          # systemd starts; creating them in stage 1 is too late for early units.
++          mkdir -p ./var
++          ln -sfn /run ./var/run
++          ln -sfn /run/lock ./var/lock
++          echo "Copying system closure..."
++
++          err=0
++          while IFS= read -r path; do
++            echo "  Copying $path"
++            if test -e "$path"; then
++              cp -prf "$path" ./nix/store
++            else
++              2>&1 printf "ERROR: path %q does not exist...\n" "$path"
++              (( ++err ))
++            fi
++          done < "${closureInfo}/store-paths"
++
++          if (( err > 0 )); then
++            2>&1 printf "... Bailing out, %d errors.\n" "$err"
++            exit 2
+           fi
+-        done < "${closureInfo}/store-paths"
+-
+-        if (( err > 0 )); then
+-          2>&1 printf "... Bailing out, %d errors.\n" "$err"
+-          exit 2
+-        fi
+ 
+-        echo "Done copying system closure..."
+-        cp -v ${closureInfo}/registration ./nix-path-registration
+-      '';
++          echo "Done copying system closure..."
++          cp -v ${closureInfo}/registration ./nix-path-registration
++        '';
+ 
+       # Give some headroom for initial mounting.
+       extraPadding = pkgs.image-builder.helpers.size.MiB 20;
+@@ -84,24 +98,26 @@ in
+       # FIXME: See #117, move compression into the image builder.
+       # Zstd can take a long time to complete successfully at high compression
+       # levels. Increasing the compression level could lead to timeouts.
+-      additionalCommands = optionalString compressLargeArtifacts ''
+-        echo ":: Compressing rootfs image"
+-        (PS4=" $ "; set -x
+-        cd $out_path
+-        # Hacky, but the img path here already has .zst appended.
+-        # Let's rename it (we assume rootfs.img) and do the compression here.
+-        mv "$img" "rootfs.img"
+-        time ${buildPackages.zstd}/bin/zstd -10 --rm "rootfs.img"
+-        )
+-      '' + ''
+-        echo ":: Adding hydra-build-products"
+-        (PS4=" $ "; set -x
+-        mkdir -p $out_path/nix-support
+-        cat <<EOF > $out_path/nix-support/hydra-build-products
+-        file rootfs${optionalString compressLargeArtifacts "-zstd"} $img
+-        EOF
+-        )
+-      '';
++      additionalCommands =
++        optionalString compressLargeArtifacts ''
++          echo ":: Compressing rootfs image"
++          (PS4=" $ "; set -x
++          cd $out_path
++          # Hacky, but the img path here already has .zst appended.
++          # Let's rename it (we assume rootfs.img) and do the compression here.
++          mv "$img" "rootfs.img"
++          time ${buildPackages.zstd}/bin/zstd -10 --rm "rootfs.img"
++          )
++        ''
++        + ''
++          echo ":: Adding hydra-build-products"
++          (PS4=" $ "; set -x
++          mkdir -p $out_path/nix-support
++          cat <<EOF > $out_path/nix-support/hydra-build-products
++          file rootfs${optionalString compressLargeArtifacts "-zstd"} $img
++          EOF
++          )
++        '';
+     };
+ 
+     boot.postBootCommands = mkIf (config.mobile.rootfs.rehydrateStore) ''
+@@ -126,7 +142,9 @@ in
          options =
            if config.mobile.generatedFilesystems.rootfs.filesystem == "btrfs" then
              [
