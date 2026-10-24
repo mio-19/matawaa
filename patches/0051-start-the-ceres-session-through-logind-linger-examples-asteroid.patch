@@ -12,7 +12,7 @@ Start user@1000 through the canonical linger-users.service instead of pre-seedin
  1 file changed, 44 insertions(+)
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index d6e6c0f1..bb470ad9 100644
+index 28c44f1c..522ef452 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
 @@ -113,6 +113,17 @@ in
@@ -33,7 +33,7 @@ index d6e6c0f1..bb470ad9 100644
      # Smartwatch stem/power button should be handled by compositor/shell, not logind shutdown
      services.logind.settings = {
        Login = {
-@@ -210,10 +221,43 @@ in
+@@ -214,10 +225,43 @@ in
        group = "root";
      };
  

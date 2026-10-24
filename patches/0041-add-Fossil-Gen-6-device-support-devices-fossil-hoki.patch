@@ -18,8 +18,8 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/android-init.nix      |  63 +++++
- devices/fossil-hoki/default.nix           | 302 ++++++++++++++++++++++
+ devices/fossil-hoki/android-init.nix      |  71 +++++
+ devices/fossil-hoki/default.nix           | 306 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
  devices/fossil-hoki/hybris-android.nix    |  15 ++
  devices/fossil-hoki/hybris.nix            |  34 +++
@@ -27,7 +27,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 10 files changed, 712 insertions(+)
+ 10 files changed, 724 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -103,10 +103,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..5bb2eee8
+index 00000000..ad2be902
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,71 @@
 +{
 +  pkgs,
 +  ...
@@ -161,9 +161,17 @@ index 00000000..5bb2eee8
 +    serviceConfig = {
 +      Type = "simple";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        # The hal-droid init has these paths compiled in: it parses
++        # /usr/libexec/hal-droid/system/etc/init and runs the services from
++        # the system/vendor trees.
++        ${pkgs.coreutils}/bin/mkdir -p /usr/libexec/hal-droid
++        ${pkgs.coreutils}/bin/ln -sfn ${hybrisAndroid}/usr/libexec/hal-droid/system /usr/libexec/hal-droid/system
 +        ${pkgs.coreutils}/bin/cp -f ${initRc} /init.rc
 +        ${pkgs.coreutils}/bin/cp -f ${platPropertyContexts} /plat_property_contexts
 +        ${pkgs.coreutils}/bin/cp -f ${nonplatPropertyContexts} /nonplat_property_contexts
++        if [ -f /vendor/etc/selinux/vendor_property_contexts ]; then
++          ${pkgs.coreutils}/bin/cp -f /vendor/etc/selinux/vendor_property_contexts /vendor_property_contexts
++        fi
 +        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
 +      '';
 +      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
@@ -172,10 +180,10 @@ index 00000000..5bb2eee8
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..108abb2b
+index 00000000..e69a1f88
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,302 @@
+@@ -0,0 +1,306 @@
 +{
 +  config,
 +  lib,
@@ -330,6 +338,10 @@ index 00000000..108abb2b
 +
 +  # Persistent hardware partition mounts on Fossil Gen 6 eMMC
 +  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-core/base-files/base-files/fstab
++  # The stage-2 msm-fb-refresher pans /dev/fb0 continuously; it fights the Qt
++  # linuxfb fallback's own panning. Keep it for stage 1 (splash) only.
++  mobile.quirks.fb-refresher.enable = lib.mkForce false;
++
 +  fileSystems = {
 +    # Stock Fossil/Android system and vendor partitions. Android init loads
 +    # /system/etc/init/hw/init.rc (servicemanager, hwservicemanager) and

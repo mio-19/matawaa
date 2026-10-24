@@ -8,20 +8,20 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
- examples/asteroid/asteroid-desktop.nix | 240 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 244 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  38 ++++
  examples/asteroid/default.nix          |  15 ++
- 3 files changed, 293 insertions(+)
+ 3 files changed, 297 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..d6e6c0f1
+index 00000000..28c44f1c
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,240 @@
+@@ -0,0 +1,244 @@
 +{
 +  config,
 +  lib,
@@ -201,6 +201,10 @@ index 00000000..d6e6c0f1
 +          export QT_QPA_PLATFORM=linuxfb:fb=/dev/fb0
 +          export QT_QUICK_BACKEND=software
 +          export EGL_PLATFORM=
++          # Prefer the DRM backend of linuxfb when the msm DRM node exists.
++          if [ -e /dev/dri/card0 ]; then
++            export QT_QPA_FB_DRM=1
++          fi
 +          exec "$launcher" -plugin evdevtouch $LIPSTICK_OPTIONS --systemd
 +        ''}";
 +        TimeoutStopSec = "3s";
