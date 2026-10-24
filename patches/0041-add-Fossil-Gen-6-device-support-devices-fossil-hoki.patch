@@ -17,17 +17,21 @@ Install the compositor environment as
 and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
- devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/android-init.nix      |  63 ++++
- devices/fossil-hoki/default.nix           | 339 ++++++++++++++++++++++
- devices/fossil-hoki/gps_xtra.ini          |   2 +
- devices/fossil-hoki/hybris-android.nix    |  22 ++
- devices/fossil-hoki/hybris.nix            |  38 +++
- devices/fossil-hoki/kernel/default.nix    | 109 +++++++
- devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
- devices/fossil-ray/default.nix            |  56 ++++
- devices/fossil-triggerfish/default.nix    |  56 ++++
- 10 files changed, 760 insertions(+)
+ devices/fossil-firefish/default.nix           |  56 +++
+ devices/fossil-hoki/android-init.nix          |  63 ++++
+ devices/fossil-hoki/default.nix               | 341 ++++++++++++++++++
+ devices/fossil-hoki/gps_xtra.ini              |   2 +
+ devices/fossil-hoki/hybris-android.nix        |  22 ++
+ devices/fossil-hoki/hybris.nix                |  38 ++
+ devices/fossil-hoki/kernel/default.nix        | 109 ++++++
+ devices/fossil-hoki/wlan-firmware-hoki.sh     |  20 +
+ devices/fossil-hoki/wlan.nix                  |  81 +++++
+ ...co_profile-fix-use-of-adapter-before.patch |  30 ++
+ ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 ++
+ devices/fossil-hoki/wlan/wakelock.h           |   3 +
+ devices/fossil-ray/default.nix                |  56 +++
+ devices/fossil-triggerfish/default.nix        |  56 +++
+ 14 files changed, 902 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -36,6 +40,10 @@ they cannot hold multi-user.target.
  create mode 100644 devices/fossil-hoki/hybris.nix
  create mode 100644 devices/fossil-hoki/kernel/default.nix
  create mode 100644 devices/fossil-hoki/wlan-firmware-hoki.sh
+ create mode 100644 devices/fossil-hoki/wlan.nix
+ create mode 100644 devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
+ create mode 100644 devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
+ create mode 100644 devices/fossil-hoki/wlan/wakelock.h
  create mode 100644 devices/fossil-ray/default.nix
  create mode 100644 devices/fossil-triggerfish/default.nix
 
@@ -172,10 +180,10 @@ index 00000000..7fe6bef7
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..ca80655b
+index 00000000..5c43b639
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,339 @@
+@@ -0,0 +1,341 @@
 +{
 +  config,
 +  lib,
@@ -191,6 +199,7 @@ index 00000000..ca80655b
 +    ../families/asteroidos.nix
 +    ./hybris.nix
 +    ./android-init.nix
++    ./wlan.nix
 +  ];
 +
 +  mobile.device.name = "fossil-hoki";
@@ -450,16 +459,17 @@ index 00000000..ca80655b
 +  # WCNSS Wi-Fi firmware initialization and driver loading
 +  # Upstream PR: https://github.com/AsteroidOS/meta-smartwatch/pull/341 ("hoki: wlan: working WiFi driver from source")
 +  systemd.services.wlan-firmware-hoki = {
-+    description = "Fossil Gen 6 WCNSS WLAN firmware setup";
++    description = "Enable pronto WLAN firmware and load the wlan module on hoki";
++    after = [ "android-init.service" ];
++    before = [ "connman.service" ];
 +    wantedBy = [ "multi-user.target" ];
-+    before = [ "network-pre.target" ];
 +    path = with pkgs; [
 +      kmod
 +      coreutils
 +    ];
 +    serviceConfig = {
-+      # Firmware loading can stall waiting for WCNSS; do not hold multi-user.
-+      Type = "simple";
++      Type = "oneshot";
++      RemainAfterExit = true;
 +      ExecStart = "${pkgs.writeShellScript "wlan-firmware-hoki" (
 +        builtins.readFile ./wlan-firmware-hoki.sh
 +      )}";
@@ -712,29 +722,193 @@ index 00000000..1a520e75
 +}
 diff --git a/devices/fossil-hoki/wlan-firmware-hoki.sh b/devices/fossil-hoki/wlan-firmware-hoki.sh
 new file mode 100644
-index 00000000..32d6dca3
+index 00000000..75857254
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan-firmware-hoki.sh
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,20 @@
 +#!/bin/sh
 +# SPDX-License-Identifier: MIT
-+# Fossil Gen 6 (hoki) Wi-Fi WCNSS firmware extraction and initialization.
-+# Symlinks stock vendor WCNSS calibration data, triggers WCNSS powerup,
-+# and loads the WLAN driver module.
++# Symlink stock vendor WCNSS firmware/calibration data into the path the
++# out-of-tree pronto WLAN driver actually looks under, power up WCNSS by
++# opening (not writing) /dev/wcnss_wlan, then load the driver.
++# See https://github.com/AsteroidOS/meta-smartwatch/issues/224
 +
 +mkdir -p /lib/firmware/wlan/prima
 +
 +for f in WCNSS_qcom_cfg.ini WCNSS_qcom_wlan_nv.bin WCNSS_wlan_dictionary.dat; do
-+	if [ -e "/vendor/firmware/wlan/prima/$f" ] && [ ! -e "/lib/firmware/wlan/prima/$f" ]; then
-+		ln -sf "/vendor/firmware/wlan/prima/$f" "/lib/firmware/wlan/prima/$f"
++	if [ ! -e "/lib/firmware/wlan/prima/$f" ]; then
++		ln -s "/vendor/firmware/wlan/prima/$f" "/lib/firmware/wlan/prima/$f"
 +	fi
 +done
 +
-+# Opening /dev/wcnss_wlan powers on the WCNSS subsystem
++# Opening this device node is what actually powers WCNSS up; the write
++# itself is expected to fail and is not an error.
 +echo 1 > /dev/wcnss_wlan 2>/dev/null || true
 +
-+modprobe wlan 2>/dev/null || true
-+exit 0
++modprobe wlan
+diff --git a/devices/fossil-hoki/wlan.nix b/devices/fossil-hoki/wlan.nix
+new file mode 100644
+index 00000000..cfcf4fbd
+--- /dev/null
++++ b/devices/fossil-hoki/wlan.nix
+@@ -0,0 +1,81 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  kernel = config.mobile.boot.stage-1.kernel.package;
++
++  # AsteroidOS PR #341: "hoki: wlan: working WiFi driver from source".
++  # The stock /vendor/lib/modules/wlan.ko was built against Fossil's own
++  # 4.14.206-perf+ kernel and fails with a vermagic mismatch against ours, so
++  # build the out-of-tree Qualcomm pronto/prima driver against this kernel.
++  prima = pkgs.fetchFromGitHub {
++    owner = "Dev-msm8953";
++    repo = "vendor_qcom_opensource_wlan_prima";
++    rev = "3401b53";
++    hash = "sha256-nApGIHSWY5V06TGqm9w7kylWucddPBAd6yFCXNI/anY=";
++  };
++
++  wlanModule = pkgs.stdenv.mkDerivation {
++    pname = "wlan-prima";
++    version = "4.14";
++    src = prima;
++
++    patches = [
++      ./wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
++      ./wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
++    ];
++
++    nativeBuildInputs =
++      (with pkgs.buildPackages; [
++        bc
++        bison
++        flex
++        openssl
++        python3
++      ])
++      ++ [ pkgs.buildPackages.buildPackages.gcc ];
++    buildInputs = [ kernel ];
++
++    # The mobile-nixos kernel output has no module build tree, so prepare one
++    # from the kernel source and the config the kernel was built with.
++    # HOSTCC must be a build-platform compiler: the kernel builds fixdep for
++    # the build machine. pkgs.buildPackages.gcc is still the cross compiler,
++    # so reach one level further out for the native one.
++    configurePhase = ''
++      runHook preConfigure
++      cp -r ${kernel.src} kernel-src
++      chmod -R u+w kernel-src
++      cp ${kernel.configfile} kernel-src/.config
++      cp ${./wlan/wakelock.h} kernel-src/include/linux/wakelock.h
++      make -C kernel-src ARCH=arm CROSS_COMPILE=${pkgs.stdenv.cc.targetPrefix} HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc olddefconfig
++      make -C kernel-src ARCH=arm CROSS_COMPILE=${pkgs.stdenv.cc.targetPrefix} HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc modules_prepare
++      runHook postConfigure
++    '';
++
++    makeFlags = [
++      "ARCH=arm"
++      "CROSS_COMPILE=${pkgs.stdenv.cc.targetPrefix}"
++      "HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc"
++      "KERNEL_SOURCE=$(PWD)/kernel-src"
++      "KERNEL_SRC=$(PWD)/kernel-src"
++      "CONFIG_PRONTO_WLAN=m"
++      "WLAN_ROOT=$(PWD)"
++      "MODNAME=wlan"
++    ];
++
++    installPhase = ''
++      mkdir -p $out/lib/modules/${kernel.modDirVersion}/extra
++      cp wlan.ko $out/lib/modules/${kernel.modDirVersion}/extra/wlan.ko
++    '';
++  };
++in
++{
++  # wlan-firmware-hoki.sh symlinks the vendor firmware and opens
++  # /dev/wcnss_wlan before this module is loaded.
++  boot.extraModulePackages = [ wlanModule ];
++  boot.kernelModules = [ "wlan" ];
++}
+diff --git a/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch b/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
+new file mode 100644
+index 00000000..05d22dda
+--- /dev/null
++++ b/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
+@@ -0,0 +1,30 @@
++From 749c0d6d61aaf3e2e9f655cd1af980c0d06efc6e Mon Sep 17 00:00:00 2001
++From: pettcomputers <chris@pettcomputers.com>
++Date: Sun, 30 Aug 2026 09:48:28 -0500
++Subject: [PATCH] hdd_process_bt_sco_profile: fix use of adapter before
++ assignment
++
++---
++ CORE/HDD/src/wlan_hdd_main.c | 7 +++++++
++ 1 file changed, 7 insertions(+)
++
++diff --git a/CORE/HDD/src/wlan_hdd_main.c b/CORE/HDD/src/wlan_hdd_main.c
++index 91368f1..a80b1f4 100644
++--- a/CORE/HDD/src/wlan_hdd_main.c
+++++ b/CORE/HDD/src/wlan_hdd_main.c
++@@ -3974,6 +3974,13 @@ int hdd_process_bt_sco_profile(hdd_context_t *hdd_ctx,
++ 		return -EINVAL;
++ 	}
++ 
+++	adapter = hdd_get_adapter(hdd_ctx, WLAN_HDD_INFRA_STATION);
+++	if (!adapter) {
+++		hddLog(VOS_TRACE_LEVEL_ERROR,
+++		       "%s: No station adapter, skipping bt profile", __func__);
+++		return -EINVAL;
+++	}
+++
++ 	INIT_COMPLETION(hdd_ctx->sw_pta_comp);
++ 
++ 	hal_status = sme_sw_pta_req(hdd_ctx->hHal, hdd_sw_pta_resp_callback,
++-- 
++2.51.1
+diff --git a/devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch b/devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
+new file mode 100644
+index 00000000..19a90d46
+--- /dev/null
++++ b/devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
+@@ -0,0 +1,25 @@
++From c597ca249a4ec61fd8ceddd9474eda6e6717535c Mon Sep 17 00:00:00 2001
++From: pettcomputers <chris@pettcomputers.com>
++Date: Sun, 30 Aug 2026 10:10:18 -0500
++Subject: [PATCH] Makefile: quote CC/LD/AR/OBJCOPY/STRIP in nested make
++ invocation
++
++---
++ Makefile | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/Makefile b/Makefile
++index d5c94f0..c644d01 100644
++--- a/Makefile
+++++ b/Makefile
++@@ -5,7 +5,7 @@ KBUILD_OPTIONS += MODNAME=wlan
++ 
++ all::
++ 	$(MAKE) -C $(KERNEL_SOURCE) $(KBUILD_OPTIONS) $(EXTRA_CFLAGS) ARCH=$(ARCH) \
++-		SUBDIRS=$(CURDIR) CC=${CC} modules
+++		SUBDIRS=$(CURDIR) CC="$(CC)" LD="$(LD)" AR="$(AR)" OBJCOPY="$(OBJCOPY)" STRIP="$(STRIP)" modules
++ 
++ modules_install:
++ 	$(MAKE) INSTALL_MOD_STRIP=1 -C $(KERNEL_SRC) M=$(shell pwd) modules_install
++-- 
++2.51.1
+diff --git a/devices/fossil-hoki/wlan/wakelock.h b/devices/fossil-hoki/wlan/wakelock.h
+new file mode 100644
+index 00000000..02faafd6
+--- /dev/null
++++ b/devices/fossil-hoki/wlan/wakelock.h
+@@ -0,0 +1,3 @@
++/* Empty stub. This header was removed from mainline Linux (replaced by the
++ * wakeup_source API) but the vendor pronto WLAN driver still #includes it.
++ * See https://github.com/AsteroidOS/meta-smartwatch/issues/224 */
 diff --git a/devices/fossil-ray/default.nix b/devices/fossil-ray/default.nix
 new file mode 100644
 index 00000000..1aa4a568
