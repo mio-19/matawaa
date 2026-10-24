@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:26:47 +1100
+Subject: [PATCH] pre-mount cgroup2 for old vendor kernels (boot/stage-1)
+
+Pre-mount cgroup2 before switch_root with the newest options the running
+kernel accepts. systemd 261 otherwise mounts it with nsdelegate and
+memory_recursiveprot, which Linux 4.14 vendor kernels reject and then
+freeze on.
+---
+ boot/init/tasks/switch_root.rb | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
+index 6a3ad197..b3a6045b 100644
+--- a/boot/init/tasks/switch_root.rb
++++ b/boot/init/tasks/switch_root.rb
+@@ -416,6 +416,17 @@ class Tasks::SwitchRoot < SingletonTask
+       System.run("mount", "--move", mount_point, new_location)
+     end
+ 
++    # TODO: systemd 261 mounts cgroup2 with "nsdelegate,memory_recursiveprot",
++    # which vendor 4.14 kernels reject and then freeze. Pre-mount cgroup2 with
++    # the newest options the kernel accepts so systemd's mount_setup() sees an
++    # existing mount and skips its own. Remove once systemd handles this.
++    cgroup2_path = File.join(SYSTEM_MOUNT_POINT, "sys/fs/cgroup")
++    begin
++      System.run("mount", "-t", "cgroup2", "-o", "nsdelegate,memory_recursiveprot", "cgroup2", cgroup2_path)
++    rescue System::CommandError
++      System.run("mount", "-t", "cgroup2", "cgroup2", cgroup2_path)
++    end
++
+     switch_root = System.which("switch_root")
+     System.exec({}, switch_root, SYSTEM_MOUNT_POINT, init)
+   end

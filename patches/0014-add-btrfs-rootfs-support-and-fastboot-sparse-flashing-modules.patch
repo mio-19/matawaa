@@ -1,0 +1,167 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 11:07:23 +1100
+Subject: [PATCH] add btrfs rootfs support and fastboot sparse flashing
+ (modules)
+
+This patch improves image generation for Android smartwatch targets:
+
+- modules/rootfs.nix: Wires up btrfs-progs when btrfs is selected as the
+  rootfs filesystem, configures the root mount for transparent zstd
+  compression, and sets the btrfs partition ID.
+- modules/system-types/android/default.nix: Adds sparseSystemImage conversion
+  via img2simg, provides an automated flash-all.sh script, tolerates kernels
+  that are not built yet, and guards the optional QCDT/Exynos DT metadata.
+---
+ modules/rootfs.nix                       | 24 +++++++++---
+ modules/system-types/android/default.nix | 50 +++++++++++++++++++++---
+ 2 files changed, 64 insertions(+), 10 deletions(-)
+
+diff --git a/modules/rootfs.nix b/modules/rootfs.nix
+index 595f045d..0af0c136 100644
+--- a/modules/rootfs.nix
++++ b/modules/rootfs.nix
+@@ -40,6 +40,8 @@ in
+       filesystem = lib.mkDefault "ext4";
+       label = lib.mkDefault "NIXOS_SYSTEM";
+       ext4.partitionID = "44444444-4444-4444-8888-888888888888";
++      btrfs.partitionID = "44444444-4444-4444-8888-888888888888";
++      btrfs.compression = "zstd:3";
+ 
+       populateCommands =
+       let
+@@ -115,16 +117,28 @@ in
+     fileSystems = {
+       "/" = lib.mkDefault {
+         device = "/dev/disk/by-label/${rootfsLabel}";
+-        fsType = "ext4";
++        fsType = config.mobile.generatedFilesystems.rootfs.filesystem;
++        options =
++          if config.mobile.generatedFilesystems.rootfs.filesystem == "btrfs" then
++            [
++              "compress=zstd:3"
++              "noatime"
++              "space_cache=v2"
++            ]
++          else
++            [ "defaults" ];
+         autoResize = true;
+       };
+     };
+ 
+-    # FIXME: Move this in a proper module + task for the filesystem.
+-    # This is a "wrong" assumption, that only holds through since we are setting
+-    # fileSystems."/".autoResize to true here.
++    # Include appropriate filesystem tools in stage-1 extraUtils
+     mobile.boot.stage-1.extraUtils = [
+-      { package = pkgs.e2fsprogs; }
++      (lib.mkIf (config.mobile.generatedFilesystems.rootfs.filesystem == "ext4") {
++        package = pkgs.e2fsprogs;
++      })
++      (lib.mkIf (config.mobile.generatedFilesystems.rootfs.filesystem == "btrfs") {
++        package = pkgs.btrfs-progs;
++      })
+     ];
+   };
+ }
+diff --git a/modules/system-types/android/default.nix b/modules/system-types/android/default.nix
+index 5c5639aa..2281e409 100644
+--- a/modules/system-types/android/default.nix
++++ b/modules/system-types/android/default.nix
+@@ -9,7 +9,7 @@ let
+   inherit (config.mobile.system.android) ab_partitions has_recovery_partition flashingMethod;
+   inherit (stage-0.mobile.boot.stage-1) kernel;
+ 
+-  kernelPackage = kernel.package;
++  kernelPackage = if kernel.package != null then kernel.package else config.boot.kernelPackages.kernel;
+ 
+   cmdline = concatStringsSep " " config.boot.kernelParams;
+ 
+@@ -18,7 +18,7 @@ let
+     inherit cmdline;
+     inherit (config.mobile.outputs) initrd;
+     name = "mobile-nixos_${device.name}_${bootimg.name}";
+-    kernel = "${kernelPackage}/${if kernelPackage ? file then kernelPackage.file else kernelPackage.target}";
++    kernel = "${kernelPackage}/${if kernelPackage ? file then kernelPackage.file else (kernelPackage.target or "zImage")}";
+     inherit (config.mobile.system.android) appendDTB;
+   };
+ 
+@@ -31,9 +31,16 @@ let
+   # either of fastboot or the outputs.
+   # This is because this output should have no refs. A simple tarball of this
+   # output should be usable even on systems without Nix.
+-  android-fastboot-images = pkgs.runCommand "android-fastboot-images-${device.name}" {} ''
++  android-fastboot-images = pkgs.runCommand "android-fastboot-images-${device.name}" {
++    nativeBuildInputs = lib.optionals config.mobile.system.android.sparseSystemImage [ pkgs.buildPackages.android-tools ];
++  } ''
+     mkdir -p $out
++    ${if config.mobile.system.android.sparseSystemImage then ''
++    echo "Converting rootfs image to Android sparse format with img2simg..."
++    img2simg ${rootfs.imagePath} $out/system.img
++    '' else ''
+     cp -v ${rootfs.imagePath} $out/system.img
++    ''}
+     cp -v ${android-bootimg} $out/boot.img
+     ${optionalString has_recovery_partition ''
+     cp -v ${android-recovery} $out/recovery.img
+@@ -72,6 +79,33 @@ let
+     echo "The system image needs to be flashed manually to the ${config.mobile.system.android.system_partition_destination} partition."
+     EOF
+     chmod +x $out/flash-critical.sh
++
++    cat > $out/flash-all.sh <<'EOF'
++    #!/usr/bin/env bash
++    dir="$(cd "$(dirname "''${BASH_SOURCE[0]}")"; echo "$PWD")"
++    PS4=" $ "
++    echo "Flashing boot, ${optionalString has_recovery_partition "recovery, "}and system/userdata partitions..."
++    (
++    set -x
++    ${if flashingMethod == "fastboot" then ''
++      fastboot flash ${optionalString ab_partitions "--slot=all"} boot "$dir"/boot.img
++      ${optionalString has_recovery_partition ''
++      fastboot flash ${optionalString ab_partitions "--slot=all"} recovery "$dir"/recovery.img
++      ''}
++      fastboot flash ${optionalString ab_partitions "--slot=all"} ${config.mobile.system.android.system_partition_destination} "$dir"/system.img
++    ''
++    else if flashingMethod == "odin" then ''
++      heimdall flash \
++        --BOOT "$dir"/boot.img ${optionalString has_recovery_partition ''
++        --RECOVERY "$dir"/recovery.img
++      ''} \
++        --USERDATA "$dir"/system.img
++    ''
++    else builtins.throw "No flashing method for ${flashingMethod}"})
++    echo ""
++    echo "Full flashing completed."
++    EOF
++    chmod +x $out/flash-all.sh
+   '';
+ 
+   mkBootimgOption = name: lib.mkOption {
+@@ -139,6 +173,12 @@ in
+         internal = true;
+       };
+ 
++      sparseSystemImage = lib.mkOption {
++        type = types.bool;
++        description = "Whether to convert the system rootfs image into an Android sparse image format using img2simg for faster, reliable fastboot flashing.";
++        default = true;
++      };
++
+       bootimg = {
+         name = lib.mkOption {
+           type = types.str;
+@@ -234,11 +274,11 @@ in
+       ];
+     })
+ 
+-    (lib.mkIf (kernelPackage != null && kernelPackage.isQcdt) {
++    (lib.mkIf (kernelPackage != null && kernelPackage ? isQcdt && kernelPackage.isQcdt) {
+       mobile.system.android.bootimg.dt = "${kernelPackage}/dt.img";
+     })
+ 
+-    (lib.mkIf (kernelPackage != null && kernelPackage.isExynosDT) {
++    (lib.mkIf (kernelPackage != null && kernelPackage ? isExynosDT && kernelPackage.isExynosDT) {
+       mobile.system.android.bootimg.dt = "${kernelPackage}/dt.img";
+     })
+ 

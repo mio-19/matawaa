@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:06:36 +1100
+Subject: [PATCH] update nixpkgs to current nixos-unstable (npins)
+
+Refresh the npins channel pin used by Mobile-NixOS from
+nixos-26.11pre1031299.0bb7ec54c848 to
+nixos-26.11pre1095516.09063bd1f2b3.
+
+This keeps the target userland and cross-compilation toolchains on the
+current nixos-unstable snapshot. The pin is expressed as a channel tarball
+so it remains reproducible without adding a separate Nixpkgs flake input.
+---
+ npins/sources.json | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/npins/sources.json b/npins/sources.json
+index 8a487595..6aa0f2e8 100644
+--- a/npins/sources.json
++++ b/npins/sources.json
+@@ -3,9 +3,9 @@
+     "nixpkgs": {
+       "type": "Channel",
+       "name": "nixos-unstable",
+-      "artifact": "nixexprs.tar.xz",
+-      "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1031299.0bb7ec54c848/nixexprs.tar.xz",
+-      "hash": "sha256-nFgG4gPQueCgP8LidXsdI2lYPrSwTcmDl6afcVn7F/U="
++      "artifact": "nixexprs.tar.zst",
++      "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1097682.02c087f3fe67/nixexprs.tar.zst",
++      "hash": "sha256-ij8QUxzTOHovLrNOxVRx+RAhGQFOMsJbji0veiatH5k="
+     }
+   },
+   "version": 8

@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Wed, 21 Oct 2026 23:28:11 +1100
+Subject: [PATCH] apply AsteroidOS systemd boot and input settings
+ (devices/families)
+
+Bring the smartwatch family in line with AsteroidOS meta-asteroid:
+
+- Credit the saved random seed as entropy so pre-5.4 vendor kernels do not
+  stall systemd-random-seed and resolved during boot.
+- Ignore suspend, hibernate, and lid-switch keys in logind, matching
+  AsteroidOS systemd-conf powerkey.conf; the compositor handles them.
+- Grant the video group access to Android graphics nodes (ion, kgsl, mali,
+  etc.) as in AsteroidOS 50-video.rules.
+---
+ devices/families/asteroidos.nix        | 18 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix |  7 ++++++-
+ 2 files changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 486eeb22..46ce2d83 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -98,6 +98,24 @@ in
+     memoryPercent = lib.mkOptionDefault 50;
+   };
+ 
++  # AsteroidOS credits the saved random seed as entropy to avoid slow boots on
++  # pre-5.4 watch kernels.
++  # Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
++  systemd.services.systemd-random-seed.environment.SYSTEMD_RANDOM_SEED_CREDIT = "force";
++
++  # AsteroidOS grants the video group access to Android graphics nodes.
++  # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd/50-video.rules
++  services.udev.extraRules = lib.mkAfter ''
++    ACTION=="add", KERNEL=="ion", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="kgsl-3d0", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mm_interlock", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mm_v3d", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mtk_disp_mgr", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="MTK_SMI", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mali", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="vboxguest", MODE="0664", GROUP="video"
++  '';
++
+   # Default to ext4 root filesystem for compatibility across vendor kernels
+   mobile.generatedFilesystems.rootfs.filesystem = mkDefault "ext4";
+ 
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index b2b12e9f..09fb7b6f 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -124,10 +124,15 @@ in
+     # calls loginctl enable-linger after logind starts. Let the normal systemd
+     # linger mechanism own the marker; do not pre-seed it or override the unit.
+ 
+-    # Smartwatch stem/power button should be handled by compositor/shell, not logind shutdown
++    # Smartwatch stem/power button should be handled by compositor/shell, not
++    # logind shutdown; match AsteroidOS systemd-conf powerkey.conf.
++    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd-conf/powerkey.conf
+     services.logind.settings = {
+       Login = {
+         HandlePowerKey = "ignore";
++        HandleSuspendKey = "ignore";
++        HandleHibernateKey = "ignore";
++        HandleLidSwitch = "ignore";
+       };
+     };
+ 

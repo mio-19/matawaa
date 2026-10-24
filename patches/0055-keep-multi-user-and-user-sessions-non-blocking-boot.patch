@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 24 Oct 2026 17:18:23 +1100
+Subject: [PATCH] keep multi-user and user sessions non-blocking (boot)
+
+Run dhcpcd in the background and use explicit drop-ins for nscd and systemd-user-sessions so nss-user-lookup cannot hold multi-user.target on the vendor kernel. The nscd unit is forced to Type=simple, and the systemd-user-sessions After= on nss-user-lookup is cleared, because the journal showed multi-user.target still waiting for it.
+---
+ devices/families/asteroidos.nix | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 46ce2d83..4a0a75f4 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -66,6 +66,31 @@ in
+     nixos.enable = mkDefault false;
+   };
+ 
++  # nscd is now Type=simple, but the journal still shows multi-user.target
++  # waiting for systemd-user-sessions.service, whose upstream unit is ordered
++  # after nss-user-lookup.target. Keep the nscd fix and explicitly remove that
++  # ordering so the user session and launcher can start.
++  systemd.services.systemd-user-sessions = {
++    after = lib.mkForce [ ];
++    overrideStrategy = "asDropin";
++  };
++
++  # nsncd's generated nscd.service is Type=notify but the daemon never sends
++  # READY. Use an explicit drop-in so the setting applies to the nscd unit that
++  # nss-user-lookup.target requires, not only to a newly generated unit. With
++  # nscd actually active, nss-user-lookup and systemd-user-sessions can complete
++  # normally without bypassing the user-sessions gate.
++  systemd.services.nscd = {
++    overrideStrategy = "asDropin";
++    serviceConfig.Type = lib.mkForce "simple";
++  };
++
++  # Keep DHCP available but do not let it hold boot. There is no guaranteed
++  # DHCP-capable interface at stage-2 startup, and dhcpcd otherwise waits for
++  # an address, holding multi-user.target. Forking to background lets the user
++  # session and launcher start while dhcpcd continues to watch for links.
++  networking.dhcpcd.wait = lib.mkDefault "background";
++
+   # Disable heavy desktop/server utilities and editors not used on smartwatches
+   programs.nano.enable = mkDefault false;
+   programs.command-not-found.enable = mkDefault false;

@@ -1,0 +1,173 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 24 Oct 2026 13:37:18 +1100
+Subject: [PATCH] add the AsteroidOS 4.9.112 vendor kernel and image
+ (devices/oppo-beluga)
+
+Add the OPPO Watch (beluga) port with the AsteroidOS 4.9.112 msm8909w
+vendor kernel, its 17 upstream kernel patches, the extracted defconfig,
+the correct qualcomm-msm8909w SoC metadata and the Android fastboot
+layout. Keep the device best-effort until it has been boot-tested.
+---
+ devices/oppo-beluga/default.nix        | 24 ++++---
+ devices/oppo-beluga/kernel/default.nix | 95 ++++++++++++++++++++++++++
+ 2 files changed, 110 insertions(+), 9 deletions(-)
+ create mode 100644 devices/oppo-beluga/kernel/default.nix
+
+diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
+index c2cef490..deb217e2 100644
+--- a/devices/oppo-beluga/default.nix
++++ b/devices/oppo-beluga/default.nix
+@@ -16,11 +16,11 @@
+     manufacturer = "OPPO";
+   };
+ 
+-  mobile.device.supportLevel = "supported";
++  mobile.device.supportLevel = "best-effort";
+ 
+   mobile.hardware = {
+     # Qualcomm Snapdragon Wear 3100
+-    soc = "qualcomm-sda429w";
++    soc = "qualcomm-msm8909w";
+     ram = 1024 * 1;
+     screen = {
+       width = 402;
+@@ -34,24 +34,30 @@
+     };
+   };
+ 
++  mobile.boot.stage-1.kernel.package = pkgs.callPackage ./kernel { };
++
+   mobile.system.android = {
+     device_name = "beluga";
+     bootimg.flash = {
+-      offset_base = "0x80000000";
++      offset_base = "0x00000000";
+       offset_kernel = "0x00008000";
+-      offset_ramdisk = "0x01000000";
++      offset_ramdisk = "0x02000000";
+       offset_second = "0x00f00000";
+-      offset_tags = "0x00000100";
+-      pagesize = "4096";
++      offset_tags = "0x01e00000";
++      pagesize = "2048";
+     };
+   };
+ 
++  # Matches AsteroidOS meta-beluga img_info.
+   boot.kernelParams = [
+-    "console=ttyMSM0,115200,n8"
+-    "androidboot.console=ttyMSM0"
++    "console=ttyHSL0,115200,n8"
++    "androidboot.console=ttyHSL0"
+     "androidboot.hardware=beluga"
++    "androidboot.selinux=permissive"
+     "msm_rtb.filter=0x237"
+     "ehci-hcd.park=3"
+-    "vmalloc=300M"
++    "lpm_levels.sleep_disabled=1"
++    "earlycon=msm_hsl_uart,0x78af000"
++    "audit=0"
+   ];
+ }
+diff --git a/devices/oppo-beluga/kernel/default.nix b/devices/oppo-beluga/kernel/default.nix
+new file mode 100644
+index 00000000..3c120c93
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/default.nix
+@@ -0,0 +1,95 @@
++{
++  mobile-nixos,
++  stdenv,
++  cpio,
++  fetchgit,
++  fetchurl,
++  runCommand,
++  ...
++}:
++
++# OPPO Watch (beluga) uses the 4.9 msm8909w vendor kernel from AsteroidOS
++# meta-smartwatch. The recipe inherits kernel-gcc8; gcc >= 13 does not boot.
++# Source: https://github.com/AsteroidOS/meta-smartwatch/tree/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-kernel/linux
++let
++  # Same pinned GCC 8 cross compiler used by the hoki vendor kernel.
++  pkgsGcc8 = import (builtins.fetchGit {
++    url = "https://github.com/NixOS/nixpkgs.git";
++    rev = "b134951a4c9f3c995fd7be05f3243f8ecd65d798";
++    shallow = true;
++  }) { };
++
++  cc8 = pkgsGcc8.pkgsCross.armv7l-hf-multiplatform.buildPackages.gcc8;
++
++  stdenvGcc8 = stdenv.override {
++    allowedRequisites = null;
++    cc = cc8;
++    hasCC = true;
++  };
++
++  kernel-builder-gcc8 = mobile-nixos.kernel-builder.override {
++    stdenv = stdenvGcc8;
++  };
++
++  asteroidos = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-kernel/linux";
++
++  upstreamDefconfig = fetchurl {
++    url = "${asteroidos}/linux-beluga/defconfig";
++    hash = "sha256-3ZwmXssSXDYkgZ7c1LfErS2ouqrN8NwOtqnUgE6sXes=";
++  };
++
++  upstreamPatch =
++    name: hash:
++    fetchurl {
++      url = "${asteroidos}/files/${name}";
++      inherit hash;
++    };
++
++  configfile = runCommand "oppo-beluga-defconfig" { inherit upstreamDefconfig; } ''
++    cp "$upstreamDefconfig" "$out"
++  '';
++in
++kernel-builder-gcc8 {
++  version = "4.9.112";
++  inherit configfile;
++
++  src = fetchgit {
++    url = "https://github.com/aosp-mirror/kernel_msm";
++    rev = "c9e8c2ecb9a8b9453504c12469b73a3947060a4e";
++    hash = "sha256-2HKKVLtayQvt06UAAhrgtfHAxRDRewu/yrWGNlBp1ak=";
++  };
++
++  patches = [
++    (upstreamPatch "0001-scripts-dtc-Remove-redundant-YYLOC-global-declaratio.patch" "sha256-mrpPIBWIT7Ex97F4skQ9h8YOhTzLJotQGnwY/dPK72g=")
++    (upstreamPatch "0002-dts-Add-oppo-device-trees.patch" "sha256-P/zal1/f0P9h27mpMaEbwDQ0JbAkbncPVl0ORnGaho0=")
++    (upstreamPatch "0003-cyttsp5-Fix-compilation.patch" "sha256-FyYsC6oOXO5xfuCt6KyjZohgiPbITwcQz5y0V0sc39Q=")
++    (upstreamPatch "0004-oppo-Fix-compilation.patch" "sha256-lUBGW65QsnpnYxFLuYWXt2ssP8AXvWJ8UO+PUB2I+6s=")
++    (upstreamPatch "0005-pinctrl-Fix-compilation.patch" "sha256-QFPrKKMcu4FS5SB31+uTjlCgytLRjoBZrVzU7Di5iXE=")
++    (upstreamPatch "0006-btfm_slim-Fix-compilation.patch" "sha256-TZlN1sREWmqyi5Vsoh4LXks4JuD6cgyGcK+5qTBdsU8=")
++    (upstreamPatch "0007-cpuidle-Fix-compilation.patch" "sha256-2roJSFy8GSKIcJft+tNT9VCeWtLxrOmemKcRYeQPDiQ=")
++    (upstreamPatch "0008-gpu-Compilation-fix.patch" "sha256-exol3jWiW0JSEr8P0ydkxy7F7Oki+XedgrSJc5MK254=")
++    (upstreamPatch "0009-vl53l0x-Fix-compilation.patch" "sha256-jnyAqDdUS6vAQiGtVyk9AfM15jAf8aDzVwULcsLAW+E=")
++    (upstreamPatch "0010-camera_v2-Fix-compilation.patch" "sha256-vS+vuhqKU3UWIhHwqHs1cxt/fXPTj+lsJYtaO1YjrLs=")
++    (upstreamPatch "0011-ipa_v2-Fix-compilation.patch" "sha256-jT/KKoLKdoYMc06m7qYIIlgSTGKpsbFtnHBjYrkdv3M=")
++    (upstreamPatch "0012-usb-gadget-Fix-compilation.patch" "sha256-KUOFnBdG3g61c4qsRFW9sBylfgNFPXl3chNj+DINk1o=")
++    (upstreamPatch "0013-soc-qcom-Fix-compilation.patch" "sha256-wkK4hbjgGFEv0NX4KRAvoxUEvFAcr2TtV5yfPk+X5O4=")
++    (upstreamPatch "0014-initramfs-Don-t-skip-initramfs.patch" "sha256-4hmlSmuAR7lr205aCSLy9fbyp9cjW6m2jtEBhELK8qc=")
++    (upstreamPatch "0015-touchscreen-cyttsp5-Add-delay-for-wakeup-report.patch" "sha256-AZZKWGL8eb+YlKKkXwsnD1OgHs5GH9DBs8+ODCmDo5M=")
++    (upstreamPatch "0016-dts-msm8909w-Enable-more-GPU-clock-frequencies.patch" "sha256-u0ciKzWPboBvdqPol9y9dEE/BT05zOnpD2Sj4Gg2YPc=")
++    (upstreamPatch "0017-linux3.4-ARM-8933-1-replace-Sun-Solaris-style-flag-on-section.patch" "sha256-nEJRKSB9cJydzoxVg+cjtsxm5qTy3rVrGCLzr4iHML0=")
++  ];
++
++  isModular = false;
++
++  # This defconfig sets CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE, so the bootable
++  # image is arch/arm/boot/zImage-dtb (the built MSM8909 DTBs concatenated).
++  # The builder installs the bare zImage, which has no FDT. Do not add
++  # zImage-dtb to buildFlags: it shares arch/arm/boot/compressed with zImage,
++  # and a parallel make races. Build it serially after install instead.
++  # This tree has no dtbs_install target.
++  buildDTBs = false;
++  postInstall = ''
++    make $makeFlags "''${makeFlagsArray[@]}" zImage-dtb
++    cp -f "$buildRoot/arch/arm/boot/zImage-dtb" "$out/zImage"
++  '';
++}

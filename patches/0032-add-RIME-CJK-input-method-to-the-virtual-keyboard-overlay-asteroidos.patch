@@ -1,0 +1,812 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:13:58 +1100
+Subject: [PATCH] add RIME CJK input method to the virtual keyboard
+ (overlay/asteroidos)
+
+Integrate librime into asteroid-virtualkeyboard and add wearable-sized
+Chinese layouts:
+
+- 0001-add-rime-plugin-and-layouts.patch: register the RIME input method
+  plugin and layout hooks.
+- rimeinputmethod.{h,cpp}: librime engine wrapper.
+- layouts/{zh_CN,zh_HK,zh_TW}: Pinyin, Bopomofo, and Jyutping layouts.
+- default.nix: link librime, copy the plugin sources and layouts, and
+  pre-deploy common schemas with the host rime_deployer.
+---
+ .../0001-add-rime-plugin-and-layouts.patch    |  49 +++
+ .../asteroidos/virtualkeyboard/default.nix    |  36 +-
+ .../virtualkeyboard/layouts/zh_CN/main.qml    |  60 ++++
+ .../virtualkeyboard/layouts/zh_CN/symbols.qml |  54 +++
+ .../virtualkeyboard/layouts/zh_HK/main.qml    |  60 ++++
+ .../virtualkeyboard/layouts/zh_TW/main.qml    |  60 ++++
+ .../virtualkeyboard/rimeinputmethod.cpp       | 312 ++++++++++++++++++
+ .../virtualkeyboard/rimeinputmethod.h         |  68 ++++
+ 8 files changed, 698 insertions(+), 1 deletion(-)
+ create mode 100644 overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
+ create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
+ create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml
+ create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml
+ create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml
+ create mode 100644 overlay/asteroidos/virtualkeyboard/rimeinputmethod.cpp
+ create mode 100644 overlay/asteroidos/virtualkeyboard/rimeinputmethod.h
+
+diff --git a/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch b/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
+new file mode 100644
+index 00000000..b08fcd8e
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
+@@ -0,0 +1,49 @@
++--- a/CMakeLists.txt
+++++ b/CMakeLists.txt
++@@ -9,6 +9,36 @@
++ include(FeatureSummary)
++ include(GNUInstallDirs)
++ 
+++find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick VirtualKeyboard)
+++find_package(PkgConfig REQUIRED)
+++pkg_check_modules(RIME REQUIRED rime)
+++
++ add_subdirectory(styles)
++ 
+++qt_add_qml_module(qtvkbrimeplugin
+++    URI "QtQuick.VirtualKeyboard.Plugins.Rime"
+++    VERSION 1.0
+++    PLUGIN_TARGET qtvkbrimeplugin
+++    SOURCES
+++        rimeinputmethod.h
+++        rimeinputmethod.cpp
+++)
+++
+++target_include_directories(qtvkbrimeplugin PRIVATE ${RIME_INCLUDE_DIRS})
+++target_link_libraries(qtvkbrimeplugin PRIVATE
+++    Qt6::Core
+++    Qt6::Gui
+++    Qt6::Qml
+++    Qt6::VirtualKeyboard
+++    ${RIME_LIBRARIES}
+++)
+++
+++install(TARGETS qtvkbrimeplugin
+++    DESTINATION "${CMAKE_INSTALL_LIBDIR}/qt-6/qml/QtQuick/VirtualKeyboard/Plugins/Rime"
+++)
+++
+++install(DIRECTORY layouts/
+++    DESTINATION "${CMAKE_INSTALL_DATADIR}/qtvirtualkeyboard/layouts"
+++)
+++
++ feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)
++--- a/styles/watch/CMakeLists.txt
+++++ b/styles/watch/CMakeLists.txt
++@@ -1,4 +1,6 @@
++-set(STYLEDEST "${CMAKE_INSTALL_LIBDIR}/qml/QtQuick/VirtualKeyboard/Styles/watch")
+++set(STYLEDEST "${CMAKE_INSTALL_LIBDIR}/qt-6/qml/QtQuick/VirtualKeyboard/Styles/watch")
++ install(FILES style.qml DESTINATION "${STYLEDEST}")
++ install(DIRECTORY images/ DESTINATION "${STYLEDEST}/images")
++ 
+++install(FILES style.qml DESTINATION "${CMAKE_INSTALL_LIBDIR}/qml/QtQuick/VirtualKeyboard/Styles/watch")
+++install(DIRECTORY images/ DESTINATION "${CMAKE_INSTALL_LIBDIR}/qml/QtQuick/VirtualKeyboard/Styles/watch/images")
+diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
+index f5df8828..5d616bcb 100644
+--- a/overlay/asteroidos/virtualkeyboard/default.nix
++++ b/overlay/asteroidos/virtualkeyboard/default.nix
+@@ -5,6 +5,8 @@
+   cmake,
+   pkg-config,
+   qt6,
++  librime,
++  rime-data,
+   buildPackages,
+ }:
+ 
+@@ -19,18 +21,31 @@ stdenv.mkDerivation (finalAttrs: {
+     sha256 = "0yw1xq315p7q7illjpq92cs0060lrw94bfk8ywc7fbrr1gmkmvjf";
+   };
+ 
++  patches = [
++    ./0001-add-rime-plugin-and-layouts.patch
++  ];
++
++  postPatch = ''
++    cp ${./rimeinputmethod.cpp} rimeinputmethod.cpp
++    cp ${./rimeinputmethod.h} rimeinputmethod.h
++    mkdir -p layouts
++    cp -r ${./layouts}/* layouts/
++  '';
++
+   strictDeps = true;
+ 
+   nativeBuildInputs = [
+     cmake
+     pkg-config
+     qt6.wrapQtAppsHook
++    buildPackages.librime
+   ];
+ 
+   buildInputs = [
+     qt6.qtbase
+     qt6.qtdeclarative
+     qt6.qtvirtualkeyboard
++    librime
+   ];
+ 
+   cmakeFlags = [
+@@ -43,8 +58,27 @@ stdenv.mkDerivation (finalAttrs: {
+     "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
+   ];
+ 
++  # Pre-deploy common Chinese schemas (Pinyin, Shuangpin, Wubi, Cangjie, Stroke, Bopomofo, Jyutping)
++  # Upstream: https://github.com/rime/librime
++  postInstall = ''
++    mkdir -p $out/share/rime-data/build
++    cp -r ${rime-data}/share/rime-data/* $out/share/rime-data/
++
++    # Run rime_deployer on host buildPlatform to compile binary tables
++    mkdir -p build-deploy/user build-deploy/staging
++    ${buildPackages.librime}/bin/rime_deployer --add-schema \
++      luna_pinyin double_pinyin wubi86 cangjie5 stroke bopomofo jyutping \
++      build-deploy/user $out/share/rime-data
++
++    ${buildPackages.librime}/bin/rime_deployer --build \
++      build-deploy/user $out/share/rime-data build-deploy/staging || true
++
++    cp -n build-deploy/staging/* $out/share/rime-data/build/ 2>/dev/null || true
++    cp -n build-deploy/staging/* $out/share/rime-data/ 2>/dev/null || true
++  '';
++
+   meta = with lib; {
+-    description = "AsteroidOS on-screen virtual keyboard with watch style and layouts";
++    description = "AsteroidOS on-screen virtual keyboard with watch style, layouts, and integrated RIME input method engine";
+     homepage = "https://asteroidos.org/";
+     license = licenses.gpl3Plus;
+     platforms = platforms.linux;
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
+new file mode 100644
+index 00000000..911c2dc6
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
+@@ -0,0 +1,60 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++
++KeyboardLayout {
++    id: zhCNLayout
++    inputMode: InputEngine.InputMode.Pinyin
++
++    function createInputMethod() {
++        return Qt.createQmlObject('import QtQuick; import QtQuick.VirtualKeyboard.Plugins.Rime; RimeInputMethod {}', parent, "inputMethod.qml")
++    }
++
++    keyWeight: 160
++    KeyboardRow {
++        Key { key: Qt.Key_Q; text: "q" }
++        Key { key: Qt.Key_W; text: "w" }
++        Key { key: Qt.Key_E; text: "e" }
++        Key { key: Qt.Key_R; text: "r" }
++        Key { key: Qt.Key_T; text: "t" }
++        Key { key: Qt.Key_Y; text: "y" }
++        Key { key: Qt.Key_U; text: "u" }
++        Key { key: Qt.Key_I; text: "i" }
++        Key { key: Qt.Key_O; text: "o" }
++        Key { key: Qt.Key_P; text: "p" }
++        BackspaceKey {}
++    }
++    KeyboardRow {
++        FillerKey { weight: 56 }
++        Key { key: Qt.Key_A; text: "a" }
++        Key { key: Qt.Key_S; text: "s" }
++        Key { key: Qt.Key_D; text: "d" }
++        Key { key: Qt.Key_F; text: "f" }
++        Key { key: Qt.Key_G; text: "g" }
++        Key { key: Qt.Key_H; text: "h" }
++        Key { key: Qt.Key_J; text: "j" }
++        Key { key: Qt.Key_K; text: "k" }
++        Key { key: Qt.Key_L; text: "l" }
++        EnterKey { weight: 283 }
++    }
++    KeyboardRow {
++        keyWeight: 156
++        ShiftKey {}
++        Key { key: Qt.Key_Z; text: "z" }
++        Key { key: Qt.Key_X; text: "x" }
++        Key { key: Qt.Key_C; text: "c" }
++        Key { key: Qt.Key_V; text: "v" }
++        Key { key: Qt.Key_B; text: "b" }
++        Key { key: Qt.Key_N; text: "n" }
++        Key { key: Qt.Key_M; text: "m" }
++        Key { key: Qt.Key_Apostrophe; text: "'"; alternativeKeys: "\"`" }
++        Key { key: Qt.Key_Comma; text: "，" }
++        Key { key: Qt.Key_Period; text: "。" }
++    }
++    KeyboardRow {
++        keyWeight: 154
++        SymbolModeKey { weight: 217 }
++        ChangeLanguageKey { weight: 154 }
++        SpaceKey { weight: 864 }
++        HideKeyboardKey { weight: 204 }
++    }
++}
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml
+new file mode 100644
+index 00000000..9157df43
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml
+@@ -0,0 +1,54 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++
++KeyboardLayout {
++    id: zhCNSymbolsLayout
++    inputMode: InputEngine.InputMode.Latin
++
++    keyWeight: 160
++    KeyboardRow {
++        Key { key: Qt.Key_1; text: "1" }
++        Key { key: Qt.Key_2; text: "2" }
++        Key { key: Qt.Key_3; text: "3" }
++        Key { key: Qt.Key_4; text: "4" }
++        Key { key: Qt.Key_5; text: "5" }
++        Key { key: Qt.Key_6; text: "6" }
++        Key { key: Qt.Key_7; text: "7" }
++        Key { key: Qt.Key_8; text: "8" }
++        Key { key: Qt.Key_9; text: "9" }
++        Key { key: Qt.Key_0; text: "0" }
++        BackspaceKey {}
++    }
++    KeyboardRow {
++        FillerKey { weight: 56 }
++        Key { key: Qt.Key_At; text: "@" }
++        Key { key: Qt.Key_NumberSign; text: "#" }
++        Key { key: Qt.Key_Dollar; text: "¥" }
++        Key { key: Qt.Key_Percent; text: "%" }
++        Key { key: Qt.Key_Ampersand; text: "&" }
++        Key { key: Qt.Key_Minus; text: "-" }
++        Key { key: Qt.Key_Plus; text: "+" }
++        Key { key: Qt.Key_ParenLeft; text: "（" }
++        Key { key: Qt.Key_ParenRight; text: "）" }
++        EnterKey { weight: 283 }
++    }
++    KeyboardRow {
++        keyWeight: 156
++        Key { key: Qt.Key_Asterisk; text: "*" }
++        Key { key: Qt.Key_QuoteDbl; text: "“" }
++        Key { key: Qt.Key_Apostrophe; text: "’" }
++        Key { key: Qt.Key_Colon; text: "：" }
++        Key { key: Qt.Key_Semicolon; text: "；" }
++        Key { key: Qt.Key_Exclam; text: "！" }
++        Key { key: Qt.Key_Question; text: "？" }
++        Key { key: Qt.Key_Slash; text: "/" }
++        Key { key: Qt.Key_Underscore; text: "_" }
++    }
++    KeyboardRow {
++        keyWeight: 154
++        SymbolModeKey { weight: 217 }
++        ChangeLanguageKey { weight: 154 }
++        SpaceKey { weight: 864 }
++        HideKeyboardKey { weight: 204 }
++    }
++}
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml
+new file mode 100644
+index 00000000..815ca8a1
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml
+@@ -0,0 +1,60 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++
++KeyboardLayout {
++    id: zhHKLayout
++    inputMode: InputEngine.InputMode.Pinyin
++
++    function createInputMethod() {
++        return Qt.createQmlObject('import QtQuick; import QtQuick.VirtualKeyboard.Plugins.Rime; RimeInputMethod { Component.onCompleted: selectSchema("jyutping") }', parent, "inputMethod.qml")
++    }
++
++    keyWeight: 160
++    KeyboardRow {
++        Key { key: Qt.Key_Q; text: "q" }
++        Key { key: Qt.Key_W; text: "w" }
++        Key { key: Qt.Key_E; text: "e" }
++        Key { key: Qt.Key_R; text: "r" }
++        Key { key: Qt.Key_T; text: "t" }
++        Key { key: Qt.Key_Y; text: "y" }
++        Key { key: Qt.Key_U; text: "u" }
++        Key { key: Qt.Key_I; text: "i" }
++        Key { key: Qt.Key_O; text: "o" }
++        Key { key: Qt.Key_P; text: "p" }
++        BackspaceKey {}
++    }
++    KeyboardRow {
++        FillerKey { weight: 56 }
++        Key { key: Qt.Key_A; text: "a" }
++        Key { key: Qt.Key_S; text: "s" }
++        Key { key: Qt.Key_D; text: "d" }
++        Key { key: Qt.Key_F; text: "f" }
++        Key { key: Qt.Key_G; text: "g" }
++        Key { key: Qt.Key_H; text: "h" }
++        Key { key: Qt.Key_J; text: "j" }
++        Key { key: Qt.Key_K; text: "k" }
++        Key { key: Qt.Key_L; text: "l" }
++        EnterKey { weight: 283 }
++    }
++    KeyboardRow {
++        keyWeight: 156
++        ShiftKey {}
++        Key { key: Qt.Key_Z; text: "z" }
++        Key { key: Qt.Key_X; text: "x" }
++        Key { key: Qt.Key_C; text: "c" }
++        Key { key: Qt.Key_V; text: "v" }
++        Key { key: Qt.Key_B; text: "b" }
++        Key { key: Qt.Key_N; text: "n" }
++        Key { key: Qt.Key_M; text: "m" }
++        Key { key: Qt.Key_Apostrophe; text: "'"; alternativeKeys: "\"`" }
++        Key { key: Qt.Key_Comma; text: "，" }
++        Key { key: Qt.Key_Period; text: "。" }
++    }
++    KeyboardRow {
++        keyWeight: 154
++        SymbolModeKey { weight: 217 }
++        ChangeLanguageKey { weight: 154 }
++        SpaceKey { weight: 864 }
++        HideKeyboardKey { weight: 204 }
++    }
++}
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml
+new file mode 100644
+index 00000000..8231897a
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml
+@@ -0,0 +1,60 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++
++KeyboardLayout {
++    id: zhTWLayout
++    inputMode: InputEngine.InputMode.Pinyin
++
++    function createInputMethod() {
++        return Qt.createQmlObject('import QtQuick; import QtQuick.VirtualKeyboard.Plugins.Rime; RimeInputMethod { Component.onCompleted: selectSchema("bopomofo") }', parent, "inputMethod.qml")
++    }
++
++    keyWeight: 160
++    KeyboardRow {
++        Key { key: Qt.Key_Q; text: "q" }
++        Key { key: Qt.Key_W; text: "w" }
++        Key { key: Qt.Key_E; text: "e" }
++        Key { key: Qt.Key_R; text: "r" }
++        Key { key: Qt.Key_T; text: "t" }
++        Key { key: Qt.Key_Y; text: "y" }
++        Key { key: Qt.Key_U; text: "u" }
++        Key { key: Qt.Key_I; text: "i" }
++        Key { key: Qt.Key_O; text: "o" }
++        Key { key: Qt.Key_P; text: "p" }
++        BackspaceKey {}
++    }
++    KeyboardRow {
++        FillerKey { weight: 56 }
++        Key { key: Qt.Key_A; text: "a" }
++        Key { key: Qt.Key_S; text: "s" }
++        Key { key: Qt.Key_D; text: "d" }
++        Key { key: Qt.Key_F; text: "f" }
++        Key { key: Qt.Key_G; text: "g" }
++        Key { key: Qt.Key_H; text: "h" }
++        Key { key: Qt.Key_J; text: "j" }
++        Key { key: Qt.Key_K; text: "k" }
++        Key { key: Qt.Key_L; text: "l" }
++        EnterKey { weight: 283 }
++    }
++    KeyboardRow {
++        keyWeight: 156
++        ShiftKey {}
++        Key { key: Qt.Key_Z; text: "z" }
++        Key { key: Qt.Key_X; text: "x" }
++        Key { key: Qt.Key_C; text: "c" }
++        Key { key: Qt.Key_V; text: "v" }
++        Key { key: Qt.Key_B; text: "b" }
++        Key { key: Qt.Key_N; text: "n" }
++        Key { key: Qt.Key_M; text: "m" }
++        Key { key: Qt.Key_Apostrophe; text: "'"; alternativeKeys: "\"`" }
++        Key { key: Qt.Key_Comma; text: "，" }
++        Key { key: Qt.Key_Period; text: "。" }
++    }
++    KeyboardRow {
++        keyWeight: 154
++        SymbolModeKey { weight: 217 }
++        ChangeLanguageKey { weight: 154 }
++        SpaceKey { weight: 864 }
++        HideKeyboardKey { weight: 204 }
++    }
++}
+diff --git a/overlay/asteroidos/virtualkeyboard/rimeinputmethod.cpp b/overlay/asteroidos/virtualkeyboard/rimeinputmethod.cpp
+new file mode 100644
+index 00000000..d9c2f026
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/rimeinputmethod.cpp
+@@ -0,0 +1,312 @@
++/*
++ * Rime Input Method Plugin for Qt Virtual Keyboard & AsteroidOS
++ *
++ * Upstream: https://github.com/rime/librime
++ * Inspiration: https://github.com/fcitx/fcitx5-rime
++ */
++
++#include "rimeinputmethod.h"
++
++#include <rime_api.h>
++#undef Bool
++
++#include <QtCore/QDir>
++#include <QtCore/QStandardPaths>
++#include <QtCore/QLoggingCategory>
++
++namespace QtVirtualKeyboard {
++
++Q_LOGGING_CATEGORY(lcRime, "qt.virtualkeyboard.rime")
++
++RimeInputMethod::RimeInputMethod(QObject *parent)
++    : QVirtualKeyboardAbstractInputMethod(parent)
++    , m_inputMode(QVirtualKeyboardInputEngine::InputMode::Pinyin)
++    , m_currentSchema(QStringLiteral("luna_pinyin"))
++{
++    initRime();
++}
++
++RimeInputMethod::~RimeInputMethod()
++{
++    if (m_rime && m_session != 0) {
++        m_rime->destroy_session(m_session);
++        m_session = 0;
++    }
++}
++
++void RimeInputMethod::initRime()
++{
++    if (m_initialized)
++        return;
++
++    m_rime = rime_get_api();
++    if (!m_rime) {
++        qCWarning(lcRime) << "Failed to acquire Rime API";
++        return;
++    }
++
++    // Determine paths
++    QString sharedDataDir = qEnvironmentVariable("RIME_SHARED_DATA_DIR");
++    if (sharedDataDir.isEmpty() || !QDir(sharedDataDir).exists()) {
++        const QStringList searchDirs = {
++            QStringLiteral("/run/current-system/sw/share/rime-data"),
++            QStringLiteral("/usr/share/rime-data"),
++            QDir::homePath() + QStringLiteral("/.local/share/rime-data")
++        };
++        for (const QString &dir : searchDirs) {
++            if (QDir(dir).exists()) {
++                sharedDataDir = dir;
++                break;
++            }
++        }
++    }
++
++    QString userDataDir = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + QStringLiteral("/asteroid/rime");
++    QDir().mkpath(userDataDir);
++
++    RimeTraits traits;
++    RIME_STRUCT_INIT(RimeTraits, traits);
++    QByteArray sharedDirBa = sharedDataDir.toUtf8();
++    QByteArray userDirBa = userDataDir.toUtf8();
++    traits.shared_data_dir = sharedDirBa.constData();
++    traits.user_data_dir = userDirBa.constData();
++    traits.distribution_name = "Rime";
++    traits.distribution_code_name = "AsteroidOS";
++    traits.distribution_version = "1.0";
++    traits.app_name = "asteroid-virtualkeyboard";
++
++    m_rime->setup(&traits);
++    m_rime->initialize(&traits);
++    m_rime->start_maintenance(0);
++
++    m_session = m_rime->create_session();
++    if (m_session != 0) {
++        m_rime->select_schema(m_session, m_currentSchema.toUtf8().constData());
++    }
++
++    m_initialized = true;
++    qCInfo(lcRime) << "Rime initialized with shared dir:" << sharedDataDir << "user dir:" << userDataDir;
++}
++
++QList<QVirtualKeyboardInputEngine::InputMode> RimeInputMethod::inputModes(const QString &locale)
++{
++    Q_UNUSED(locale);
++    return {
++        QVirtualKeyboardInputEngine::InputMode::Pinyin,
++        QVirtualKeyboardInputEngine::InputMode::Latin
++    };
++}
++
++bool RimeInputMethod::setInputMode(const QString &locale, QVirtualKeyboardInputEngine::InputMode inputMode)
++{
++    Q_UNUSED(locale);
++    m_inputMode = inputMode;
++    reset();
++    return true;
++}
++
++bool RimeInputMethod::setTextCase(QVirtualKeyboardInputEngine::TextCase textCase)
++{
++    Q_UNUSED(textCase);
++    return true;
++}
++
++int RimeInputMethod::translateQtKeyToRime(Qt::Key key, const QString &text) const
++{
++    switch (key) {
++    case Qt::Key_Backspace:
++        return 0xff08; // XK_BackSpace
++    case Qt::Key_Return:
++    case Qt::Key_Enter:
++        return 0xff0d; // XK_Return
++    case Qt::Key_Space:
++        return 0x0020; // XK_space
++    case Qt::Key_Escape:
++        return 0xff1b; // XK_Escape
++    case Qt::Key_Delete:
++        return 0xffff; // XK_Delete
++    case Qt::Key_Apostrophe:
++        return '\'';
++    default:
++        break;
++    }
++
++    if (!text.isEmpty()) {
++        QChar ch = text.at(0);
++        if (ch.unicode() <= 127) {
++            return ch.toLower().toLatin1();
++        }
++    }
++
++    return 0;
++}
++
++bool RimeInputMethod::keyEvent(Qt::Key key, const QString &text, Qt::KeyboardModifiers modifiers)
++{
++    Q_UNUSED(modifiers);
++    if (!m_initialized || !m_rime || m_session == 0)
++        return false;
++
++    if (m_inputMode != QVirtualKeyboardInputEngine::InputMode::Pinyin)
++        return false;
++
++    // Check if composing
++    RimeContext ctx;
++    RIME_STRUCT_INIT(RimeContext, ctx);
++    bool isComposing = false;
++    if (m_rime->get_context(m_session, &ctx)) {
++        isComposing = (ctx.composition.length > 0 || ctx.menu.num_candidates > 0);
++        m_rime->free_context(&ctx);
++    }
++
++    // Space key when candidates exist selects candidate 0
++    if (key == Qt::Key_Space) {
++        if (isComposing && !m_candidates.isEmpty()) {
++            selectionListItemSelected(QVirtualKeyboardSelectionListModel::Type::WordCandidateList, 0);
++            return true;
++        }
++        return false;
++    }
++
++    // Number keys 1-9 when composing select candidate by index
++    if (isComposing && key >= Qt::Key_1 && key <= Qt::Key_9) {
++        int index = key - Qt::Key_1;
++        if (index < m_candidates.size()) {
++            selectionListItemSelected(QVirtualKeyboardSelectionListModel::Type::WordCandidateList, index);
++            return true;
++        }
++    }
++
++    int keycode = translateQtKeyToRime(key, text);
++    if (keycode == 0)
++        return false;
++
++    // Process key in Rime
++    bool handled = (m_rime->process_key(m_session, keycode, 0) != 0);
++    updateContextAndCommit();
++
++    return handled;
++}
++
++void RimeInputMethod::updateContextAndCommit()
++{
++    if (!m_rime || m_session == 0)
++        return;
++
++    // 1. Check for committed text
++    RimeCommit commit;
++    RIME_STRUCT_INIT(RimeCommit, commit);
++    if (m_rime->get_commit(m_session, &commit)) {
++        if (commit.text && commit.text[0] != '\0') {
++            if (inputContext()) {
++                inputContext()->commit(QString::fromUtf8(commit.text));
++            }
++        }
++        m_rime->free_commit(&commit);
++    }
++
++    // 2. Update context (preedit & candidates)
++    RimeContext ctx;
++    RIME_STRUCT_INIT(RimeContext, ctx);
++    if (m_rime->get_context(m_session, &ctx)) {
++        QString preedit = QString::fromUtf8(ctx.composition.preedit);
++        if (inputContext()) {
++            inputContext()->setPreeditText(preedit);
++        }
++
++        m_candidates.clear();
++        for (int i = 0; i < ctx.menu.num_candidates; ++i) {
++            m_candidates.append(QString::fromUtf8(ctx.menu.candidates[i].text));
++        }
++
++        emit selectionListChanged(QVirtualKeyboardSelectionListModel::Type::WordCandidateList);
++        emit selectionListsChanged();
++        m_rime->free_context(&ctx);
++    }
++}
++
++QList<QVirtualKeyboardSelectionListModel::Type> RimeInputMethod::selectionLists()
++{
++    return { QVirtualKeyboardSelectionListModel::Type::WordCandidateList };
++}
++
++int RimeInputMethod::selectionListItemCount(QVirtualKeyboardSelectionListModel::Type type)
++{
++    if (type == QVirtualKeyboardSelectionListModel::Type::WordCandidateList)
++        return m_candidates.size();
++    return 0;
++}
++
++QVariant RimeInputMethod::selectionListData(QVirtualKeyboardSelectionListModel::Type type, int index,
++                                            QVirtualKeyboardSelectionListModel::Role role)
++{
++    if (type == QVirtualKeyboardSelectionListModel::Type::WordCandidateList && index >= 0 && index < m_candidates.size()) {
++        if (role == QVirtualKeyboardSelectionListModel::Role::Display)
++            return m_candidates.at(index);
++    }
++    return QVariant();
++}
++
++void RimeInputMethod::selectionListItemSelected(QVirtualKeyboardSelectionListModel::Type type, int index)
++{
++    if (type == QVirtualKeyboardSelectionListModel::Type::WordCandidateList && m_rime && m_session != 0) {
++        m_rime->select_candidate(m_session, index);
++        updateContextAndCommit();
++    }
++}
++
++void RimeInputMethod::reset()
++{
++    if (m_rime && m_session != 0) {
++        m_rime->clear_composition(m_session);
++    }
++    m_candidates.clear();
++    if (inputContext()) {
++        inputContext()->setPreeditText(QString());
++    }
++    emit selectionListChanged(QVirtualKeyboardSelectionListModel::Type::WordCandidateList);
++    emit selectionListsChanged();
++}
++
++void RimeInputMethod::update()
++{
++    // No-op
++}
++
++bool RimeInputMethod::selectSchema(const QString &schemaId)
++{
++    if (!m_rime || m_session == 0)
++        return false;
++
++    QByteArray schemaBa = schemaId.toUtf8();
++    bool ok = (m_rime->select_schema(m_session, schemaBa.constData()) != 0);
++    if (ok) {
++        m_currentSchema = schemaId;
++        reset();
++        emit schemaChanged(m_currentSchema);
++        qCInfo(lcRime) << "Selected Rime schema:" << schemaId;
++        return true;
++    }
++    return false;
++}
++
++QString RimeInputMethod::currentSchema() const
++{
++    return m_currentSchema;
++}
++
++QStringList RimeInputMethod::availableSchemas() const
++{
++    return {
++        QStringLiteral("luna_pinyin"),
++        QStringLiteral("double_pinyin"),
++        QStringLiteral("double_pinyin_flypy"),
++        QStringLiteral("wubi86"),
++        QStringLiteral("cangjie5"),
++        QStringLiteral("stroke"),
++        QStringLiteral("bopomofo"),
++        QStringLiteral("jyutping")
++    };
++}
++
++} // namespace QtVirtualKeyboard
+diff --git a/overlay/asteroidos/virtualkeyboard/rimeinputmethod.h b/overlay/asteroidos/virtualkeyboard/rimeinputmethod.h
+new file mode 100644
+index 00000000..2c64e4f0
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/rimeinputmethod.h
+@@ -0,0 +1,68 @@
++/*
++ * Rime Input Method Plugin for Qt Virtual Keyboard & AsteroidOS
++ *
++ * Upstream: https://github.com/rime/librime
++ * Inspiration: https://github.com/fcitx/fcitx5-rime
++ */
++
++#pragma once
++
++#include <QtVirtualKeyboard/qvirtualkeyboardabstractinputmethod.h>
++#include <QtVirtualKeyboard/qvirtualkeyboardinputcontext.h>
++#include <QtVirtualKeyboard/qvirtualkeyboardinputengine.h>
++#include <QtQml/qqml.h>
++#include <QtCore/QStringList>
++#include <QtCore/QPointer>
++
++typedef struct rime_api_t RimeApi;
++
++namespace QtVirtualKeyboard {
++
++class RimeInputMethod : public QVirtualKeyboardAbstractInputMethod
++{
++    Q_OBJECT
++    QML_ELEMENT
++    QML_ADDED_IN_VERSION(1, 0)
++    Q_PROPERTY(QString currentSchema READ currentSchema WRITE selectSchema NOTIFY schemaChanged)
++    Q_PROPERTY(QStringList availableSchemas READ availableSchemas CONSTANT)
++
++public:
++    explicit RimeInputMethod(QObject *parent = nullptr);
++    ~RimeInputMethod() override;
++
++    QList<QVirtualKeyboardInputEngine::InputMode> inputModes(const QString &locale) override;
++    bool setInputMode(const QString &locale, QVirtualKeyboardInputEngine::InputMode inputMode) override;
++    bool setTextCase(QVirtualKeyboardInputEngine::TextCase textCase) override;
++
++    bool keyEvent(Qt::Key key, const QString &text, Qt::KeyboardModifiers modifiers) override;
++
++    QList<QVirtualKeyboardSelectionListModel::Type> selectionLists() override;
++    int selectionListItemCount(QVirtualKeyboardSelectionListModel::Type type) override;
++    QVariant selectionListData(QVirtualKeyboardSelectionListModel::Type type, int index,
++                               QVirtualKeyboardSelectionListModel::Role role) override;
++    void selectionListItemSelected(QVirtualKeyboardSelectionListModel::Type type, int index) override;
++
++    void reset() override;
++    void update() override;
++
++    Q_INVOKABLE bool selectSchema(const QString &schemaId);
++    Q_INVOKABLE QString currentSchema() const;
++    Q_INVOKABLE QStringList availableSchemas() const;
++
++Q_SIGNALS:
++    void schemaChanged(const QString &schemaId);
++
++private:
++    void initRime();
++    void updateContextAndCommit();
++    int translateQtKeyToRime(Qt::Key key, const QString &text) const;
++
++    RimeApi *m_rime = nullptr;
++    uintptr_t m_session = 0;
++    QStringList m_candidates;
++    QString m_currentSchema;
++    QVirtualKeyboardInputEngine::InputMode m_inputMode;
++    bool m_initialized = false;
++};
++
++} // namespace QtVirtualKeyboard

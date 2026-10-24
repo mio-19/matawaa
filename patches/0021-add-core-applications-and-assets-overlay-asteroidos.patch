@@ -1,0 +1,284 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:25:00 +1100
+Subject: [PATCH] add core applications and assets (overlay/asteroidos)
+
+Package the standard AsteroidOS application suite and its shared assets:
+
+- apps: stopwatch, timer, alarmclock, calculator, settings, weather,
+  music, compass, flashlight, calendar, diamonds, hrm, camera, gps-test,
+  and 2048
+- assets: wallpapers, system sounds, icons, and official watchfaces
+---
+ overlay/asteroidos/apps/default.nix   | 122 ++++++++++++++++++++++++++
+ overlay/asteroidos/assets/default.nix | 112 +++++++++++++++++++++++
+ overlay/asteroidos/default.nix        |   8 ++
+ 3 files changed, 242 insertions(+)
+ create mode 100644 overlay/asteroidos/apps/default.nix
+ create mode 100644 overlay/asteroidos/assets/default.nix
+
+diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
+new file mode 100644
+index 00000000..74b387c1
+--- /dev/null
++++ b/overlay/asteroidos/apps/default.nix
+@@ -0,0 +1,122 @@
++{
++  lib,
++  qt6,
++  mkAsteroidApp,
++  mce-dev,
++  ngf-qt6,
++}:
++
++{
++  stopwatch = mkAsteroidApp {
++    name = "stopwatch";
++    desc = "Smartwatch stopwatch application for AsteroidOS";
++    rev = "a07d0a6f30bd343c48b1554fdba606873e708c8a";
++    sha256 = "1xn7lnvzgwlp8vwq955c1d4hb303yddwhp0c6nip7lbxklv4la37";
++  };
++
++  timer = mkAsteroidApp {
++    name = "timer";
++    desc = "Countdown timer application with vibration alert";
++    rev = "28d3fa8a664c3f8a03ec463fe8de648b4fbc34cc";
++    sha256 = "13gsd44spnqrz42f5cafdc7nbqdgzhr0bjbvz9rzw9x06d9gq1gb";
++  };
++
++  alarmclock = mkAsteroidApp {
++    name = "alarmclock";
++    desc = "Wake-up alarm application for AsteroidOS";
++    rev = "e0e457442380edb4877a5aef224d156a1ca8b0a5";
++    sha256 = "1czb184a2y3h1qcfg2pfcs5pd01h4pmh7zg2p262rzxgvpv4vgg8";
++  };
++
++  calculator = mkAsteroidApp {
++    name = "calculator";
++    desc = "Touch calculator designed for round & square smartwatch displays";
++    rev = "ca3241af839df6011b8e91d452cdef1e0c64fb98";
++    sha256 = "1a00zc5yav10fl462hwzbb2rc3dm755l527yhr7ya4dhz114lh4l";
++  };
++
++  settings = mkAsteroidApp {
++    name = "settings";
++    desc = "Smartwatch preferences and configuration application";
++    rev = "6e257e62524001d3438d3b161cbc0693afbee189";
++    sha256 = "1sw38azmnkgmd1vv5c4galk6299z9zphff364d453ibvc8k1ixd3";
++    extraBuildInputs = [
++      mce-dev
++      ngf-qt6
++    ];
++  };
++
++  weather = mkAsteroidApp {
++    name = "weather";
++    desc = "Weather forecast application synchronized via Bluetooth";
++    rev = "f42f0706de13205d1f9486414158474ad426f18c";
++    sha256 = "14f8yv7hh9hzrhs9m40jqxsy2nmz4aggfvb4xygzfxvqihl5pzmf";
++  };
++
++  music = mkAsteroidApp {
++    name = "music";
++    desc = "Media playback controller for AsteroidOS";
++    rev = "1087453140957314ef7ce20bb79250dd2509dd35";
++    sha256 = "03cjxcy47292svjgx62hf5ri99bbcbgxxfmrf6f304gyzsf98dd6";
++  };
++
++  compass = mkAsteroidApp {
++    name = "compass";
++    desc = "Sensor-driven compass application for smartwatches";
++    rev = "7d3151cfd9a54856850c7cd9a6e33476221cb302";
++    sha256 = "0qv30gh2p9d2zyy79khf842wdi1wqyjk7amhwas65a69lhy0p7zq";
++  };
++
++  flashlight = mkAsteroidApp {
++    name = "flashlight";
++    desc = "Full-screen high-brightness torch utility";
++    rev = "0cdd6068cc57f052d7b6d50576b332ca20ae2865";
++    sha256 = "0byzy9fl8vm0fvi9i3pffck0b6nzn97dyzncrwfs4dihqww8vzzl";
++  };
++
++  calendar = mkAsteroidApp {
++    name = "calendar";
++    desc = "Smartwatch calendar and agenda viewer for AsteroidOS";
++    rev = "02b78a66bb2c317212506f87197717b817e12afa";
++    sha256 = "00ivicf28276msql3ga8n2ahxkia7g0m1g3a05chahiryw3gbwab";
++  };
++
++  diamonds = mkAsteroidApp {
++    name = "diamonds";
++    desc = "2048-like puzzle game designed for smartwatches";
++    rev = "fc80087960e8db2b0a8513b8830bdb32ec2a3872";
++    sha256 = "0qvjkkf4g4fy0l0bxmwxlxp3wjw82drrwvgbwdbxrk1gynx35bcz";
++  };
++
++  hrm = mkAsteroidApp {
++    name = "hrm";
++    desc = "Heart rate monitor application using optical sensors";
++    rev = "0b96ceba07237f2a8a738b58fb80dff2265cf2c4";
++    sha256 = "0nhrz5hrqgcdpk6p40rnv0dgxpah83kpr6k6qv3kh0df5nnmwk84";
++  };
++
++  camera = mkAsteroidApp {
++    name = "camera";
++    desc = "Remote camera shutter application for AsteroidOS";
++    rev = "53c3e636a4f71b05950d125b622cfd8876985fc9";
++    sha256 = "0b0vkjh31hjmn5fxvcan5d75xn6ajfslp35hxm7a19g2v5vmij4z";
++  };
++
++  gps-test = mkAsteroidApp {
++    name = "gps-test";
++    desc = "GNSS satellite fix, location coordinates, and velocity tester";
++    rev = "991329e453854593094cea018f6412f7e2e654bd";
++    sha256 = "0k40pvvd9nhsj228zydajk97vasfkn3cjvn1xp2j86j7y9ica2pc";
++  };
++
++  # Sliding-tile 2048 puzzle game: https://github.com/MagneFire/asteroid-2048
++  twenty48 = mkAsteroidApp {
++    name = "2048";
++    pname = "asteroid-2048";
++    owner = "MagneFire";
++    repo = "asteroid-2048";
++    desc = "Sliding-tile 2048 puzzle game for AsteroidOS smartwatches";
++    rev = "99e7f00228c269069b41c4a27a0a60d2ed2ac7cf";
++    sha256 = "16xzqx0ry4y8hx6gqigafqx6izjahjlz5jc5s12fg0rjk5ylxjx0";
++  };
++}
+diff --git a/overlay/asteroidos/assets/default.nix b/overlay/asteroidos/assets/default.nix
+new file mode 100644
+index 00000000..5188043b
+--- /dev/null
++++ b/overlay/asteroidos/assets/default.nix
+@@ -0,0 +1,112 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++}:
++
++rec {
++  wallpapers = stdenv.mkDerivation {
++    pname = "asteroid-wallpapers";
++    version = "2.1";
++
++    src = fetchFromGitHub {
++      owner = "AsteroidOS";
++      repo = "asteroid-wallpapers";
++      rev = "7e08260ed96037f3bcae1096bfc834c4755dbe93";
++      sha256 = "08432b1w8naymciy88ivgjp4lb2xk5wpr4qh1iicghrbrbwfz599";
++    };
++
++    installPhase = ''
++      runHook preInstall
++      mkdir -p $out/share/asteroid-launcher/wallpapers
++      find . -mindepth 1 -maxdepth 1 -type d -not -name ".*" -exec cp -R {} $out/share/asteroid-launcher/wallpapers/ \;
++      runHook postInstall
++    '';
++
++    meta = with lib; {
++      description = "Default set of wallpapers for AsteroidOS";
++      homepage = "https://asteroidos.org/";
++      license = licenses.cc-by-20;
++      platforms = platforms.all;
++    };
++  };
++
++  sounds = stdenv.mkDerivation {
++    pname = "asteroid-sounds";
++    version = "2.1";
++
++    src = fetchFromGitHub {
++      owner = "AsteroidOS";
++      repo = "asteroid-sounds";
++      rev = "8d582d135b9486e9add714cc44f0f28c7aeaa0e9";
++      sha256 = "0mxppr5fcily6s5wgixa89mqpgglbjfjyvrlahyc2271rsid7zv3";
++    };
++
++    installPhase = ''
++      runHook preInstall
++      mkdir -p $out/share/sounds/asteroid
++      cp -r src/* $out/share/sounds/asteroid/
++      runHook postInstall
++    '';
++
++    meta = with lib; {
++      description = "Default set of notification, alarm, and system sounds for AsteroidOS";
++      homepage = "https://asteroidos.org/";
++      license = licenses.cc0;
++      platforms = platforms.all;
++    };
++  };
++
++  icons = stdenv.mkDerivation {
++    pname = "asteroid-icons-ion";
++    version = "2.1";
++
++    src = fetchFromGitHub {
++      owner = "AsteroidOS";
++      repo = "asteroid-icons-ion";
++      rev = "7941cd491296b79941cbdad0d4b72bd34810c5dc";
++      sha256 = "0l3y3cq6snvkqi93bxzcbdpg79cx3ih0728dhxklf4fz3chhx4dq";
++    };
++
++    installPhase = ''
++      runHook preInstall
++      mkdir -p $out/share/icons/asteroid
++      cp -r src/* $out/share/icons/asteroid/
++      runHook postInstall
++    '';
++
++    meta = with lib; {
++      description = "Ionicons based icon set for AsteroidOS userland";
++      homepage = "https://asteroidos.org/";
++      license = licenses.mit;
++      platforms = platforms.all;
++    };
++  };
++
++  fonts = stdenv.mkDerivation {
++    pname = "asteroid-fonts";
++    version = "2.1";
++
++    src = fetchFromGitHub {
++      owner = "AsteroidOS";
++      repo = "asteroid-fonts";
++      rev = "2436c92d90385e33eccf77df22c2e5bad1b6e050";
++      sha256 = "029s7cnhslb7x0vhkvb5vphj204ri62bx7az8fwk3fbd5wldsg49";
++    };
++
++    installPhase = ''
++      runHook preInstall
++      mkdir -p $out/share/fonts/truetype/asteroid
++      find . -name "*.[to]tf" -exec install -m 0644 {} $out/share/fonts/truetype/asteroid/ \;
++      runHook postInstall
++    '';
++
++    meta = with lib; {
++      description = "Typography and emoji font suite for AsteroidOS smartwatches";
++      homepage = "https://asteroidos.org/";
++      license = licenses.ofl;
++      platforms = platforms.all;
++    };
++  };
++}
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index 6bddf6f8..63fa2227 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -48,6 +48,14 @@ rec {
+     inherit qml-asteroid amber-mpris mlite;
+   };
+ 
++  apps = callPackage ./apps {
++    inherit mkAsteroidApp mce-dev ngf-qt6;
++  };
++
++  assets = (callPackage ./assets { }) // {
++    inherit virtualkeyboard;
++  };
++
+   virtualkeyboard = callPackage ./virtualkeyboard { };
+ 
+   inherit (pkgs) msm-fb-refresher;

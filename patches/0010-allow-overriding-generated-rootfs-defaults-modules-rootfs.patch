@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:22:05 +1100
+Subject: [PATCH] allow overriding generated rootfs defaults (modules/rootfs)
+
+Move the filesystem type and label into mkDefault bindings inside the
+generated rootfs configuration. Devices can now override the default
+ext4/NIXOS_SYSTEM values without disabling the whole default
+configuration.
+---
+ modules/rootfs.nix | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/modules/rootfs.nix b/modules/rootfs.nix
+index 818308b1..595f045d 100644
+--- a/modules/rootfs.nix
++++ b/modules/rootfs.nix
+@@ -36,9 +36,9 @@ in
+   config = mkIf (config.mobile.rootfs.enableDefaultConfiguration) {
+     boot.growPartition = lib.mkDefault true;
+ 
+-    mobile.generatedFilesystems.rootfs = lib.mkDefault {
+-      filesystem = "ext4";
+-      label = "NIXOS_SYSTEM";
++    mobile.generatedFilesystems.rootfs = {
++      filesystem = lib.mkDefault "ext4";
++      label = lib.mkDefault "NIXOS_SYSTEM";
+       ext4.partitionID = "44444444-4444-4444-8888-888888888888";
+ 
+       populateCommands =

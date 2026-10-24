@@ -33,6 +33,7 @@ git -C "$WORK_DIR" format-patch \
     --zero-commit \
     --no-numbered \
     --no-signature \
+    --filename-max-length=110 \
     -o "$TEMP_PATCH_DIR" \
     "$UPSTREAM_COMMIT"..HEAD
 

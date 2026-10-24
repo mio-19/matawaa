@@ -1,0 +1,158 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 20 Oct 2026 19:32:12 +1100
+Subject: [PATCH] add local kernel fixes and defconfig (devices/fossil-hoki)
+
+Add the hoki-specific kernel changes that are not available from the
+upstream AsteroidOS patch set:
+
+- 0007-pcm_native: guard pm_qos_remove_request() with an active check
+- 90_dtbs-install: provide the missing ARM dtbs_install target
+- defconfig.patch: enable Bluetooth RFCOMM/BNEP/HIDP, btrfs, and zstd
+
+The remaining vendor kernel patches are fetched from the pinned
+AsteroidOS meta-smartwatch revision by the kernel derivation.
+---
+ ...d-pm_qos_remove_request-with-active-.patch | 40 ++++++++++++++++
+ .../fossil-hoki/kernel/90_dtbs-install.patch  | 29 +++++++++++
+ devices/fossil-hoki/kernel/defconfig.patch    | 48 +++++++++++++++++++
+ 3 files changed, 117 insertions(+)
+ create mode 100644 devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
+ create mode 100644 devices/fossil-hoki/kernel/90_dtbs-install.patch
+ create mode 100644 devices/fossil-hoki/kernel/defconfig.patch
+
+diff --git a/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch b/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
+new file mode 100644
+index 00000000..cd5c429b
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
+@@ -0,0 +1,40 @@
++From: pettcomputers <chris@pettcomputers.com>
++Date: Tue, 2 Sep 2026 00:00:00 -0500
++Subject: [PATCH] pcm_native: guard pm_qos_remove_request with an active check
++ in snd_pcm_hw_free
++
++snd_pcm_hw_free() calls pm_qos_remove_request() unconditionally, while
++two other call sites in this same file (snd_pcm_release_substream and
++snd_pcm_hw_params) correctly guard the equivalent remove call with
++pm_qos_request_active() first. If hw_params ever skips its own
++conditional pm_qos_add_request() (a real, reachable path on hoki via
++the "Tertiary MI2S TX Hostless" PCM device, which never gets a real
++stream opened against it), hw_free's unconditional remove fires
++against a request that was never added, producing a kernel warning
++with a full backtrace.
++
++Found while debugging audio capture on hoki (Skagen Falster Gen 6) -
++see https://github.com/AsteroidOS/meta-smartwatch (audio bring-up).
++Confirmed via direct before/after dmesg comparison that the warning
++and backtrace are gone after this change, both immediately post-boot
++and after a settled retest.
++
++Signed-off-by: pettcomputers <chris@pettcomputers.com>
++---
++ sound/core/pcm_native.c | 1 +
++ 1 file changed, 1 insertion(+)
++
++diff --git a/sound/core/pcm_native.c b/sound/core/pcm_native.c
++index 7d9ef49..cfbf2b5 100644
++--- a/sound/core/pcm_native.c
+++++ b/sound/core/pcm_native.c
++@@ -787,6 +787,7 @@ static int snd_pcm_hw_free(struct snd_pcm_substream *substream)
++ 	if (substream->ops->hw_free)
++ 		result = substream->ops->hw_free(substream);
++ 	snd_pcm_set_state(substream, SNDRV_PCM_STATE_OPEN);
+++	if (pm_qos_request_active(&substream->latency_pm_qos_req))
++ 	pm_qos_remove_request(&substream->latency_pm_qos_req);
++ 	return result;
++ }
++--
++2.34.1
+diff --git a/devices/fossil-hoki/kernel/90_dtbs-install.patch b/devices/fossil-hoki/kernel/90_dtbs-install.patch
+new file mode 100644
+index 00000000..1cd6dc69
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/90_dtbs-install.patch
+@@ -0,0 +1,29 @@
++Add a dtbs_install target for the hoki DTB
++
++This downstream 4.14 tree defines dtbs_install only under arch/arm64; ARM has
++no such target, so `make dtbs dtbs_install` installs nothing.
++
++The sda429-hoki sub-make writes its blob to $(obj)/../%.dtb, i.e. into
++arch/arm/boot/dts/, and the parent dts/Makefile never lists it in dtb-y. That
++puts the DTB out of reach of scripts/Makefile.dtbinst, so copy it directly.
++
++diff --git a/arch/arm/Makefile b/arch/arm/Makefile
++--- a/arch/arm/Makefile
+++++ b/arch/arm/Makefile
++@@ -361,6 +361,16 @@ $(INSTALL_TARGETS):
++ %.dtb: | scripts
++ 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
++ 
+++# This downstream tree has no dtbs_install for ARM (only arm64 defines one).
+++# The hoki DTB is built into $(boot)/dts/ by the sda429-hoki sub-make, which
+++# writes to $(obj)/../%.dtb, so it is not reachable via
+++# scripts/Makefile.dtbinst (the parent dts/Makefile does not list it in
+++# dtb-y). Install it directly.
+++PHONY += dtbs_install
+++dtbs_install:
+++	$(Q)mkdir -p $(INSTALL_DTBS_PATH)
+++	$(Q)cp -v $(boot)/dts/*.dtb $(INSTALL_DTBS_PATH)/
+++
++ dtbs: scripts
++ 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) dtbs
++ 	$(foreach DIR, $(DTSSUBDIR), $(Q)$(MAKE) $(build)=$(boot)/dts/$(DIR) MACHINE=$(MACHINE) dtbs)
+diff --git a/devices/fossil-hoki/kernel/defconfig.patch b/devices/fossil-hoki/kernel/defconfig.patch
+new file mode 100644
+index 00000000..b15a40c2
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/defconfig.patch
+@@ -0,0 +1,48 @@
++--- a/defconfig
+++++ b/defconfig
++@@ -1177,8 +1177,14 @@
++ # CONFIG_HAMRADIO is not set
++ # CONFIG_CAN is not set
++ CONFIG_BT=y
++-# CONFIG_BT_BREDR is not set
++-# CONFIG_BT_LE is not set
+++CONFIG_BT_BREDR=y
+++CONFIG_BT_RFCOMM=y
+++CONFIG_BT_RFCOMM_TTY=y
+++CONFIG_BT_BNEP=y
+++CONFIG_BT_BNEP_MC_FILTER=y
+++CONFIG_BT_BNEP_PROTO_FILTER=y
+++CONFIG_BT_HIDP=y
+++CONFIG_BT_LE=y
++ # CONFIG_BT_LEDS is not set
++ # CONFIG_BT_SELFTEST is not set
++ # CONFIG_BT_DEBUGFS is not set
++@@ -4491,9 +4497,12 @@
++ # CONFIG_JFS_FS is not set
++ # CONFIG_XFS_FS is not set
++ # CONFIG_GFS2_FS is not set
++-# CONFIG_OCFS2_FS is not set
++-# CONFIG_BTRFS_FS is not set
++-# CONFIG_NILFS2_FS is not set
+++CONFIG_BTRFS_FS=y
+++CONFIG_BTRFS_FS_POSIX_ACL=y
+++# CONFIG_BTRFS_FS_CHECK_INTEGRITY is not set
+++# CONFIG_BTRFS_FS_RUN_SANITY_TESTS is not set
+++# CONFIG_BTRFS_DEBUG is not set
+++# CONFIG_BTRFS_ASSERT is not set
++ CONFIG_F2FS_FS=y
++ CONFIG_F2FS_STAT_FS=y
++ CONFIG_F2FS_FS_XATTR=y
++@@ -5051,7 +5060,11 @@
++ # CONFIG_CRYPTO_842 is not set
++ CONFIG_CRYPTO_LZ4=y
++ CONFIG_CRYPTO_LZ4HC=y
++-# CONFIG_CRYPTO_ZSTD is not set
+++CONFIG_CRYPTO_ZSTD=y
+++CONFIG_ZSTD_COMPRESS=y
+++CONFIG_ZSTD_DECOMPRESS=y
+++CONFIG_XXHASH=y
+++CONFIG_CRYPTO_XXHASH=y
++ 
++ #
++ # Random Number Generation
