@@ -1,12 +1,12 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Fri, 23 Oct 2026 15:50:57 +1100
-Subject: [PATCH] devices/fossil-hoki: use a compressed btrfs rootfs
+Subject: [PATCH] devices/fossil-hoki: use 4.14-compatible btrfs mount options
 
-Use btrfs with zstd compression and 4.14-supported mount options
-(noatime, space_cache=v2), enable automatic resize, and create the
-standard /var symlinks in the generated image. Fold the earlier ext4
-and btrfs mount-option experiments into the final btrfs configuration.
+The first btrfs change enabled zstd compression. This follow-up selects
+the 4.14-supported mount options (noatime, space_cache=v2) and keeps the
+compressed rootfs; the ext4 experiment is folded into the final
+configuration.
 
 Signed-off-by: Mio <mio@mio19.uk>
 ---

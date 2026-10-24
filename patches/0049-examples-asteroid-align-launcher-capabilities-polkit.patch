@@ -1,13 +1,13 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Thu, 22 Oct 2026 01:13:05 +1100
-Subject: [PATCH] examples/asteroid: align launcher capabilities and polkit
- rule
+Subject: [PATCH] examples/asteroid: align launcher capabilities, polkit, and
+ nightly pin
 
-Match upstream AsteroidOS:
-- grant asteroid-launcher cap_wake_alarm and cap_block_suspend for
-  always-on-display ticks through the NixOS security wrapper
-- allow the ceres user to reboot and power off via polkit
+Grant the hwcomposer capability, install the upstream polkit rule, and
+pin the launcher to the current nightly that uses it.
+
+Signed-off-by: Mio <mio@mio19.uk>
 ---
  devices/fossil-hoki/kernel/default.nix        |  23 +-
  .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++++++++++++

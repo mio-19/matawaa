@@ -1,9 +1,13 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Fri, 23 Oct 2026 20:40:54 +1100
-Subject: [PATCH] examples/asteroid: disable polkit private namespaces on 4.14
+Subject: [PATCH] examples/asteroid: disable the polkit sandbox on 4.14
 
-polkitd exits with status=226/NAMESPACE because the vendor kernel has no /dev/mqueue or /dev/hugepages for the private-device namespace. Disable PrivateDevices and PrivateTmp for polkit so it can start and authorize loginctl SetUserLinger.
+Private namespaces and all sandbox namespaces are unavailable on 4.14;
+disable them so polkit can start and logind can process the linger
+request.
+
+Signed-off-by: Mio <mio@mio19.uk>
 ---
  examples/asteroid/asteroid-desktop.nix | 20 ++++++++++++++++++++
  1 file changed, 20 insertions(+)
