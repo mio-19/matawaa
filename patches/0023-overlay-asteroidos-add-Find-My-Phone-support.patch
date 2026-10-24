@@ -303,7 +303,7 @@ index 00000000..d34883f4
 +        ;;
 +esac
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 793dfc2b..1e0f7da9 100644
+index 20f9f747..bfc24190 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -36,6 +36,13 @@ stdenv.mkDerivation (finalAttrs: {

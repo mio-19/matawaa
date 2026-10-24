@@ -1,43 +1,30 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
-Date: Fri, 23 Oct 2026 17:07:34 +1100
+Date: Sat, 24 Oct 2026 17:18:23 +1100
 Subject: [PATCH] boot: keep multi-user and user sessions non-blocking
 
-Create /var/run and /var/lock in the target root, run dhcpcd in the
-background, and use explicit drop-ins for nscd and systemd-user-sessions
-so nss-user-lookup cannot hold multi-user.target on the vendor kernel.
+Run dhcpcd in the background and use explicit drop-ins for nscd and systemd-user-sessions so nss-user-lookup cannot hold multi-user.target on the vendor kernel. The nscd unit is forced to Type=simple, and the systemd-user-sessions After= on nss-user-lookup is cleared, because the journal showed multi-user.target still waiting for it.
 ---
- boot/init/tasks/switch_root.rb  |  8 ++++++++
- devices/families/asteroidos.nix | 16 ++++++++++++++++
- 2 files changed, 24 insertions(+)
+ devices/families/asteroidos.nix | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
-index b3a6045b..8f5c877d 100644
---- a/boot/init/tasks/switch_root.rb
-+++ b/boot/init/tasks/switch_root.rb
-@@ -386,6 +386,14 @@ class Tasks::SwitchRoot < SingletonTask
-   def run()
-     init = File.join(selected_generation.path, "init")
- 
-+    # The generated rootfs image does not populate the standard /var/run and
-+    # /var/lock symlinks. Create them in the target root before systemd starts;
-+    # otherwise dhcpcd/nscd fail and multi-user.target stays held.
-+    system_var = File.join(SYSTEM_MOUNT_POINT, "var")
-+    System.run("mkdir", "-p", system_var)
-+    System.run("ln", "-sfn", "/run", File.join(system_var, "run"))
-+    System.run("ln", "-sfn", "/run/lock", File.join(system_var, "lock"))
-+
-     # This is the traditional way we printed the init path.
-     # This is still helpful to take vertical real estate when visually looking
-     # through the log.
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 2667e25b..01323613 100644
+index 46ce2d83..4a0a75f4 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
-@@ -75,6 +75,22 @@ in
+@@ -66,6 +66,31 @@ in
      nixos.enable = mkDefault false;
    };
  
++  # nscd is now Type=simple, but the journal still shows multi-user.target
++  # waiting for systemd-user-sessions.service, whose upstream unit is ordered
++  # after nss-user-lookup.target. Keep the nscd fix and explicitly remove that
++  # ordering so the user session and launcher can start.
++  systemd.services.systemd-user-sessions = {
++    after = lib.mkForce [ ];
++    overrideStrategy = "asDropin";
++  };
++
 +  # nsncd's generated nscd.service is Type=notify but the daemon never sends
 +  # READY. Use an explicit drop-in so the setting applies to the nscd unit that
 +  # nss-user-lookup.target requires, not only to a newly generated unit. With

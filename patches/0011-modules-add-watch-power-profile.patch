@@ -3,16 +3,14 @@ From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:22:17 +1100
 Subject: [PATCH] modules: add watch power profile
 
-Add mobile.hardware.watch.powerManagement, which applies wearable power
-and memory tuning when enabled:
+Add mobile.hardware.watch.powerManagement, which applies wearable power and memory tuning when enabled:
 
 - zram swap with zstd and a high memory percentage
 - volatile, size-limited journald storage to reduce eMMC writes
 - swappiness and dirty-page writeback tuning
 - schedutil CPU frequency governor where cpupower is available
 
-The profile is gated on mobile.hardware.watch.enable and defaults to on
-for watch devices only.
+The journald storage uses the structured services.journald.settings.Journal attributes required by current nixpkgs. The profile is gated on mobile.hardware.watch.enable and defaults to on for watch devices only.
 ---
  modules/module-list.nix |  1 +
  modules/watch-power.nix | 61 +++++++++++++++++++++++++++++++++++++++++
@@ -32,7 +30,7 @@ index e9d9a143..0a18885d 100644
  ]
 diff --git a/modules/watch-power.nix b/modules/watch-power.nix
 new file mode 100644
-index 00000000..0432730a
+index 00000000..5b936f61
 --- /dev/null
 +++ b/modules/watch-power.nix
 @@ -0,0 +1,61 @@
@@ -77,10 +75,10 @@ index 00000000..0432730a
 +
 +    # Systemd journal volatile storage reduces write cycles on watch eMMC/UFS storage
 +    # and saves flash controller power draw.
-+    services.journald.extraConfig = ''
-+      Storage=volatile
-+      RuntimeMaxUse=16M
-+    '';
++    services.journald.settings.Journal = {
++      Storage = "volatile";
++      RuntimeMaxUse = "16M";
++    };
 +
 +    # Sysctl kernel tuning for battery life and wrist devices
 +    boot.kernel.sysctl = {

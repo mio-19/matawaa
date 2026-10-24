@@ -847,10 +847,10 @@ index 00000000..c8cf0974
 +    return status;
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index b1ed8dc8..e1f47936 100644
+index d80b058c..ac28998c 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -35,10 +35,20 @@ rec {
+@@ -43,10 +43,20 @@ rec {
      inherit qml-asteroid amber-mpris mlite;
    };
  

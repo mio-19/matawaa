@@ -4,25 +4,24 @@ Date: Tue, 20 Oct 2026 10:42:20 +1100
 Subject: [PATCH] examples: add asteroid smartwatch desktop demonstration
  system
 
-This patch introduces examples/asteroid/:
+Add examples/asteroid/, a complete example system demonstrating the AsteroidOS Wayland desktop, compositor, virtual keyboard, and preinstalled smartwatch applications.
 
-- Complete example system demonstrating the AsteroidOS Wayland desktop,
-  compositor, virtual keyboard, and preinstalled smartwatch applications.
+Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
- examples/asteroid/asteroid-desktop.nix | 167 +++++++++++++++++++++++++
- examples/asteroid/configuration.nix    |  37 ++++++
- examples/asteroid/default.nix          |  15 +++
- 3 files changed, 219 insertions(+)
+ examples/asteroid/asteroid-desktop.nix | 210 +++++++++++++++++++++++++
+ examples/asteroid/configuration.nix    |  38 +++++
+ examples/asteroid/default.nix          |  15 ++
+ 3 files changed, 263 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..a934b5e3
+index 00000000..de8eaf4d
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,210 @@
 +{
 +  config,
 +  lib,
@@ -150,8 +149,8 @@ index 00000000..a934b5e3
 +      QT_VIRTUALKEYBOARD_STYLE = "watch";
 +      QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
 +      RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
-+      QML2_IMPORT_PATH = "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml:${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml";
-+      QT_PLUGIN_PATH = "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins";
++      QML2_IMPORT_PATH = "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qt5compat}/lib/qt-6/qml:${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml:${pkgs.asteroid.mce-qt6}/lib/qt-6/qml:${pkgs.asteroid.mlite}/lib/qt-6/qml:${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml";
++      QT_PLUGIN_PATH = "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins";
 +      # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
 +      QT_ENABLE_HIGHDPI_SCALING = "0";
 +    };
@@ -161,27 +160,70 @@ index 00000000..a934b5e3
 +    systemd.user.services.asteroid-launcher = {
 +      description = "AsteroidOS Wayland Compositor and Launcher";
 +      wantedBy = [ "default.target" ];
++      requires = [ "dbus.socket" ];
++      unitConfig.ConditionUser = "!root";
 +      environment = {
 +        QT_IM_MODULE = "qtvirtualkeyboard";
 +        QT_VIRTUALKEYBOARD_STYLE = "watch";
 +        QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
 +        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
-+        QT_QPA_PLATFORM = lib.mkDefault "linuxfb:fb=/dev/fb0";
++        # The launcher is the compositor: use the hwcomposer QPA, not xcb.
++        EGL_PLATFORM = "hwcomposer";
++        QT_QPA_PLATFORM = "hwcomposer";
++        QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
++        QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
 +      }
 +      // config.environment.variables;
 +      serviceConfig = {
-+        ExecStart = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher $LIPSTICK_OPTIONS -plugin evdevtouch --systemd";
++        Type = "notify";
++        WorkingDirectory = "/";
++        EnvironmentFile = "-/var/lib/environment/compositor/*.conf";
++        ExecStartPre = [
++          "${pkgs.writeShellScript "asteroid-launcher-precondition" ''
++            if [ -f /usr/lib/systemd/user/android-boot-completed.service ]; then
++              while [ ! -f /dev/.coldboot_done ]; do sleep 1; done
++            fi
++          ''}"
++          "-${pkgs.bash}/bin/bash -c 'echo QUIT > /run/psplash_fifo 2>/dev/null || true'"
++        ];
++        ExecStart = "${config.security.wrapperDir}/asteroid-launcher $LIPSTICK_OPTIONS -plugin evdevtouch --systemd";
++        TimeoutStopSec = "3s";
 +        Restart = "always";
 +        RestartSec = "2s";
 +      };
 +    };
 +
-+    # AsteroidOS Bluetooth synchronization daemon service
-+    systemd.services.asteroid-btsyncd = {
++    # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
++    # cap_block_suspend for always-on-display ticks; expose the same file
++    # capabilities through the NixOS wrapper.
++    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
++    security.wrappers.asteroid-launcher = {
++      source = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher";
++      capabilities = "cap_wake_alarm,cap_block_suspend+ep";
++      owner = "root";
++      group = "root";
++    };
++
++    # Upstream AsteroidOS allows the ceres user to reboot and power off.
++    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-apps/files/30-org.freedesktop.login1.rules
++    security.polkit.extraConfig = ''
++      polkit.addRule(function(action, subject) {
++        if ((action.id == "org.freedesktop.login1.set-reboot-parameter" ||
++             action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
++             action.id == "org.freedesktop.login1.reboot-multiple-sessions") &&
++            subject.user == "ceres") {
++          return polkit.Result.YES;
++        }
++      });
++    '';
++
++    # AsteroidOS Bluetooth synchronization daemon (upstream user service)
++    systemd.user.services.asteroid-btsyncd = {
 +      description = "AsteroidOS Bluetooth Sync Daemon";
++      wantedBy = [ "default.target" ];
++      requires = [ "dbus.socket" ];
 +      after = [ "bluetooth.service" ];
-+      wants = [ "bluetooth.service" ];
-+      wantedBy = [ "multi-user.target" ];
++      unitConfig.ConditionUser = "!root";
 +      serviceConfig = {
 +        ExecStart = "${pkgs.asteroid.asteroid-btsyncd}/bin/asteroid-btsyncd";
 +        Restart = "always";
@@ -192,10 +234,10 @@ index 00000000..a934b5e3
 +}
 diff --git a/examples/asteroid/configuration.nix b/examples/asteroid/configuration.nix
 new file mode 100644
-index 00000000..781f4217
+index 00000000..8b1b32c3
 --- /dev/null
 +++ b/examples/asteroid/configuration.nix
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,38 @@
 +{
 +  config,
 +  lib,
@@ -225,6 +267,7 @@ index 00000000..781f4217
 +        "input"
 +        "networkmanager"
 +        "systemd-journal"
++        "tty"
 +        "video"
 +        "wheel"
 +      ];

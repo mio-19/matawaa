@@ -11,15 +11,20 @@ Add the Fossil Gen 6 (hoki) device configuration and its Snapdragon Wear
   kernel patches from the pinned meta-smartwatch revision instead of
   vendoring their contents
 - fossil-firefish, fossil-ray, and fossil-triggerfish family entries
+
+Install the compositor environment as
+/var/lib/environment/compositor/20-device.conf with the hwcomposer QPA,
+and keep the underclock and WLAN firmware setup services non-blocking so
+they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/default.nix           | 304 ++++++++++++++++++++++
+ devices/fossil-hoki/default.nix           | 314 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
  devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 7 files changed, 602 insertions(+)
+ 7 files changed, 612 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/default.nix
  create mode 100644 devices/fossil-hoki/gps_xtra.ini
@@ -92,10 +97,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..223ac94e
+index 00000000..e3ed4f3e
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,304 @@
+@@ -0,0 +1,314 @@
 +{
 +  config,
 +  lib,
@@ -233,18 +238,15 @@ index 00000000..223ac94e
 +    };
 +  };
 +
-+  # AsteroidOS Wayland compositor & libhybris hwcomposer environment options for hoki
-+  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-asteroid/asteroid-launcher/asteroid-launcher-configs/20-device.conf
-+  environment.variables = {
-+    QPA_HWC_FORCE_GLES = "1";
-+    QPA_HWC2_FORCE_DOZE_UPDATE = "1";
-+    QT_OPENGL_NO_BGRA = "1";
-+    LIPSTICK_OPTIONS = "-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1";
-+  };
++  # AsteroidOS Wayland compositor environment is installed as
++  # /var/lib/environment/compositor/20-device.conf below, matching the
++  # upstream EnvironmentFile contract.
 +
 +  # Hardware node permissions and symlinks for Android HAL / libhybris
 +  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-android/android-init/android-init/init.rc
 +  services.udev.extraRules = ''
++    KERNEL=="binder", MODE="0666"
++    KERNEL=="ashmem", MODE="0666"
 +    KERNEL=="hwbinder", MODE="0666"
 +    KERNEL=="vndbinder", MODE="0666"
 +    KERNEL=="mdss_rotator", MODE="0666"
@@ -286,6 +288,17 @@ index 00000000..223ac94e
 +  # Subsystem boots and firmware mount setup
 +  # GNSS vendor service symlink PR: https://github.com/AsteroidOS/meta-smartwatch/pull/342
 +  systemd.tmpfiles.rules = [
++    "d /var/lib/environment/compositor 0755 root root -"
++    "L+ /var/lib/environment/compositor/20-device.conf - - - - ${pkgs.writeText "20-device.conf" ''
++      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"
++      EGL_PLATFORM=hwcomposer
++      QT_QPA_PLATFORM=hwcomposer
++      QT_ENABLE_GLYPH_CACHE_WORKAROUND=true
++      QT_GSTREAMER_CAMERABIN_SRC=droidcamsrc
++      QPA_HWC_FORCE_GLES=1
++      QPA_HWC2_FORCE_DOZE_UPDATE=1
++      QT_OPENGL_NO_BGRA=1
++    ''}"
 +    "L+ /system/lib/hw/gps.default.so - - - - /vendor/lib/hw/gps.default.so"
 +    "L+ /vendor/bin/hw/android.hardware.gnss@1.0-service - - - - /vendor/bin/hw/android.hardware.gnss@1.0-service-qti"
 +    "L+ /dev/graphics/fb0 - - - - /dev/fb0"
@@ -334,10 +347,12 @@ index 00000000..223ac94e
 +    description = "Fossil Gen 6 low power collapse and CPU underclocking";
 +    wantedBy = [ "multi-user.target" ];
 +    serviceConfig = {
-+      Type = "oneshot";
-+      RemainAfterExit = true;
-+      ExecStartPre = "${pkgs.coreutils}/bin/sleep 20";
++      Type = "simple";
 +      ExecStart = pkgs.writeShellScript "underclock-hoki" ''
++        # Delay tuning until the boot has settled, but do not hold
++        # multi-user.target while waiting.
++        ${pkgs.coreutils}/bin/sleep 20
++
 +        # Enable low power mode & allow system-pc
 +        if [ -f /sys/module/lpm_levels/parameters/sleep_disabled ]; then
 +          echo 0 > /sys/module/lpm_levels/parameters/sleep_disabled 2>/dev/null || true
@@ -370,8 +385,8 @@ index 00000000..223ac94e
 +      coreutils
 +    ];
 +    serviceConfig = {
-+      Type = "oneshot";
-+      RemainAfterExit = true;
++      # Firmware loading can stall waiting for WCNSS; do not hold multi-user.
++      Type = "simple";
 +      ExecStart = "${pkgs.writeShellScript "wlan-firmware-hoki" (
 +        builtins.readFile ./wlan-firmware-hoki.sh
 +      )}";

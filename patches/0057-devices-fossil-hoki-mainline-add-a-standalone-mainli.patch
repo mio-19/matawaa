@@ -1,43 +1,32 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
-Date: Sat, 24 Oct 2026 14:46:46 +1100
+Date: Sat, 24 Oct 2026 17:18:23 +1100
 Subject: [PATCH] devices/fossil-hoki-mainline: add a standalone mainline
  target
 
-Add a standalone Fossil Gen 6 mainline device. It imports only the
-AsteroidOS watch family and declares its own hardware, Android fastboot
-geometry and Linux 6.18 mainline kernel with the vendor sda429-hoki DTS.
-It no longer imports the vendor fossil-hoki device or inherits its
-Android/libhybris services.
+Add a standalone Fossil Gen 6 mainline device. It imports only the AsteroidOS watch family and declares its own hardware, Android fastboot geometry and Linux 6.18 mainline kernel with the vendor sda429-hoki DTS. It no longer imports the vendor fossil-hoki device or inherits its Android/libhybris services.
 
-The mainline display, touch, modem, WLAN and audio drivers are still
-missing, so the target remains best-effort and non-bootable.
+The mainline display, touch, modem, WLAN and audio drivers are still missing, so the target remains best-effort and non-bootable.
 ---
- devices/fossil-hoki-mainline/default.nix     |   120 +-
+ devices/fossil-hoki-mainline/default.nix     |   114 +
  devices/fossil-hoki-mainline/sda429-hoki.dts | 11722 +++++++++++++++++
- 2 files changed, 11820 insertions(+), 22 deletions(-)
+ 2 files changed, 11836 insertions(+)
+ create mode 100644 devices/fossil-hoki-mainline/default.nix
  create mode 100644 devices/fossil-hoki-mainline/sda429-hoki.dts
 
 diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
-index 35ee3b43..850b9477 100644
---- a/devices/fossil-hoki-mainline/default.nix
+new file mode 100644
+index 00000000..850b9477
+--- /dev/null
 +++ b/devices/fossil-hoki-mainline/default.nix
-@@ -1,38 +1,114 @@
- {
--  config,
--  lib,
-   pkgs,
-   ...
- }:
- 
--# DRAFT: all-AArch64 hoki target.
+@@ -0,0 +1,114 @@
++{
++  pkgs,
++  ...
++}:
++
 +# DRAFT: independent hoki mainline target.
- #
--# This reuses the existing hoki hardware description, but swaps the 32-bit
--# vendor 4.14 kernel for Linux 6.18 LTS mainline and builds both the kernel and
--# userspace for aarch64-linux. Mainline hoki display, touch, modem, WLAN, and
--# the vendor boot DTB are not ported; this target is expected to be
--# non-bootable for now and is intentionally best-effort, not supported.
++#
 +# This deliberately does not import the vendor `fossil-hoki` device. The vendor
 +# device carries Android/libhybris services, firmware mounts and udev rules that
 +# only make sense with the 32-bit 4.14 vendor kernel. The mainline target keeps
@@ -49,23 +38,14 @@ index 35ee3b43..850b9477 100644
 +let
 +  hokiDts = ./sda429-hoki.dts;
 +in
- {
--  imports = [
--    ../fossil-hoki
--  ];
--
--  nixpkgs.hostPlatform = lib.mkForce "aarch64-linux";
++{
 +  imports = [ ../families/asteroidos.nix ];
- 
--  mobile.hardware.watch.kernel = lib.mkForce "modern";
++
 +  nixpkgs.hostPlatform = "armv7l-linux";
- 
-   mobile.device = {
--    name = lib.mkForce "fossil-hoki-mainline";
++
++  mobile.device = {
 +    name = "fossil-hoki-mainline";
-     identity = {
--      name = lib.mkForce "Gen 6 (mainline draft)";
--      manufacturer = lib.mkForce "Fossil";
++    identity = {
 +      name = "Gen 6 (mainline draft)";
 +      manufacturer = "Fossil";
 +    };
@@ -121,15 +101,12 @@ index 35ee3b43..850b9477 100644
 +      offset_second = "0x00f00000";
 +      offset_tags = "0x00000100";
 +      pagesize = "4096";
-     };
--    supportLevel = lib.mkForce "best-effort";
++    };
 +    appendDTB = [
 +      "dtbs/sda429-hoki.dtb"
 +    ];
-   };
- 
--  # Linux 6.18 LTS mainline; no vendor 4.14 tree or vendor patch set.
--  mobile.boot.stage-1.kernel.package = lib.mkForce pkgs.linuxPackages_6_18.kernel;
++  };
++
 +  boot.kernelParams = [
 +    "console=ttyMSM0,115200,n8"
 +    "androidboot.console=ttyMSM0"
@@ -144,9 +121,7 @@ index 35ee3b43..850b9477 100644
 +  ];
 +
 +  zramSwap.enable = false;
- 
--  # Mainline hoki has no appended vendor DTB in this draft.
--  mobile.system.android.appendDTB = lib.mkForce [ ];
++
 +  # The mainline kernel uses the same userdata partition label as the vendor
 +  # boot image; stage 1 must expose it before the rootfs is mounted.
 +  mobile.boot.stage-1.extraUdevRules = ''
@@ -158,7 +133,7 @@ index 35ee3b43..850b9477 100644
 +  environment.systemPackages = [
 +    pkgs.btrfs-progs
 +  ];
- }
++}
 diff --git a/devices/fossil-hoki-mainline/sda429-hoki.dts b/devices/fossil-hoki-mainline/sda429-hoki.dts
 new file mode 100644
 index 00000000..41b00986

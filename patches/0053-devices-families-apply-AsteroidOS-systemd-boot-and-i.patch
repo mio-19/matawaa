@@ -47,12 +47,12 @@ index 486eeb22..46ce2d83 100644
    mobile.generatedFilesystems.rootfs.filesystem = mkDefault "ext4";
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index a934b5e3..7ca898e0 100644
+index b2b12e9f..09fb7b6f 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -113,10 +113,15 @@ in
-       enable = false;
-     };
+@@ -124,10 +124,15 @@ in
+     # calls loginctl enable-linger after logind starts. Let the normal systemd
+     # linger mechanism own the marker; do not pre-seed it or override the unit.
  
 -    # Smartwatch stem/power button should be handled by compositor/shell, not logind shutdown
 +    # Smartwatch stem/power button should be handled by compositor/shell, not

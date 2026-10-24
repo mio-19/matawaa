@@ -13,19 +13,22 @@ applications:
 - timed-qt6: RTC alarm and time management client
 - usb-moded-qt6: USB dynamic mode switcher
 - keepalive: CPU wakelock and background execution coordinator
+
+The mce-qt6 package builds the Nemo.Mce QML plugin against the target Qt
+libraries, without wrapping the Qt apps.
 ---
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++++++++++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++++++
  overlay/asteroidos/default.nix                |  11 ++
  overlay/asteroidos/keepalive/default.nix      | 167 ++++++++++++++++++
  overlay/asteroidos/mce-dev/default.nix        |  41 +++++
- overlay/asteroidos/mce-qt6/default.nix        |  88 +++++++++
+ overlay/asteroidos/mce-qt6/default.nix        | 100 +++++++++++
  overlay/asteroidos/mlite/CMakeLists.txt       | 124 +++++++++++++
  overlay/asteroidos/mlite/default.nix          |  52 ++++++
  overlay/asteroidos/ngf-qt6/default.nix        |  78 ++++++++
  overlay/asteroidos/timed-qt6/default.nix      | 162 +++++++++++++++++
  overlay/asteroidos/usb-moded-qt6/default.nix  | 113 ++++++++++++
- 11 files changed, 1018 insertions(+)
+ 11 files changed, 1030 insertions(+)
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
  create mode 100644 overlay/asteroidos/keepalive/default.nix
@@ -474,10 +477,10 @@ index 00000000..ccf3ec5a
 +}
 diff --git a/overlay/asteroidos/mce-qt6/default.nix b/overlay/asteroidos/mce-qt6/default.nix
 new file mode 100644
-index 00000000..6abc14e4
+index 00000000..182d249c
 --- /dev/null
 +++ b/overlay/asteroidos/mce-qt6/default.nix
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,100 @@
 +# Qt6 bindings and client library for Mode Control Entity (MCE)
 +# Upstream repository: https://github.com/sailfishos/libmce-qt
 +{
@@ -503,23 +506,29 @@ index 00000000..6abc14e4
 +  };
 +
 +  strictDeps = true;
++  dontWrapQtApps = true;
 +
 +  nativeBuildInputs = [
 +    cmake
 +    pkg-config
-+    qt6.wrapQtAppsHook
 +  ];
 +
 +  buildInputs = [
 +    qt6.qtbase
++    qt6.qtdeclarative
 +    mce-dev
++  ];
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
 +  ];
 +
 +  postPatch = ''
 +        cat << "EOF" > CMakeLists.txt
 +    cmake_minimum_required(VERSION 3.16)
 +    project(mce-qt6 LANGUAGES CXX)
-+    find_package(Qt6 REQUIRED COMPONENTS Core DBus)
++    find_package(Qt6 REQUIRED COMPONENTS Core DBus Qml)
 +    find_package(PkgConfig REQUIRED)
 +    pkg_check_modules(mce REQUIRED IMPORTED_TARGET mce)
 +    set(CMAKE_AUTOMOC ON)
@@ -538,6 +547,12 @@ index 00000000..6abc14e4
 +    install(FILES ''${HEADERS} DESTINATION include/mce-qt6)
 +    configure_file(mce-qt6.pc.in mce-qt6.pc @ONLY)
 +    install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/mce-qt6.pc DESTINATION lib/pkgconfig)
++
++    add_library(qmcedeclarative MODULE plugin/qmcedeclarativeplugin.cpp)
++    target_include_directories(qmcedeclarative PRIVATE lib/include)
++    target_link_libraries(qmcedeclarative PRIVATE Qt6::Core Qt6::Qml mce-qt6)
++    install(TARGETS qmcedeclarative LIBRARY DESTINATION lib/qt-6/qml/Nemo/Mce)
++    install(FILES plugin/qmldir plugin/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/Mce)
 +    EOF
 +        cat << "EOF" > mce-qt6.pc.in
 +    prefix=@CMAKE_INSTALL_PREFIX@

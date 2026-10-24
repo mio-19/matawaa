@@ -3,13 +3,11 @@ From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:26:43 +1100
 Subject: [PATCH] boot/error: adapt the error UI to round smartwatch displays
 
-Make the stage-1 error screen responsive to the configured display
-geometry so text and layout remain readable on round and chin-shaped
-smartwatch panels.
+Make the stage-1 error screen responsive to the configured display geometry so text and layout remain readable on round and chin-shaped smartwatch panels. Center the message and action panes inside the round display safe area and center the message text instead of laying them out from x=0.
 ---
- boot/error/lib/shaded_text.rb | 25 +++++++++++++------
- boot/error/main.rb            | 45 +++++++++++++++++++++++++----------
- 2 files changed, 51 insertions(+), 19 deletions(-)
+ boot/error/lib/shaded_text.rb | 25 ++++++++++----
+ boot/error/main.rb            | 61 ++++++++++++++++++++++++++---------
+ 2 files changed, 63 insertions(+), 23 deletions(-)
 
 diff --git a/boot/error/lib/shaded_text.rb b/boot/error/lib/shaded_text.rb
 index ee7ecd69..bbb43174 100644
@@ -51,7 +49,7 @@ index ee7ecd69..bbb43174 100644
      # Ensures the position is reset at least once, to sync-up the shade.
      set_pos(0, 0)
 diff --git a/boot/error/main.rb b/boot/error/main.rb
-index e033ae02..aafbc56d 100644
+index e033ae02..487a45d4 100644
 --- a/boot/error/main.rb
 +++ b/boot/error/main.rb
 @@ -43,9 +43,12 @@ class UI
@@ -79,7 +77,16 @@ index e033ae02..aafbc56d 100644
      add_title
    end
  
-@@ -114,11 +117,19 @@ class UI
+@@ -85,7 +88,7 @@ class UI
+   def add_messages_pane()
+     @messages_pane = LVGL::LVContainer.new(@screen)
+     @messages_pane.set_width(get_pane_width())
+-    @messages_pane.set_pos(0, @title_bar.get_height())
++    @messages_pane.set_pos(horizontal? ? 0 : pane_x, @title_bar.get_height())
+ 
+     # When horizontal, full height
+     if horizontal?
+@@ -114,18 +117,26 @@ class UI
    end
  
    def add_title()
@@ -104,7 +111,32 @@ index e033ae02..aafbc56d 100644
    end
  
    # Messages pane elements
-@@ -216,10 +227,10 @@ class UI
+ 
+   def add_message_title()
+     @message_title = new_text($title, parent: @messages_pane)
+-    @message_title.set_align(LVGL::LABEL_ALIGN::LEFT)
++    @message_title.set_align(text_align())
+     @message_title.set_pos(
+       padding,
+       padding,
+@@ -134,7 +145,7 @@ class UI
+ 
+   def add_message()
+     @message = new_text($message, parent: @messages_pane)
+-    @message.set_align(LVGL::LABEL_ALIGN::LEFT)
++    @message.set_align(text_align())
+     @message.set_pos(
+       padding,
+       @message_title.get_height() + @message_title.get_y() + padding
+@@ -209,17 +220,17 @@ class UI
+       )
+ 
+       # Always push it as far down as possible!
+-      @actions_pane.set_pos(0, @screen.get_height() - @actions_pane.get_height())
++      @actions_pane.set_pos(pane_x, @screen.get_height() - @actions_pane.get_height())
+     end
+   end
+ 
    # Misc. helpers
  
    # Creates a label with some useful defaults.
@@ -117,7 +149,7 @@ index e033ae02..aafbc56d 100644
      el.set_long_mode(LVGL::LABEL_LONG::BREAK)
      el.set_align(LVGL::LABEL_ALIGN::CENTER)
      el.set_width((parent.get_width - 2*padding).to_i)
-@@ -244,6 +255,8 @@ class UI
+@@ -244,11 +255,21 @@ class UI
    def get_pane_width()
      if horizontal?
        @screen.get_width() / 2
@@ -126,7 +158,20 @@ index e033ae02..aafbc56d 100644
      else
        @screen.get_width()
      end
-@@ -257,8 +270,16 @@ class UI
+   end
+ 
++  def pane_x()
++    (@screen.get_width() - get_pane_width()) / 2
++  end
++
++  def text_align()
++    round_screen? ? LVGL::LABEL_ALIGN::CENTER : LVGL::LABEL_ALIGN::LEFT
++  end
++
+   def unit()
+     (if horizontal?
+       @screen.get_height()
+@@ -257,8 +278,16 @@ class UI
      end) / 128
    end
  

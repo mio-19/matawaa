@@ -15,9 +15,8 @@ current systemd 262. Keep the old-kernel-patched 262 package as
 systemd262oldkernel.
 ---
  devices/families/asteroidos.nix               |    7 +
- devices/fossil-hoki-mainline/default.nix      |    2 +
  modules/hardware-watch.nix                    |   27 +
- overlay/cross-compile.nix                     |   51 +-
+ overlay/cross-compile.nix                     |   54 +-
  .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
  ...on-t-try-to-unmount-nix-or-nix-store.patch |   45 +
@@ -43,7 +42,7 @@ systemd262oldkernel.
  ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
- 29 files changed, 2310 insertions(+), 7 deletions(-)
+ 28 files changed, 2311 insertions(+), 7 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -88,19 +87,6 @@ index 4a0a75f4..c4550492 100644
    mobile.system.type = mkDefault "android";
    mobile.system.system = mkDefault "armv7l-linux";
  
-diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
-index c5ca20c7..35ee3b43 100644
---- a/devices/fossil-hoki-mainline/default.nix
-+++ b/devices/fossil-hoki-mainline/default.nix
-@@ -19,6 +19,8 @@
- 
-   nixpkgs.hostPlatform = lib.mkForce "aarch64-linux";
- 
-+  mobile.hardware.watch.kernel = lib.mkForce "modern";
-+
-   mobile.device = {
-     name = lib.mkForce "fossil-hoki-mainline";
-     identity = {
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
 index 35ac4030..c43cedf0 100644
 --- a/modules/hardware-watch.nix
@@ -140,7 +126,7 @@ index 35ac4030..c43cedf0 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index ba450985..6c65efee 100644
+index ba450985..87e0ec16 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -32,13 +32,14 @@ else
@@ -165,7 +151,7 @@ index ba450985..6c65efee 100644
        (super.systemd.override (
          super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
            # systemd BPF framework fails when cross-compiling on 32-bit ARM
-@@ -58,6 +59,42 @@ else
+@@ -58,6 +59,45 @@ else
            ];
          });
  
@@ -203,6 +189,9 @@ index ba450985..6c65efee 100644
 +  in
 +  {
 +    inherit systemd257;
++    # Keep the patched systemd 262 for old kernels available for debugging
++    # or fallback even when the legacy profile selects systemd 257.
++    systemd262oldkernel = systemd262OldKernel;
 +    systemd_latest-oldkernel = systemd262OldKernel;
 +
      # ModemManager's generated GDBus sources race with the static archive link

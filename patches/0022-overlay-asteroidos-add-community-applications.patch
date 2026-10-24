@@ -374,10 +374,10 @@ index 00000000..843b7c85
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index d7967524..b1ed8dc8 100644
+index 173b79ab..d80b058c 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -45,5 +45,10 @@ rec {
+@@ -53,5 +53,10 @@ rec {
  
    virtualkeyboard = callPackage ./virtualkeyboard { };
  

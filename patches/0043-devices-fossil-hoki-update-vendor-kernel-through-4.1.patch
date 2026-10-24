@@ -1,23 +1,23 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Thu, 22 Oct 2026 23:02:08 +1100
-Subject: [PATCH] devices/fossil-hoki: update vendor kernel through 4.14.212
+Subject: [PATCH] devices/fossil-hoki: update vendor kernel through 4.14.213
 
-Apply the 4.14.207 stable update and the later 4.14.212 increment to
-the vendor kernel. The 4.14.206-207 patch-of-patch and the strictDeps
-change belong with the kernel update, not the launcher patch.
+Apply the 4.14.207 stable update and the later 4.14.212 and 4.14.213 increments to the vendor kernel. The checked-in patch-of-patch files drop the hunks already superseded by the vendor tree, including the f_fs.c, ufshcd.c and smp2p.c diffs in 4.14.213. The 4.14.213 kernel and hoki DTBs build successfully.
 ---
- devices/fossil-hoki/kernel/default.nix        | 106 +++++++-
+ devices/fossil-hoki/kernel/default.nix        | 125 +++++++++-
  .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++++++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 +++
  .../kernel/linux-4.14.211-212.patch.patch     | 152 ++++++++++++
- 4 files changed, 513 insertions(+), 1 deletion(-)
+ .../kernel/linux-4.14.212-213.patch.patch     |  99 ++++++++
+ 5 files changed, 631 insertions(+), 1 deletion(-)
  create mode 100644 devices/fossil-hoki/kernel/linux-4.14.206-207.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/linux-4.14.209-210.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/linux-4.14.211-212.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/linux-4.14.212-213.patch.patch
 
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
-index 1a520e75..b87a910e 100644
+index 1a520e75..50d2ee71 100644
 --- a/devices/fossil-hoki/kernel/default.nix
 +++ b/devices/fossil-hoki/kernel/default.nix
 @@ -5,6 +5,7 @@
@@ -28,7 +28,7 @@ index 1a520e75..b87a910e 100644
    ...
  }:
  
-@@ -62,6 +63,103 @@ let
+@@ -62,6 +63,121 @@ let
        inherit sha256;
      };
  
@@ -129,19 +129,37 @@ index 1a520e75..b87a910e 100644
 +        cp "$TMPDIR/stable/linux-4.14.211-212.patch" "$out"
 +      '';
 +
++  # Incremental 4.14.212 -> 4.14.213 stable patch.
++  stablePatch213 =
++    runCommand "linux-4.14.212-213.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.212-213.xz";
++          hash = "sha256-TthjpDn2ZHHYocbu9zOhb9EeguLC/KwMvMKb1/nhOHs=";
++        };
++        patchFile = ./linux-4.14.212-213.patch.patch;
++      }
++      ''
++        mkdir -p "$TMPDIR/stable"
++        xz -dc "$src" > "$TMPDIR/stable/linux-4.14.212-213.patch"
++        (cd "$TMPDIR/stable" && patch -p1 -i "$patchFile")
++        cp "$TMPDIR/stable/linux-4.14.212-213.patch" "$out"
++      '';
++
    # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
    # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
    configfile =
-@@ -76,7 +174,7 @@ let
+@@ -76,7 +192,7 @@ let
  in
  
  kernel-builder-gcc8 {
 -  version = "4.14.206";
-+  version = "4.14.212";
++  version = "4.14.213";
    inherit configfile;
  
    src = fetchFromGitHub {
-@@ -87,6 +185,12 @@ kernel-builder-gcc8 {
+@@ -87,6 +203,13 @@ kernel-builder-gcc8 {
    };
  
    patches = [
@@ -151,6 +169,7 @@ index 1a520e75..b87a910e 100644
 +    stablePatch210
 +    stablePatch211
 +    stablePatch212
++    stablePatch213
      (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
      (upstreamPatch "0002-mmc-Fix-embedded_sdio_data-duplicate-definition.patch" "0h7d3pxz8di2rh257kmc83iwcpf8xmrqhbqq4an2vclfdhyr297j")
      (upstreamPatch "0003-video-fbdev-msm-Provide-mdss_dsi_switch_page.patch" "1igqg795cvr81w948k4dj8nrbzc2pz5bg6gdp68jfplm2hcs4nch")
@@ -580,3 +599,108 @@ index 00000000..6e5dee43
 + diff --git a/drivers/usb/serial/ch341.c b/drivers/usb/serial/ch341.c
 + index d45a3f4e752c7..389b24b84ba46 100644
 + --- a/drivers/usb/serial/ch341.c
+diff --git a/devices/fossil-hoki/kernel/linux-4.14.212-213.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.212-213.patch.patch
+new file mode 100644
+index 00000000..c0688d26
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/linux-4.14.212-213.patch.patch
+@@ -0,0 +1,99 @@
++# Drop the f_fs.c, ufshcd.c and smp2p.c changes from the
++# 4.14.212 -> 4.14.213 stable patch: the vendor tree has divergent
++# implementations and these hunks reject.
++--- a/linux-4.14.212-213.patch
+++++ b/linux-4.14.212-213.patch
++@@ -4023,26 +4023,6 @@
++  			break;
++  		default:
++  			break;
++-diff --git a/drivers/scsi/ufs/ufshcd.c b/drivers/scsi/ufs/ufshcd.c
++-index a3a3ee6e2a002..342e086e41991 100644
++---- a/drivers/scsi/ufs/ufshcd.c
++-+++ b/drivers/scsi/ufs/ufshcd.c
++-@@ -1215,8 +1215,15 @@ static int ufshcd_devfreq_target(struct device *dev,
++- 	}
++- 	spin_unlock_irqrestore(hba->host->host_lock, irq_flags);
++- 
++-+	pm_runtime_get_noresume(hba->dev);
++-+	if (!pm_runtime_active(hba->dev)) {
++-+		pm_runtime_put_noidle(hba->dev);
++-+		ret = -EAGAIN;
++-+		goto out;
++-+	}
++- 	start = ktime_get();
++- 	ret = ufshcd_devfreq_scale(hba, scale_up);
++-+	pm_runtime_put(hba->dev);
++- 
++- 	trace_ufshcd_profile_clk_scaling(dev_name(hba->dev),
++- 		(scale_up ? "up" : "down"),
++ diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
++ index fb2a8b1e79791..d0b18cc7e61b5 100644
++ --- a/drivers/soc/mediatek/mtk-scpsys.c
++@@ -4067,29 +4047,6 @@
++  	}
++  
++  	/*
++-diff --git a/drivers/soc/qcom/smp2p.c b/drivers/soc/qcom/smp2p.c
++-index f51fb2ea72001..4c5767c73b7a8 100644
++---- a/drivers/soc/qcom/smp2p.c
++-+++ b/drivers/soc/qcom/smp2p.c
++-@@ -314,15 +314,16 @@ static int qcom_smp2p_inbound_entry(struct qcom_smp2p *smp2p,
++- static int smp2p_update_bits(void *data, u32 mask, u32 value)
++- {
++- 	struct smp2p_entry *entry = data;
++-+	unsigned long flags;
++- 	u32 orig;
++- 	u32 val;
++- 
++--	spin_lock(&entry->lock);
++-+	spin_lock_irqsave(&entry->lock, flags);
++- 	val = orig = readl(entry->value);
++- 	val &= ~mask;
++- 	val |= value;
++- 	writel(val, entry->value);
++--	spin_unlock(&entry->lock);
++-+	spin_unlock_irqrestore(&entry->lock, flags);
++- 
++- 	if (val != orig)
++- 		qcom_smp2p_kick(entry->smp2p);
++ diff --git a/drivers/soc/tegra/fuse/speedo-tegra210.c b/drivers/soc/tegra/fuse/speedo-tegra210.c
++ index 5373f4c16b54c..4403b89561fd6 100644
++ --- a/drivers/soc/tegra/fuse/speedo-tegra210.c
++@@ -4598,36 +4555,6 @@
++  	if (status)
++  		goto fail;
++  
++-diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
++-index 2f98161d062e2..9f1bb8ed99bc7 100644
++---- a/drivers/usb/gadget/function/f_fs.c
++-+++ b/drivers/usb/gadget/function/f_fs.c
++-@@ -1248,6 +1248,7 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code,
++- 
++- 		switch (epfile->ffs->gadget->speed) {
++- 		case USB_SPEED_SUPER:
++-+		case USB_SPEED_SUPER_PLUS:
++- 			desc_idx = 2;
++- 			break;
++- 		case USB_SPEED_HIGH:
++-@@ -3067,7 +3068,8 @@ static int _ffs_func_bind(struct usb_configuration *c,
++- 	}
++- 
++- 	if (likely(super)) {
++--		func->function.ss_descriptors = vla_ptr(vlabuf, d, ss_descs);
++-+		func->function.ss_descriptors = func->function.ssp_descriptors =
++-+			vla_ptr(vlabuf, d, ss_descs);
++- 		ss_len = ffs_do_descs(ffs->ss_descs_count,
++- 				vla_ptr(vlabuf, d, raw_descs) + fs_len + hs_len,
++- 				d_raw_descs__sz - fs_len - hs_len,
++-@@ -3477,6 +3479,7 @@ static void ffs_func_unbind(struct usb_configuration *c,
++- 	func->function.fs_descriptors = NULL;
++- 	func->function.hs_descriptors = NULL;
++- 	func->function.ss_descriptors = NULL;
++-+	func->function.ssp_descriptors = NULL;
++- 	func->interfaces_nums = NULL;
++- 
++- 	ffs_event_add(ffs, FUNCTIONFS_UNBIND);
++ diff --git a/drivers/usb/gadget/function/f_midi.c b/drivers/usb/gadget/function/f_midi.c
++ index 34c0a385516ef..10ab13136cd14 100644
++ --- a/drivers/usb/gadget/function/f_midi.c

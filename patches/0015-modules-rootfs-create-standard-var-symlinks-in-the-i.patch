@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 24 Oct 2026 17:16:15 +1100
+Subject: [PATCH] modules/rootfs: create standard /var symlinks in the image
+
+The generated Mobile-NixOS rootfs image did not contain /var/run or /var/lock, so stage-1 and tmpfiles workarounds were needed. Create the standard symlinks in populateCommands so every boot sees them before early systemd units.
+---
+ modules/rootfs.nix | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/modules/rootfs.nix b/modules/rootfs.nix
+index 0af0c136..6c49de0b 100644
+--- a/modules/rootfs.nix
++++ b/modules/rootfs.nix
+@@ -49,6 +49,11 @@ in
+       in
+       ''
+         mkdir -p ./nix/store
++        # The generated rootfs must contain the standard /var symlinks before
++        # systemd starts; creating them in stage 1 is too late for early units.
++        mkdir -p ./var
++        ln -sfn /run ./var/run
++        ln -sfn /run/lock ./var/lock
+         echo "Copying system closure..."
+ 
+         err=0
