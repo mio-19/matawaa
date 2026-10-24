@@ -8,8 +8,6 @@ connection instead of relying on the phone's AVRCP media session.
 
 The music derivation now carries the streaming patch and links Qt
 Multimedia for network playback.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/apps/default.nix           |   9 +-
  .../apps/music-ytmusic-streaming.patch        | 306 ++++++++++++++++++

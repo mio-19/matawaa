@@ -12,8 +12,6 @@ This patch imports configurations for the AsteroidOS smartwatch catalog:
 - Motorola Moto 360 series: motorola-minnow and motorola-smelt.
 - Other watches: casio-koi, oppo-beluga, polar-pike, samsung-rinato,
   samsung-sprat, and sony-tetra.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  devices/asus-anthias/default.nix       | 57 ++++++++++++++++++++++++++
  devices/asus-sparrow/default.nix       | 56 +++++++++++++++++++++++++

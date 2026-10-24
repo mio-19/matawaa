@@ -6,8 +6,6 @@ Subject: [PATCH] modules: add AsteroidOS machine configuration
 Generate /etc/asteroid/machine.conf from the mobile device identity and
 screen geometry. AsteroidOS userland reads this file to select the
 correct watchface layout, display shape, and hardware capabilities.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  modules/asteroid-config.nix | 39 +++++++++++++++++++++++++++++++++++++
  modules/module-list.nix     |  1 +

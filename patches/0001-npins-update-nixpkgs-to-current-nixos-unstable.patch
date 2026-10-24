@@ -10,8 +10,6 @@ nixos-26.11pre1095516.09063bd1f2b3.
 This keeps the target userland and cross-compilation toolchains on the
 current nixos-unstable snapshot. The pin is expressed as a channel tarball
 so it remains reproducible without adding a separate Nixpkgs flake input.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  npins/sources.json | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)

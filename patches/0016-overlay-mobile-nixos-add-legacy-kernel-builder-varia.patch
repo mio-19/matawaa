@@ -7,8 +7,6 @@ Expose kernel-builder-gcc49, kernel-builder-gcc6, kernel-builder-clang_8,
 and kernel-builder-clang_9 alongside the existing builders. These select
 the legacy toolchains provided by nixpkgs-multiverse and are required by
 older vendor Android/Linux kernels.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/overlay.nix | 11 +++++++++++
  1 file changed, 11 insertions(+)

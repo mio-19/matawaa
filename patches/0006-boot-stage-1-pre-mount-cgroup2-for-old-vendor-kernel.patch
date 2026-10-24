@@ -7,8 +7,6 @@ Pre-mount cgroup2 before switch_root with the newest options the running
 kernel accepts. systemd 261 otherwise mounts it with nsdelegate and
 memory_recursiveprot, which Linux 4.14 vendor kernels reject and then
 freeze on.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  boot/init/tasks/switch_root.rb | 11 +++++++++++
  1 file changed, 11 insertions(+)

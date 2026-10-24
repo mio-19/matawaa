@@ -11,8 +11,6 @@ bidirectional companion-phone communication:
   interface for remote camera and sensor messages.
 - camera-shutter.sh: small helper that triggers the companion camera
   shutter through the new bridge.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  .../asteroid-btsyncd/app-bridge.patch         |  85 ++++++++++
  .../asteroid-btsyncd/appbridgeservice.cpp     | 155 ++++++++++++++++++

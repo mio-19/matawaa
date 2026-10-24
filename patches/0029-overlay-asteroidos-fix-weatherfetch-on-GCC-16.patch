@@ -5,8 +5,6 @@ Subject: [PATCH] overlay/asteroidos: fix weatherfetch on GCC 16
 
 Apply the small compatibility patch that lets bberoset/asteroid-weatherfetch
 compile with modern GCC 16 toolchains.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/community-apps/default.nix         |  3 +++
  .../community-apps/weatherfetch-gcc16.patch           | 11 +++++++++++

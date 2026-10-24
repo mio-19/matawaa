@@ -13,8 +13,6 @@ paired phone over Wi-Fi or Bluetooth:
 
 The camera derivation now carries the companion patch and links the Qt
 Multimedia/Qt Base modules required by the viewfinder.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  .../apps/camera/camera-companion.patch        | 559 ++++++++++++++++++
  .../apps/camera/camerastreamview.cpp          | 398 +++++++++++++

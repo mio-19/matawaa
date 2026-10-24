@@ -8,8 +8,6 @@ This patch introduces devices/families/asteroidos.nix:
 - Standard base configuration for AsteroidOS smartwatch devices.
 - Configures fastboot userdata partition targets and display unblanking.
 - Trims unneeded background server/desktop services to reduce closure size.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  devices/families/asteroidos.nix | 108 ++++++++++++++++++++++++++++++++
  1 file changed, 108 insertions(+)

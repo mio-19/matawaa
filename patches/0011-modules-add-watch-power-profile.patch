@@ -13,8 +13,6 @@ and memory tuning when enabled:
 
 The profile is gated on mobile.hardware.watch.enable and defaults to on
 for watch devices only.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  modules/module-list.nix |  1 +
  modules/watch-power.nix | 61 +++++++++++++++++++++++++++++++++++++++++

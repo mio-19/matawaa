@@ -6,8 +6,6 @@ Subject: [PATCH] overlay: add cross-compilation hook overlay
 Add overlay/cross-compile.nix, which fixes package builds for 32-bit
 ARMv7 wearable targets, and overlay/default.nix to compose the base
 Mobile-NixOS overlay with the cross-compilation hooks.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/cross-compile.nix | 256 ++++++++++++++++++++++++++++++++++++++
  overlay/default.nix       |   8 ++

@@ -6,8 +6,6 @@ Subject: [PATCH] devices/google-aurora: add Pixel Watch 2 device configuration
 Add the Google Pixel Watch 2 (aurora) device definition, wiring the
 vendor kernel, boot modules, VKB data, partition layout, display, and
 watch hardware options into a Mobile-NixOS device.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  devices/google-aurora/default.nix | 106 ++++++++++++++++++++++++++++++
  1 file changed, 106 insertions(+)

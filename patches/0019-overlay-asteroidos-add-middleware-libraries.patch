@@ -13,8 +13,6 @@ applications:
 - timed-qt6: RTC alarm and time management client
 - usb-moded-qt6: USB dynamic mode switcher
 - keepalive: CPU wakelock and background execution coordinator
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++++++++++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++++++

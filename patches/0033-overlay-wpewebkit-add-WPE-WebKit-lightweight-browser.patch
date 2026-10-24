@@ -13,8 +13,6 @@ This patch integrates the lightweight WPE WebKit rendering engine and browser:
   captive portal helper and kinetic touch scrolling.
 - overlay/asteroidos/default.nix: Exposes browser and wpewebkit-qt in asteroid scope.
 - overlay/overlay.nix: Registers wpewebkit package in Nixpkgs overlay.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/browser/CMakeLists.txt     |  49 +++
  .../browser/asteroid-browser.desktop          |  12 +

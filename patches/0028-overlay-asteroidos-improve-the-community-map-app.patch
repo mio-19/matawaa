@@ -5,8 +5,6 @@ Subject: [PATCH] overlay/asteroidos: improve the community map app
 
 Apply the CoMaps-inspired patch to asteroid-map, adding offline tile
 caching and compass heading orientation for wearable navigation.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/community-apps/default.nix |   3 +
  .../map-comaps-improvements.patch             | 814 ++++++++++++++++++

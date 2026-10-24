@@ -13,8 +13,6 @@ kernel (VKB) assembly data:
 
 These files provide the data consumed by the boot derivation and are
 kept separate from the device configuration.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  .../boot/aurora-post-rootfs.conf              |   48 +
  .../google-aurora/boot/aurora-vkb-assemble.py |  280 +

@@ -6,8 +6,6 @@ Subject: [PATCH] examples/asteroid: disable the polkit sandbox on 4.14
 Private namespaces and all sandbox namespaces are unavailable on 4.14;
 disable them so polkit can start and logind can process the linger
 request.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  examples/asteroid/asteroid-desktop.nix | 20 ++++++++++++++++++++
  1 file changed, 20 insertions(+)

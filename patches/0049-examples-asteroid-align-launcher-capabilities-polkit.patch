@@ -6,8 +6,6 @@ Subject: [PATCH] examples/asteroid: align launcher capabilities, polkit, and
 
 Grant the hwcomposer capability, install the upstream polkit rule, and
 pin the launcher to the current nightly that uses it.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  examples/asteroid/asteroid-desktop.nix        | 26 ++++++++++++++++++-
  .../asteroidos/asteroid-launcher/default.nix  |  4 +--

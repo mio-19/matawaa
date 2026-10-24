@@ -13,10 +13,10 @@ Port the upstream qt6-qpa-hwcomposer-plugin with Android 10 HWC2 headers, instal
  create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 7ab4dc45..714d7a08 100644
+index d3663d8c..3c377f16 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -196,6 +196,10 @@
+@@ -197,6 +197,10 @@
      "d /var/lib/environment/compositor 0755 root root -"
      "L+ /var/lib/environment/compositor/20-device.conf - - - - ${pkgs.writeText "20-device.conf" ''
        LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"

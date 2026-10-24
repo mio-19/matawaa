@@ -7,8 +7,6 @@ Refresh the upstream msm-fb-refresher package from the old 0.2 release
 tarball to the current AsteroidOS git revision and modern stdenv
 arguments. This keeps the Qualcomm framebuffer refresher compatible with
 the watch display stack.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/msm-fb-refresher/default.nix | 43 +++++++++++++++++-----------
  1 file changed, 26 insertions(+), 17 deletions(-)

@@ -11,17 +11,15 @@ Add the Fossil Gen 6 (hoki) device configuration and its Snapdragon Wear
   kernel patches from the pinned meta-smartwatch revision instead of
   vendoring their contents
 - fossil-firefish, fossil-ray, and fossil-triggerfish family entries
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/default.nix           | 303 ++++++++++++++++++++++
+ devices/fossil-hoki/default.nix           | 304 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
  devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 7 files changed, 601 insertions(+)
+ 7 files changed, 602 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/default.nix
  create mode 100644 devices/fossil-hoki/gps_xtra.ini
@@ -94,10 +92,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..6c023b9d
+index 00000000..223ac94e
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,303 @@
+@@ -0,0 +1,304 @@
 +{
 +  config,
 +  lib,
@@ -119,7 +117,8 @@ index 00000000..6c023b9d
 +  mobile.device.supportLevel = "supported";
 +
 +  mobile.hardware = {
-+    # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), 32-bit Cortex-A7 SoC.
++    # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), Cortex-A53.
++    # The Android system image is the 32-bit armv7l ABI.
 +    soc = "qualcomm-sda429w";
 +    ram = 1024 * 1;
 +    screen = {

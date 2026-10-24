@@ -8,8 +8,6 @@ Apply the skip-firstrun patch to asteroid-launcher so the initial
 tutorial and setup guide can be dismissed with a visible skip button.
 
 This is useful for preconfigured watch images and automated bring-up.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  .../asteroidos/asteroid-launcher/default.nix  |  2 +
  .../asteroid-launcher/skip-firstrun.patch     | 45 +++++++++++++++++++

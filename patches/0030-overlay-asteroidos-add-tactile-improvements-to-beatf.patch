@@ -5,8 +5,6 @@ Subject: [PATCH] overlay/asteroidos: add tactile improvements to beatfork
 
 Apply the Tack-inspired patch to moWerk/asteroid-beatfork, adding tap
 tempo, accented subdivisions, a pulse ring, and haptic feedback.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  .../beatfork-tack-improvements.patch          | 449 ++++++++++++++++++
  overlay/asteroidos/community-apps/default.nix |   4 +

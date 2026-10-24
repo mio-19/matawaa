@@ -10,8 +10,6 @@ Improve stage-1 udev bring-up on older vendor kernels:
 - Restrict the initial trigger to the subsystems needed during boot.
 - Treat trigger and settle failures as warnings instead of aborting boot.
 - Use a shorter settle timeout once NIXOS_SYSTEM is already present.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  boot/init/tasks/udev.rb | 27 +++++++++++++++++++++++++--
  1 file changed, 25 insertions(+), 2 deletions(-)

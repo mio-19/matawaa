@@ -7,8 +7,6 @@ Move the filesystem type and label into mkDefault bindings inside the
 generated rootfs configuration. Devices can now override the default
 ext4/NIXOS_SYSTEM values without disabling the whole default
 configuration.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  modules/rootfs.nix | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)

@@ -12,8 +12,6 @@ This patch improves image generation for Android smartwatch targets:
 - modules/system-types/android/default.nix: Adds sparseSystemImage conversion
   via img2simg, provides an automated flash-all.sh script, tolerates kernels
   that are not built yet, and guards the optional QCDT/Exynos DT metadata.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  modules/rootfs.nix                       | 24 +++++++++---
  modules/system-types/android/default.nix | 50 +++++++++++++++++++++---

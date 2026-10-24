@@ -8,8 +8,6 @@ It configures ext4 file-based encryption with the Adiantum cipher and
 provides the keyctl and fscrypt tooling needed to provision keys.
 
 The module is disabled by default so existing devices are unaffected.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  modules/fscrypt.nix     | 76 +++++++++++++++++++++++++++++++++++++++++
  modules/module-list.nix |  1 +

@@ -10,8 +10,6 @@ BTN_SIDE, BTN_0, BTN_1, and BTN_TRIGGER_HAPPY.
 
 On round-display devices, poll briefly so a short stem press is not
 missed. Existing volume and keyboard recovery keys are unchanged.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  boot/lib/hal/recovery.rb | 23 ++++++++++++++++++++++-
  1 file changed, 22 insertions(+), 1 deletion(-)

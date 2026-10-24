@@ -8,12 +8,10 @@ Add the OPPO Watch (beluga) port with the AsteroidOS 4.9.112 msm8909w
 vendor kernel, its 17 upstream kernel patches, the extracted defconfig,
 the correct qualcomm-msm8909w SoC metadata and the Android fastboot
 layout. Keep the device best-effort until it has been boot-tested.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  devices/oppo-beluga/default.nix        | 24 ++++---
- devices/oppo-beluga/kernel/default.nix | 87 ++++++++++++++++++++++++++
- 2 files changed, 102 insertions(+), 9 deletions(-)
+ devices/oppo-beluga/kernel/default.nix | 95 ++++++++++++++++++++++++++
+ 2 files changed, 110 insertions(+), 9 deletions(-)
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
@@ -74,10 +72,10 @@ index c2cef490..deb217e2 100644
  }
 diff --git a/devices/oppo-beluga/kernel/default.nix b/devices/oppo-beluga/kernel/default.nix
 new file mode 100644
-index 00000000..f870708a
+index 00000000..3c120c93
 --- /dev/null
 +++ b/devices/oppo-beluga/kernel/default.nix
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,95 @@
 +{
 +  mobile-nixos,
 +  stdenv,
@@ -161,7 +159,15 @@ index 00000000..f870708a
 +
 +  isModular = false;
 +
-+  # CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE=y appends the DTB to the kernel
-+  # image; the 4.9 tree has no separate dtbs_install target.
++  # This defconfig sets CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE, so the bootable
++  # image is arch/arm/boot/zImage-dtb (the built MSM8909 DTBs concatenated).
++  # The builder installs the bare zImage, which has no FDT. Do not add
++  # zImage-dtb to buildFlags: it shares arch/arm/boot/compressed with zImage,
++  # and a parallel make races. Build it serially after install instead.
++  # This tree has no dtbs_install target.
 +  buildDTBs = false;
++  postInstall = ''
++    make $makeFlags "''${makeFlagsArray[@]}" zImage-dtb
++    cp -f "$buildRoot/arch/arm/boot/zImage-dtb" "$out/zImage"
++  '';
 +}

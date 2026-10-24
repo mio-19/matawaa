@@ -9,10 +9,10 @@ The underclock service used a oneshot ExecStartPre sleep 20, so multi-user.targe
  1 file changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index cb03a636..414535bb 100644
+index 645083e4..4c77b04a 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -257,10 +257,12 @@
+@@ -258,10 +258,12 @@
      description = "Fossil Gen 6 low power collapse and CPU underclocking";
      wantedBy = [ "multi-user.target" ];
      serviceConfig = {

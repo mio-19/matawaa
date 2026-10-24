@@ -6,8 +6,6 @@ Subject: [PATCH] boot/error: adapt the error UI to round smartwatch displays
 Make the stage-1 error screen responsive to the configured display
 geometry so text and layout remain readable on round and chin-shaped
 smartwatch panels.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  boot/error/lib/shaded_text.rb | 25 +++++++++++++------
  boot/error/main.rb            | 45 +++++++++++++++++++++++++----------

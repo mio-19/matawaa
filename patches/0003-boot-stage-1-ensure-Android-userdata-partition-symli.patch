@@ -7,8 +7,6 @@ Add fallback symlink creation for Android userdata partitions before
 udev settles. This handles vendor kernels and bootloaders that do not
 expose stable by-partlabel or by-label links early enough for the
 rootfs mount.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  boot/init/tasks/udev.rb | 39 +++++++++++++++++++++++++++++++++++++++
  1 file changed, 39 insertions(+)

@@ -9,8 +9,6 @@ Add the development-only stage debugging modes:
 - boot/init/tasks/switch_root.rb: pause before switch_root only when stage1-pause-debug is enabled.
 - devices/families/asteroidos.nix: gate the stage-1 console/SSH/telnet and pause behind stage1-pause-debug; persist the journal and coredumps only when stage2-save-logs is enabled; enable stage-2 OpenSSH and USB networking when stage2-ssh is enabled; assert that stage1-pause-debug and stage2-ssh are mutually exclusive.
 - devices/fossil-hoki/default.nix: opt hoki into stage1-pause-debug and stage2-save-logs for the current bring-up, and keep verbose systemd logging gated by the stage1 debug mode.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  boot/init/tasks/switch_root.rb  | 19 +++++++
  devices/families/asteroidos.nix | 97 +++++++++++++++++++++++++++++++++
@@ -183,10 +181,10 @@ index c4550492..081cfc53 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 9d17da00..33ea07f3 100644
+index 085458b0..d42e8a2c 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -41,6 +41,9 @@
+@@ -42,6 +42,9 @@
        hasCrown = true;
        hasHaptics = true;
        aodSupport = true;
@@ -196,7 +194,7 @@ index 9d17da00..33ea07f3 100644
      };
    };
  
-@@ -85,10 +88,19 @@
+@@ -86,10 +89,19 @@
      "androidboot.usbconfigfs=true"
      "loop.max_part=7"
      "cgroup.memory=nokmem,nosocket"

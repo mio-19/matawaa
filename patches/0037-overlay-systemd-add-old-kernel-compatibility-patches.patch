@@ -8,8 +8,6 @@ kernels: mountpoint and faccessat fallbacks, pidfd and close_range
 fallbacks, proc credentials without the new mount API, and the
 epoll_pwait2 EINVAL fallback. Keep the patches in one series entry so
 the old-kernel work is not split across unrelated commits.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/cross-compile.nix                     |  15 +-
  .../systemd-261-faccessat-old-kernel.patch    |  19 +++

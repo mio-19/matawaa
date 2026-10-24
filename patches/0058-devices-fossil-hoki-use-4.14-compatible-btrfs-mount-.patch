@@ -7,15 +7,13 @@ The first btrfs change enabled zstd compression. This follow-up selects
 the 4.14-supported mount options (noatime, space_cache=v2) and keeps the
 compressed rootfs; the ext4 experiment is folded into the final
 configuration.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  devices/fossil-hoki/default.nix |  5 ++++-
  modules/rootfs.nix              | 10 ++++++++--
  2 files changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 714d7a08..cb03a636 100644
+index 3c377f16..645083e4 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -18,9 +18,12 @@

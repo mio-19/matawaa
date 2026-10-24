@@ -9,8 +9,6 @@ Package the standard AsteroidOS application suite and its shared assets:
   music, compass, flashlight, calendar, diamonds, hrm, camera, gps-test,
   and 2048
 - assets: wallpapers, system sounds, icons, and official watchfaces
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/apps/default.nix   | 122 ++++++++++++++++++++++++++
  overlay/asteroidos/assets/default.nix | 112 +++++++++++++++++++++++

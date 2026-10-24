@@ -6,8 +6,6 @@ Subject: [PATCH] devices/fossil-hoki: update vendor kernel through 4.14.212
 Apply the 4.14.207 stable update and the later 4.14.212 increment to
 the vendor kernel. The 4.14.206-207 patch-of-patch and the strictDeps
 change belong with the kernel update, not the launcher patch.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  devices/fossil-hoki/kernel/default.nix        | 106 +++++++-
  .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++++++++++++

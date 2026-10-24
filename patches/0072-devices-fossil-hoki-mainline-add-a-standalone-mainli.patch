@@ -12,19 +12,17 @@ Android/libhybris services.
 
 The mainline display, touch, modem, WLAN and audio drivers are still
 missing, so the target remains best-effort and non-bootable.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
- devices/fossil-hoki-mainline/default.nix     |   116 +-
+ devices/fossil-hoki-mainline/default.nix     |   120 +-
  devices/fossil-hoki-mainline/sda429-hoki.dts | 11722 +++++++++++++++++
- 2 files changed, 11816 insertions(+), 22 deletions(-)
+ 2 files changed, 11820 insertions(+), 22 deletions(-)
  create mode 100644 devices/fossil-hoki-mainline/sda429-hoki.dts
 
 diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
-index 35ee3b43..a760ddaa 100644
+index 35ee3b43..850b9477 100644
 --- a/devices/fossil-hoki-mainline/default.nix
 +++ b/devices/fossil-hoki-mainline/default.nix
-@@ -1,38 +1,110 @@
+@@ -1,38 +1,114 @@
  {
 -  config,
 -  lib,
@@ -44,7 +42,7 @@ index 35ee3b43..a760ddaa 100644
 +# device carries Android/libhybris services, firmware mounts and udev rules that
 +# only make sense with the 32-bit 4.14 vendor kernel. The mainline target keeps
 +# only the hardware description and the Android fastboot image geometry, and
-+# builds its own Linux 6.18 armv7l kernel with the vendor hoki DTS.
++# builds its own Linux 6.18 armv7l kernel and appends the vendor hoki DTS.
 +#
 +# Mainline display, touch, modem, WLAN and audio drivers are still missing, so
 +# this target remains non-bootable and best-effort.
@@ -75,7 +73,8 @@ index 35ee3b43..a760ddaa 100644
 +  };
 +
 +  mobile.hardware = {
-+    # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), 32-bit Cortex-A7.
++    # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), Cortex-A53.
++    # Userspace stays on the 32-bit armv7l Android ABI.
 +    soc = "qualcomm-sda429w";
 +    ram = 1024;
 +    screen = {
@@ -98,8 +97,11 @@ index 35ee3b43..a760ddaa 100644
 +    btrfs.compression = "zstd";
 +  };
 +
-+  # Linux 6.18 LTS mainline with the standalone vendor hoki DTS added to the
-+  # mainline qcom DTS directory. The DTS has no #include dependencies.
++  # Linux 6.18 LTS with the vendor sda429-hoki.dts added under the mainline
++  # qcom DTS directory. It is the flattened 4.14 vendor tree (numeric
++  # phandles, two address cells), not a mainline binding. The nixpkgs armv7
++  # config has CONFIG_ARM_APPENDED_DTB, so the boot image can append this DTB.
++  # Display, touch, modem, WLAN and audio drivers are still absent.
 +  mobile.boot.stage-1.kernel.package = pkgs.linuxPackages_6_18.kernel.overrideAttrs (old: {
 +    postPatch = (old.postPatch or "") + ''
 +      install -Dm644 ${hokiDts} arch/arm/boot/dts/qcom/sda429-hoki.dts

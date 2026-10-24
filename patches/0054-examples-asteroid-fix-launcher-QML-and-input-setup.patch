@@ -15,10 +15,10 @@ Build the Nemo.Mce QML plugin with the target Qt libraries, add the Nemo.Configu
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 24e4487e..3ebe0d83 100644
+index f71c807f..e2e47366 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -134,18 +134,15 @@
+@@ -135,18 +135,15 @@
      };
    };
  
@@ -42,7 +42,7 @@ index 24e4487e..3ebe0d83 100644
      KERNEL=="hwbinder", MODE="0666"
      KERNEL=="vndbinder", MODE="0666"
      KERNEL=="mdss_rotator", MODE="0666"
-@@ -187,6 +184,13 @@
+@@ -188,6 +185,13 @@
    # Subsystem boots and firmware mount setup
    # GNSS vendor service symlink PR: https://github.com/AsteroidOS/meta-smartwatch/pull/342
    systemd.tmpfiles.rules = [

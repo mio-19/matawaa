@@ -13,8 +13,6 @@ Chinese layouts:
 - layouts/{zh_CN,zh_HK,zh_TW}: Pinyin, Bopomofo, and Jyutping layouts.
 - default.nix: link librime, copy the plugin sources and layouts, and
   pre-deploy common schemas with the host rime_deployer.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  .../0001-add-rime-plugin-and-layouts.patch    |  49 +++
  .../asteroidos/virtualkeyboard/default.nix    |  36 +-

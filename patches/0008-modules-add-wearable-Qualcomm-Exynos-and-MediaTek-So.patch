@@ -12,8 +12,6 @@ hardware modules can select the correct target ABI:
 - MediaTek: MT2601, MT6580
 
 Each option defaults to false to preserve existing device behavior.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  modules/hardware-exynos.nix   | 11 ++++++
  modules/hardware-mediatek.nix | 22 ++++++++++++

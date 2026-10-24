@@ -6,8 +6,6 @@ Subject: [PATCH] overlay/asteroidos: add packaging infrastructure
 Introduce the asteroid package set, the shared mkAsteroidApp derivation
 builder, and the qml-asteroid wearable QML controls. Register the new
 package set in the Mobile-NixOS overlay.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/default.nix              |  11 ++
  overlay/asteroidos/lib/mk-asteroid-app.nix  | 100 ++++++++++++++++++

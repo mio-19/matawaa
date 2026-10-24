@@ -6,8 +6,6 @@ Subject: [PATCH] boot: keep multi-user and user sessions non-blocking
 Create /var/run and /var/lock in the target root, run dhcpcd in the
 background, and use explicit drop-ins for nscd and systemd-user-sessions
 so nss-user-lookup cannot hold multi-user.target on the vendor kernel.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  boot/init/tasks/switch_root.rb  |  8 ++++++++
  devices/families/asteroidos.nix | 16 ++++++++++++++++

@@ -10,8 +10,6 @@ layer:
 - asteroid-launcher: Wayland compositor and touch smartwatch shell
 - asteroid-btsyncd: Bluetooth LE synchronization daemon
 - virtualkeyboard: on-screen touch keyboard with watch styling
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  .../asteroidos/asteroid-btsyncd/default.nix   | 68 +++++++++++++++
  .../org.asteroidos.btsyncd.conf               | 13 +++

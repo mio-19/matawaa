@@ -12,8 +12,6 @@ upstream AsteroidOS patch set:
 
 The remaining vendor kernel patches are fetched from the pinned
 AsteroidOS meta-smartwatch revision by the kernel derivation.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  ...d-pm_qos_remove_request-with-active-.patch | 40 ++++++++++++++++
  .../fossil-hoki/kernel/90_dtbs-install.patch  | 29 +++++++++++

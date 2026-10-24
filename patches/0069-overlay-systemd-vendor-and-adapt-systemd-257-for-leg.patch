@@ -13,8 +13,6 @@ expose the package flags current NixOS expects.
 Select systemd 257 only for the legacy kernel; modern kernels use the
 current systemd 262. Keep the old-kernel-patched 262 package as
 systemd262oldkernel.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  devices/families/asteroidos.nix               |    7 +
  devices/fossil-hoki-mainline/default.nix      |    2 +

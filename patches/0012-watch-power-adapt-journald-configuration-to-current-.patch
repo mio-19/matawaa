@@ -8,8 +8,6 @@ services.journald.extraConfig option. Use the structured
 services.journald.settings.Journal attribute set instead so the watch
 power profile continues to configure volatile, size-limited journal
 storage.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  modules/watch-power.nix | 8 ++++----
  1 file changed, 4 insertions(+), 4 deletions(-)

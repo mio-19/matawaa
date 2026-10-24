@@ -14,7 +14,7 @@ Merge with https://android.googlesource.com/kernel/common/+/refs/heads/deprecate
 
 | Component | Specification | Notes |
 | :--- | :--- | :--- |
-| **SoC** | Qualcomm Snapdragon Wear 4100+ (SDA429W) | 4× ARM Cortex-A7 @ 1.95 GHz, Adreno 504 GPU |
+| **SoC** | Qualcomm Snapdragon Wear 4100+ (SDA429W) | 4× ARM Cortex-A53, Adreno 504 GPU |
 | **Memory** | 1 GB LPDDR3 | Shared system RAM |
 | **Storage** | 8 GB eMMC 5.1 | Partitioned for A/B boot and large `userdata` |
 | **Display** | 1.28″ Round AMOLED (416×416, ~326 ppi) | 60 Hz refresh, Always-On Display (AOD) ambient mode |

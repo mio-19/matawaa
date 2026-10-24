@@ -9,8 +9,6 @@ overlay/cross-compile.nix for cross builds, and disable growPartition on
 
 This keeps the cross-compilation workarounds in one module and moves
 package fixes to the overlay.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  modules/cross-workarounds.nix | 55 ++++++++++++-----------------------
  1 file changed, 18 insertions(+), 37 deletions(-)

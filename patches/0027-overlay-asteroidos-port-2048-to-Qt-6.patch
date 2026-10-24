@@ -6,8 +6,6 @@ Subject: [PATCH] overlay/asteroidos: port 2048 to Qt 6
 Apply the twenty48 Qt 6 compatibility patch to MagneFire/asteroid-2048 so
 the sliding-tile puzzle builds against the current AsteroidOS Qt 6
 toolkit.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/apps/default.nix        |   3 +
  overlay/asteroidos/apps/twenty48-qt6.patch | 124 +++++++++++++++++++++

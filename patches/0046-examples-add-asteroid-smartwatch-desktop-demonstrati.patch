@@ -8,8 +8,6 @@ This patch introduces examples/asteroid/:
 
 - Complete example system demonstrating the AsteroidOS Wayland desktop,
   compositor, virtual keyboard, and preinstalled smartwatch applications.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  examples/asteroid/asteroid-desktop.nix | 167 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  37 ++++++

@@ -10,10 +10,10 @@ WCNSS firmware loading can stall waiting for the modem, and wlan-firmware-hoki w
  2 files changed, 14 insertions(+), 6 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 414535bb..9d17da00 100644
+index 4c77b04a..085458b0 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -295,8 +295,8 @@
+@@ -296,8 +296,8 @@
        coreutils
      ];
      serviceConfig = {

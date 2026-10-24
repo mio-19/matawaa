@@ -12,8 +12,6 @@ Introduce mobile.hardware.watch with opt-in smartwatch hardware options:
 
 The module defaults watch.enable to false so existing phone, tablet, and
 UEFI configurations remain unchanged.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  modules/hardware-watch.nix | 146 +++++++++++++++++++++++++++++++++++++
  modules/module-list.nix    |   1 +

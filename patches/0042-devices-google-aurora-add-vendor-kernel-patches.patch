@@ -9,8 +9,6 @@ secure-fail handling, RTC read-only handling, response-file fixes, and
 the module file-function command.
 
 The kernel patches are kept separate from the device configuration.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  ...d-qcom-continuous-splash-framebuffer.patch | 264 ++++++++++++++++++
  .../kernel/cc-o-c-respfile.patch              |  29 ++

@@ -9,8 +9,6 @@ This patch introduces bin/resilient-flash:
 - Robust chunked flashing tool for smartwatches connecting via Pogo pins.
 - Resumes interrupted transfers across USB disconnections.
 - Performs end-to-end SHA256 partition verification against the host image.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  bin/resilient-flash | 691 ++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 691 insertions(+)

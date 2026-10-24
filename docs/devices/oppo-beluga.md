@@ -9,7 +9,7 @@ The **OPPO Watch 46mm** (Model **OW19W8**, codename `beluga` / `oppo-beluga`) is
 | Component | Specification | Notes |
 | :--- | :--- | :--- |
 | **Model** | OW19W8 (Global / Wi-Fi & Bluetooth) | Also known as OPPO Watch 46mm |
-| **SoC** | Qualcomm Snapdragon Wear 3100 (SDA429W) | 4× ARM Cortex-A7 @ 1.2 GHz, Adreno 304 GPU |
+| **SoC** | Qualcomm Snapdragon Wear 3100 (MSM8909W) | 4× ARM Cortex-A7 @ 1.2 GHz, Adreno 304 GPU |
 | **Co-Processor** | Ambiq Micro Apollo 3 Wireless MCU | Ultra-low power co-processor for sensor hub / ambient mode |
 | **Memory** | 1 GB LPDDR3 | Shared system RAM |
 | **Storage** | 8 GB eMMC 4.51 | High-speed on-board flash storage |

@@ -10,8 +10,6 @@ This patch provides an offline Wikipedia / Zim reader for AsteroidOS:
 - Touch-friendly library browser, search page, and article viewer.
 - Full offline access to encyclopedias and travel guides on the wrist.
 - Exposes kiwix in overlay/asteroidos/default.nix and apps attribute set.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/default.nix                |   9 +-
  overlay/asteroidos/kiwix/CMakeLists.txt       |  58 +++

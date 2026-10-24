@@ -11,8 +11,6 @@ This patch updates the btrfs image builder module:
 - Add a configurable compression option (defaulting to zstd:3).
 - Adjust minimal filesystem size calculation to account for btrfs metadata
   overhead and transparent compression workspace before shrinking.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  .../filesystem-image/filesystem/btrfs.nix           | 13 +++++++++++++
  1 file changed, 13 insertions(+)

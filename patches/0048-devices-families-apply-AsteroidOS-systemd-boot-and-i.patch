@@ -12,10 +12,6 @@ Bring the smartwatch family in line with AsteroidOS meta-asteroid:
   AsteroidOS systemd-conf powerkey.conf; the compositor handles them.
 - Grant the video group access to Android graphics nodes (ion, kgsl, mali,
   etc.) as in AsteroidOS 50-video.rules.
-
-Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
-Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd-conf/powerkey.conf
-Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd/50-video.rules
 ---
  devices/families/asteroidos.nix        | 18 ++++++++++++++++++
  examples/asteroid/asteroid-desktop.nix |  7 ++++++-

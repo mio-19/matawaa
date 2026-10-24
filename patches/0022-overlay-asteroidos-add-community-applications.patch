@@ -7,8 +7,6 @@ Package the bundled community watch applications: sensorlogd, health,
 map, qmltester, skedaddle, weatherfetch, beatfork, benchymark,
 docking-bay, heliograph, horizon, meteormatch, pulsar, rag, shopper,
 toolwatch, and touchdown.
-
-Signed-off-by: Mio <mio@mio19.uk>
 ---
  overlay/asteroidos/community-apps/default.nix | 354 ++++++++++++++++++
  overlay/asteroidos/default.nix                |   5 +
