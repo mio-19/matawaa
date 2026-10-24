@@ -6,7 +6,8 @@ This target is a skeleton for an hoki mainline port:
 
 - kernel: Linux 6.18 LTS mainline (`linuxPackages_6_18.kernel`)
 - userspace and stage 1: `armv7l-linux`
-- hardware description: reuses the existing `fossil-hoki` device definition
+- hardware description: standalone mainline device definition; it imports only
+  `../families/asteroidos.nix` and does not import `fossil-hoki`
 - no vendor 4.14 kernel, vendor patches, or vendor boot DTB
 - the standalone vendor `sda429-hoki.dts` is added to the mainline qcom DTS
   directory and appended to the boot image as `dtbs/sda429-hoki.dtb`
