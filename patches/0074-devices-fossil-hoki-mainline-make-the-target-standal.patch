@@ -1,0 +1,155 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 24 Oct 2026 15:42:39 +1100
+Subject: [PATCH] devices/fossil-hoki-mainline: make the target standalone
+
+Stop importing the vendor fossil-hoki device. The mainline target now imports only the AsteroidOS watch family and declares its own hardware, Android boot geometry, mainline kernel/DTS and debug settings. This removes the long chain of mkForce overrides and the vendor Android/libhybris services that do not belong in the mainline port.
+---
+ devices/fossil-hoki-mainline/default.nix | 118 +++++++++++++++++------
+ 1 file changed, 90 insertions(+), 28 deletions(-)
+
+diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
+index 47b82b03..14ea85ed 100644
+--- a/devices/fossil-hoki-mainline/default.nix
++++ b/devices/fossil-hoki-mainline/default.nix
+@@ -1,50 +1,112 @@
+ {
+-  config,
+-  lib,
+   pkgs,
+   ...
+ }:
+ 
+-# DRAFT: all-AArch64 hoki target.
++# DRAFT: independent hoki mainline target.
+ #
+-# This reuses the existing hoki hardware description, but swaps the 32-bit
+-# vendor 4.14 kernel for Linux 6.18 LTS mainline and builds both the kernel and
+-# userspace for aarch64-linux.
++# This deliberately does not import the vendor `fossil-hoki` device. The vendor
++# device carries Android/libhybris services, firmware mounts and udev rules that
++# only make sense with the 32-bit 4.14 vendor kernel. The mainline target keeps
++# only the hardware description and the Android fastboot image geometry, and
++# builds its own Linux 6.18 armv7l kernel with the vendor hoki DTS.
+ #
+-# The vendor hoki device tree is now added to the mainline qcom DTS directory.
+-# Mainline display, touch, modem, WLAN and audio drivers still need porting, so
++# Mainline display, touch, modem, WLAN and audio drivers are still missing, so
+ # this target remains non-bootable and best-effort.
+ let
+   hokiDts = ./sda429-hoki.dts;
+ in
+ {
+   imports = [
+-    ../fossil-hoki
++    ../families/asteroidos.nix
+   ];
+ 
+-  nixpkgs.hostPlatform = lib.mkForce "armv7l-linux";
+-
+-  mobile.hardware.watch.kernel = lib.mkForce "modern";
++  nixpkgs.hostPlatform = "armv7l-linux";
+ 
+   mobile.device = {
+-    name = lib.mkForce "fossil-hoki-mainline";
++    name = "fossil-hoki-mainline";
+     identity = {
+-      name = lib.mkForce "Gen 6 (mainline draft)";
+-      manufacturer = lib.mkForce "Fossil";
++      name = "Gen 6 (mainline draft)";
++      manufacturer = "Fossil";
++    };
++    supportLevel = "best-effort";
++  };
++
++  mobile.hardware = {
++    # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), 32-bit Cortex-A7.
++    soc = "qualcomm-sda429w";
++    ram = 1024;
++    screen = {
++      width = 416;
++      height = 416;
++    };
++    watch = {
++      kernel = "modern";
++      hasCrown = true;
++      hasHaptics = true;
++      aodSupport = true;
++      stage1-pause-debug.enable = true;
++      stage2-ssh.enable = false;
++      stage2-save-logs.enable = true;
+     };
+-    supportLevel = lib.mkForce "best-effort";
+   };
+ 
+-  # Linux 6.18 LTS mainline with the vendor hoki DTS added to the qcom DTS
+-  # directory. The vendor DTS is standalone; it has no #include dependencies.
+-  mobile.boot.stage-1.kernel.package = lib.mkForce (
+-    pkgs.linuxPackages_6_18.kernel.overrideAttrs (old: {
+-      postPatch = (old.postPatch or "") + ''
+-        install -Dm644 ${hokiDts} arch/arm/boot/dts/qcom/sda429-hoki.dts
+-        printf '%s\n' 'dtb-$(CONFIG_ARCH_QCOM) += sda429-hoki.dtb' >> arch/arm/boot/dts/qcom/Makefile
+-      '';
+-    })
+-  );
+-
+-  mobile.system.android.appendDTB = lib.mkForce [ "dtbs/sda429-hoki.dtb" ];
++  mobile.generatedFilesystems.rootfs = {
++    filesystem = "btrfs";
++    btrfs.compression = "zstd";
++  };
++
++  # Linux 6.18 LTS mainline with the standalone vendor hoki DTS added to the
++  # mainline qcom DTS directory. The DTS has no #include dependencies.
++  mobile.boot.stage-1.kernel.package = pkgs.linuxPackages_6_18.kernel.overrideAttrs (old: {
++    postPatch = (old.postPatch or "") + ''
++      install -Dm644 ${hokiDts} arch/arm/boot/dts/qcom/sda429-hoki.dts
++      printf '%s\n' 'dtb-$(CONFIG_ARCH_QCOM) += sda429-hoki.dtb' >> arch/arm/boot/dts/qcom/Makefile
++    '';
++  });
++
++  mobile.system.type = "android";
++
++  mobile.system.android = {
++    device_name = "hoki";
++    ab_partitions = true;
++    bootimg.flash = {
++      offset_base = "0x80000000";
++      offset_kernel = "0x00008000";
++      offset_ramdisk = "0x01000000";
++      offset_second = "0x00f00000";
++      offset_tags = "0x00000100";
++      pagesize = "4096";
++    };
++    appendDTB = [
++      "dtbs/sda429-hoki.dtb"
++    ];
++  };
++
++  boot.kernelParams = [
++    "console=ttyMSM0,115200,n8"
++    "androidboot.console=ttyMSM0"
++    "androidboot.hardware=hoki"
++    "androidboot.selinux=permissive"
++    "audit=0"
++    "androidboot.bootdevice=7824900.sdhci"
++    "androidboot.usbconfigfs=true"
++    "loop.max_part=7"
++    "systemd.log_level=debug"
++    "systemd.log_target=kmsg"
++  ];
++
++  zramSwap.enable = false;
++
++  # The mainline kernel uses the same userdata partition label as the vendor
++  # boot image; stage 1 must expose it before the rootfs is mounted.
++  mobile.boot.stage-1.extraUdevRules = ''
++    KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
++    ENV{PARTNAME}=="userdata", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
++    ENV{ID_PART_ENTRY_NAME}=="userdata", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
++  '';
++
++  environment.systemPackages = [
++    pkgs.btrfs-progs
++  ];
+ }
