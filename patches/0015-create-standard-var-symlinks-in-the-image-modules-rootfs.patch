@@ -5,11 +5,11 @@ Subject: [PATCH] create standard /var symlinks in the image (modules/rootfs)
 
 The generated Mobile-NixOS rootfs image did not contain /var/run or /var/lock, so stage-1 and tmpfiles workarounds were needed. Create the standard symlinks in populateCommands so every boot sees them before early systemd units.
 ---
- modules/rootfs.nix | 5 +++++
- 1 file changed, 5 insertions(+)
+ modules/rootfs.nix | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
-index 0af0c136..6c49de0b 100644
+index 0af0c136..718c1b2d 100644
 --- a/modules/rootfs.nix
 +++ b/modules/rootfs.nix
 @@ -49,6 +49,11 @@ in
@@ -24,3 +24,19 @@ index 0af0c136..6c49de0b 100644
          echo "Copying system closure..."
  
          err=0
+@@ -69,6 +74,15 @@ in
+ 
+         echo "Done copying system closure..."
+         cp -v ${closureInfo}/registration ./nix-path-registration
++
++        # The image builder runs unprivileged, so the root of the filesystem and
++        # the directories created above would otherwise be owned by uid 1000,
++        # which is ceres on the device. systemd-tmpfiles then refuses to create
++        # symlinks such as the compositor environment file across the unsafe
++        # ownership transition, leaving the launcher without QPA_HWC_FORCE_GLES
++        # and QPA_HWC2_FORCE_DOZE_UPDATE.
++        chown -h 0:0 . ./*
++        chown -R 0:0 ./nix/store
+       '';
+ 
+       # Give some headroom for initial mounting.

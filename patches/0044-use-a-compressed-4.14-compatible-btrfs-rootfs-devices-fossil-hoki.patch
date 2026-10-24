@@ -41,7 +41,7 @@ index d8cafe80..32d760aa 100644
  
    # Hardware audio mixer DAI link routing for NXP TFA98xx speaker amplifier & digital mic
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
-index 6c49de0b..2cc889fa 100644
+index 718c1b2d..7fe3237b 100644
 --- a/modules/rootfs.nix
 +++ b/modules/rootfs.nix
 @@ -41,7 +41,11 @@ in
@@ -57,7 +57,7 @@ index 6c49de0b..2cc889fa 100644
  
        populateCommands =
        let
-@@ -126,7 +130,9 @@ in
+@@ -135,7 +139,9 @@ in
          options =
            if config.mobile.generatedFilesystems.rootfs.filesystem == "btrfs" then
              [
