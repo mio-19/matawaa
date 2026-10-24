@@ -18,16 +18,16 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/android-init.nix      |  71 +++++
- devices/fossil-hoki/default.nix           | 306 ++++++++++++++++++++++
+ devices/fossil-hoki/android-init.nix      |  77 +++++
+ devices/fossil-hoki/default.nix           | 351 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
- devices/fossil-hoki/hybris-android.nix    |  15 ++
+ devices/fossil-hoki/hybris-android.nix    |  15 +
  devices/fossil-hoki/hybris.nix            |  34 +++
- devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
+ devices/fossil-hoki/kernel/default.nix    | 109 +++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 10 files changed, 724 insertions(+)
+ 10 files changed, 775 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -103,10 +103,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..ad2be902
+index 00000000..ffd575bf
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,77 @@
 +{
 +  pkgs,
 +  ...
@@ -161,12 +161,18 @@ index 00000000..ad2be902
 +    serviceConfig = {
 +      Type = "simple";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
-+        # The hal-droid init has these paths compiled in: it parses
-+        # /usr/libexec/hal-droid/system/etc/init and runs the services from
-+        # the system/vendor trees.
-+        ${pkgs.coreutils}/bin/mkdir -p /usr/libexec/hal-droid
-+        ${pkgs.coreutils}/bin/ln -sfn ${hybrisAndroid}/usr/libexec/hal-droid/system /usr/libexec/hal-droid/system
++        # The hal-droid init has /usr/libexec/hal-droid/system/etc/init
++        # compiled in. Expose the stock /system bin/etc (apexd, servicemanager,
++        # the linker) and the hybris libraries from the tarball.
++        ${pkgs.coreutils}/bin/rm -rf /usr/libexec/hal-droid/system
++        ${pkgs.coreutils}/bin/mkdir -p /usr/libexec/hal-droid/system
++        ${pkgs.coreutils}/bin/ln -sfn /system/bin /usr/libexec/hal-droid/system/bin
++        ${pkgs.coreutils}/bin/ln -sfn /system/etc /usr/libexec/hal-droid/system/etc
++        ${pkgs.coreutils}/bin/ln -sfn ${hybrisAndroid}/usr/libexec/hal-droid/system/lib /usr/libexec/hal-droid/system/lib
 +        ${pkgs.coreutils}/bin/cp -f ${initRc} /init.rc
++        # The stock Android init mounts /apex and starts apexd before anything
++        # that needs /system/bin/linker.
++        ${pkgs.coreutils}/bin/echo 'import /system/etc/init/hw/init.rc' >> /init.rc
 +        ${pkgs.coreutils}/bin/cp -f ${platPropertyContexts} /plat_property_contexts
 +        ${pkgs.coreutils}/bin/cp -f ${nonplatPropertyContexts} /nonplat_property_contexts
 +        if [ -f /vendor/etc/selinux/vendor_property_contexts ]; then
@@ -180,10 +186,10 @@ index 00000000..ad2be902
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..e69a1f88
+index 00000000..6a2d43fb
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,306 @@
+@@ -0,0 +1,351 @@
 +{
 +  config,
 +  lib,
@@ -343,16 +349,61 @@ index 00000000..e69a1f88
 +  mobile.quirks.fb-refresher.enable = lib.mkForce false;
 +
 +  fileSystems = {
-+    # Stock Fossil/Android system and vendor partitions. Android init loads
-+    # /system/etc/init/hw/init.rc (servicemanager, hwservicemanager) and
-+    # /vendor/etc/init/hw/init.hoki.rc (the HWC2 composer and other HALs).
-+    "/system" = {
++    # p31 is the Android system-as-root: /system, /system_ext, /product and
++    # /odm live below its root, and /apex is a tmpfs that apexd populates from
++    # /system/apex. /system/bin/linker is a symlink into /apex, so apexd must
++    # be able to mount there before servicemanager can exec.
++    "/mnt/system_root" = {
 +      device = "/dev/disk/by-partlabel/system";
 +      fsType = "ext4";
 +      options = [
 +        "ro"
 +        "nofail"
 +      ];
++    };
++    "/system" = {
++      device = "/mnt/system_root/system";
++      fsType = "none";
++      options = [
++        "bind"
++        "ro"
++        "nofail"
++      ];
++      depends = [ "/mnt/system_root" ];
++    };
++    "/system_ext" = {
++      device = "/mnt/system_root/system_ext";
++      fsType = "none";
++      options = [
++        "bind"
++        "ro"
++        "nofail"
++      ];
++      depends = [ "/mnt/system_root" ];
++    };
++    "/product" = {
++      device = "/mnt/system_root/product";
++      fsType = "none";
++      options = [
++        "bind"
++        "ro"
++        "nofail"
++      ];
++      depends = [ "/mnt/system_root" ];
++    };
++    "/odm" = {
++      device = "/mnt/system_root/odm";
++      fsType = "none";
++      options = [
++        "bind"
++        "ro"
++        "nofail"
++      ];
++      depends = [ "/mnt/system_root" ];
++    };
++    "/apex" = {
++      fsType = "tmpfs";
++      options = [ "mode=0755" ];
 +    };
 +    "/vendor" = {
 +      device = "/dev/disk/by-partlabel/vendor";

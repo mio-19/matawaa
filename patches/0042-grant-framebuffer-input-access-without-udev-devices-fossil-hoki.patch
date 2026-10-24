@@ -10,10 +10,10 @@ Set /dev/fb0 to root:video 0660 and /dev/input/event* to root:input 0660 with sy
  1 file changed, 2 insertions(+)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index e69a1f88..907bbc70 100644
+index 6a2d43fb..d8cafe80 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -217,6 +217,8 @@
+@@ -262,6 +262,8 @@
      "L+ /system/lib/hw/gps.default.so - - - - /vendor/lib/hw/gps.default.so"
      "L+ /vendor/bin/hw/android.hardware.gnss@1.0-service - - - - /vendor/bin/hw/android.hardware.gnss@1.0-service-qti"
      "L+ /dev/graphics/fb0 - - - - /dev/fb0"
