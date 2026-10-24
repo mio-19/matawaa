@@ -8,20 +8,20 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
- examples/asteroid/asteroid-desktop.nix | 222 +++++++++++++++++++++++++
- examples/asteroid/configuration.nix    |  38 +++++
+ examples/asteroid/asteroid-desktop.nix | 240 +++++++++++++++++++++++++
+ examples/asteroid/configuration.nix    |  38 ++++
  examples/asteroid/default.nix          |  15 ++
- 3 files changed, 275 insertions(+)
+ 3 files changed, 293 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..9f5fd4db
+index 00000000..d6e6c0f1
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,222 @@
+@@ -0,0 +1,240 @@
 +{
 +  config,
 +  lib,
@@ -180,15 +180,19 @@ index 00000000..9f5fd4db
 +        EnvironmentFile = "-/var/lib/environment/compositor/*.conf";
 +        ExecStartPre = [
 +          "${pkgs.writeShellScript "asteroid-launcher-precondition" ''
-+            if [ -f /usr/lib/systemd/user/android-boot-completed.service ]; then
-+              while [ ! -f /dev/.coldboot_done ]; do sleep 1; done
-+            fi
++            # android-init.service touches this marker once the property
++            # service and the vendor HALs are up; wait for it with a bound.
++            i=0
++            while [ ! -e /dev/.coldboot_done ] && [ "$i" -lt 30 ]; do
++              sleep 1
++              i=$((i + 1))
++            done
 +          ''}"
 +          "-${pkgs.bash}/bin/bash -c 'echo QUIT > /run/psplash_fifo 2>/dev/null || true'"
 +        ];
 +        ExecStart = "${pkgs.writeShellScript "asteroid-launcher-run" ''
 +          launcher=${config.security.wrapperDir}/asteroid-launcher
-+          if "$launcher" $LIPSTICK_OPTIONS -plugin evdevtouch --systemd; then
++          if "$launcher" -plugin evdevtouch $LIPSTICK_OPTIONS --systemd; then
 +            exit 0
 +          fi
 +          # The hwcomposer QPA needs libhybris' HWC2 compatibility layer in the
@@ -197,11 +201,25 @@ index 00000000..9f5fd4db
 +          export QT_QPA_PLATFORM=linuxfb:fb=/dev/fb0
 +          export QT_QUICK_BACKEND=software
 +          export EGL_PLATFORM=
-+          exec "$launcher" $LIPSTICK_OPTIONS -plugin evdevtouch --systemd
++          exec "$launcher" -plugin evdevtouch $LIPSTICK_OPTIONS --systemd
 +        ''}";
 +        TimeoutStopSec = "3s";
 +        Restart = "always";
 +        RestartSec = "2s";
++      };
++    };
++
++    # Upstream meta-asteroid installs android-boot-completed.service as a user
++    # unit; setting sys.boot_completed lets hoki's init.rc run init.rsb.sh.
++    systemd.user.services.android-boot-completed = {
++      description = "Tells the Android init system that the boot has been completed";
++      wantedBy = [ "default.target" ];
++      after = [ "asteroid-launcher.service" ];
++      unitConfig.ConditionUser = "!root";
++      serviceConfig = {
++        Type = "simple";
++        ExecStartPre = "-${pkgs.coreutils}/bin/sleep 10";
++        ExecStart = "${pkgs.bash}/bin/bash -ec 'if [ \"$(/system/bin/getprop sys.boot_completed)\" != 1 ]; then /system/bin/setprop sys.boot_completed 1; fi'";
 +      };
 +    };
 +

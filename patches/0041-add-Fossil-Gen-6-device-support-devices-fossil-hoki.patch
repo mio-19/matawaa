@@ -17,20 +17,22 @@ Install the compositor environment as
 and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
- devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/android-init.nix      |  43 +++
- devices/fossil-hoki/default.nix           | 316 ++++++++++++++++++++++
+ devices/fossil-firefish/default.nix       |  56 +++++
+ devices/fossil-hoki/android-init.nix      |  62 +++++
+ devices/fossil-hoki/default.nix           | 283 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
- devices/fossil-hoki/hybris.nix            |  47 ++++
- devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
+ devices/fossil-hoki/hybris-android.nix    |  15 ++
+ devices/fossil-hoki/hybris.nix            |  34 +++
+ devices/fossil-hoki/kernel/default.nix    | 109 +++++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
- devices/fossil-ray/default.nix            |  56 ++++
- devices/fossil-triggerfish/default.nix    |  56 ++++
- 9 files changed, 704 insertions(+)
+ devices/fossil-ray/default.nix            |  56 +++++
+ devices/fossil-triggerfish/default.nix    |  56 +++++
+ 10 files changed, 692 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
  create mode 100644 devices/fossil-hoki/gps_xtra.ini
+ create mode 100644 devices/fossil-hoki/hybris-android.nix
  create mode 100644 devices/fossil-hoki/hybris.nix
  create mode 100644 devices/fossil-hoki/kernel/default.nix
  create mode 100644 devices/fossil-hoki/wlan-firmware-hoki.sh
@@ -101,18 +103,18 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..d18aaa9a
+index 00000000..5cf9baf2
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,62 @@
 +{
-+  config,
-+  lib,
 +  pkgs,
 +  ...
 +}:
 +
 +let
++  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
++
 +  # AsteroidOS hoki init.rc: starts servicemanager, hwservicemanager,
 +  # vndservicemanager and the core/hal service classes. The vendor HALs
 +  # (including android.hardware.graphics.composer) are defined in
@@ -122,38 +124,57 @@ index 00000000..d18aaa9a
 +    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-hoki/recipes-android/android-init/android-init/init.rc";
 +    hash = "sha256-TBa60Z7PdgTjZYECheZYEA/6D/OZwpVx3bU70XwWJHU=";
 +  };
++
++  # hoki installs these at / in meta-smartwatch's android-init bbappend; the
++  # property service needs them to label sys.boot_completed and the hwc props.
++  platPropertyContexts = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-hoki/recipes-android/android-init/android-init/plat_property_contexts";
++    hash = "sha256-Je6T4SOA1vfc8bJOLBRwaBqIW4BCO+akXS7L+P1QYuo=";
++  };
++
++  nonplatPropertyContexts = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-hoki/recipes-android/android-init/android-init/nonplat_property_contexts";
++    hash = "sha256-PkLCQb9VlnKQXqMofCNFB6p2SXxwd06+E8yFAWMLWXY=";
++  };
 +in
 +{
 +  # Without Android init the vendor HIDL services never start, so libhybris
 +  # cannot reach android.hardware.graphics.composer and the hwcomposer QPA
-+  # aborts. AsteroidOS runs /system/bin/init from this systemd unit.
++  # aborts. AsteroidOS runs the hal-droid init, which reads /init.rc and the
++  # vendor init rc files.
 +  systemd.services.android-init = {
-+    description = "Android init for hoki (property service, servicemanager, vendor HALs)";
++    description = "/system/bin/init initializes the property service and launches servicemanager and logd";
 +    wantedBy = [ "multi-user.target" ];
 +    after = [ "local-fs.target" ];
 +    before = [
-+      "multi-user.target"
-+      "user@1000.service"
++      "basic.target"
++      "network.target"
++      "bluetooth.service"
++      "ofono.service"
++      "sensord.service"
 +    ];
++    unitConfig.DefaultDependencies = false;
++    unitConfig.Conflicts = [ "shutdown.target" ];
 +    serviceConfig = {
 +      Type = "simple";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        ${pkgs.coreutils}/bin/mkdir -p /usr/libexec/hal-droid
++        ${pkgs.coreutils}/bin/ln -sfn ${hybrisAndroid}/usr/libexec/hal-droid/system /usr/libexec/hal-droid/system
 +        ${pkgs.coreutils}/bin/ln -sfn ${initRc} /init.rc
-+        ${pkgs.coreutils}/bin/mkdir -p /dev/graphics
++        ${pkgs.coreutils}/bin/ln -sfn ${platPropertyContexts} /plat_property_contexts
++        ${pkgs.coreutils}/bin/ln -sfn ${nonplatPropertyContexts} /nonplat_property_contexts
 +        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
 +      '';
-+      ExecStart = "/system/bin/init";
-+      Restart = "always";
-+      RestartSec = "1s";
++      ExecStart = "/usr/libexec/hal-droid/system/bin/init";
 +    };
 +  };
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..17712c8d
+index 00000000..3b659759
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,316 @@
+@@ -0,0 +1,283 @@
 +{
 +  config,
 +  lib,
@@ -253,10 +274,7 @@ index 00000000..17712c8d
 +  systemd.services.audio-routing-hoki = {
 +    description = "Fossil Gen 6 TFA98xx audio amplifier and microphone mixer routing";
 +    wantedBy = [ "multi-user.target" ];
-+    after = [
-+      "sound.target"
-+      "subsystems-hoki.service"
-+    ];
++    after = [ "sound.target" ];
 +    path = with pkgs; [
 +      alsa-utils
 +      coreutils
@@ -346,10 +364,6 @@ index 00000000..17712c8d
 +    "d /var/lib/environment/compositor 0755 root root -"
 +    "L+ /var/lib/environment/compositor/20-device.conf - - - - ${pkgs.writeText "20-device.conf" ''
 +      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"
-+      EGL_PLATFORM=hwcomposer
-+      QT_QPA_PLATFORM=hwcomposer
-+      QT_ENABLE_GLYPH_CACHE_WORKAROUND=true
-+      QT_GSTREAMER_CAMERABIN_SRC=droidcamsrc
 +      QPA_HWC_FORCE_GLES=1
 +      QPA_HWC2_FORCE_DOZE_UPDATE=1
 +      QT_OPENGL_NO_BGRA=1
@@ -364,36 +378,10 @@ index 00000000..17712c8d
 +    "d /data/vendor/bgdaemon 0755 root root -"
 +  ];
 +
-+  # Fossil Gen 6 Qualcomm ADSP, CDSP, and SLPI subsystem initialization
-+  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-android/android-init/android-init/init.rc
-+  systemd.services.subsystems-hoki = {
-+    description = "Fossil Gen 6 Qualcomm ADSP/CDSP/SLPI subsystem boot";
-+    wantedBy = [ "basic.target" ];
-+    before = [ "wlan-firmware-hoki.service" ];
-+    serviceConfig = {
-+      Type = "oneshot";
-+      RemainAfterExit = true;
-+      ExecStart = pkgs.writeShellScript "subsystems-hoki-init" ''
-+        for i in 0 1 2 3 4; do
-+          if [ -f "/sys/bus/msm_subsys/devices/subsys$i/restart_level" ]; then
-+            echo RELATED > "/sys/bus/msm_subsys/devices/subsys$i/restart_level" 2>/dev/null || true
-+          fi
-+        done
-+        for sub in adsp cdsp slpi; do
-+          if [ -f "/sys/kernel/boot_$sub/boot" ]; then
-+            echo 1 > "/sys/kernel/boot_$sub/boot" 2>/dev/null || true
-+          fi
-+        done
-+        # Qualcomm Blackghost RSB companion processor bus permissions and init
-+        if [ -f "/sys/devices/platform/soc/soc:qcom,bg-rsb/enable" ]; then
-+          chmod 0666 /sys/devices/platform/soc/soc:qcom,bg-rsb/enable 2>/dev/null || true
-+        fi
-+        if [ -x "/vendor/bin/init.rsb.sh" ]; then
-+          /vendor/bin/init.rsb.sh 2>/dev/null || true
-+        fi
-+      '';
-+    };
-+  };
++  # The hoki init.rc (run by android-init.service) boots the ADSP/CDSP/SLPI
++  # subsystems, sets their restart levels, fixes up the bg-rsb permissions and
++  # runs init.rsb.sh on sys.boot_completed, matching AsteroidOS. No separate
++  # systemd service is needed.
 +
 +  # Fossil Gen 6 CPU/GPU underclock and power collapse profile
 +  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-core/underclock/underclock/underclock
@@ -478,39 +466,47 @@ index 00000000..594fc6c1
 @@ -0,0 +1,2 @@
 +[ntp]
 +NTP_FORCE_INJECT=true
+diff --git a/devices/fossil-hoki/hybris-android.nix b/devices/fossil-hoki/hybris-android.nix
+new file mode 100644
+index 00000000..0cd392b7
+--- /dev/null
++++ b/devices/fossil-hoki/hybris-android.nix
+@@ -0,0 +1,15 @@
++{ pkgs }:
++# AsteroidOS ships patched Android system libraries and headers for hybris on
++# the Fossil Gen 6. They contain the HWC2 compatibility layer that the stock
++# Fossil system/vendor image lacks, and the hal-droid init/system binaries
++# used by android-init.service.
++# Source: meta-asteroid recipes-android/android/android_armv7-pie64.bb
++pkgs.runCommand "hybris-p-msm8909w" { } ''
++  mkdir -p $out
++  ${pkgs.gnutar}/bin/tar xf ${
++    pkgs.fetchurl {
++      url = "https://dl.dropboxusercontent.com/s/2btck4hlowhronv/hybris-p-msm8909w.tar.gz";
++      hash = "sha256-19kXAAB3la7c30//pBhVLt8rP9QaAiM2dAGQb09N/tM=";
++    }
++  } -C $out
++''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..838ca775
+index 00000000..981705af
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,34 @@
 +{
-+  config,
 +  lib,
 +  pkgs,
 +  ...
 +}:
 +
 +let
-+  # AsteroidOS ships patched Android libraries and headers for hybris on the
-+  # Fossil Gen 6. They contain the HWC2 compatibility layer that the stock
-+  # Fossil system/vendor image lacks, so the hwcomposer QPA needs them.
-+  # Source: meta-asteroid recipes-android/android/android_armv7-pie64.bb
-+  hybrisAndroid = pkgs.runCommand "hybris-p-msm8909w" { } ''
-+    mkdir -p $out
-+    ${pkgs.gnutar}/bin/tar xf ${
-+      pkgs.fetchurl {
-+        url = "https://dl.dropboxusercontent.com/s/2btck4hlowhronv/hybris-p-msm8909w.tar.gz";
-+        hash = "sha256-19kXAAB3la7c30//pBhVLt8rP9QaAiM2dAGQb09N/tM=";
-+      }
-+    } -C $out
-+  '';
++  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
 +in
 +{
 +  # Build libhybris against the AsteroidOS Android headers and point its
-+  # runtime Android library path at the patched hybris libraries. Without
-+  # this, libhwc2.so is built empty (no hwcomposer2.h) and the hwcomposer
-+  # QPA cannot load.
++  # runtime Android library path at the hal-droid tree, matching
++  # meta-asteroid's libhybris_git.bbappend. android-init.service installs
++  # the hybris tarball at /usr/libexec/hal-droid/system.
 +  nixpkgs.overlays = lib.mkAfter [
 +    (
 +      final: super:
@@ -524,7 +520,7 @@ index 00000000..838ca775
 +            ) (old.configureFlags or [ ]))
 +            ++ [
 +              "--with-android-headers=${hybrisAndroid}/include"
-+              "--with-default-hybris-ld-library-path=${hybrisAndroid}/usr/libexec/hal-droid/system/lib:/vendor/lib:/system/lib"
++              "--with-default-hybris-ld-library-path=/usr/libexec/hal-droid/system/lib:/vendor/lib:/system/lib"
 +            ];
 +        });
 +      }
