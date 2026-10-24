@@ -10,7 +10,7 @@ Set /dev/fb0 to root:video 0660 and /dev/input/event* to root:input 0660 with sy
  1 file changed, 2 insertions(+)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index ecdca7fd..81ca0ec8 100644
+index ca80655b..32a23ca3 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -205,6 +205,8 @@ in

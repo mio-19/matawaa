@@ -11,7 +11,7 @@ Switch the hoki rootfs to btrfs with zstd compression and the 4.14-supported noa
  2 files changed, 20 insertions(+), 2 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 81ca0ec8..b1a7d041 100644
+index 32a23ca3..5b086d7b 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -23,6 +23,17 @@ in

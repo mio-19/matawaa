@@ -18,16 +18,16 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/android-init.nix      |  63 +++++
- devices/fossil-hoki/default.nix           | 312 ++++++++++++++++++++++
+ devices/fossil-hoki/android-init.nix      |  63 ++++
+ devices/fossil-hoki/default.nix           | 339 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
- devices/fossil-hoki/hybris-android.nix    |  15 ++
+ devices/fossil-hoki/hybris-android.nix    |  22 ++
  devices/fossil-hoki/hybris.nix            |  41 +++
- devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
+ devices/fossil-hoki/kernel/default.nix    | 109 +++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 10 files changed, 729 insertions(+)
+ 10 files changed, 763 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -172,10 +172,10 @@ index 00000000..7fe6bef7
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..ecdca7fd
+index 00000000..ca80655b
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,312 @@
+@@ -0,0 +1,339 @@
 +{
 +  config,
 +  lib,
@@ -470,6 +470,33 @@ index 00000000..ecdca7fd
 +  # Upstream PR: https://github.com/AsteroidOS/meta-smartwatch/pull/342 ("hoki: gnss: symlink real vendor HAL service, enable NTP AGPS assistance")
 +  environment.etc."gps_xtra.ini".source = ./gps_xtra.ini;
 +
++  # The vendor GNSS rc references android.hardware.gnss@1.0-service but the
++  # stock vendor ships the -qti variant. Create the alias at boot (the vendor
++  # partition is read-only, so remount it for the operation) and drop the AGPS
++  # assistance file on /persist, matching PR #342.
++  systemd.services.gnss-hoki = {
++    description = "hoki GNSS vendor service symlink and AGPS assistance";
++    after = [
++      "vendor.mount"
++      "persist.mount"
++    ];
++    before = [ "android-init.service" ];
++    wantedBy = [ "multi-user.target" ];
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = pkgs.writeShellScript "gnss-hoki" ''
++        ${pkgs.util-linux}/bin/mount -o remount,rw /vendor || true
++        ${pkgs.coreutils}/bin/ln -sfn android.hardware.gnss@1.0-service-qti \
++          /vendor/bin/hw/android.hardware.gnss@1.0-service
++        ${pkgs.util-linux}/bin/mount -o remount,ro /vendor || true
++        if [ -d /persist ]; then
++          ${pkgs.coreutils}/bin/cp -f /etc/gps_xtra.ini /persist/gps_xtra.ini || true
++        fi
++      '';
++    };
++  };
++
 +  # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
 +  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd/51-ffmemless.ini
 +  environment.etc."ngf/51-ffmemless.ini".source = pkgs.fetchurl {
@@ -498,10 +525,10 @@ index 00000000..594fc6c1
 +NTP_FORCE_INJECT=true
 diff --git a/devices/fossil-hoki/hybris-android.nix b/devices/fossil-hoki/hybris-android.nix
 new file mode 100644
-index 00000000..0cd392b7
+index 00000000..1e97adce
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris-android.nix
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,22 @@
 +{ pkgs }:
 +# AsteroidOS ships patched Android system libraries and headers for hybris on
 +# the Fossil Gen 6. They contain the HWC2 compatibility layer that the stock
@@ -516,6 +543,13 @@ index 00000000..0cd392b7
 +      hash = "sha256-19kXAAB3la7c30//pBhVLt8rP9QaAiM2dAGQb09N/tM=";
 +    }
 +  } -C $out
++
++  # GNSS (#342): the vendor provides gps.default.so under /vendor/lib/hw.
++  # /system is the read-only hal-droid tree, so create the hw module alias at
++  # build time rather than relying on a boot-time symlink into the store.
++  ${pkgs.coreutils}/bin/mkdir -p $out/usr/libexec/hal-droid/system/lib/hw
++  ${pkgs.coreutils}/bin/ln -sfn /vendor/lib/hw/gps.default.so \
++    $out/usr/libexec/hal-droid/system/lib/hw/gps.default.so
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
