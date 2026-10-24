@@ -15,14 +15,14 @@ Add the Nemo.Configuration QML plugin and the upstream libhybris
 hwcomposer QPA plugin the launcher needs, and pin the launcher to the
 current nightly.
 ---
- .../asteroidos/asteroid-btsyncd/default.nix   |  68 +++++++
+ .../asteroidos/asteroid-btsyncd/default.nix   |  68 ++++++
  .../org.asteroidos.btsyncd.conf               |  13 ++
  .../asteroidos/asteroid-launcher/default.nix  |  82 ++++++++
- overlay/asteroidos/default.nix                |  27 +++
- .../nemo-qml-plugin-configuration/default.nix |  69 +++++++
- .../qt6-qpa-hwcomposer-plugin/default.nix     | 188 ++++++++++++++++++
+ overlay/asteroidos/default.nix                |  32 +++
+ .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
+ .../qt6-qpa-hwcomposer-plugin/default.nix     | 198 ++++++++++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 7 files changed, 499 insertions(+)
+ 7 files changed, 514 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
@@ -212,15 +212,20 @@ index 00000000..20f9f747
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 90363944..a7ee3ef8 100644
+index 90363944..6bddf6f8 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,8 +7,29 @@ rec {
+@@ -7,8 +7,34 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
 +  qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
-+    inherit (pkgs) libhybris android-headers glib mtdev;
++    inherit (pkgs)
++      libhybris
++      android-headers
++      glib
++      mtdev
++      ;
 +    libudev = pkgs.udev;
 +  };
 +
@@ -245,7 +250,7 @@ index 90363944..a7ee3ef8 100644
    mce-dev = callPackage ./mce-dev { };
    mce-qt6 = callPackage ./mce-qt6 {
      inherit mce-dev;
-@@ -18,5 +39,11 @@ rec {
+@@ -18,5 +44,11 @@ rec {
    keepalive = callPackage ./keepalive { };
    timed-qt6 = callPackage ./timed-qt6 { };
  
@@ -334,10 +339,10 @@ index 00000000..214fc9e5
 +})
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 new file mode 100644
-index 00000000..e624788d
+index 00000000..3702fd20
 --- /dev/null
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,198 @@
 +{
 +  lib,
 +  stdenv,
@@ -357,32 +362,42 @@ index 00000000..e624788d
 +
 +let
 +  metaAsteroid = "6c1daa5cc617cf49ad316cdc9ddc4cbd290bfbe8";
-+  patch = name: hash: fetchurl {
-+    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroid}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/${name}";
-+    inherit hash;
-+  };
++  patch =
++    name: hash:
++    fetchurl {
++      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroid}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/${name}";
++      inherit hash;
++    };
 +
 +  # HWC2 was introduced after the Android 6 headers in android-headers 23.
 +  # Keep the old headers for HWC1/libhybris and use the Android 10 HWC2
 +  # headers for this plugin.
 +  hwc2Headers = runCommand "android-hwc2-headers" { } ''
 +    mkdir -p $out/include/hardware
-+    cp ${fetchurl {
-+      url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hardware.h";
-+      sha256 = "1s5f4gxmqhd4xfddwaiw9q8csjnk8fcmb02370v7xj6n100jzk05";
-+    }} $out/include/hardware/hardware.h
-+    cp ${fetchurl {
-+      url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer_defs.h";
-+      sha256 = "1far10f35b95apgqdasmpl7jgdqm51j5xjwzsgj3h59n5n1almhi";
-+    }} $out/include/hardware/hwcomposer_defs.h
-+    cp ${fetchurl {
-+      url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer.h";
-+      sha256 = "12i9w601lnsli38wnwal81zzvfr4x6ynlxhm2crd1qwhw29jwqz7";
-+    }} $out/include/hardware/hwcomposer.h
-+    cp ${fetchurl {
-+      url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer2.h";
-+      sha256 = "0f2vp1mqvn7psvx0xhdfspxjf07f4gr42wprkv1l8n5llfxqklgd";
-+    }} $out/include/hardware/hwcomposer2.h
++    cp ${
++      fetchurl {
++        url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hardware.h";
++        sha256 = "1s5f4gxmqhd4xfddwaiw9q8csjnk8fcmb02370v7xj6n100jzk05";
++      }
++    } $out/include/hardware/hardware.h
++    cp ${
++      fetchurl {
++        url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer_defs.h";
++        sha256 = "1far10f35b95apgqdasmpl7jgdqm51j5xjwzsgj3h59n5n1almhi";
++      }
++    } $out/include/hardware/hwcomposer_defs.h
++    cp ${
++      fetchurl {
++        url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer.h";
++        sha256 = "12i9w601lnsli38wnwal81zzvfr4x6ynlxhm2crd1qwhw29jwqz7";
++      }
++    } $out/include/hardware/hwcomposer.h
++    cp ${
++      fetchurl {
++        url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer2.h";
++        sha256 = "0f2vp1mqvn7psvx0xhdfspxjf07f4gr42wprkv1l8n5llfxqklgd";
++      }
++    } $out/include/hardware/hwcomposer2.h
 +  '';
 +in
 +stdenv.mkDerivation (finalAttrs: {

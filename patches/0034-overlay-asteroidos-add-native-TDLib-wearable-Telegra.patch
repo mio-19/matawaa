@@ -51,10 +51,10 @@ This patch provides a native C++/QML Telegram client for AsteroidOS:
  create mode 100644 overlay/asteroidos/telegram/src/telegramclient.h
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index ac28998c..dc3e92d4 100644
+index 9d9bf511..b7cd1061 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -49,12 +49,19 @@ rec {
+@@ -54,12 +54,19 @@ rec {
      inherit (pkgs) wpewebkit;
    };
  

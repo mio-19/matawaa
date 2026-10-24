@@ -14,9 +14,9 @@ Select systemd 257 only for the legacy kernel; modern kernels use the
 current systemd 262. Keep the old-kernel-patched 262 package as
 systemd262oldkernel.
 ---
- devices/families/asteroidos.nix               |    7 +
- modules/hardware-watch.nix                    |   27 +
- overlay/cross-compile.nix                     |   54 +-
+ devices/families/asteroidos.nix               |    4 +
+ modules/hardware-watch.nix                    |   30 +
+ overlay/cross-compile.nix                     |   55 +-
  .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
  ...on-t-try-to-unmount-nix-or-nix-store.patch |   45 +
@@ -42,7 +42,7 @@ systemd262oldkernel.
  ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
- 28 files changed, 2311 insertions(+), 7 deletions(-)
+ 28 files changed, 2312 insertions(+), 7 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -70,33 +70,33 @@ systemd262oldkernel.
  create mode 100644 overlay/systemd-257/systemd-udevd-varlink.socket
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 4a0a75f4..c4550492 100644
+index 4a0a75f4..397bbab1 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
-@@ -12,6 +12,13 @@ let
+@@ -12,6 +12,10 @@ let
      ;
  in
  {
 +  systemd.package = lib.mkForce (
-+    if config.mobile.hardware.watch.kernel == "legacy" then
-+      pkgs.systemd257
-+    else
-+      pkgs.systemd
++    if config.mobile.hardware.watch.kernel == "legacy" then pkgs.systemd257 else pkgs.systemd
 +  );
 +
    mobile.system.type = mkDefault "android";
    mobile.system.system = mkDefault "armv7l-linux";
  
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
-index 35ac4030..c43cedf0 100644
+index 35ac4030..4ddb720f 100644
 --- a/modules/hardware-watch.nix
 +++ b/modules/hardware-watch.nix
-@@ -117,6 +117,33 @@ in
+@@ -117,6 +117,36 @@ in
        '';
      };
  
 +    kernel = mkOption {
-+      type = types.enum [ "legacy" "modern" ];
++      type = types.enum [
++        "legacy"
++        "modern"
++      ];
 +      default = "legacy";
 +      description = ''
 +        Watch kernel generation. "legacy" uses the vendor 4.14 kernel and the
@@ -126,7 +126,7 @@ index 35ac4030..c43cedf0 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index ba450985..87e0ec16 100644
+index ba450985..d0114800 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -32,13 +32,14 @@ else
@@ -151,7 +151,7 @@ index ba450985..87e0ec16 100644
        (super.systemd.override (
          super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
            # systemd BPF framework fails when cross-compiling on 32-bit ARM
-@@ -58,6 +59,45 @@ else
+@@ -58,6 +59,46 @@ else
            ];
          });
  
@@ -161,7 +161,7 @@ index ba450985..87e0ec16 100644
 +    systemdStdenv = super.stdenv.override {
 +      cc = super.stdenv.cc.override {
 +        cc = super.stdenv.cc.cc.overrideAttrs (old: {
-+          patches = (old.patches or []) ++ [ ./patches/gcc-16.2.0-libgomp-uid-buffer.patch ];
++          patches = (old.patches or [ ]) ++ [ ./patches/gcc-16.2.0-libgomp-uid-buffer.patch ];
 +        });
 +      };
 +    };
@@ -171,21 +171,22 @@ index ba450985..87e0ec16 100644
 +        (builtins.intersectAttrs (super.lib.functionArgs (import ./systemd-257)) final)
 +        ./systemd-257
 +        { stdenv = systemdStdenv; }
-+      ).override (
-+        {
-+          # hoki has no encrypted root or EFI UKI; dropping these removes the
-+          # only postFixup users of makeBinaryWrapper, whose helper hook pulls
-+          # in the GCC build that currently fails on armv7.
-+          withCryptsetup = false;
-+          withUkify = false;
-+          withHomed = false;
-+          withRepart = false;
-+          withFido2 = false;
-+        }
-+        // super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
-+          withLibBPF = false;
-+        }
-+      );
++      ).override
++        (
++          {
++            # hoki has no encrypted root or EFI UKI; dropping these removes the
++            # only postFixup users of makeBinaryWrapper, whose helper hook pulls
++            # in the GCC build that currently fails on armv7.
++            withCryptsetup = false;
++            withUkify = false;
++            withHomed = false;
++            withRepart = false;
++            withFido2 = false;
++          }
++          // super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
++            withLibBPF = false;
++          }
++        );
 +  in
 +  {
 +    inherit systemd257;
