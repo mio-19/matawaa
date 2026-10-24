@@ -6,10 +6,10 @@ Subject: [PATCH] examples/asteroid: use upstream libhybris hwcomposer QPA
 Port the upstream qt6-qpa-hwcomposer-plugin with Android 10 HWC2 headers, install it in QT_PLUGIN_PATH, and switch the launcher to EGL_PLATFORM=hwcomposer and QT_QPA_PLATFORM=hwcomposer instead of the fbdev/software fallback. Move asteroid-btsyncd to the upstream user-service layout. The plugin, btrfs rootfs and hoki image build successfully.
 ---
  devices/fossil-hoki/default.nix               |   4 +
- examples/asteroid/asteroid-desktop.nix        |  15 +-
+ examples/asteroid/asteroid-desktop.nix        |  11 +-
  overlay/asteroidos/default.nix                |   5 +
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 188 ++++++++++++++++++
- 4 files changed, 203 insertions(+), 9 deletions(-)
+ 4 files changed, 203 insertions(+), 5 deletions(-)
  create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
@@ -28,10 +28,10 @@ index 7ab4dc45..714d7a08 100644
        QPA_HWC2_FORCE_DOZE_UPDATE=1
        QT_OPENGL_NO_BGRA=1
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 8615cb64..5321cee2 100644
+index 824cc67e..5321cee2 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -143,11 +143,9 @@ in
+@@ -143,7 +143,7 @@ in
        QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
        QML2_IMPORT_PATH = "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qt5compat}/lib/qt-6/qml:${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml:${pkgs.asteroid.mce-qt6}/lib/qt-6/qml:${pkgs.asteroid.mlite}/lib/qt-6/qml:${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml";
@@ -39,21 +39,8 @@ index 8615cb64..5321cee2 100644
 +      QT_PLUGIN_PATH = "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins";
        # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
        QT_ENABLE_HIGHDPI_SCALING = "0";
--      # Avoid requiring a hardware EGL display for the fbdev compositor.
--      QT_QUICK_BACKEND = "software";
      };
- 
-     # Wayland compositor and watchface launcher user service (runs under user session)
-@@ -162,8 +160,6 @@ in
-         QT_VIRTUALKEYBOARD_STYLE = "watch";
-         QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
-         RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
--        QT_QPA_PLATFORM = lib.mkDefault "linuxfb:fb=/dev/fb0";
--        QT_QUICK_BACKEND = "software";
-       }
-       // config.environment.variables;
-       serviceConfig = {
-@@ -209,12 +205,13 @@ in
+@@ -205,12 +205,13 @@ in
        });
      '';
  

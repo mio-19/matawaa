@@ -1,17 +1,17 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Fri, 23 Oct 2026 09:57:21 +1100
-Subject: [PATCH] examples/asteroid: fix launcher QML, fbdev and input setup
+Subject: [PATCH] examples/asteroid: fix launcher QML and input setup
 
-Build the Nemo.Mce QML plugin with the target Qt libraries, add the Nemo.Configuration plugin from Sailfish, and include qt5compat in QML2_IMPORT_PATH. Run the fbdev launcher with the Qt Quick software backend so it does not require an EGL display on the 4.14 kernel. Add ceres to the tty group and drop the unavailable keys.qmap option so the compositor can open the tty and evdev keyboards.
+Build the Nemo.Mce QML plugin with the target Qt libraries, add the Nemo.Configuration plugin from Sailfish, and include qt5compat in QML2_IMPORT_PATH. Add ceres to the tty group and drop the unavailable keys.qmap option so the compositor can open the tty and evdev keyboards.
 ---
  devices/fossil-hoki/default.nix               | 20 +++---
- examples/asteroid/asteroid-desktop.nix        | 19 ++++-
+ examples/asteroid/asteroid-desktop.nix        | 17 ++++-
  examples/asteroid/configuration.nix           |  1 +
  overlay/asteroidos/default.nix                |  3 +
  overlay/asteroidos/mce-qt6/default.nix        | 16 ++++-
  .../nemo-qml-plugin-configuration/default.nix | 69 +++++++++++++++++++
- 6 files changed, 117 insertions(+), 11 deletions(-)
+ 6 files changed, 114 insertions(+), 12 deletions(-)
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
@@ -57,10 +57,10 @@ index 24e4487e..3ebe0d83 100644
      "L+ /vendor/bin/hw/android.hardware.gnss@1.0-service - - - - /vendor/bin/hw/android.hardware.gnss@1.0-service-qti"
      "L+ /dev/graphics/fb0 - - - - /dev/fb0"
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 5d686296..8615cb64 100644
+index 5d686296..824cc67e 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -142,10 +142,12 @@ in
+@@ -142,7 +142,7 @@ in
        QT_VIRTUALKEYBOARD_STYLE = "watch";
        QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
@@ -69,12 +69,7 @@ index 5d686296..8615cb64 100644
        QT_PLUGIN_PATH = "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins";
        # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
        QT_ENABLE_HIGHDPI_SCALING = "0";
-+      # Avoid requiring a hardware EGL display for the fbdev compositor.
-+      QT_QUICK_BACKEND = "software";
-     };
- 
-     # Wayland compositor and watchface launcher user service (runs under user session)
-@@ -153,16 +155,31 @@ in
+@@ -153,16 +153,29 @@ in
      systemd.user.services.asteroid-launcher = {
        description = "AsteroidOS Wayland Compositor and Launcher";
        wantedBy = [ "default.target" ];
@@ -85,8 +80,7 @@ index 5d686296..8615cb64 100644
          QT_VIRTUALKEYBOARD_STYLE = "watch";
          QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
          RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
-         QT_QPA_PLATFORM = lib.mkDefault "linuxfb:fb=/dev/fb0";
-+        QT_QUICK_BACKEND = "software";
+-        QT_QPA_PLATFORM = lib.mkDefault "linuxfb:fb=/dev/fb0";
        }
        // config.environment.variables;
        serviceConfig = {
