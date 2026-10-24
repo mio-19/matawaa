@@ -45,27 +45,11 @@
         "url": "https://nixos.org/channels/nixos-unstable/nixexprs.tar.zst"
       }
     },
-    "nixpkgs-multiverse": {
-      "locked": {
-        "lastModified": 1792653064,
-        "narHash": "sha256-OXCzUjYL2I6x8g9Uzi4M+1pJ6ARrQl04HjxjTIgQBI8=",
-        "owner": "fzakaria",
-        "repo": "nixpkgs-multiverse",
-        "rev": "a9a5469d9effb0776e2669dd2eefa6cf9fd1706a",
-        "type": "github"
-      },
-      "original": {
-        "owner": "fzakaria",
-        "repo": "nixpkgs-multiverse",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
         "mobile-nixos": "mobile-nixos",
         "nix-systems": "nix-systems",
-        "nixpkgs": "nixpkgs",
-        "nixpkgs-multiverse": "nixpkgs-multiverse"
+        "nixpkgs": "nixpkgs"
       }
     }
   },
