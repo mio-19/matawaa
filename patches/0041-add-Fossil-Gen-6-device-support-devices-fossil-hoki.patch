@@ -17,17 +17,17 @@ Install the compositor environment as
 and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
- devices/fossil-firefish/default.nix       |  56 +++++
+ devices/fossil-firefish/default.nix       |  56 ++++
  devices/fossil-hoki/android-init.nix      |  63 +++++
- devices/fossil-hoki/default.nix           | 283 ++++++++++++++++++++++
+ devices/fossil-hoki/default.nix           | 302 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
  devices/fossil-hoki/hybris-android.nix    |  15 ++
  devices/fossil-hoki/hybris.nix            |  34 +++
- devices/fossil-hoki/kernel/default.nix    | 109 +++++++++
+ devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
- devices/fossil-ray/default.nix            |  56 +++++
- devices/fossil-triggerfish/default.nix    |  56 +++++
- 10 files changed, 693 insertions(+)
+ devices/fossil-ray/default.nix            |  56 ++++
+ devices/fossil-triggerfish/default.nix    |  56 ++++
+ 10 files changed, 712 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -103,7 +103,7 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..36066d80
+index 00000000..5bb2eee8
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
 @@ -0,0 +1,63 @@
@@ -161,9 +161,9 @@ index 00000000..36066d80
 +    serviceConfig = {
 +      Type = "simple";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
-+        ${pkgs.coreutils}/bin/ln -sfn ${initRc} /init.rc
-+        ${pkgs.coreutils}/bin/ln -sfn ${platPropertyContexts} /plat_property_contexts
-+        ${pkgs.coreutils}/bin/ln -sfn ${nonplatPropertyContexts} /nonplat_property_contexts
++        ${pkgs.coreutils}/bin/cp -f ${initRc} /init.rc
++        ${pkgs.coreutils}/bin/cp -f ${platPropertyContexts} /plat_property_contexts
++        ${pkgs.coreutils}/bin/cp -f ${nonplatPropertyContexts} /nonplat_property_contexts
 +        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
 +      '';
 +      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
@@ -172,10 +172,10 @@ index 00000000..36066d80
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..3b659759
+index 00000000..108abb2b
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,283 @@
+@@ -0,0 +1,302 @@
 +{
 +  config,
 +  lib,
@@ -331,6 +331,25 @@ index 00000000..3b659759
 +  # Persistent hardware partition mounts on Fossil Gen 6 eMMC
 +  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-core/base-files/base-files/fstab
 +  fileSystems = {
++    # Stock Fossil/Android system and vendor partitions. Android init loads
++    # /system/etc/init/hw/init.rc (servicemanager, hwservicemanager) and
++    # /vendor/etc/init/hw/init.hoki.rc (the HWC2 composer and other HALs).
++    "/system" = {
++      device = "/dev/disk/by-partlabel/system";
++      fsType = "ext4";
++      options = [
++        "ro"
++        "nofail"
++      ];
++    };
++    "/vendor" = {
++      device = "/dev/disk/by-partlabel/vendor";
++      fsType = "ext4";
++      options = [
++        "ro"
++        "nofail"
++      ];
++    };
 +    "/persist" = {
 +      device = "/dev/disk/by-partlabel/persist";
 +      fsType = "ext4";
