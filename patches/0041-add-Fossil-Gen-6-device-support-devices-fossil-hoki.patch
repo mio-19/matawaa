@@ -18,15 +18,17 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/default.nix           | 315 ++++++++++++++++++++++
+ devices/fossil-hoki/android-init.nix      |  43 +++
+ devices/fossil-hoki/default.nix           | 316 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
  devices/fossil-hoki/hybris.nix            |  47 ++++
  devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 8 files changed, 660 insertions(+)
+ 9 files changed, 704 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
+ create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
  create mode 100644 devices/fossil-hoki/gps_xtra.ini
  create mode 100644 devices/fossil-hoki/hybris.nix
@@ -97,12 +99,61 @@ index 00000000..b8605a4c
 +    "vmalloc=300M"
 +  ];
 +}
+diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
+new file mode 100644
+index 00000000..d18aaa9a
+--- /dev/null
++++ b/devices/fossil-hoki/android-init.nix
+@@ -0,0 +1,43 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  # AsteroidOS hoki init.rc: starts servicemanager, hwservicemanager,
++  # vndservicemanager and the core/hal service classes. The vendor HALs
++  # (including android.hardware.graphics.composer) are defined in
++  # /vendor/etc/init/hw/init.hoki.rc and are picked up by Android init.
++  # Source: meta-smartwatch meta-hoki/recipes-android/android-init
++  initRc = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-hoki/recipes-android/android-init/android-init/init.rc";
++    hash = "sha256-TBa60Z7PdgTjZYECheZYEA/6D/OZwpVx3bU70XwWJHU=";
++  };
++in
++{
++  # Without Android init the vendor HIDL services never start, so libhybris
++  # cannot reach android.hardware.graphics.composer and the hwcomposer QPA
++  # aborts. AsteroidOS runs /system/bin/init from this systemd unit.
++  systemd.services.android-init = {
++    description = "Android init for hoki (property service, servicemanager, vendor HALs)";
++    wantedBy = [ "multi-user.target" ];
++    after = [ "local-fs.target" ];
++    before = [
++      "multi-user.target"
++      "user@1000.service"
++    ];
++    serviceConfig = {
++      Type = "simple";
++      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        ${pkgs.coreutils}/bin/ln -sfn ${initRc} /init.rc
++        ${pkgs.coreutils}/bin/mkdir -p /dev/graphics
++        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
++      '';
++      ExecStart = "/system/bin/init";
++      Restart = "always";
++      RestartSec = "1s";
++    };
++  };
++}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..a8e2ed7b
+index 00000000..17712c8d
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,315 @@
+@@ -0,0 +1,316 @@
 +{
 +  config,
 +  lib,
@@ -114,6 +165,7 @@ index 00000000..a8e2ed7b
 +  imports = [
 +    ../families/asteroidos.nix
 +    ./hybris.nix
++    ./android-init.nix
 +  ];
 +
 +  mobile.device.name = "fossil-hoki";

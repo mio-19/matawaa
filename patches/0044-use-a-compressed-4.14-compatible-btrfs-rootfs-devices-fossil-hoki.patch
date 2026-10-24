@@ -11,10 +11,10 @@ Switch the hoki rootfs to btrfs with zstd compression and the 4.14-supported noa
  2 files changed, 20 insertions(+), 2 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 4e3105e1..22da3f51 100644
+index 88d0eaca..70e00e0f 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -19,6 +19,17 @@
+@@ -20,6 +20,17 @@
  
    mobile.device.supportLevel = "supported";
  
@@ -32,7 +32,7 @@ index 4e3105e1..22da3f51 100644
    mobile.hardware = {
      # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), Cortex-A53.
      # The Android system image is the 32-bit armv7l ABI.
-@@ -89,6 +100,7 @@
+@@ -90,6 +101,7 @@
  
    environment.systemPackages = [
      pkgs.alsa-utils
