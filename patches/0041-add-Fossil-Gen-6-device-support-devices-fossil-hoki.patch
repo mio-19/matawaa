@@ -18,16 +18,18 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix       |  56 ++++
- devices/fossil-hoki/default.nix           | 314 ++++++++++++++++++++++
+ devices/fossil-hoki/default.nix           | 315 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
+ devices/fossil-hoki/hybris.nix            |  47 ++++
  devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 7 files changed, 612 insertions(+)
+ 8 files changed, 660 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/default.nix
  create mode 100644 devices/fossil-hoki/gps_xtra.ini
+ create mode 100644 devices/fossil-hoki/hybris.nix
  create mode 100644 devices/fossil-hoki/kernel/default.nix
  create mode 100644 devices/fossil-hoki/wlan-firmware-hoki.sh
  create mode 100644 devices/fossil-ray/default.nix
@@ -97,10 +99,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..e3ed4f3e
+index 00000000..a8e2ed7b
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,314 @@
+@@ -0,0 +1,315 @@
 +{
 +  config,
 +  lib,
@@ -111,6 +113,7 @@ index 00000000..e3ed4f3e
 +{
 +  imports = [
 +    ../families/asteroidos.nix
++    ./hybris.nix
 +  ];
 +
 +  mobile.device.name = "fossil-hoki";
@@ -423,6 +426,59 @@ index 00000000..594fc6c1
 @@ -0,0 +1,2 @@
 +[ntp]
 +NTP_FORCE_INJECT=true
+diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
+new file mode 100644
+index 00000000..838ca775
+--- /dev/null
++++ b/devices/fossil-hoki/hybris.nix
+@@ -0,0 +1,47 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  # AsteroidOS ships patched Android libraries and headers for hybris on the
++  # Fossil Gen 6. They contain the HWC2 compatibility layer that the stock
++  # Fossil system/vendor image lacks, so the hwcomposer QPA needs them.
++  # Source: meta-asteroid recipes-android/android/android_armv7-pie64.bb
++  hybrisAndroid = pkgs.runCommand "hybris-p-msm8909w" { } ''
++    mkdir -p $out
++    ${pkgs.gnutar}/bin/tar xf ${
++      pkgs.fetchurl {
++        url = "https://dl.dropboxusercontent.com/s/2btck4hlowhronv/hybris-p-msm8909w.tar.gz";
++        hash = "sha256-19kXAAB3la7c30//pBhVLt8rP9QaAiM2dAGQb09N/tM=";
++      }
++    } -C $out
++  '';
++in
++{
++  # Build libhybris against the AsteroidOS Android headers and point its
++  # runtime Android library path at the patched hybris libraries. Without
++  # this, libhwc2.so is built empty (no hwcomposer2.h) and the hwcomposer
++  # QPA cannot load.
++  nixpkgs.overlays = lib.mkAfter [
++    (
++      final: super:
++      {
++        libhybris = super.libhybris.overrideAttrs (old: {
++          configureFlags =
++            (lib.filter (
++              flag:
++              !(lib.hasPrefix "--with-android-headers=" flag)
++              && !(lib.hasPrefix "--with-default-hybris-ld-library-path=" flag)
++            ) (old.configureFlags or [ ]))
++            ++ [
++              "--with-android-headers=${hybrisAndroid}/include"
++              "--with-default-hybris-ld-library-path=${hybrisAndroid}/usr/libexec/hal-droid/system/lib:/vendor/lib:/system/lib"
++            ];
++        });
++      }
++    )
++  ];
++}
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
 index 00000000..1a520e75
