@@ -22,12 +22,12 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/default.nix           | 312 ++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini          |   2 +
  devices/fossil-hoki/hybris-android.nix    |  15 ++
- devices/fossil-hoki/hybris.nix            |  34 +++
+ devices/fossil-hoki/hybris.nix            |  41 +++
  devices/fossil-hoki/kernel/default.nix    | 109 ++++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh |  19 ++
  devices/fossil-ray/default.nix            |  56 ++++
  devices/fossil-triggerfish/default.nix    |  56 ++++
- 10 files changed, 722 insertions(+)
+ 10 files changed, 729 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -519,10 +519,10 @@ index 00000000..0cd392b7
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..f2cf49fe
+index 00000000..cf5ae792
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,41 @@
 +{
 +  lib,
 +  pkgs,
@@ -552,6 +552,13 @@ index 00000000..f2cf49fe
 +              "--with-android-headers=${hybrisAndroid}/include"
 +              "--with-default-hybris-ld-library-path=${hybrisAndroid}/usr/libexec/hal-droid/system/lib:/vendor/lib:/system/lib"
 +            ];
++        });
++
++        # The Qt5Compat QML module (GraphicalEffects) is only built with the
++        # qml feature enabled; asteroid-launcher imports
++        # Qt5Compat.GraphicalEffects and otherwise fails to start.
++        qt5compat = super.qt5compat.overrideAttrs (old: {
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DQT_FEATURE_qml=ON" ];
 +        });
 +      }
 +    )

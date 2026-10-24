@@ -9,9 +9,9 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  examples/asteroid/asteroid-desktop.nix | 244 +++++++++++++++++++++++++
- examples/asteroid/configuration.nix    |  38 ++++
+ examples/asteroid/configuration.nix    |  43 +++++
  examples/asteroid/default.nix          |  15 ++
- 3 files changed, 297 insertions(+)
+ 3 files changed, 302 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -268,10 +268,10 @@ index 00000000..28c44f1c
 +}
 diff --git a/examples/asteroid/configuration.nix b/examples/asteroid/configuration.nix
 new file mode 100644
-index 00000000..8b1b32c3
+index 00000000..d55911c0
 --- /dev/null
 +++ b/examples/asteroid/configuration.nix
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,43 @@
 +{
 +  config,
 +  lib,
@@ -308,6 +308,11 @@ index 00000000..8b1b32c3
 +    };
 +
 +    services.asteroid-desktop.enable = true;
++
++    # dbus-broker refuses the compositor and sync daemon names ("Request to
++    # own name refused by policy") even though session.conf allows own="*".
++    # AsteroidOS uses the reference dbus-daemon; match it.
++    services.dbus.implementation = "dbus";
 +  };
 +}
 diff --git a/examples/asteroid/default.nix b/examples/asteroid/default.nix
