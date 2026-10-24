@@ -24,7 +24,7 @@ systemd262oldkernel.
  ...some-NixOS-specific-unit-directories.patch |  129 ++
  ...f-a-useless-message-in-user-sessions.patch |   28 +
  ...d-timedated-disable-methods-that-cha.patch |  105 ++
- ...e-usr-share-zoneinfo-to-etc-zoneinfo.patch |  138 +++
+ ...e-usr-share-zoneinfo-to-etc-zoneinfo.patch |  138 ++
  ...calectl-use-etc-X11-xkb-for-list-x11.patch |   24 +
  ...9-add-rootprefix-to-lookup-dir-paths.patch |   35 +
  ...-execute-scripts-in-etc-systemd-syst.patch |   23 +
@@ -38,11 +38,11 @@ systemd262oldkernel.
  .../0018-meson-Don-t-link-ssh-dropins.patch   |   29 +
  ...nit_file_exists_full-follow-symlinks.patch |   22 +
  ...e-NSCD-when-DNSSEC-validation-is-dis.patch |   43 +
- overlay/systemd-257/default.nix               | 1089 +++++++++++++++++
+ overlay/systemd-257/default.nix               | 1121 +++++++++++++++++
  ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
- 28 files changed, 2312 insertions(+), 7 deletions(-)
+ 28 files changed, 2344 insertions(+), 7 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -1254,10 +1254,10 @@ index 00000000..a1b1575a
 +         notify_message = notify_start("READY=1\n"
 diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
 new file mode 100644
-index 00000000..39e74bdb
+index 00000000..e8613cf2
 --- /dev/null
 +++ b/overlay/systemd-257/default.nix
-@@ -0,0 +1,1089 @@
+@@ -0,0 +1,1121 @@
 +{
 +  stdenv,
 +  lib,
@@ -2086,10 +2086,42 @@ index 00000000..39e74bdb
 +      mv $out/lib/{binfmt.d,sysctl.d,tmpfiles.d} $out/example
 +      mv $out/lib/systemd/{system,user} $out/example/systemd
 +
-+      # NixOS 26.11 expects systemd 262 unit files such as
-+      # systemd-udevd-varlink.socket and systemd-ask-password@.service.
-+      # Merge the current unit set into the legacy 257 package.
-+      cp -a ${systemd}/example/systemd/system/. $out/example/systemd/system/
++      # NixOS 26.11 installs a few unit files that only exist in newer
++      # systemd releases (systemd-udevd-varlink.socket,
++      # systemd-ask-password@.service, ...). Take those files from the
++      # systemd 262 source instead of merging the built 262 unit set: the
++      # built units exec the 262 binaries, so user@.service would start the
++      # stock 262 user manager instead of the patched 257 one. The legacy
++      # 257 units installed above are left untouched.
++      for unit in \
++        systemd-ask-password@.service \
++        systemd-ask-password.socket \
++        systemd-factory-reset-reboot.service \
++        systemd-factory-reset-request.service \
++        systemd-factory-reset@.service \
++        systemd-factory-reset.socket \
++        systemd-journalctl@.service \
++        systemd-journalctl.socket \
++        systemd-machined.socket \
++        systemd-mute-console@.service \
++        systemd-mute-console.socket \
++        systemd-pcrlogin@.service \
++        systemd-tpm2-clear.service \
++        systemd-udevd-varlink.socket
++      do
++        unit_src=${systemd.src}/units/"$unit"
++        if [ ! -f "$unit_src" ]; then
++          unit_src="$unit_src.in"
++        fi
++        install -m 0644 "$unit_src" "$out/example/systemd/system/$unit"
++        substituteInPlace "$out/example/systemd/system/$unit" \
++          --replace '{{LIBEXECDIR}}' "$out/lib/systemd"
++      done
++
++      # NixOS installs the wants directory for the factory-reset target too.
++      mkdir -p $out/example/systemd/system/factory-reset.target.wants
++      ln -sfn ../systemd-factory-reset-request.service \
++        $out/example/systemd/system/factory-reset.target.wants/systemd-factory-reset-request.service
 +
 +      rm -rf $out/etc/systemd/system
 +
