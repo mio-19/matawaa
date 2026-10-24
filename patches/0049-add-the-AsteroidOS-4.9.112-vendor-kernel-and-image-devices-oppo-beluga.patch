@@ -9,16 +9,87 @@ vendor kernel, its 17 upstream kernel patches, the extracted defconfig,
 the correct qualcomm-msm8909w SoC metadata and the Android fastboot
 layout. Keep the device best-effort until it has been boot-tested.
 ---
- devices/oppo-beluga/default.nix        | 24 ++++---
+ devices/oppo-beluga/android-init.nix   | 54 +++++++++++++++
+ devices/oppo-beluga/default.nix        | 74 +++++++++++++++++---
  devices/oppo-beluga/kernel/default.nix | 95 ++++++++++++++++++++++++++
- 2 files changed, 110 insertions(+), 9 deletions(-)
+ 3 files changed, 214 insertions(+), 9 deletions(-)
+ create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
+diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
+new file mode 100644
+index 00000000..a1e9aabf
+--- /dev/null
++++ b/devices/oppo-beluga/android-init.nix
+@@ -0,0 +1,54 @@
++{
++  pkgs,
++  ...
++}:
++
++let
++  # meta-beluga init.rc: the OPPO-specific subsystem setup, HAL services and
++  # the legacy vibrator/SDCard bits. It is Android 9, matching the stock
++  # system and vendor on this device.
++  initRc = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-beluga/recipes-android/android-init/android-init/init.rc";
++    hash = "sha256-X8j87Fk+Tbon53xQMgbP17EG4iGlTporkPvb6u1ROls=";
++  };
++in
++{
++  # The stock Android 9 system and vendor carry the linker, servicemanager,
++  # hwservicemanager and the graphics composer. Run the stock init so they are
++  # brought up exactly as on the stock firmware; the meta-beluga init.rc adds
++  # the OPPO-specific services on top.
++  systemd.services.android-init = {
++    description = "/system/bin/init initializes the property service and launches servicemanager and logd";
++    wantedBy = [
++      "multi-user.target"
++      "basic.target"
++    ];
++    after = [ "local-fs.target" ];
++    before = [
++      "basic.target"
++      "network.target"
++      "bluetooth.service"
++      "ofono.service"
++      "sensord.service"
++    ];
++    unitConfig.DefaultDependencies = false;
++    unitConfig.Conflicts = [ "shutdown.target" ];
++    serviceConfig = {
++      Type = "simple";
++      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        ${pkgs.coreutils}/bin/cp -f ${initRc} /init.rc
++        if [ -f /system/etc/selinux/plat_property_contexts ]; then
++          ${pkgs.coreutils}/bin/cp -f /system/etc/selinux/plat_property_contexts /plat_property_contexts
++        fi
++        if [ -f /system/etc/selinux/nonplat_property_contexts ]; then
++          ${pkgs.coreutils}/bin/cp -f /system/etc/selinux/nonplat_property_contexts /nonplat_property_contexts
++        fi
++        if [ -f /vendor/etc/selinux/vendor_property_contexts ]; then
++          ${pkgs.coreutils}/bin/cp -f /vendor/etc/selinux/vendor_property_contexts /vendor_property_contexts
++        fi
++        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
++      '';
++      ExecStart = "/system/bin/init";
++    };
++  };
++}
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
-index c2cef490..deb217e2 100644
+index c2cef490..37592302 100644
 --- a/devices/oppo-beluga/default.nix
 +++ b/devices/oppo-beluga/default.nix
-@@ -16,11 +16,11 @@
+@@ -8,6 +8,8 @@
+ {
+   imports = [
+     ../families/asteroidos.nix
++    ../fossil-hoki/hybris.nix
++    ./android-init.nix
+   ];
+ 
+   mobile.device.name = "oppo-beluga";
+@@ -16,11 +18,11 @@
      manufacturer = "OPPO";
    };
  
@@ -32,7 +103,7 @@ index c2cef490..deb217e2 100644
      ram = 1024 * 1;
      screen = {
        width = 402;
-@@ -34,24 +34,30 @@
+@@ -34,24 +36,78 @@
      };
    };
  
@@ -68,6 +139,54 @@ index c2cef490..deb217e2 100644
 +    "lpm_levels.sleep_disabled=1"
 +    "earlycon=msm_hsl_uart,0x78af000"
 +    "audit=0"
++  ];
++
++  # The stage-2 msm-fb-refresher pans /dev/fb0 continuously; it fights the Qt
++  # linuxfb fallback's own panning. Keep it for stage 1 (splash) only.
++  mobile.quirks.fb-refresher.enable = lib.mkForce false;
++
++  # Stock Android 9 system and vendor: they carry the Pie linker,
++  # servicemanager, hwservicemanager and the graphics composer. Android 9 is
++  # not system-as-root, so plain /system and /vendor mounts are enough.
++  fileSystems = {
++    "/system" = {
++      device = "/dev/disk/by-partlabel/system";
++      fsType = "ext4";
++      options = [
++        "ro"
++        "nofail"
++      ];
++    };
++    "/vendor" = {
++      device = "/dev/disk/by-partlabel/vendor";
++      fsType = "ext4";
++      options = [
++        "ro"
++        "nofail"
++      ];
++    };
++    "/persist" = {
++      device = "/dev/disk/by-partlabel/persist";
++      fsType = "ext4";
++      options = [
++        "nofail"
++        "errors=continue"
++      ];
++    };
++  };
++
++  systemd.tmpfiles.rules = [
++    "d /var/lib/environment/compositor 0755 root root -"
++    "L+ /var/lib/environment/compositor/20-device.conf - - - - ${pkgs.writeText "20-device.conf" ''
++      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event0"
++      QPA_HWC_FORCE_GLES=1
++      QT_OPENGL_NO_BGRA=1
++    ''}"
++    "L+ /dev/graphics/fb0 - - - - /dev/fb0"
++    "z /dev/fb0 0660 root video -"
++    "z /dev/input/event* 0660 root input -"
++    "d /mnt/vendor 0755 root root -"
++    "L+ /mnt/vendor/persist - - - - /persist"
    ];
  }
 diff --git a/devices/oppo-beluga/kernel/default.nix b/devices/oppo-beluga/kernel/default.nix
