@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 24 Oct 2026 14:10:01 +1100
+Subject: [PATCH] devices/oppo-beluga: correct the SoC and support level
+
+The OPPO Watch 46mm uses Snapdragon Wear 3100 (msm8909w), not the hoki sda429w. Mark it best-effort until the new kernel and image are boot-tested on hardware.
+---
+ devices/oppo-beluga/default.nix | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
+index e021f594..deb217e2 100644
+--- a/devices/oppo-beluga/default.nix
++++ b/devices/oppo-beluga/default.nix
+@@ -16,11 +16,11 @@
+     manufacturer = "OPPO";
+   };
+ 
+-  mobile.device.supportLevel = "supported";
++  mobile.device.supportLevel = "best-effort";
+ 
+   mobile.hardware = {
+     # Qualcomm Snapdragon Wear 3100
+-    soc = "qualcomm-sda429w";
++    soc = "qualcomm-msm8909w";
+     ram = 1024 * 1;
+     screen = {
+       width = 402;
