@@ -16,3 +16,8 @@ The patch series might be regarded as the real commit history, whereas the git c
 + Planned: pixel watch 2, supported kernel
 
 For devices running EOL kernel, it is equivalent to every processes having root permissions.
+
+
+## TODO
+
++ only keep one systemd 257 or 262 in closure. no matter we override systemd or not we are always building all packages from source code
