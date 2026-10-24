@@ -67,3 +67,45 @@ twenty48 = mkAsteroidApp {
 | **`mlite`** | `sailfishos/mlite` | Lightweight dconf / GSettings integration for Qt |
 | **`virtualkeyboard`**| Custom overlay | Touch keyboard input method engine with RIME Chinese layout support and watch style |
 | **`msm-fb-refresher`** | `AsteroidOS/msm-fb-refresher` | Refresh synchronization daemon for Qualcomm MSM display panels |
+
+---
+
+## AppBridge Security Model (phone camera remote)
+
+The watch talks to the phone through the `asteroid-btsyncd` AppBridge GATT service
+(`0000A071-...`). The phone camera is a remote shutter/control only: there is **no
+network path** (no HTTP/MJPEG/RTSP, no sockets, no IPs or ports exchanged) and **no live
+viewfinder**. The phone app has no `INTERNET` permission and never tells the watch to
+connect anywhere.
+
+### Threat model
+- Untrusted: any BLE peer that manages to write the RX characteristic, and any local
+  process or user other than the watch session user.
+- Trusted: the bonded phone, after LE encryption with authentication
+  (`encrypt-authenticated-*` characteristic flags), and `root` / `ceres` on the watch.
+- Goal: a malicious or buggy peer can at most trigger the fixed camera remote actions
+  below; it cannot make the watch open connections, parse variable payloads or reach
+  other D-Bus services through btsyncd.
+
+### Frame format
+`[0xA0][appIdLen:1][appId][actionLen:1][action][payload]`, at most 512 bytes in total.
+App ids and actions are lowercase `[a-z0-9_.]` tokens of at most 64 bytes. Wire alias
+`cam` maps to `org.asteroidos.camera` and `spo2` to `org.asteroidos.spo2`; every other
+app id is dropped. Camera frames carry an empty payload in both directions; spo2
+payloads are capped at 256 bytes. Payload contents are never logged.
+
+### Allowlists
+| Direction | Camera actions |
+|---|---|
+| watch -> phone | `capture`, `flip`, `zoom_in`, `zoom_out`, `torch`, `mode_photo`, `mode_video`, `status_query` |
+| phone -> watch | `ready`, `paused`, `photo_captured`, `video_started`, `video_stopped` |
+
+Anything else is dropped with a warning on receive, and rejected by the D-Bus
+`sendMessage`/`sendBytes` methods on send. `camera-shutter` and the `RemoteCameraBridge`
+class of `asteroid-camera` apply the same watch -> phone allowlist before calling D-Bus.
+
+### D-Bus policy
+`org.asteroidos.btsyncd.conf` is deny-by-default. Only `root` and `ceres` (the
+unprivileged session user running `asteroid-btsyncd` and the apps) may own, send to or
+receive from `org.asteroidos.btsyncd`. `asteroid-btsyncd` exits if it cannot register
+that name.
