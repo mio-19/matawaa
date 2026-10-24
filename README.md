@@ -16,3 +16,8 @@ The patch series might be regarded as the real commit history, whereas the git c
 + Planned: pixel watch 2, supported kernel
 
 For devices running EOL kernel, it is equivalent to every processes having root permissions.
+
+
+## TODO
+
++ move hoki hardcoded partitions to better places
