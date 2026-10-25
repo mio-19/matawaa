@@ -22,7 +22,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/default.nix               | 354 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 ++
- devices/fossil-hoki/hybris.nix                |  38 ++
+ devices/fossil-hoki/hybris.nix                |  47 +++
  devices/fossil-hoki/kernel/default.nix        | 109 ++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh     |  26 ++
  devices/fossil-hoki/wlan.nix                  |  81 ++++
@@ -31,7 +31,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 +++
  devices/fossil-triggerfish/default.nix        |  56 +++
- 14 files changed, 920 insertions(+)
+ 14 files changed, 929 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -575,10 +575,10 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..8a802ff9
+index 00000000..5c3a3acb
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,47 @@
 +{
 +  lib,
 +  pkgs,
@@ -611,9 +611,18 @@ index 00000000..8a802ff9
 +      # The Qt5Compat QML module (GraphicalEffects) is only built with the
 +      # qml feature enabled; asteroid-launcher imports
 +      # Qt5Compat.GraphicalEffects and otherwise fails to start.
-+      qt5compat = super.qt5compat.overrideAttrs (old: {
-+        cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DQT_FEATURE_qml=ON" ];
-+      });
++      # The cross qt5compat builds only Qt6Core5Compat; it ships no QML module,
++      # so the launcher's `import Qt5Compat.GraphicalEffects` aborts (SIGABRT,
++      # launcher.log only says "Aborted"). GraphicalEffects is plain QML with an
++      # *optional* plugin (shader resources), so ship the arch-independent QML
++      # from the build-platform package. Effects that need the plugin degrade,
++      # but the module resolves and the UI loads.
++      qt5compatQml = super.runCommand "qt5compat-qml" { } ''
++        mkdir -p $out/lib/qt-6/qml
++        cp -r ${super.buildPackages.qt6.qt5compat}/lib/qt-6/qml/Qt5Compat $out/lib/qt-6/qml/
++        chmod -R u+w $out
++        find $out -name '*.so*' -delete
++      '';
 +    })
 +  ];
 +}
