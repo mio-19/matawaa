@@ -8,20 +8,20 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
- examples/asteroid/asteroid-desktop.nix | 244 +++++++++++++++++++++++++
- examples/asteroid/configuration.nix    |  43 +++++
+ examples/asteroid/asteroid-desktop.nix | 262 +++++++++++++++++++++++++
+ examples/asteroid/configuration.nix    |  43 ++++
  examples/asteroid/default.nix          |  15 ++
- 3 files changed, 302 insertions(+)
+ 3 files changed, 320 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..28c44f1c
+index 00000000..b27bad7d
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,262 @@
 +{
 +  config,
 +  lib,
@@ -32,6 +32,13 @@ index 00000000..28c44f1c
 +let
 +  cfg = config.services.asteroid-desktop;
 +  inherit (lib) mkDefault mkEnableOption mkIf;
++
++  # Debug builds: the stage-2 journal is volatile and a hard reset loses it,
++  # so keep the launcher's Qt/EGL output in the user's home instead.
++  debugBuild =
++    config.mobile.hardware.watch.stage1-pause-debug.enable
++    || config.mobile.hardware.watch.stage2-save-logs.enable
++    || config.mobile.hardware.watch.stage2-ssh.enable;
 +in
 +{
 +  options.services.asteroid-desktop = {
@@ -157,6 +164,11 @@ index 00000000..28c44f1c
 +
 +    # Wayland compositor and watchface launcher user service (runs under user session)
 +    # Upstream reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher/asteroid-launcher.service
++    systemd.user.services.asteroid-launcher.serviceConfig.StandardOutput =
++      lib.mkIf debugBuild "append:/home/ceres/launcher.log";
++    systemd.user.services.asteroid-launcher.serviceConfig.StandardError =
++      lib.mkIf debugBuild "append:/home/ceres/launcher.log";
++
 +    systemd.user.services.asteroid-launcher = {
 +      description = "AsteroidOS Wayland Compositor and Launcher";
 +      wantedBy = [ "default.target" ];
@@ -192,6 +204,12 @@ index 00000000..28c44f1c
 +        ];
 +        ExecStart = "${pkgs.writeShellScript "asteroid-launcher-run" ''
 +          launcher=${config.security.wrapperDir}/asteroid-launcher
++          # The setcap wrapper only adds cap_wake_alarm/cap_block_suspend.
++          # If it is absent (its service did not run, or /run/wrappers is
++          # fresh), use the real binary so the display still comes up.
++          if [ ! -x "$launcher" ]; then
++            launcher=${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher
++          fi
 +          if "$launcher" -plugin evdevtouch $LIPSTICK_OPTIONS --systemd; then
 +            exit 0
 +          fi

@@ -19,7 +19,7 @@ they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 +++
  devices/fossil-hoki/android-init.nix          |  63 ++++
- devices/fossil-hoki/default.nix               | 353 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 352 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 ++
  devices/fossil-hoki/hybris.nix                |  38 ++
@@ -31,7 +31,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 +++
  devices/fossil-triggerfish/default.nix        |  56 +++
- 14 files changed, 920 insertions(+)
+ 14 files changed, 919 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -180,10 +180,10 @@ index 00000000..7fe6bef7
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..e639c140
+index 00000000..89858a90
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,353 @@
+@@ -0,0 +1,352 @@
 +{
 +  config,
 +  lib,
@@ -424,7 +424,6 @@ index 00000000..e639c140
 +      QT_OPENGL_NO_BGRA=1
 +      ${lib.optionalString debugBuild ''
 +        QT_DEBUG_PLUGINS=1
-+        LD_DEBUG=libs
 +      ''}
 +    ''} ./var/lib/environment/compositor/20-device.conf
 +  '';
