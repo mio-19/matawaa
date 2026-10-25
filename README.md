@@ -21,3 +21,7 @@ For devices running EOL kernel, it is equivalent to every processes having root 
 ## TODO
 
 + move hoki hardcoded partitions to better places
+
+## LLM Policy
+
+LLM usage shall be discouraged when resources are available.
