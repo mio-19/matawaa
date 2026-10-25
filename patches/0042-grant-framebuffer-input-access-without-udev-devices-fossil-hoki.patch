@@ -10,10 +10,10 @@ Set /dev/fb0 to root:video 0660 and /dev/input/event* to root:input 0660 with sy
  1 file changed, 2 insertions(+)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 5c43b639..f7785b0f 100644
+index e639c140..2df4a802 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -206,6 +206,8 @@ in
+@@ -214,6 +214,8 @@ in
    systemd.tmpfiles.rules = [
      "d /var/lib/environment/compositor 0755 root root -"
      "L+ /dev/graphics/fb0 - - - - /dev/fb0"

@@ -19,19 +19,19 @@ they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 +++
  devices/fossil-hoki/android-init.nix          |  63 ++++
- devices/fossil-hoki/default.nix               | 341 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 353 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 ++
  devices/fossil-hoki/hybris.nix                |  38 ++
  devices/fossil-hoki/kernel/default.nix        | 109 ++++++
- devices/fossil-hoki/wlan-firmware-hoki.sh     |  20 +
- devices/fossil-hoki/wlan.nix                  |  81 +++++
+ devices/fossil-hoki/wlan-firmware-hoki.sh     |  26 ++
+ devices/fossil-hoki/wlan.nix                  |  81 ++++
  ...co_profile-fix-use-of-adapter-before.patch |  30 ++
  ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 ++
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 +++
  devices/fossil-triggerfish/default.nix        |  56 +++
- 14 files changed, 902 insertions(+)
+ 14 files changed, 920 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -180,10 +180,10 @@ index 00000000..7fe6bef7
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..5c43b639
+index 00000000..e639c140
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,353 @@
 +{
 +  config,
 +  lib,
@@ -193,6 +193,14 @@ index 00000000..5c43b639
 +
 +let
 +  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
++
++  # Debug builds get Qt plugin/loader tracing in the compositor environment,
++  # so a launcher dlopen/EGL failure is visible in the journal without
++  # hand-editing 20-device.conf on the device.
++  debugBuild =
++    config.mobile.hardware.watch.stage1-pause-debug.enable
++    || config.mobile.hardware.watch.stage2-save-logs.enable
++    || config.mobile.hardware.watch.stage2-ssh.enable;
 +in
 +{
 +  imports = [
@@ -414,6 +422,10 @@ index 00000000..5c43b639
 +      QPA_HWC_FORCE_GLES=1
 +      QPA_HWC2_FORCE_DOZE_UPDATE=1
 +      QT_OPENGL_NO_BGRA=1
++      ${lib.optionalString debugBuild ''
++        QT_DEBUG_PLUGINS=1
++        LD_DEBUG=libs
++      ''}
 +    ''} ./var/lib/environment/compositor/20-device.conf
 +  '';
 +
@@ -722,10 +734,10 @@ index 00000000..1a520e75
 +}
 diff --git a/devices/fossil-hoki/wlan-firmware-hoki.sh b/devices/fossil-hoki/wlan-firmware-hoki.sh
 new file mode 100644
-index 00000000..75857254
+index 00000000..d014c1b6
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan-firmware-hoki.sh
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,26 @@
 +#!/bin/sh
 +# SPDX-License-Identifier: MIT
 +# Symlink stock vendor WCNSS firmware/calibration data into the path the
@@ -739,6 +751,12 @@ index 00000000..75857254
 +	if [ ! -e "/lib/firmware/wlan/prima/$f" ]; then
 +		ln -s "/vendor/firmware/wlan/prima/$f" "/lib/firmware/wlan/prima/$f"
 +	fi
++done
++
++# The PIL firmware loader requests /lib/firmware/wcnss.mdt and the
++# wcnss.b00..b09 segments, not the /vendor path, so link those too.
++for f in /vendor/firmware/wcnss.*; do
++	[ -e "$f" ] && ln -sf "$f" "/lib/firmware/${f##*/}"
 +done
 +
 +# Opening this device node is what actually powers WCNSS up; the write

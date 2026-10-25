@@ -180,10 +180,10 @@ index 397bbab1..375c235b 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 07e93768..6c85fc2d 100644
+index 156332af..cccb884e 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -48,6 +48,9 @@ in
+@@ -56,6 +56,9 @@ in
        hasCrown = true;
        hasHaptics = true;
        aodSupport = true;
@@ -193,7 +193,7 @@ index 07e93768..6c85fc2d 100644
      };
    };
  
-@@ -92,10 +95,19 @@ in
+@@ -100,10 +103,19 @@ in
      "androidboot.usbconfigfs=true"
      "loop.max_part=7"
      "cgroup.memory=nokmem,nosocket"
