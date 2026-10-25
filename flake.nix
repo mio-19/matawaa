@@ -7,10 +7,6 @@
       url = "github:NixOS/mobile-nixos/development";
       flake = false;
     };
-    # nixpkgs-multiverse is intentionally not used: its legacyPackages only
-    # exposes latest/versions/versionsOf, not the armv7 cross GCC 8 package set
-    # required by the hoki/OPPO vendor kernels. Keep the pinned nixpkgs 24.05
-    # cross toolchain in the kernel derivations instead.
     nix-systems.url = "github:nix-systems/default-linux";
   };
 
