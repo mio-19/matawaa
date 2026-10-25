@@ -22,7 +22,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/default.nix               | 354 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 ++
- devices/fossil-hoki/hybris.nix                |  47 +++
+ devices/fossil-hoki/hybris.nix                |  64 ++++
  devices/fossil-hoki/kernel/default.nix        | 109 ++++++
  devices/fossil-hoki/wlan-firmware-hoki.sh     |  26 ++
  devices/fossil-hoki/wlan.nix                  |  81 ++++
@@ -31,7 +31,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 +++
  devices/fossil-triggerfish/default.nix        |  56 +++
- 14 files changed, 929 insertions(+)
+ 14 files changed, 946 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -575,10 +575,10 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..5c3a3acb
+index 00000000..30fc1c0d
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,64 @@
 +{
 +  lib,
 +  pkgs,
@@ -606,6 +606,23 @@ index 00000000..5c3a3acb
 +            "--with-android-headers=${hybrisAndroid}/include"
 +            "--with-default-hybris-ld-library-path=${hybrisAndroid}/usr/libexec/hal-droid/system/lib:/vendor/lib:/system/lib"
 +          ];
++
++        # libhybris-eglplatformcommon and -hwcomposerwindow call
++        # hybris_gralloc_release() but are not linked against libgralloc, so
++        # dlopen()ing the hwcomposer QPA plugin fails with
++        #   undefined symbol: hybris_gralloc_release
++        # and Qt aborts. Record the dependency explicitly.
++        postFixup = (old.postFixup or "") + ''
++          for f in \
++            "$out/lib/libhybris-eglplatformcommon.so.1" \
++            "$out/lib/libhybris-hwcomposerwindow.so.1"
++          do
++            if [ -e "$f" ]; then
++              ${super.buildPackages.patchelf}/bin/patchelf \
++                --add-needed "$out/lib/libgralloc.so.1" "$f"
++            fi
++          done
++        '';
 +      });
 +
 +      # The Qt5Compat QML module (GraphicalEffects) is only built with the

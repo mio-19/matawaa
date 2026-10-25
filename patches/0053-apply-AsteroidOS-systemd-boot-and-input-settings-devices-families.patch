@@ -47,7 +47,7 @@ index 486eeb22..46ce2d83 100644
    mobile.generatedFilesystems.rootfs.filesystem = mkDefault "ext4";
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index d4c979e3..8c0d45b5 100644
+index ec06d0b1..9188ac02 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
 @@ -133,10 +133,15 @@ in

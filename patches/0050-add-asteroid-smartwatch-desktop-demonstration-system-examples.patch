@@ -8,20 +8,20 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
- examples/asteroid/asteroid-desktop.nix | 268 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 270 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++++
  examples/asteroid/default.nix          |  15 ++
- 3 files changed, 326 insertions(+)
+ 3 files changed, 328 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..4da4526a
+index 00000000..5bae9505
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,268 @@
+@@ -0,0 +1,270 @@
 +{
 +  config,
 +  lib,
@@ -203,14 +203,16 @@ index 00000000..4da4526a
 +          "-${pkgs.bash}/bin/bash -c 'echo QUIT > /run/psplash_fifo 2>/dev/null || true'"
 +        ];
 +        ExecStart = "${pkgs.writeShellScript "asteroid-launcher-run" ''
-+          launcher=${config.security.wrapperDir}/asteroid-launcher
-+          # The setcap wrapper only adds cap_wake_alarm/cap_block_suspend.
-+          # If it is absent (its service did not run, or /run/wrappers is
-+          # fresh), use the real binary so the display still comes up.
-+          if [ ! -x "$launcher" ]; then
-+            launcher=${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher
-+          fi
-+          if "$launcher" -plugin evdevtouch $LIPSTICK_OPTIONS --systemd; then
++          # The setcap wrapper cannot raise its capabilities inside a user
++          # service: capset() returns EPERM, it prints "failed to inherit
++          # capabilities: Operation not permitted" and exits 1, leaving the
++          # screen black. Those caps only cover wake-alarm/block-suspend, which
++          # drawing does not need, so run the real binary.
++          launcher=${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher
++          # Debug builds: the launcher dies with SIGABRT and prints nothing, so
++          # trace it to find which syscall/loader step aborts.
++          trace="${lib.optionalString debugBuild "${pkgs.strace}/bin/strace -f -o /home/ceres/launcher.strace"}"
++          if $trace "$launcher" -plugin evdevtouch $LIPSTICK_OPTIONS --systemd; then
 +            exit 0
 +          fi
 +          # The hwcomposer QPA needs libhybris' HWC2 compatibility layer in the
