@@ -18,8 +18,8 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 +++
- devices/fossil-hoki/android-init.nix          |  63 ++++
- devices/fossil-hoki/default.nix               | 352 ++++++++++++++++++
+ devices/fossil-hoki/android-init.nix          |  62 +++
+ devices/fossil-hoki/default.nix               | 354 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 ++
  devices/fossil-hoki/hybris.nix                |  38 ++
@@ -31,7 +31,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 +++
  devices/fossil-triggerfish/default.nix        |  56 +++
- 14 files changed, 919 insertions(+)
+ 14 files changed, 920 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/default.nix
@@ -111,10 +111,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..7fe6bef7
+index 00000000..b6fd3606
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,62 @@
 +{
 +  pkgs,
 +  ...
@@ -155,7 +155,6 @@ index 00000000..7fe6bef7
 +    ];
 +    after = [ "local-fs.target" ];
 +    before = [
-+      "basic.target"
 +      "network.target"
 +      "bluetooth.service"
 +      "ofono.service"
@@ -180,10 +179,10 @@ index 00000000..7fe6bef7
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..89858a90
+index 00000000..017a8f0e
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,352 @@
+@@ -0,0 +1,354 @@
 +{
 +  config,
 +  lib,
@@ -479,8 +478,10 @@ index 00000000..89858a90
 +      coreutils
 +    ];
 +    serviceConfig = {
-+      Type = "oneshot";
-+      RemainAfterExit = true;
++      # Never hold multi-user.target: the prima module waits for WCNSS
++      # firmware inside the kernel, which can take minutes when the firmware
++      # is missing. WiFi coming up late must not delay the user session.
++      Type = "simple";
 +      ExecStart = "${pkgs.writeShellScript "wlan-firmware-hoki" (
 +        builtins.readFile ./wlan-firmware-hoki.sh
 +      )}";
