@@ -17,12 +17,12 @@ current nightly.
 ---
  .../asteroidos/asteroid-btsyncd/default.nix   |  68 ++++++
  .../org.asteroidos.btsyncd.conf               |  13 ++
- .../asteroidos/asteroid-launcher/default.nix  |  82 ++++++++
+ .../asteroidos/asteroid-launcher/default.nix  |  82 +++++++
  overlay/asteroidos/default.nix                |  32 +++
  .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
- .../qt6-qpa-hwcomposer-plugin/default.nix     | 199 ++++++++++++++++++
+ .../qt6-qpa-hwcomposer-plugin/default.nix     | 200 ++++++++++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 7 files changed, 515 insertions(+)
+ 7 files changed, 516 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
@@ -339,10 +339,10 @@ index 00000000..214fc9e5
 +})
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 new file mode 100644
-index 00000000..1762321c
+index 00000000..2810130f
 --- /dev/null
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,200 @@
 +{
 +  lib,
 +  stdenv,
@@ -503,6 +503,7 @@ index 00000000..1762321c
 +      ''${MTDEV_INCLUDE_DIRS}
 +    )
 +    target_compile_definitions(hwcomposer PRIVATE
++      QCOM_BSP
 +      QEGL_EXTRA_DEBUG
 +      MESA_EGL_NO_X11_HEADERS
 +      QT_OPENGL_ES_2

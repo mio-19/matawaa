@@ -8,20 +8,50 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
- examples/asteroid/asteroid-desktop.nix | 270 +++++++++++++++++++++++++
+ devices/families/asteroidos.nix        |  18 ++
+ examples/asteroid/asteroid-desktop.nix | 319 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++++
  examples/asteroid/default.nix          |  15 ++
- 3 files changed, 328 insertions(+)
+ 4 files changed, 395 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 61a9b65c..397bbab1 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -127,6 +127,24 @@ in
+     memoryPercent = lib.mkOptionDefault 50;
+   };
+ 
++  # AsteroidOS credits the saved random seed as entropy to avoid slow boots on
++  # pre-5.4 watch kernels.
++  # Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
++  systemd.services.systemd-random-seed.environment.SYSTEMD_RANDOM_SEED_CREDIT = "force";
++
++  # AsteroidOS grants the video group access to Android graphics nodes.
++  # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd/50-video.rules
++  services.udev.extraRules = lib.mkAfter ''
++    ACTION=="add", KERNEL=="ion", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="kgsl-3d0", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mm_interlock", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mm_v3d", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mtk_disp_mgr", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="MTK_SMI", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mali", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="vboxguest", MODE="0664", GROUP="video"
++  '';
++
+   # Default to ext4 root filesystem for compatibility across vendor kernels
+   mobile.generatedFilesystems.rootfs.filesystem = mkDefault "ext4";
+ 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..5bae9505
+index 00000000..9188ac02
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,270 @@
+@@ -0,0 +1,319 @@
 +{
 +  config,
 +  lib,
@@ -146,10 +176,26 @@ index 00000000..5bae9505
 +      enable = false;
 +    };
 +
-+    # Smartwatch stem/power button should be handled by compositor/shell, not logind shutdown
++    # The getty generator also creates autovt@tty1 from the active console.
++    # On this watch it waits for a tty device that udev never finishes, holding
++    # back multi-user.target and the user session.
++    systemd.services."autovt@tty1" = {
++      enable = false;
++    };
++
++    # users.users.ceres.linger generates NixOS's linger-users.service, which
++    # calls loginctl enable-linger after logind starts. Let the normal systemd
++    # linger mechanism own the marker; do not pre-seed it or override the unit.
++
++    # Smartwatch stem/power button should be handled by compositor/shell, not
++    # logind shutdown; match AsteroidOS systemd-conf powerkey.conf.
++    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd-conf/powerkey.conf
 +    services.logind.settings = {
 +      Login = {
 +        HandlePowerKey = "ignore";
++        HandleSuspendKey = "ignore";
++        HandleHibernateKey = "ignore";
++        HandleLidSwitch = "ignore";
 +      };
 +    };
 +
@@ -264,10 +310,43 @@ index 00000000..5bae9505
 +      group = "root";
 +    };
 +
++    # logind authorizes SetUserLinger through polkit.
++    security.polkit.enable = true;
++
++    # polkitd must be running before linger-users invokes loginctl.
++    systemd.services.polkit = {
++      wantedBy = lib.mkForce [ "multi-user.target" ];
++      before = [ "linger-users.service" ];
++      # The 4.14 vendor kernel has no /dev/mqueue or /dev/hugepages; systemd's
++      # private-device namespace setup exits 226/NAMESPACE. polkit does not
++      # need either, so disable the two private namespaces for this service.
++      serviceConfig = {
++        PrivateDevices = lib.mkForce false;
++        PrivateTmp = lib.mkForce false;
++        PrivateNetwork = lib.mkForce false;
++        PrivateUsers = lib.mkForce false;
++        PrivateMounts = lib.mkForce false;
++        ProtectSystem = lib.mkForce false;
++        ProtectHome = lib.mkForce false;
++        ProtectKernelTunables = lib.mkForce false;
++        ProtectKernelModules = lib.mkForce false;
++        ProtectControlGroups = lib.mkForce false;
++        ProtectClock = lib.mkForce false;
++        ProtectHostname = lib.mkForce false;
++        ProtectProc = lib.mkForce "default";
++        ProcSubset = lib.mkForce "all";
++        RestrictNamespaces = lib.mkForce false;
++      };
++    };
++
 +    # Upstream AsteroidOS allows the ceres user to reboot and power off.
 +    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-apps/files/30-org.freedesktop.login1.rules
 +    security.polkit.extraConfig = ''
 +      polkit.addRule(function(action, subject) {
++        if (action.id == "org.freedesktop.login1.set-user-linger" &&
++            (subject.user == "root" || subject.user == "ceres")) {
++          return polkit.Result.YES;
++        }
 +        if ((action.id == "org.freedesktop.login1.set-reboot-parameter" ||
 +             action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
 +             action.id == "org.freedesktop.login1.reboot-multiple-sessions") &&

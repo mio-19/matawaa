@@ -9,16 +9,16 @@ This patch introduces devices/families/asteroidos.nix:
 - Configures fastboot userdata partition targets and display unblanking.
 - Trims unneeded background server/desktop services to reduce closure size.
 ---
- devices/families/asteroidos.nix | 108 ++++++++++++++++++++++++++++++++
- 1 file changed, 108 insertions(+)
+ devices/families/asteroidos.nix | 133 ++++++++++++++++++++++++++++++++
+ 1 file changed, 133 insertions(+)
  create mode 100644 devices/families/asteroidos.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 new file mode 100644
-index 00000000..486eeb22
+index 00000000..d9d272b4
 --- /dev/null
 +++ b/devices/families/asteroidos.nix
-@@ -0,0 +1,108 @@
+@@ -0,0 +1,133 @@
 +{
 +  config,
 +  lib,
@@ -86,6 +86,31 @@ index 00000000..486eeb22
 +    info.enable = mkDefault false;
 +    nixos.enable = mkDefault false;
 +  };
++
++  # nscd is now Type=simple, but the journal still shows multi-user.target
++  # waiting for systemd-user-sessions.service, whose upstream unit is ordered
++  # after nss-user-lookup.target. Keep the nscd fix and explicitly remove that
++  # ordering so the user session and launcher can start.
++  systemd.services.systemd-user-sessions = {
++    after = lib.mkForce [ ];
++    overrideStrategy = "asDropin";
++  };
++
++  # nsncd's generated nscd.service is Type=notify but the daemon never sends
++  # READY. Use an explicit drop-in so the setting applies to the nscd unit that
++  # nss-user-lookup.target requires, not only to a newly generated unit. With
++  # nscd actually active, nss-user-lookup and systemd-user-sessions can complete
++  # normally without bypassing the user-sessions gate.
++  systemd.services.nscd = {
++    overrideStrategy = "asDropin";
++    serviceConfig.Type = lib.mkForce "simple";
++  };
++
++  # Keep DHCP available but do not let it hold boot. There is no guaranteed
++  # DHCP-capable interface at stage-2 startup, and dhcpcd otherwise waits for
++  # an address, holding multi-user.target. Forking to background lets the user
++  # session and launcher start while dhcpcd continues to watch for links.
++  networking.dhcpcd.wait = lib.mkDefault "background";
 +
 +  # Disable heavy desktop/server utilities and editors not used on smartwatches
 +  programs.nano.enable = mkDefault false;

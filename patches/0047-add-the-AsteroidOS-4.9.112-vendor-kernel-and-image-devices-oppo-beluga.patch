@@ -9,38 +9,54 @@ vendor kernel, its 17 upstream kernel patches, the extracted defconfig,
 the correct qualcomm-msm8909w SoC metadata and the Android fastboot
 layout. Keep the device best-effort until it has been boot-tested.
 ---
- devices/oppo-beluga/android-init.nix   | 54 +++++++++++++++
- devices/oppo-beluga/default.nix        | 74 +++++++++++++++++---
- devices/oppo-beluga/kernel/default.nix | 95 ++++++++++++++++++++++++++
- 3 files changed, 214 insertions(+), 9 deletions(-)
+ devices/oppo-beluga/android-init.nix   |  70 +++++++++++
+ devices/oppo-beluga/default.nix        | 158 +++++++++++++++++++++++--
+ devices/oppo-beluga/kernel/default.nix |  95 +++++++++++++++
+ 3 files changed, 313 insertions(+), 10 deletions(-)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
 new file mode 100644
-index 00000000..a1e9aabf
+index 00000000..76a2b38c
 --- /dev/null
 +++ b/devices/oppo-beluga/android-init.nix
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,70 @@
 +{
 +  pkgs,
 +  ...
 +}:
 +
 +let
++  hybrisAndroid = import ../fossil-hoki/hybris-android.nix { inherit pkgs; };
++
 +  # meta-beluga init.rc: the OPPO-specific subsystem setup, HAL services and
-+  # the legacy vibrator/SDCard bits. It is Android 9, matching the stock
-+  # system and vendor on this device.
++  # vibrator/SDCard bits. It runs Android 9, matching the stock system/vendor.
 +  initRc = pkgs.fetchurl {
-+    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-beluga/recipes-android/android-init/android-init/init.rc";
-+    hash = "sha256-X8j87Fk+Tbon53xQMgbP17EG4iGlTporkPvb6u1ROls=";
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-android/android-init/android-init/init.rc";
++    hash = "sha256-qFQBFCNqHkJmaPaqj7ybMGgvLSTZXLipyAD1YJxvO08=";
++  };
++
++  platPropertyContexts = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-android/android-init/android-init/plat_property_contexts";
++    hash = "sha256-2CMXpRqhDz9xRGKQx7fvpDC8Xt5bxrJ92oshRy7Flw8=";
++  };
++
++  nonplatPropertyContexts = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-android/android-init/android-init/nonplat_property_contexts";
++    hash = "sha256-obLeXDR+D72dV6Lh9Ns/yuFV703bBOGYZXKmoZM4PhA=";
++  };
++
++  # ld.config.28.txt from AsteroidOS meta-beluga:
++  # Allows Android binaries to load libraries from /usr/libexec/hal-droid/system/lib
++  ldConfig = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-core/initrdscripts/initramfs-scripts-android/ld.config.28.txt";
++    hash = "sha256-6c95G6kOKuyKN4KXtlVQ4+L90vmstOgjsIU5lorUC/4=";
 +  };
 +in
 +{
-+  # The stock Android 9 system and vendor carry the linker, servicemanager,
-+  # hwservicemanager and the graphics composer. Run the stock init so they are
-+  # brought up exactly as on the stock firmware; the meta-beluga init.rc adds
-+  # the OPPO-specific services on top.
++  # AsteroidOS-style Pie stack: run the hal-droid Pie init (/usr/libexec/hal-droid/system/bin/init).
++  # Matches upstream meta-beluga recipes-android/android-init/android-init/android-init.service.
 +  systemd.services.android-init = {
 +    description = "/system/bin/init initializes the property service and launches servicemanager and logd";
 +    wantedBy = [
@@ -49,7 +65,6 @@ index 00000000..a1e9aabf
 +    ];
 +    after = [ "local-fs.target" ];
 +    before = [
-+      "basic.target"
 +      "network.target"
 +      "bluetooth.service"
 +      "ofono.service"
@@ -60,27 +75,34 @@ index 00000000..a1e9aabf
 +    serviceConfig = {
 +      Type = "simple";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        if [ -d /system_root/system ] && [ ! -d /system/bin ]; then
++          ${pkgs.util-linux}/bin/mount --bind /system_root/system /system || true
++        elif [ -d /system_root/bin ] && [ ! -d /system/bin ]; then
++          ${pkgs.util-linux}/bin/mount --bind /system_root /system || true
++        fi
 +        ${pkgs.coreutils}/bin/cp -f ${initRc} /init.rc
-+        if [ -f /system/etc/selinux/plat_property_contexts ]; then
-+          ${pkgs.coreutils}/bin/cp -f /system/etc/selinux/plat_property_contexts /plat_property_contexts
-+        fi
-+        if [ -f /system/etc/selinux/nonplat_property_contexts ]; then
-+          ${pkgs.coreutils}/bin/cp -f /system/etc/selinux/nonplat_property_contexts /nonplat_property_contexts
-+        fi
-+        if [ -f /vendor/etc/selinux/vendor_property_contexts ]; then
-+          ${pkgs.coreutils}/bin/cp -f /vendor/etc/selinux/vendor_property_contexts /vendor_property_contexts
++        ${pkgs.coreutils}/bin/cp -f ${platPropertyContexts} /plat_property_contexts
++        ${pkgs.coreutils}/bin/cp -f ${nonplatPropertyContexts} /nonplat_property_contexts
++        if [ -f /system/etc/ld.config.28.txt ]; then
++          ${pkgs.util-linux}/bin/mount --bind ${ldConfig} /system/etc/ld.config.28.txt || true
 +        fi
 +        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
 +      '';
-+      ExecStart = "/system/bin/init";
++      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
 +    };
 +  };
 +}
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
-index c2cef490..37592302 100644
+index c2cef490..95786a25 100644
 --- a/devices/oppo-beluga/default.nix
 +++ b/devices/oppo-beluga/default.nix
-@@ -8,6 +8,8 @@
+@@ -5,9 +5,14 @@
+   ...
+ }:
+ 
++let
++  hybrisAndroid = import ../fossil-hoki/hybris-android.nix { inherit pkgs; };
++in
  {
    imports = [
      ../families/asteroidos.nix
@@ -89,7 +111,7 @@ index c2cef490..37592302 100644
    ];
  
    mobile.device.name = "oppo-beluga";
-@@ -16,11 +18,11 @@
+@@ -16,11 +21,11 @@
      manufacturer = "OPPO";
    };
  
@@ -97,13 +119,14 @@ index c2cef490..37592302 100644
 +  mobile.device.supportLevel = "best-effort";
  
    mobile.hardware = {
-     # Qualcomm Snapdragon Wear 3100
+-    # Qualcomm Snapdragon Wear 3100
 -    soc = "qualcomm-sda429w";
++    # Qualcomm Snapdragon Wear 3100 (MSM8909W), Cortex-A7 quad-core
 +    soc = "qualcomm-msm8909w";
      ram = 1024 * 1;
      screen = {
        width = 402;
-@@ -34,24 +36,78 @@
+@@ -34,24 +39,157 @@
      };
    };
  
@@ -145,11 +168,22 @@ index c2cef490..37592302 100644
 +  # linuxfb fallback's own panning. Keep it for stage 1 (splash) only.
 +  mobile.quirks.fb-refresher.enable = lib.mkForce false;
 +
-+  # Stock Android 9 system and vendor: they carry the Pie linker,
-+  # servicemanager, hwservicemanager and the graphics composer. Android 9 is
-+  # not system-as-root, so plain /system and /vendor mounts are enough.
++  # Hardware node permissions for Android HAL / libhybris
++  # Reference: AsteroidOS meta-beluga/recipes-android/android-init/android-init/init.rc
++  services.udev.extraRules = ''
++    KERNEL=="binder", MODE="0666"
++    KERNEL=="ashmem", MODE="0666"
++    KERNEL=="hwbinder", MODE="0666"
++    KERNEL=="vndbinder", MODE="0666"
++    SUBSYSTEM=="leds", KERNEL=="vibrator", ATTR{trigger}="transient", MODE="0666"
++  '';
++
++  # Stock Android 9 system and vendor: carrying the Pie linker,
++  # servicemanager, hwservicemanager and the graphics composer.
++  # Reference: AsteroidOS meta-beluga/recipes-core/base-files/base-files/fstab
++  # and meta-beluga/recipes-core/initrdscripts/initramfs-scripts-android/machine.conf
 +  fileSystems = {
-+    "/system" = {
++    "/system_root" = {
 +      device = "/dev/disk/by-partlabel/system";
 +      fsType = "ext4";
 +      options = [
@@ -173,21 +207,89 @@ index c2cef490..37592302 100644
 +        "errors=continue"
 +      ];
 +    };
++    "/vendor/firmware_mnt" = {
++      device = "/dev/disk/by-partlabel/modem";
++      fsType = "vfat";
++      options = [
++        "ro"
++        "shortname=lower"
++        "nofail"
++      ];
++    };
 +  };
 +
++  # Subsystem boots and firmware mount setup
 +  systemd.tmpfiles.rules = [
 +    "d /var/lib/environment/compositor 0755 root root -"
-+    "L+ /var/lib/environment/compositor/20-device.conf - - - - ${pkgs.writeText "20-device.conf" ''
-+      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event0"
-+      QPA_HWC_FORCE_GLES=1
-+      QT_OPENGL_NO_BGRA=1
-+    ''}"
 +    "L+ /dev/graphics/fb0 - - - - /dev/fb0"
 +    "z /dev/fb0 0660 root video -"
 +    "z /dev/input/event* 0660 root input -"
 +    "d /mnt/vendor 0755 root root -"
 +    "L+ /mnt/vendor/persist - - - - /persist"
++    "d /data/vendor 0755 root root -"
++    "d /data/vendor/ssrdump 0755 root root -"
++    "d /data/vendor/bgdaemon 0755 root root -"
    ];
++
++  # Install compositor environment and hal-droid symlinks into rootfs
++  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
++    mkdir -p ./usr/libexec ./system ./system_root ./vendor
++    ln -sfn ${hybrisAndroid}/usr/libexec/hal-droid ./usr/libexec/hal-droid
++
++    mkdir -p ./var/lib/environment/compositor
++    cp ${pkgs.writeText "20-device.conf" ''
++      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event0"
++      QPA_HWC_FORCE_GLES=1
++      QT_OPENGL_NO_BGRA=1
++    ''} ./var/lib/environment/compositor/20-device.conf
++  '';
++
++  # OPPO Watch CPU underclock and power collapse profile
++  # Upstream reference: meta-beluga/recipes-core/underclock/underclock/underclock
++  systemd.services.underclock-beluga = {
++    description = "OPPO Watch low power collapse and CPU underclocking";
++    wantedBy = [ "multi-user.target" ];
++    serviceConfig = {
++      Type = "simple";
++      ExecStart = pkgs.writeShellScript "underclock-beluga" ''
++        ${pkgs.coreutils}/bin/sleep 20
++
++        if [ -f /sys/module/lpm_levels_legacy/parameters/sleep_disabled ]; then
++          echo 0 > /sys/module/lpm_levels_legacy/parameters/sleep_disabled 2>/dev/null || true
++        fi
++        if [ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]; then
++          echo schedutil > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || true
++        fi
++        for c in 1 2 3; do
++          if [ -f /sys/devices/system/cpu/cpu$c/online ]; then
++            echo 0 > /sys/devices/system/cpu/cpu$c/online 2>/dev/null || true
++          fi
++        done
++        for node in suspend_enabled standalone_pc/suspend_enabled standalone_pc/idle_enabled idle_enabled; do
++          if [ -f /sys/module/lpm_levels_legacy/system/cpu0/$node ]; then
++            echo 1 > /sys/module/lpm_levels_legacy/system/cpu0/$node 2>/dev/null || true
++          fi
++        done
++      '';
++    };
++  };
++
++  # WCNSS Wi-Fi kernel driver loading
++  # Upstream reference: meta-beluga/recipes-kernel/modules/linux-wlan-modules-beluga/wlan-module-load.service
++  systemd.services.wlan-firmware-beluga = {
++    description = "Load wlan module on OPPO Watch";
++    after = [ "android-init.service" ];
++    before = [ "connman.service" ];
++    wantedBy = [ "multi-user.target" ];
++    path = with pkgs; [
++      kmod
++      coreutils
++    ];
++    serviceConfig = {
++      Type = "simple";
++      ExecStart = "${pkgs.kmod}/bin/modprobe wlan";
++    };
++  };
  }
 diff --git a/devices/oppo-beluga/kernel/default.nix b/devices/oppo-beluga/kernel/default.nix
 new file mode 100644

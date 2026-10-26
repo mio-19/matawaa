@@ -70,7 +70,7 @@ systemd262oldkernel.
  create mode 100644 overlay/systemd-257/systemd-udevd-varlink.socket
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 4a0a75f4..397bbab1 100644
+index d9d272b4..61a9b65c 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -12,6 +12,10 @@ let
