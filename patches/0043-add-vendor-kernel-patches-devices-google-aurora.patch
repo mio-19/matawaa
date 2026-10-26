@@ -571,3 +571,6 @@ index 00000000..1c5e64a1
 + 
 + 	rtc_dd->regs = match->data;
 + 	rtc_dd->rtc_dev = &pdev->dev;
+-- 
+2.56.0
+

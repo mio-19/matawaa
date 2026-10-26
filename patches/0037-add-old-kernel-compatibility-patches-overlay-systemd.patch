@@ -444,3 +444,6 @@ index 00000000..cf16aa51
 +                 return setup_credentials_plain_dir(context, cred_dir);
 +         }
 +         if (mfd < 0)
+-- 
+2.56.0
+

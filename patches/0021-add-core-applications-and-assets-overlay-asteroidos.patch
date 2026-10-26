@@ -282,3 +282,6 @@ index 6bddf6f8..63fa2227 100644
    virtualkeyboard = callPackage ./virtualkeyboard { };
  
    inherit (pkgs) msm-fb-refresher;
+-- 
+2.56.0
+

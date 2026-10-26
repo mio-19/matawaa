@@ -52,3 +52,6 @@ index f6d95e13..18665072 100644
              ${optionalString (partitionID != null) "-U ${partitionID}"} \
              ${optionalString (label != null) "-L ${escapeShellArg label}"} \
              ${optionalString (config.size == null) "--shrink"} \
+-- 
+2.56.0
+

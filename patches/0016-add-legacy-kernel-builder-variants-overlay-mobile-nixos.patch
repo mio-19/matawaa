@@ -33,3 +33,6 @@ index 02dfb3ac..9598347c 100644
        # We need to "globally" locally override some packages for stage-1.
        stage-1 = (final.appendOverlays [(import ../boot/overlay)]).mobile-nixos.stage-1;
  
+-- 
+2.56.0
+

@@ -18,7 +18,7 @@ layout. Keep the device best-effort until it has been boot-tested.
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
 new file mode 100644
-index 00000000..76a2b38c
+index 00000000..ed2cba46
 --- /dev/null
 +++ b/devices/oppo-beluga/android-init.nix
 @@ -0,0 +1,70 @@
@@ -51,7 +51,7 @@ index 00000000..76a2b38c
 +  # Allows Android binaries to load libraries from /usr/libexec/hal-droid/system/lib
 +  ldConfig = pkgs.fetchurl {
 +    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-core/initrdscripts/initramfs-scripts-android/ld.config.28.txt";
-+    hash = "sha256-6c95G6kOKuyKN4KXtlVQ4+L90vmstOgjsIU5lorUC/4=";
++    hash = "sha256-7QCh5Q/9QxMEhlcA52ykhPVRsNQZbyPqY7YmBCGGYZE=";
 +  };
 +in
 +{
@@ -392,3 +392,6 @@ index 00000000..3c120c93
 +    cp -f "$buildRoot/arch/arm/boot/zImage-dtb" "$out/zImage"
 +  '';
 +}
+-- 
+2.56.0
+

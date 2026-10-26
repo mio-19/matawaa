@@ -206,3 +206,6 @@ index 5c5639aa..2281e409 100644
        mobile.system.android.bootimg.dt = "${kernelPackage}/dt.img";
      })
  
+-- 
+2.56.0
+

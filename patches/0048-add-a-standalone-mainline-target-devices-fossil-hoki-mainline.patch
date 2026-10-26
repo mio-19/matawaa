@@ -11862,3 +11862,6 @@ index 00000000..41b00986
 +		hoki_batterydata = "/qcom,battery-data";
 +	};
 +};
+-- 
+2.56.0
+

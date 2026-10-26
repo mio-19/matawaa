@@ -711,3 +711,6 @@ index 00000000..aa33b6e5
 +  except Exception as e:
 +    print(f"\n[!] Flash error: {e}", file=sys.stderr)
 +    sys.exit(1)
+-- 
+2.56.0
+

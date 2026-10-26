@@ -192,3 +192,6 @@ index 0959687f..43b980ea 100644
      (mkIf anyQualcomm {
        mobile.kernel.structuredConfig = [
          (helpers: with helpers; {
+-- 
+2.56.0
+

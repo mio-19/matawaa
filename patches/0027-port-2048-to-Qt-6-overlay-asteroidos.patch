@@ -155,3 +155,6 @@ index 00000000..f9607f14
 ++    view->show();
 ++    return app->exec();
 + }
+-- 
+2.56.0
+

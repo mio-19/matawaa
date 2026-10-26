@@ -267,3 +267,6 @@ index 9598347c..765a0608 100644
      dtbTool = callPackage ./dtbtool { };
      dtbTool-exynos = callPackage ./dtbtool-exynos { };
      libhybris = callPackage ./libhybris { };
+-- 
+2.56.0
+

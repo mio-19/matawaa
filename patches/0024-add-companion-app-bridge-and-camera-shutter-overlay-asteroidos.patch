@@ -548,3 +548,6 @@ index a856e19c..6a5592d0 100644
      <allow send_destination="org.asteroidos.btsyncd"/>
      <allow receive_sender="org.asteroidos.btsyncd"/>
    </policy>
+-- 
+2.56.0
+

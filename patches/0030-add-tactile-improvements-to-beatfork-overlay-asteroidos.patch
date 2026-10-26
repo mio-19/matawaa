@@ -488,3 +488,6 @@ index dd25bd98..0e218d1c 100644
      extraBuildInputs = [
        qt6.qtmultimedia
      ];
+-- 
+2.56.0
+

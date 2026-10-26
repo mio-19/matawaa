@@ -64,3 +64,6 @@ index ff0f068a..3d9d98c0 100644
 +    $logger.warn("udevadm control --exit failed; udevd may already be stopped: #{e.message}")
    end
  end
+-- 
+2.56.0
+

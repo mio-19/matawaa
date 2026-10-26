@@ -182,3 +182,6 @@ index 039be083..e9d9a143 100644
    ./hardware.nix
    ./initrd-base.nix
    ./initrd-boot-gui.nix
+-- 
+2.56.0
+

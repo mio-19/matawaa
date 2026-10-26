@@ -108,3 +108,6 @@ index fe4ce596..4006ce88 100644
    ./hardware-eink.nix
    ./generated-disk-images.nix
    ./generated-filesystems.nix
+-- 
+2.56.0
+

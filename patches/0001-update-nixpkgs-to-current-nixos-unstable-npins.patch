@@ -195,3 +195,6 @@ index da735500..4c458690 100644
 -builtins.trace "(Using pinned Nixpkgs; ${channelName} @ ${identifier})"
 -(import nixpkgs)
 +builtins.trace "(Using pinned Nixpkgs; ${channelName} @ ${identifier})" (import nixpkgs)
+-- 
+2.56.0
+
