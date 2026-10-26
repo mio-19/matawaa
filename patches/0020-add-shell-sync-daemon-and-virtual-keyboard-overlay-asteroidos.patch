@@ -20,9 +20,9 @@ current nightly.
  .../asteroidos/asteroid-launcher/default.nix  |  82 ++++++++
  overlay/asteroidos/default.nix                |  32 +++
  .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
- .../qt6-qpa-hwcomposer-plugin/default.nix     | 198 ++++++++++++++++++
+ .../qt6-qpa-hwcomposer-plugin/default.nix     | 199 ++++++++++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 7 files changed, 514 insertions(+)
+ 7 files changed, 515 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
@@ -339,10 +339,10 @@ index 00000000..214fc9e5
 +})
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 new file mode 100644
-index 00000000..3702fd20
+index 00000000..1762321c
 --- /dev/null
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-@@ -0,0 +1,198 @@
+@@ -0,0 +1,199 @@
 +{
 +  lib,
 +  stdenv,
@@ -528,6 +528,7 @@ index 00000000..3702fd20
 +      ${libhybris}/lib/libhardware.so.2.0.0
 +      ${libhybris}/lib/libhwc2.so.1.0.0
 +      ${libhybris}/lib/libhybris-eglplatformcommon.so.1.0.0
++      ${libhybris}/lib/libhybris-hwcomposerwindow.so.1.0.0
 +    )
 +
 +    install(TARGETS hwcomposer LIBRARY DESTINATION lib/qt-6/plugins/platforms)
