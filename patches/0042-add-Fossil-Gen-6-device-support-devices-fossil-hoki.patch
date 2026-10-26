@@ -20,7 +20,7 @@ they cannot hold multi-user.target.
  devices/fossil-firefish/default.nix           |  56 +++
  devices/fossil-hoki/android-init.nix          |  69 ++++
  devices/fossil-hoki/android-system-data.nix   |  18 +
- devices/fossil-hoki/default.nix               | 365 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 366 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 ++
  devices/fossil-hoki/hybris.nix                |  64 +++
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 +++
  modules/rootfs.nix                            | 120 +++---
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   8 +
- 21 files changed, 1689 insertions(+), 51 deletions(-)
+ 21 files changed, 1690 insertions(+), 51 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -222,10 +222,10 @@ index 00000000..4373edde
 +''
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..56497f20
+index 00000000..2de248c7
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,365 @@
+@@ -0,0 +1,366 @@
 +{
 +  config,
 +  lib,
@@ -470,6 +470,7 @@ index 00000000..56497f20
 +    mkdir -p ./system ./vendor
 +    cp -a ${androidSystemData}/system/* ./system/
 +    cp -a ${androidSystemData}/vendor/* ./vendor/
++    chmod -R u+w ./system ./vendor
 +
 +    # Ensure libselinux_stubs.so is accessible directly in /system/lib for Bionic linker
 +    cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so ./system/lib/libselinux_stubs.so || true
