@@ -1,0 +1,157 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 26 Oct 2026 18:27:37 +1100
+Subject: [PATCH] patch nixpkgs to eliminate x86-64 Qt host leaks in cross
+ builds (pkgs)
+
+---
+ .../0001-qt6-cross-host-leak.patch            | 95 +++++++++++++++++++
+ pkgs.nix                                      | 30 +++---
+ 2 files changed, 112 insertions(+), 13 deletions(-)
+ create mode 100644 overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
+
+diff --git a/overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch b/overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
+new file mode 100644
+index 00000000..85a8660f
+--- /dev/null
++++ b/overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
+@@ -0,0 +1,95 @@
++diff -Naur a/pkgs/development/libraries/qt-6/hooks/qtbase-setup-hook.sh b/pkgs/development/libraries/qt-6/hooks/qtbase-setup-hook.sh
++--- a/pkgs/development/libraries/qt-6/hooks/qtbase-setup-hook.sh	2026-10-26 18:18:24.965845052 +1100
+++++ b/pkgs/development/libraries/qt-6/hooks/qtbase-setup-hook.sh	2026-10-26 18:57:18.562221958 +1100
++@@ -16,7 +16,14 @@
++     . @fix_qt_module_paths@
++ 
++     # Build tools are often confused if QMAKE is unset.
++-    export QMAKE=@qtbaseOut@/bin/qmake
+++    if [[ -n "@qtHostPath@" && "@qtHostPath@" != "@"* ]]; then
+++        export QT_HOST_PATH="@qtHostPath@"
+++        export QMAKE="@qtHostPath@/bin/qmake"
+++        appendToVar cmakeFlags "-DQT_HOST_PATH=@qtHostPath@"
+++        appendToVar cmakeFlags "-DQt6HostInfo_DIR=@qtHostPath@/lib/cmake/Qt6HostInfo"
+++    else
+++        export QMAKE=@qtbaseOut@/bin/qmake
+++    fi
++ 
++     export QMAKEPATH=
++ 
++diff -Naur a/pkgs/development/libraries/qt-6/modules/qtbase/default.nix b/pkgs/development/libraries/qt-6/modules/qtbase/default.nix
++--- a/pkgs/development/libraries/qt-6/modules/qtbase/default.nix	2026-10-26 18:18:24.968845041 +1100
+++++ b/pkgs/development/libraries/qt-6/modules/qtbase/default.nix	2026-10-26 18:57:09.250324045 +1100
++@@ -345,6 +345,15 @@
++     substituteInPlace "''${!outputDev}/nix-support/setup-hook" \
++       --replace-fail "@qtbaseOut@" $out
++   ''
+++  + lib.optionalString isCrossBuild ''
+++    for f in qmake qmake6 qtpaths qtpaths6 target_qt.conf; do
+++      rm -f "$out/bin/$f"
+++    done
+++    if [ -f "$out/lib/cmake/Qt6/Qt6Dependencies.cmake" ]; then
+++      sed -i 's|set(__qt_platform_initial_qt_host_path ".*")|set(__qt_platform_initial_qt_host_path "")|' "$out/lib/cmake/Qt6/Qt6Dependencies.cmake"
+++      sed -i 's|set(__qt_platform_initial_qt_host_path_cmake_dir ".*")|set(__qt_platform_initial_qt_host_path_cmake_dir "")|' "$out/lib/cmake/Qt6/Qt6Dependencies.cmake"
+++    fi
+++  ''
++   + lib.optionalString stdenv.hostPlatform.isLinux ''
++     # FIXME: not sure why this isn't added automatically?
++     patchelf --add-rpath "${libmysqlclient}/lib/mariadb" $out/${qtPluginPrefix}/sqldrivers/libqsqlmysql.so
++@@ -364,6 +373,7 @@
++             qtPluginPrefix
++             qtQmlPrefix
++             ;
+++          qtHostPath = lib.optionalString isCrossBuild "${pkgsBuildBuild.qt6.qtbase}";
++         };
++         meta.license = lib.licenses.mit;
++       } ../../hooks/qtbase-setup-hook.sh;
++diff -Naur a/pkgs/development/libraries/qt-6/qtModule.nix b/pkgs/development/libraries/qt-6/qtModule.nix
++--- a/pkgs/development/libraries/qt-6/qtModule.nix	2026-10-26 18:18:24.970845034 +1100
+++++ b/pkgs/development/libraries/qt-6/qtModule.nix	2026-10-26 18:19:48.939548241 +1100
++@@ -8,6 +8,7 @@
++   moveBuildTree,
++   srcs,
++   patches ? [ ],
+++  pkgsBuildBuild,
++ }:
++ 
++ args:
++@@ -51,6 +52,10 @@
++       # to query the version.
++       "-DQT_INTERNAL_XCODE_VERSION=0.1"
++     ]
+++    ++ lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
+++      "-DQT_HOST_PATH=${pkgsBuildBuild.qt6.qtbase}"
+++      "-DQt6HostInfo_DIR=${pkgsBuildBuild.qt6.qtbase}/lib/cmake/Qt6HostInfo"
+++    ]
++     ++ args.cmakeFlags or [ ];
++ 
++     moveToDev = false;
++diff -Naur a/pkgs/kde/lib/mk-kde-derivation.nix b/pkgs/kde/lib/mk-kde-derivation.nix
++--- a/pkgs/kde/lib/mk-kde-derivation.nix	2026-10-26 18:18:24.972845027 +1100
+++++ b/pkgs/kde/lib/mk-kde-derivation.nix	2026-10-26 18:20:16.429451076 +1100
++@@ -9,6 +9,7 @@
++   python3,
++   python3Packages,
++   jq,
+++  pkgsBuildBuild,
++ }:
++ let
++   dependencies = (lib.importJSON ../generated/dependencies.json).dependencies;
++@@ -141,7 +142,14 @@
++     propagatedBuildInputs = deps ++ extraPropagatedBuildInputs;
++     strictDeps = true;
++ 
++-    cmakeFlags = [ "-DQT_MAJOR_VERSION=6" ] ++ extraCmakeFlags;
+++    cmakeFlags = [
+++      "-DQT_MAJOR_VERSION=6"
+++    ]
+++    ++ lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
+++      "-DQT_HOST_PATH=${pkgsBuildBuild.qt6.qtbase}"
+++      "-DQt6HostInfo_DIR=${pkgsBuildBuild.qt6.qtbase}/lib/cmake/Qt6HostInfo"
+++    ]
+++    ++ extraCmakeFlags;
++ 
++     doInstallCheck = true;
++ 
+diff --git a/pkgs.nix b/pkgs.nix
+index da735500..4c458690 100644
+--- a/pkgs.nix
++++ b/pkgs.nix
+@@ -7,22 +7,26 @@
+ # The pinning is now managed using `npins`.
+ #
+ let
+-  inherit (import ./npins)
+-    nixpkgs
+-  ;
++  rawNixpkgs = (import ./npins).nixpkgs;
+   channelInfo =
+     builtins.match
+       # https://releases.nixos.org/nixos/unstable/nixos-25.05beta723344.d3c42f187194/nixexprs.tar.xz
+       "https?://(.*)/([^/]+)/([^/]+)/([^/]+)/.*"
+-      nixpkgs.url
+-  ;
+-  channelName =
+-    builtins.concatStringsSep "-" [
+-      (builtins.elemAt channelInfo 1)
+-      (builtins.elemAt channelInfo 2)
+-    ]
+-  ;
++      rawNixpkgs.url;
++  channelName = builtins.concatStringsSep "-" [
++    (builtins.elemAt channelInfo 1)
++    (builtins.elemAt channelInfo 2)
++  ];
+   identifier = builtins.elemAt channelInfo 3;
++
++  bootstrapPkgs = import rawNixpkgs { };
++
++  nixpkgs = bootstrapPkgs.applyPatches {
++    name = "nixpkgs-patched";
++    src = rawNixpkgs;
++    patches = [
++      ./overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
++    ];
++  };
+ in
+-builtins.trace "(Using pinned Nixpkgs; ${channelName} @ ${identifier})"
+-(import nixpkgs)
++builtins.trace "(Using pinned Nixpkgs; ${channelName} @ ${identifier})" (import nixpkgs)

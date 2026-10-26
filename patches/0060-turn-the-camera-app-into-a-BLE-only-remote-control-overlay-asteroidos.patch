@@ -36,7 +36,7 @@ asteroid-camera loses the live viewfinder and every network code path.
  create mode 100644 overlay/asteroidos/apps/camera/remotecamerabridge.h
 
 diff --git a/overlay/asteroidos/apps/camera/camera-companion.patch b/overlay/asteroidos/apps/camera/camera-companion.patch
-index 3ca52e0..1329c71 100644
+index 3ca52e0e..1329c71c 100644
 --- a/overlay/asteroidos/apps/camera/camera-companion.patch
 +++ b/overlay/asteroidos/apps/camera/camera-companion.patch
 @@ -1,5 +1,5 @@
@@ -454,7 +454,7 @@ index 3ca52e0..1329c71 100644
  +    }
 diff --git a/overlay/asteroidos/apps/camera/camerastreamview.cpp b/overlay/asteroidos/apps/camera/camerastreamview.cpp
 deleted file mode 100644
-index 273a1f3..0000000
+index 273a1f30..00000000
 --- a/overlay/asteroidos/apps/camera/camerastreamview.cpp
 +++ /dev/null
 @@ -1,398 +0,0 @@
@@ -858,7 +858,7 @@ index 273a1f3..0000000
 -}
 diff --git a/overlay/asteroidos/apps/camera/camerastreamview.h b/overlay/asteroidos/apps/camera/camerastreamview.h
 deleted file mode 100644
-index fd0f420..0000000
+index fd0f420f..00000000
 --- a/overlay/asteroidos/apps/camera/camerastreamview.h
 +++ /dev/null
 @@ -1,93 +0,0 @@
@@ -957,7 +957,7 @@ index fd0f420..0000000
 -#endif // CAMERASTREAMVIEW_H
 diff --git a/overlay/asteroidos/apps/camera/remotecamerabridge.cpp b/overlay/asteroidos/apps/camera/remotecamerabridge.cpp
 new file mode 100644
-index 0000000..416b066
+index 00000000..416b066e
 --- /dev/null
 +++ b/overlay/asteroidos/apps/camera/remotecamerabridge.cpp
 @@ -0,0 +1,130 @@
@@ -1093,7 +1093,7 @@ index 0000000..416b066
 +}
 diff --git a/overlay/asteroidos/apps/camera/remotecamerabridge.h b/overlay/asteroidos/apps/camera/remotecamerabridge.h
 new file mode 100644
-index 0000000..2a57118
+index 00000000..2a57118f
 --- /dev/null
 +++ b/overlay/asteroidos/apps/camera/remotecamerabridge.h
 @@ -0,0 +1,61 @@
@@ -1159,7 +1159,7 @@ index 0000000..2a57118
 +
 +#endif // REMOTECAMERABRIDGE_H
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
-index 4c56e6d..5a6d101 100644
+index 4c56e6d1..5a6d1018 100644
 --- a/overlay/asteroidos/apps/default.nix
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -104,15 +104,15 @@

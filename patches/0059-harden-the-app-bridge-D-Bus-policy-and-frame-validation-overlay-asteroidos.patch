@@ -35,7 +35,7 @@ Subject: [PATCH] harden the app bridge D-Bus policy and frame validation
  5 files changed, 168 insertions(+), 45 deletions(-)
 
 diff --git a/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch b/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
-index bb8690c..a0117d6 100644
+index bb8690c8..a0117d6c 100644
 --- a/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
 +++ b/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
 @@ -64,22 +64,22 @@ index bed5e28..8f28a72 100644
@@ -67,7 +67,7 @@ index bb8690c..a0117d6 100644
 -
 +     Advertisement advert;
 diff --git a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
-index 7dc8fed..8802310 100644
+index 7dc8fed7..8802310f 100644
 --- a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
 +++ b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
 @@ -9,6 +9,7 @@
@@ -303,7 +303,7 @@ index 7dc8fed..8802310 100644
  }
 -
 diff --git a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
-index b9a5136..d01a4e6 100644
+index b9a51364..d01a4e6c 100644
 --- a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
 +++ b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
 @@ -17,6 +17,12 @@
@@ -320,7 +320,7 @@ index b9a5136..d01a4e6 100644
  
  // TX characteristic: Watch -> Phone notifications
 diff --git a/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh b/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh
-index 08f1591..843b716 100644
+index 08f15914..843b7162 100644
 --- a/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh
 +++ b/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh
 @@ -1,11 +1,19 @@
@@ -348,7 +348,7 @@ index 08f1591..843b716 100644
 +
 +exec busctl --system call "$DEST" "$OBJECT" "$INTERFACE" sendMessage sss "org.asteroidos.camera" "$ACTION" ""
 diff --git a/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
-index a856e19..6a5592d 100644
+index a856e19c..6a5592d0 100644
 --- a/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
 +++ b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
 @@ -1,12 +1,15 @@
