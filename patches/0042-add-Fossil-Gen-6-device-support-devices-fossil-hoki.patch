@@ -18,9 +18,9 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 +++
- devices/fossil-hoki/android-init.nix          |  69 ++++
+ devices/fossil-hoki/android-init.nix          |  81 ++++
  devices/fossil-hoki/android-system-data.nix   |  18 +
- devices/fossil-hoki/default.nix               | 366 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 369 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 ++
  devices/fossil-hoki/hybris.nix                |  64 +++
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 +++
  modules/rootfs.nix                            | 120 +++---
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   8 +
- 21 files changed, 1690 insertions(+), 51 deletions(-)
+ 21 files changed, 1705 insertions(+), 51 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -123,11 +123,12 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..56b643e8
+index 00000000..2cf8cdf8
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,81 @@
 +{
++  lib,
 +  pkgs,
 +  ...
 +}:
@@ -195,6 +196,17 @@ index 00000000..56b643e8
 +      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
 +    };
 +  };
++
++  # AsteroidOS installs root property contexts and init.rc into / at image build time
++  # Reference: meta-smartwatch meta-hoki/recipes-android/android-init/android-init_1.0.bbappend
++  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
++    cp -f ${initRc} ./init.rc
++    cp -f ${platPropertyContexts} ./plat_property_contexts
++    cp -f ${nonplatPropertyContexts} ./nonplat_property_contexts
++    if [ -f ./system/etc/ld.config.28.txt ]; then
++      cp -f ${ldConfig} ./system/etc/ld.config.28.txt
++    fi
++  '';
 +}
 diff --git a/devices/fossil-hoki/android-system-data.nix b/devices/fossil-hoki/android-system-data.nix
 new file mode 100644
@@ -222,10 +234,10 @@ index 00000000..4373edde
 +''
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..2de248c7
+index 00000000..14c6b317
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,366 @@
+@@ -0,0 +1,369 @@
 +{
 +  config,
 +  lib,
@@ -454,6 +466,8 @@ index 00000000..2de248c7
 +    "d /data/vendor 0755 root root -"
 +    "d /data/vendor/ssrdump 0755 root root -"
 +    "d /data/vendor/bgdaemon 0755 root root -"
++    "d /sbin 0755 root root -"
++    "L+ /sbin/modprobe - - - - ${pkgs.kmod}/bin/modprobe"
 +  ];
 +
 +  # systemd-tmpfiles refuses to create the compositor environment file at boot:
@@ -462,8 +476,9 @@ index 00000000..2de248c7
 +  # the image instead so the launcher always sees QPA_HWC_*.
 +  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
 +    # AsteroidOS installs the hal-droid tree at /usr/libexec/hal-droid
-+    mkdir -p ./usr/libexec
++    mkdir -p ./usr/libexec ./sbin
 +    ln -sfn ${hybrisAndroid}/usr/libexec/hal-droid ./usr/libexec/hal-droid
++    ln -sfn ${pkgs.kmod}/bin/modprobe ./sbin/modprobe
 +
 +    # AsteroidOS installs the Fossil Gen 6 Android 9 system and vendor data
 +    # Reference: meta-smartwatch meta-hoki/recipes-android/android/android-system-data_hoki-p.bb
@@ -630,7 +645,7 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..e3fc1259
+index 00000000..49e3092a
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
 @@ -0,0 +1,64 @@
@@ -659,7 +674,7 @@ index 00000000..e3fc1259
 +          ) (old.configureFlags or [ ]))
 +          ++ [
 +            "--with-android-headers=${hybrisAndroid}/include"
-+            "--with-default-hybris-ld-library-path=${hybrisAndroid}/usr/libexec/hal-droid/system/lib:/vendor/lib:/system/lib"
++            "--with-default-hybris-ld-library-path=/usr/libexec/hal-droid/system/lib:${hybrisAndroid}/usr/libexec/hal-droid/system/lib:/vendor/lib:/system/lib"
 +          ];
 +
 +        # libhybris-eglplatformcommon and -hwcomposerwindow call

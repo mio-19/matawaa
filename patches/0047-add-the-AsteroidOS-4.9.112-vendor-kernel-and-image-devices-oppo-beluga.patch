@@ -9,20 +9,21 @@ vendor kernel, its 17 upstream kernel patches, the extracted defconfig,
 the correct qualcomm-msm8909w SoC metadata and the Android fastboot
 layout. Keep the device best-effort until it has been boot-tested.
 ---
- devices/oppo-beluga/android-init.nix   |  70 +++++++++++
+ devices/oppo-beluga/android-init.nix   |  82 +++++++++++++
  devices/oppo-beluga/default.nix        | 158 +++++++++++++++++++++++--
  devices/oppo-beluga/kernel/default.nix |  95 +++++++++++++++
- 3 files changed, 313 insertions(+), 10 deletions(-)
+ 3 files changed, 325 insertions(+), 10 deletions(-)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
 new file mode 100644
-index 00000000..ed2cba46
+index 00000000..4a3a5c1c
 --- /dev/null
 +++ b/devices/oppo-beluga/android-init.nix
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,82 @@
 +{
++  lib,
 +  pkgs,
 +  ...
 +}:
@@ -91,6 +92,17 @@ index 00000000..ed2cba46
 +      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
 +    };
 +  };
++
++  # AsteroidOS installs root property contexts and init.rc into / at image build time
++  # Reference: meta-smartwatch meta-beluga/recipes-android/android-init/android-init_1.0.bbappend
++  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
++    cp -f ${initRc} ./init.rc
++    cp -f ${platPropertyContexts} ./plat_property_contexts
++    cp -f ${nonplatPropertyContexts} ./nonplat_property_contexts
++    if [ -f ./system/etc/ld.config.28.txt ]; then
++      cp -f ${ldConfig} ./system/etc/ld.config.28.txt
++    fi
++  '';
 +}
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
 index c2cef490..95786a25 100644

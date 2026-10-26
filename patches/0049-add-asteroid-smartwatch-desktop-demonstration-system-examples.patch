@@ -48,7 +48,7 @@ index 61a9b65c..397bbab1 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..9188ac02
+index 00000000..59727d5a
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
 @@ -0,0 +1,319 @@
@@ -246,7 +246,7 @@ index 00000000..9188ac02
 +              i=$((i + 1))
 +            done
 +          ''}"
-+          "-${pkgs.bash}/bin/bash -c 'echo QUIT > /run/psplash_fifo 2>/dev/null || true'"
++          "-${pkgs.bash}/bin/bash -c '(echo QUIT > /run/psplash_fifo) 2>/dev/null || true'"
 +        ];
 +        ExecStart = "${pkgs.writeShellScript "asteroid-launcher-run" ''
 +          # The setcap wrapper cannot raise its capabilities inside a user
