@@ -1,4 +1,4 @@
-From fad28391394af9ea36beb90440001a5376db5671 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 10:42:20 +1100
 Subject: [PATCH] add resilient-flash utility for flaky smartwatch USB
@@ -711,6 +711,3 @@ index 00000000..aa33b6e5
 +  except Exception as e:
 +    print(f"\n[!] Flash error: {e}", file=sys.stderr)
 +    sys.exit(1)
--- 
-2.56.0
-

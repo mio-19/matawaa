@@ -1,4 +1,4 @@
-From 32b84f62584c2b30d8beb5de690cbd9e3aed62ac Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:25:50 +1100
 Subject: [PATCH] add cross-compilation hook overlay (overlay)
@@ -289,6 +289,3 @@ index 00000000..34e60efd
 +  cross = import ./cross-compile.nix final super;
 +in
 +base // cross
--- 
-2.56.0
-

@@ -1,4 +1,4 @@
-From f3b215f8b5a1c1a183a95a598ea14a9e2533d678 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:23:41 +1100
 Subject: [PATCH] add tactile improvements to beatfork (overlay/asteroidos)
@@ -488,6 +488,3 @@ index dd25bd98..0e218d1c 100644
      extraBuildInputs = [
        qt6.qtmultimedia
      ];
--- 
-2.56.0
-

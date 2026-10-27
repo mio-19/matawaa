@@ -1,4 +1,4 @@
-From 3037bf9bcd7757b588448cc4c5e0ffd6e089db9f Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:25:00 +1100
 Subject: [PATCH] add core applications and assets (overlay/asteroidos)
@@ -282,6 +282,3 @@ index 6bddf6f8..63fa2227 100644
    virtualkeyboard = callPackage ./virtualkeyboard { };
  
    inherit (pkgs) msm-fb-refresher;
--- 
-2.56.0
-

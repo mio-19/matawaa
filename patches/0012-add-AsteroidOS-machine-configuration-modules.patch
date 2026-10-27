@@ -1,4 +1,4 @@
-From 8aac655e73eb187238b0c8b9190dd91d36ae7020 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:22:28 +1100
 Subject: [PATCH] add AsteroidOS machine configuration (modules)
@@ -69,6 +69,3 @@ index 0a18885d..fe4ce596 100644
    ./beautification.nix
    ./boot-control.nix
    ./boot-initrd.nix
--- 
-2.56.0
-

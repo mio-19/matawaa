@@ -1,4 +1,4 @@
-From af1dd206da408905bc929d8c31f426efe868e6fc Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Sat, 24 Oct 2026 13:37:18 +1100
 Subject: [PATCH] add the AsteroidOS 4.9.112 vendor kernel and image
@@ -445,6 +445,3 @@ index 00000000..3c120c93
 +    cp -f "$buildRoot/arch/arm/boot/zImage-dtb" "$out/zImage"
 +  '';
 +}
--- 
-2.56.0
-

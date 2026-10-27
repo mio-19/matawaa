@@ -1,4 +1,4 @@
-From 8063daef0c7eeee5f6834a23f6904e59c8bc9b8a Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:28:02 +1100
 Subject: [PATCH] add packaging infrastructure (overlay/asteroidos)
@@ -267,6 +267,3 @@ index 9598347c..765a0608 100644
      dtbTool = callPackage ./dtbtool { };
      dtbTool-exynos = callPackage ./dtbtool-exynos { };
      libhybris = callPackage ./libhybris { };
--- 
-2.56.0
-

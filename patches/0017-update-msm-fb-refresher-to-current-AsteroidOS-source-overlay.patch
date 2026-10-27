@@ -1,4 +1,4 @@
-From d5306ca0f91685f77c46cd759ef2e614a529a188 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:24:18 +1100
 Subject: [PATCH] update msm-fb-refresher to current AsteroidOS source
@@ -70,6 +70,3 @@ index fec3de71..37ce451f 100644
 +    platforms = platforms.linux;
 +  };
  }
--- 
-2.56.0
-

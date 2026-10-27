@@ -1,4 +1,4 @@
-From f3ca7dad6ff9ec389a0ce267975579b676002225 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:29:13 +1100
 Subject: [PATCH] add vendor kernel patches (devices/google-aurora)
@@ -571,6 +571,3 @@ index 00000000..1c5e64a1
 + 
 + 	rtc_dd->regs = match->data;
 + 	rtc_dd->rtc_dev = &pdev->dev;
--- 
-2.56.0
-

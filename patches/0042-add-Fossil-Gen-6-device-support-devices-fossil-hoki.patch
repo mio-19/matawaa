@@ -1,4 +1,4 @@
-From 767f2119dc4e09105eb95f80bc3771882d551a65 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:32:30 +1100
 Subject: [PATCH] add Fossil Gen 6 device support (devices/fossil-hoki)
@@ -2045,6 +2045,3 @@ index 2810130f..350272ab 100644
      cat > CMakeLists.txt <<EOF
      cmake_minimum_required(VERSION 3.16)
      project(hwcomposer LANGUAGES CXX)
--- 
-2.56.0
-

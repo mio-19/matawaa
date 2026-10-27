@@ -1,4 +1,4 @@
-From 3cb1abe211db693f829d8691d81f77a615f0d626 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:22:17 +1100
 Subject: [PATCH] add watch power profile (modules)
@@ -95,6 +95,3 @@ index 00000000..5b936f61
 +    );
 +  };
 +}
--- 
-2.56.0
-

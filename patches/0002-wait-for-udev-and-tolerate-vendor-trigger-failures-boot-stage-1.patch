@@ -1,4 +1,4 @@
-From 65c9a0a013ba2f1e5c5d5efac10cfa762c567b17 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:26:28 +1100
 Subject: [PATCH] wait for udev and tolerate vendor trigger failures
@@ -64,6 +64,3 @@ index ff0f068a..3d9d98c0 100644
 +    $logger.warn("udevadm control --exit failed; udevd may already be stopped: #{e.message}")
    end
  end
--- 
-2.56.0
-

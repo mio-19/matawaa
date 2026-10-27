@@ -1,4 +1,4 @@
-From 731aa3cad35f69a6519aa3105ca7381b2e64d138 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Sat, 24 Oct 2026 17:18:23 +1100
 Subject: [PATCH] add a standalone mainline target
@@ -11862,6 +11862,3 @@ index 00000000..41b00986
 +		hoki_batterydata = "/qcom,battery-data";
 +	};
 +};
--- 
-2.56.0
-

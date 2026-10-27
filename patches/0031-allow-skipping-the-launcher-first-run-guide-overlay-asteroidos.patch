@@ -1,4 +1,4 @@
-From 2144dbd921e2a9923216744c8a17ef162f585e5b Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:13:49 +1100
 Subject: [PATCH] allow skipping the launcher first-run guide
@@ -78,6 +78,3 @@ index 00000000..a3dc5d7b
 +             id: nextButton
 +             iconName: "ios-arrow-dropright"
 +             anchors { 
--- 
-2.56.0
-

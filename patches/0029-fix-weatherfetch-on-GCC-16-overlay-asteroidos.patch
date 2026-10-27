@@ -1,4 +1,4 @@
-From 8d70a0b99660bd18b656ac2d9ab24a3a42d21d80 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:23:25 +1100
 Subject: [PATCH] fix weatherfetch on GCC 16 (overlay/asteroidos)
@@ -42,6 +42,3 @@ index 00000000..26bb0392
 +     for (unsigned i = 0; i < count; ++i) {
 +         MDConfItem(QString("/org/asteroidos/weather/day%1/id").arg(i)).set(days[i].icon);
 +         MDConfItem(QString("/org/asteroidos/weather/day%1/min-temp").arg(i)).set(days[i].mintemp);
--- 
-2.56.0
-

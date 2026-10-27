@@ -1,4 +1,4 @@
-From ba256bc6daeddac985be5a7052dcbf15f949d64a Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Fri, 23 Oct 2026 21:18:15 +1100
 Subject: [PATCH] vendor and adapt systemd 257 for legacy kernels
@@ -70,7 +70,7 @@ systemd262oldkernel.
  create mode 100644 overlay/systemd-257/systemd-udevd-varlink.socket
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index d9d272b4..61a9b65c 100644
+index f69a8058..930807ef 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -12,6 +12,10 @@ let
@@ -2610,6 +2610,3 @@ index 00000000..e2cc9594
 +DeferTrigger=yes
 +XAttrEntryPoint=user.varlink=entrypoint
 +XAttrListen=user.varlink=listen
--- 
-2.56.0
-

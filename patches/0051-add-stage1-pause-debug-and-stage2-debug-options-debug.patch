@@ -1,4 +1,4 @@
-From 087da61ba74b483b6fc718c2c462f5d20f46d6a2 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:00:58 +1100
 Subject: [PATCH] add stage1-pause-debug and stage2 debug options (debug)
@@ -54,7 +54,7 @@ index b3a6045b..0644044c 100644
  
      Tasks::UDev.instance.teardown()
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 397bbab1..375c235b 100644
+index a581225e..fbdd8316 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -10,12 +10,23 @@ let
@@ -81,7 +81,7 @@ index 397bbab1..375c235b 100644
    mobile.system.type = mkDefault "android";
    mobile.system.system = mkDefault "armv7l-linux";
  
-@@ -127,6 +138,8 @@ in
+@@ -141,6 +152,8 @@ in
      memoryPercent = lib.mkOptionDefault 50;
    };
  
@@ -90,7 +90,7 @@ index 397bbab1..375c235b 100644
    # AsteroidOS credits the saved random seed as entropy to avoid slow boots on
    # pre-5.4 watch kernels.
    # Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
-@@ -152,4 +165,88 @@ in
+@@ -166,4 +179,88 @@ in
    boot.kernelParams = [
      "loop.max_part=7"
    ];
@@ -339,6 +339,3 @@ index db771346..b4842997 100644
      ];
    };
  }
--- 
-2.56.0
-

@@ -1,4 +1,4 @@
-From e8772996e9b97387cfcc22e2a433704b17905189 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 10:42:20 +1100
 Subject: [PATCH] support transparent compression and disable block-group-tree
@@ -52,6 +52,3 @@ index f6d95e13..18665072 100644
              ${optionalString (partitionID != null) "-U ${partitionID}"} \
              ${optionalString (label != null) "-L ${escapeShellArg label}"} \
              ${optionalString (config.size == null) "--shrink"} \
--- 
-2.56.0
-

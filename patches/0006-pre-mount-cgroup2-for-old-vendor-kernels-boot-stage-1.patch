@@ -1,4 +1,4 @@
-From 89ecc8c0e6085ef51f11a087614d8d7c67768512 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:26:47 +1100
 Subject: [PATCH] pre-mount cgroup2 for old vendor kernels (boot/stage-1)
@@ -33,6 +33,3 @@ index 6a3ad197..b3a6045b 100644
      switch_root = System.which("switch_root")
      System.exec({}, switch_root, SYSTEM_MOUNT_POINT, init)
    end
--- 
-2.56.0
-

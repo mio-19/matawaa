@@ -1,4 +1,4 @@
-From cfc76a8615e34bfe6a6061b7f38b261965f68b21 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 10:42:20 +1100
 Subject: [PATCH] add asteroid smartwatch desktop demonstration system
@@ -9,19 +9,19 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 ++
- examples/asteroid/asteroid-desktop.nix | 319 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 321 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++++
  examples/asteroid/default.nix          |  15 ++
- 4 files changed, 395 insertions(+)
+ 4 files changed, 397 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 61a9b65c..397bbab1 100644
+index 930807ef..a581225e 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
-@@ -127,6 +127,24 @@ in
+@@ -141,6 +141,24 @@ in
      memoryPercent = lib.mkOptionDefault 50;
    };
  
@@ -48,10 +48,10 @@ index 61a9b65c..397bbab1 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..59727d5a
+index 00000000..0532ee80
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,319 @@
+@@ -0,0 +1,321 @@
 +{
 +  config,
 +  lib,
@@ -193,6 +193,8 @@ index 00000000..59727d5a
 +    services.logind.settings = {
 +      Login = {
 +        HandlePowerKey = "ignore";
++        HandlePowerKeyLongPress = "ignore";
++        HandleRebootKey = "ignore";
 +        HandleSuspendKey = "ignore";
 +        HandleHibernateKey = "ignore";
 +        HandleLidSwitch = "ignore";
@@ -441,6 +443,3 @@ index 00000000..5eca754f
 +    '';
 +  }
 +)
--- 
-2.56.0
-

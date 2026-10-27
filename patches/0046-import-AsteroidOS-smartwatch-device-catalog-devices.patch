@@ -1,4 +1,4 @@
-From 16e5c9597449bd412ecf10f78988924d90b176d9 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 11:10:35 +1100
 Subject: [PATCH] import AsteroidOS smartwatch device catalog (devices)
@@ -1541,6 +1541,3 @@ index 00000000..69a52c41
 +    "msm_rtb.filter=0x237"
 +  ];
 +}
--- 
-2.56.0
-

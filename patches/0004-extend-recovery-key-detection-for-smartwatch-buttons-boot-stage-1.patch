@@ -1,4 +1,4 @@
-From c910b5eed759eaac1d1bb4cd36e08b79025dd99e Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:26:38 +1100
 Subject: [PATCH] extend recovery key detection for smartwatch buttons
@@ -55,6 +55,3 @@ index 6eaaf611..0fda186a 100644
      end
  
      def wants_recovery?
--- 
-2.56.0
-

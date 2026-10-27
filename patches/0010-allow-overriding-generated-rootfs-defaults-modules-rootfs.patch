@@ -1,4 +1,4 @@
-From 67f925497e18b35b47d2d1a6a600d9e4c1af66e1 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:22:05 +1100
 Subject: [PATCH] allow overriding generated rootfs defaults (modules/rootfs)
@@ -28,6 +28,3 @@ index 818308b1..595f045d 100644
        ext4.partitionID = "44444444-4444-4444-8888-888888888888";
  
        populateCommands =
--- 
-2.56.0
-

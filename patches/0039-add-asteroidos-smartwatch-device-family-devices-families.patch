@@ -1,4 +1,4 @@
-From 7feb4be86af09e0040cc2575053bf7e918a2b376 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 10:42:20 +1100
 Subject: [PATCH] add asteroidos smartwatch device family (devices/families)
@@ -9,16 +9,16 @@ This patch introduces devices/families/asteroidos.nix:
 - Configures fastboot userdata partition targets and display unblanking.
 - Trims unneeded background server/desktop services to reduce closure size.
 ---
- devices/families/asteroidos.nix | 133 ++++++++++++++++++++++++++++++++
- 1 file changed, 133 insertions(+)
+ devices/families/asteroidos.nix | 147 ++++++++++++++++++++++++++++++++
+ 1 file changed, 147 insertions(+)
  create mode 100644 devices/families/asteroidos.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 new file mode 100644
-index 00000000..d9d272b4
+index 00000000..f69a8058
 --- /dev/null
 +++ b/devices/families/asteroidos.nix
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,147 @@
 +{
 +  config,
 +  lib,
@@ -138,6 +138,20 @@ index 00000000..d9d272b4
 +  # Default stateVersion
 +  system.stateVersion = mkDefault "26.11";
 +
++  # Smartwatch stem/power button should be handled by compositor/shell, not
++  # logind shutdown; match AsteroidOS systemd-conf powerkey.conf.
++  # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd-conf/powerkey.conf
++  services.logind.settings = {
++    Login = {
++      HandlePowerKey = mkDefault "ignore";
++      HandlePowerKeyLongPress = mkDefault "ignore";
++      HandleRebootKey = mkDefault "ignore";
++      HandleSuspendKey = mkDefault "ignore";
++      HandleHibernateKey = mkDefault "ignore";
++      HandleLidSwitch = mkDefault "ignore";
++    };
++  };
++
 +  # Enable zram compressed in-memory swap to avoid OOM on 512MB-1GB smartwatches
 +  zramSwap = {
 +    enable = mkDefault true;
@@ -152,6 +166,3 @@ index 00000000..d9d272b4
 +    "loop.max_part=7"
 +  ];
 +}
--- 
-2.56.0
-

@@ -1,4 +1,4 @@
-From ba626f518e1d1ac8bbe86d9717d0caaf5f024aa8 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:13:18 +1100
 Subject: [PATCH] add standalone YouTube Music streaming (overlay/asteroidos)
@@ -350,6 +350,3 @@ index 00000000..375a101a
 +         }
 +     }
 + }
--- 
-2.56.0
-

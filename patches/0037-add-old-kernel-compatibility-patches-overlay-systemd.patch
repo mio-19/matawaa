@@ -1,4 +1,4 @@
-From ab06d563892a70d6981ab9daf84849b16fefc9c8 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:25:44 +1100
 Subject: [PATCH] add old-kernel compatibility patches (overlay/systemd)
@@ -444,6 +444,3 @@ index 00000000..cf16aa51
 +                 return setup_credentials_plain_dir(context, cred_dir);
 +         }
 +         if (mfd < 0)
--- 
-2.56.0
-
