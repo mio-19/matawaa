@@ -18,27 +18,27 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 +++
- devices/fossil-hoki/android-init.nix          | 126 ++++++
+ devices/fossil-hoki/android-init.nix          | 148 ++++++
  devices/fossil-hoki/android-system-data.nix   |  18 +
- devices/fossil-hoki/default.nix               | 392 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 461 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
  devices/fossil-hoki/hybris.nix                |  64 +++
- devices/fossil-hoki/kernel/default.nix        | 232 +++++++++++
- .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++++
+ devices/fossil-hoki/kernel/default.nix        | 232 +++++++++
+ .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 ++
- .../kernel/linux-4.14.211-212.patch.patch     | 152 +++++++
- .../kernel/linux-4.14.212-213.patch.patch     |  99 +++++
- devices/fossil-hoki/wlan-firmware-hoki.sh     |  26 ++
- devices/fossil-hoki/wlan.nix                  |  81 ++++
+ .../kernel/linux-4.14.211-212.patch.patch     | 152 ++++++
+ .../kernel/linux-4.14.212-213.patch.patch     |  99 ++++
+ devices/fossil-hoki/wlan-firmware-hoki.sh     |  30 ++
+ devices/fossil-hoki/wlan.nix                  |  81 +++
  ...co_profile-fix-use-of-adapter-before.patch |  30 ++
- ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 ++
+ ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 +
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 +++
  devices/fossil-triggerfish/default.nix        |  56 +++
- modules/rootfs.nix                            | 120 +++---
+ modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   8 +
- 21 files changed, 1773 insertions(+), 51 deletions(-)
+ 21 files changed, 1868 insertions(+), 51 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -123,10 +123,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..0d1d34b7
+index 00000000..e9ba17d2
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,148 @@
 +{
 +  lib,
 +  pkgs,
@@ -236,6 +236,28 @@ index 00000000..0d1d34b7
 +        if [ -f /system/etc/ld.config.28.txt ]; then
 +          ${pkgs.util-linux}/bin/mount --bind ${ldConfig} /system/etc/ld.config.28.txt || true
 +        fi
++
++        # Ensure /lib/firmware exists and has links to all vendor and dynamic firmware
++        ${pkgs.coreutils}/bin/mkdir -p /lib/firmware
++        for dir in /vendor/firmware /system/etc/firmware; do
++          if [ -d "$dir" ]; then
++            for f in "$dir"/*; do
++              [ -e "$f" ] || continue
++              name=$(${pkgs.coreutils}/bin/basename "$f")
++              [ -e "/lib/firmware/$name" ] || ${pkgs.coreutils}/bin/ln -sf "$f" /lib/firmware/"$name"
++            done
++          fi
++        done
++        for dir in /vendor/firmware_mnt/image /vendor/firmware_mnt /vendor/bt_firmware/image /vendor/bt_firmware; do
++          if [ -d "$dir" ]; then
++            for f in "$dir"/*; do
++              [ -e "$f" ] || continue
++              name=$(${pkgs.coreutils}/bin/basename "$f")
++              [ -e "/lib/firmware/$name" ] || ${pkgs.coreutils}/bin/ln -sf "$f" /lib/firmware/"$name"
++            done
++          fi
++        done
++
 +        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
 +      '';
 +      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
@@ -279,10 +301,10 @@ index 00000000..4373edde
 +''
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..ebbaba31
+index 00000000..6ff1dc3a
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,392 @@
+@@ -0,0 +1,461 @@
 +{
 +  config,
 +  lib,
@@ -293,6 +315,15 @@ index 00000000..ebbaba31
 +let
 +  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
 +  androidSystemData = import ./android-system-data.nix { inherit pkgs; };
++
++  # Static vendor and system firmware package for kernel direct firmware loader
++  hokiFirmware = pkgs.runCommand "hoki-firmware" { } ''
++    mkdir -p $out/lib/firmware
++    cp -a ${androidSystemData}/vendor/firmware/* $out/lib/firmware/
++    if [ -d ${androidSystemData}/system/etc/firmware ]; then
++      cp -a ${androidSystemData}/system/etc/firmware/* $out/lib/firmware/
++    fi
++  '';
 +
 +  # Debug builds get Qt plugin/loader tracing in the compositor environment,
 +  # so a launcher dlopen/EGL failure is visible in the journal without
@@ -401,6 +432,11 @@ index 00000000..ebbaba31
 +    pkgs.alsa-utils
 +    pkgs.btrfs-progs
 +  ];
++
++  # Include static Qualcomm Adreno GPU, audio DSP and Wi-Fi firmware in the system
++  # closure so the kernel direct firmware loader (/sys/module/firmware_class/parameters/path)
++  # finds a530_pm4.fw, a530_pfp.fw, a506_zap.*, ice40.bin, and tfa98xx.cnt.
++  hardware.firmware = [ hokiFirmware ];
 +
 +  # Hardware audio mixer DAI link routing for NXP TFA98xx speaker amplifier & digital mic
 +  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/issues/343
@@ -523,6 +559,8 @@ index 00000000..ebbaba31
 +    "p+ /run/psplash_fifo 0666 root root -"
 +    "d /sbin 0755 root root -"
 +    "L+ /sbin/modprobe - - - - ${pkgs.kmod}/bin/modprobe"
++    "d /lib/firmware 0755 root root -"
++    "L+ /etc/firmware - - - - /vendor/firmware"
 +  ];
 +
 +  # systemd-tmpfiles refuses to create the compositor environment file at boot:
@@ -537,10 +575,17 @@ index 00000000..ebbaba31
 +
 +    # AsteroidOS installs the Fossil Gen 6 Android 9 system and vendor data
 +    # Reference: meta-smartwatch meta-hoki/recipes-android/android/android-system-data_hoki-p.bb
-+    mkdir -p ./system ./vendor
++    mkdir -p ./system ./vendor ./lib/firmware ./etc
 +    cp -a ${androidSystemData}/system/* ./system/
 +    cp -a ${androidSystemData}/vendor/* ./vendor/
 +    chmod -R u+w ./system ./vendor
++
++    # Populate /lib/firmware and /etc/firmware with vendor & system firmware for kernel direct loading
++    cp -a ${androidSystemData}/vendor/firmware/* ./lib/firmware/ 2>/dev/null || true
++    if [ -d ${androidSystemData}/system/etc/firmware ]; then
++      cp -a ${androidSystemData}/system/etc/firmware/* ./lib/firmware/ 2>/dev/null || true
++    fi
++    ln -sfn /vendor/firmware ./etc/firmware
 +
 +    # Replace stock Android libselinux.so with AsteroidOS libselinux_stubs.so
 +    # to stub out SELinux calls for all Android HALs and service managers.
@@ -569,6 +614,52 @@ index 00000000..ebbaba31
 +      ''}
 +    ''} ./var/lib/environment/compositor/20-device.conf
 +  '';
++
++  # Symlink modem and bluetooth partition firmware into /lib/firmware
++  # once /vendor/firmware_mnt and /vendor/bt_firmware are mounted.
++  systemd.services.firmware-mount-links-hoki = {
++    description = "Symlink dynamic modem and bluetooth firmware into /lib/firmware";
++    after = [
++      "vendor-firmware_mnt.mount"
++      "vendor-bt_firmware.mount"
++    ];
++    before = [
++      "android-init.service"
++      "wlan-firmware-hoki.service"
++    ];
++    wantedBy = [ "multi-user.target" ];
++    unitConfig = {
++      DefaultDependencies = false;
++      Conflicts = [ "shutdown.target" ];
++    };
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = pkgs.writeShellScript "firmware-mount-links-hoki" ''
++        mkdir -p /lib/firmware
++        # Link modem partition PIL firmware (wcnss, venus, modem, adsp, etc.)
++        for dir in /vendor/firmware_mnt/image /vendor/firmware_mnt; do
++          if [ -d "$dir" ]; then
++            for f in "$dir"/*; do
++              [ -e "$f" ] || continue
++              base=$(${pkgs.coreutils}/bin/basename "$f")
++              [ -e "/lib/firmware/$base" ] || ln -sf "$f" "/lib/firmware/$base"
++            done
++          fi
++        done
++        # Link bluetooth partition firmware
++        for dir in /vendor/bt_firmware/image /vendor/bt_firmware; do
++          if [ -d "$dir" ]; then
++            for f in "$dir"/*; do
++              [ -e "$f" ] || continue
++              base=$(${pkgs.coreutils}/bin/basename "$f")
++              [ -e "/lib/firmware/$base" ] || ln -sf "$f" "/lib/firmware/$base"
++            done
++          fi
++        done
++      '';
++    };
++  };
 +
 +  # The hoki init.rc (run by android-init.service) boots the ADSP/CDSP/SLPI
 +  # subsystems, sets their restart levels, fixes up the bg-rsb permissions and
@@ -1552,10 +1643,10 @@ index 00000000..c0688d26
 + --- a/drivers/usb/gadget/function/f_midi.c
 diff --git a/devices/fossil-hoki/wlan-firmware-hoki.sh b/devices/fossil-hoki/wlan-firmware-hoki.sh
 new file mode 100644
-index 00000000..d014c1b6
+index 00000000..f1682bdf
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan-firmware-hoki.sh
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,30 @@
 +#!/bin/sh
 +# SPDX-License-Identifier: MIT
 +# Symlink stock vendor WCNSS firmware/calibration data into the path the
@@ -1573,8 +1664,12 @@ index 00000000..d014c1b6
 +
 +# The PIL firmware loader requests /lib/firmware/wcnss.mdt and the
 +# wcnss.b00..b09 segments, not the /vendor path, so link those too.
-+for f in /vendor/firmware/wcnss.*; do
-+	[ -e "$f" ] && ln -sf "$f" "/lib/firmware/${f##*/}"
++for dir in /vendor/firmware /vendor/firmware_mnt/image /vendor/firmware_mnt; do
++	if [ -d "$dir" ]; then
++		for f in "$dir"/wcnss.*; do
++			[ -e "$f" ] && [ ! -e "/lib/firmware/${f##*/}" ] && ln -sf "$f" "/lib/firmware/${f##*/}"
++		done
++	fi
 +done
 +
 +# Opening this device node is what actually powers WCNSS up; the write
