@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 34280fa2c9d953e00ece609a4d8f40ae7c8a62f3 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:24:14 +1100
 Subject: [PATCH] add legacy kernel builder variants (overlay/mobile-nixos)

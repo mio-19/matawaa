@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From fcaabae8c3fc8e38079f37d9de05cd483325b2bf Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:13:58 +1100
 Subject: [PATCH] add RIME CJK input method to the virtual keyboard

@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 89083bfe90d10e4b8385e41aee82fd30acbbae1a Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:22:00 +1100
 Subject: [PATCH] add smartwatch hardware abstractions (modules)

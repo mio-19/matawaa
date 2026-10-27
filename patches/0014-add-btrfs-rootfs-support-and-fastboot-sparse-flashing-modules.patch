@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 08138589e28b208ecb15d89f1eb3928c62a00ba8 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 11:07:23 +1100
 Subject: [PATCH] add btrfs rootfs support and fastboot sparse flashing

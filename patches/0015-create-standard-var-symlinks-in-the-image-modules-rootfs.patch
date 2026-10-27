@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 86681f6c1f1075526fe0a7f5b149f67948c0354f Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Sat, 24 Oct 2026 17:16:15 +1100
 Subject: [PATCH] create standard /var symlinks in the image (modules/rootfs)

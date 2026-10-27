@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 767f2119dc4e09105eb95f80bc3771882d551a65 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:32:30 +1100
 Subject: [PATCH] add Fossil Gen 6 device support (devices/fossil-hoki)
@@ -18,16 +18,16 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 +++
- devices/fossil-hoki/android-init.nix          |  81 ++++
+ devices/fossil-hoki/android-init.nix          | 126 ++++++
  devices/fossil-hoki/android-system-data.nix   |  18 +
- devices/fossil-hoki/default.nix               | 369 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 392 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
- devices/fossil-hoki/hybris-android.nix        |  22 ++
+ devices/fossil-hoki/hybris-android.nix        |  22 +
  devices/fossil-hoki/hybris.nix                |  64 +++
  devices/fossil-hoki/kernel/default.nix        | 232 +++++++++++
- .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++++
+ .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 ++
- .../kernel/linux-4.14.211-212.patch.patch     | 152 ++++++++
+ .../kernel/linux-4.14.211-212.patch.patch     | 152 +++++++
  .../kernel/linux-4.14.212-213.patch.patch     |  99 +++++
  devices/fossil-hoki/wlan-firmware-hoki.sh     |  26 ++
  devices/fossil-hoki/wlan.nix                  |  81 ++++
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 +++
  modules/rootfs.nix                            | 120 +++---
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   8 +
- 21 files changed, 1705 insertions(+), 51 deletions(-)
+ 21 files changed, 1773 insertions(+), 51 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -123,10 +123,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..2cf8cdf8
+index 00000000..0d1d34b7
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,126 @@
 +{
 +  lib,
 +  pkgs,
@@ -160,6 +160,27 @@ index 00000000..2cf8cdf8
 +    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-core/initrdscripts/initramfs-scripts-android/ld.config.28.txt";
 +    hash = "sha256-7QCh5Q/9QxMEhlcA52ykhPVRsNQZbyPqY7YmBCGGYZE=";
 +  };
++
++  # AsteroidOS SELinux stub integration for core service managers.
++  # Matches AsteroidOS meta-skipjack, meta-koi, meta-narwhal, meta-pike, meta-ray.
++  patchedInitRc = pkgs.runCommand "init.rc" { } ''
++    cat ${initRc} > $out
++    cat >> $out <<'EOF'
++
++# AsteroidOS SELinux stub integration for core service managers
++service servicemanager /usr/libexec/hal-droid/system/bin/servicemanager
++    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
++    class core
++
++service hwservicemanager /system/bin/hwservicemanager
++    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
++    class core
++
++service vndservicemanager /vendor/bin/vndservicemanager /dev/vndbinder
++    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
++    class core
++EOF
++  '';
 +in
 +{
 +  # AsteroidOS-style Pie stack: /system is the hal-droid Android 9 tree from
@@ -185,9 +206,33 @@ index 00000000..2cf8cdf8
 +    serviceConfig = {
 +      Type = "simple";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
-+        ${pkgs.coreutils}/bin/cp -f ${initRc} /init.rc
++        # Ensure Qualcomm bootdevice and platform by-name symlinks exist for rmt_storage
++        ${pkgs.coreutils}/bin/mkdir -p /dev/block/bootdevice/by-name /dev/block/platform/msm_sdcc.1/by-name /dev/block/platform/soc/7824900.sdhci/by-name
++        if [ -d /dev/disk/by-partlabel ]; then
++          for p in /dev/disk/by-partlabel/*; do
++            [ -e "$p" ] || continue
++            name=$(${pkgs.coreutils}/bin/basename "$p")
++            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/bootdevice/by-name/"$name"
++            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/platform/msm_sdcc.1/by-name/"$name"
++            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/platform/soc/7824900.sdhci/by-name/"$name"
++          done
++        fi
++        ${pkgs.coreutils}/bin/cp -f ${patchedInitRc} /init.rc
 +        ${pkgs.coreutils}/bin/cp -f ${platPropertyContexts} /plat_property_contexts
 +        ${pkgs.coreutils}/bin/cp -f ${nonplatPropertyContexts} /nonplat_property_contexts
++        if [ -f /system/lib/libselinux.so ]; then
++          ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so
++          ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux_stubs.so
++        fi
++        if [ -f /system/etc/selinux/plat_hwservice_contexts ]; then
++          ${pkgs.coreutils}/bin/ln -sf /system/etc/selinux/plat_hwservice_contexts /plat_hwservice_contexts
++        fi
++        if [ -f /vendor/etc/selinux/vendor_hwservice_contexts ]; then
++          ${pkgs.coreutils}/bin/ln -sf /vendor/etc/selinux/vendor_hwservice_contexts /vendor_hwservice_contexts
++        fi
++        if [ -f /vendor/etc/selinux/vndservice_contexts ]; then
++          ${pkgs.coreutils}/bin/ln -sf /vendor/etc/selinux/vndservice_contexts /vndservice_contexts
++        fi
 +        if [ -f /system/etc/ld.config.28.txt ]; then
 +          ${pkgs.util-linux}/bin/mount --bind ${ldConfig} /system/etc/ld.config.28.txt || true
 +        fi
@@ -200,7 +245,7 @@ index 00000000..2cf8cdf8
 +  # AsteroidOS installs root property contexts and init.rc into / at image build time
 +  # Reference: meta-smartwatch meta-hoki/recipes-android/android-init/android-init_1.0.bbappend
 +  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
-+    cp -f ${initRc} ./init.rc
++    cp -f ${patchedInitRc} ./init.rc
 +    cp -f ${platPropertyContexts} ./plat_property_contexts
 +    cp -f ${nonplatPropertyContexts} ./nonplat_property_contexts
 +    if [ -f ./system/etc/ld.config.28.txt ]; then
@@ -234,10 +279,10 @@ index 00000000..4373edde
 +''
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..14c6b317
+index 00000000..ebbaba31
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,369 @@
+@@ -0,0 +1,392 @@
 +{
 +  config,
 +  lib,
@@ -413,6 +458,10 @@ index 00000000..14c6b317
 +    KERNEL=="mdss_rotator", MODE="0666"
 +    SUBSYSTEM=="leds", KERNEL=="vibrator", ATTR{trigger}="transient", MODE="0666"
 +    DEVPATH=="/devices/platform/soc/soc:qcom,bg-rsb", ATTR{enable}=="*", MODE="0666"
++
++    # Upstream AsteroidOS block device symlinks for Qualcomm rmt_storage and Android HALs
++    # Reference: meta-asteroid 998-droid-system.rules & Qualcomm bootdevice scheme
++    ENV{ID_PART_ENTRY_NAME}=="?*", SYMLINK+="block/bootdevice/by-name/$env{ID_PART_ENTRY_NAME}", SYMLINK+="block/platform/msm_sdcc.1/by-name/$env{ID_PART_ENTRY_NAME}", SYMLINK+="block/platform/soc/7824900.sdhci/by-name/$env{ID_PART_ENTRY_NAME}"
 +  '';
 +
 +  # Persistent hardware partition mounts on Fossil Gen 6 eMMC
@@ -466,6 +515,12 @@ index 00000000..14c6b317
 +    "d /data/vendor 0755 root root -"
 +    "d /data/vendor/ssrdump 0755 root root -"
 +    "d /data/vendor/bgdaemon 0755 root root -"
++    "d /dev/block 0755 root root -"
++    "d /dev/block/bootdevice 0755 root root -"
++    "L+ /dev/block/bootdevice/by-name - - - - /dev/disk/by-partlabel"
++    "d /dev/block/platform 0755 root root -"
++    "L+ /dev/block/platform/msm_sdcc.1/by-name - - - - /dev/disk/by-partlabel"
++    "p+ /run/psplash_fifo 0666 root root -"
 +    "d /sbin 0755 root root -"
 +    "L+ /sbin/modprobe - - - - ${pkgs.kmod}/bin/modprobe"
 +  ];
@@ -487,8 +542,21 @@ index 00000000..14c6b317
 +    cp -a ${androidSystemData}/vendor/* ./vendor/
 +    chmod -R u+w ./system ./vendor
 +
-+    # Ensure libselinux_stubs.so is accessible directly in /system/lib for Bionic linker
-+    cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so ./system/lib/libselinux_stubs.so || true
++    # Replace stock Android libselinux.so with AsteroidOS libselinux_stubs.so
++    # to stub out SELinux calls for all Android HALs and service managers.
++    cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so ./system/lib/libselinux.so
++    cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so ./system/lib/libselinux_stubs.so
++
++    # Symlink SELinux service and hardware service contexts to root if present
++    if [ -f ./system/etc/selinux/plat_hwservice_contexts ]; then
++      ln -sf /system/etc/selinux/plat_hwservice_contexts ./plat_hwservice_contexts
++    fi
++    if [ -f ./vendor/etc/selinux/vendor_hwservice_contexts ]; then
++      ln -sf /vendor/etc/selinux/vendor_hwservice_contexts ./vendor_hwservice_contexts
++    fi
++    if [ -f ./vendor/etc/selinux/vndservice_contexts ]; then
++      ln -sf /vendor/etc/selinux/vndservice_contexts ./vndservice_contexts
++    fi
 +
 +    mkdir -p ./var/lib/environment/compositor
 +    cp ${pkgs.writeText "20-device.conf" ''

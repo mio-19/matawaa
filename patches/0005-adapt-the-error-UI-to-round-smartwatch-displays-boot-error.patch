@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 1ee9ad035aa20a39f16b2fc21b4160e5d0b51bf8 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:26:43 +1100
 Subject: [PATCH] adapt the error UI to round smartwatch displays (boot/error)

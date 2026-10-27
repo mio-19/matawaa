@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 8d70a0b99660bd18b656ac2d9ab24a3a42d21d80 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:23:25 +1100
 Subject: [PATCH] fix weatherfetch on GCC 16 (overlay/asteroidos)

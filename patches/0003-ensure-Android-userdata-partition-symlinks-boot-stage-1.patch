@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From a63ce7e355d50f74a4302c2fe6bcd6a9499e0e33 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:26:33 +1100
 Subject: [PATCH] ensure Android userdata partition symlinks (boot/stage-1)

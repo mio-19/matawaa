@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From af1dd206da408905bc929d8c31f426efe868e6fc Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Sat, 24 Oct 2026 13:37:18 +1100
 Subject: [PATCH] add the AsteroidOS 4.9.112 vendor kernel and image
@@ -9,19 +9,19 @@ vendor kernel, its 17 upstream kernel patches, the extracted defconfig,
 the correct qualcomm-msm8909w SoC metadata and the Android fastboot
 layout. Keep the device best-effort until it has been boot-tested.
 ---
- devices/oppo-beluga/android-init.nix   |  82 +++++++++++++
- devices/oppo-beluga/default.nix        | 158 +++++++++++++++++++++++--
- devices/oppo-beluga/kernel/default.nix |  95 +++++++++++++++
- 3 files changed, 325 insertions(+), 10 deletions(-)
+ devices/oppo-beluga/android-init.nix   | 113 +++++++++++++++++
+ devices/oppo-beluga/default.nix        | 168 +++++++++++++++++++++++--
+ devices/oppo-beluga/kernel/default.nix |  95 ++++++++++++++
+ 3 files changed, 366 insertions(+), 10 deletions(-)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
 new file mode 100644
-index 00000000..4a3a5c1c
+index 00000000..c3cfecb9
 --- /dev/null
 +++ b/devices/oppo-beluga/android-init.nix
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,113 @@
 +{
 +  lib,
 +  pkgs,
@@ -54,6 +54,27 @@ index 00000000..4a3a5c1c
 +    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-core/initrdscripts/initramfs-scripts-android/ld.config.28.txt";
 +    hash = "sha256-7QCh5Q/9QxMEhlcA52ykhPVRsNQZbyPqY7YmBCGGYZE=";
 +  };
++
++  # AsteroidOS SELinux stub integration for core service managers.
++  # Matches AsteroidOS meta-skipjack, meta-koi, meta-narwhal, meta-pike, meta-ray.
++  patchedInitRc = pkgs.runCommand "init.rc" { } ''
++    cat ${initRc} > $out
++    cat >> $out <<'EOF'
++
++# AsteroidOS SELinux stub integration for core service managers
++service servicemanager /usr/libexec/hal-droid/system/bin/servicemanager
++    setenv LD_PRELOAD /usr/libexec/hal-droid/system/lib/libselinux_stubs.so
++    class core
++
++service hwservicemanager /system/bin/hwservicemanager
++    setenv LD_PRELOAD /usr/libexec/hal-droid/system/lib/libselinux_stubs.so
++    class core
++
++service vndservicemanager /vendor/bin/vndservicemanager /dev/vndbinder
++    setenv LD_PRELOAD /usr/libexec/hal-droid/system/lib/libselinux_stubs.so
++    class core
++EOF
++  '';
 +in
 +{
 +  # AsteroidOS-style Pie stack: run the hal-droid Pie init (/usr/libexec/hal-droid/system/bin/init).
@@ -76,12 +97,22 @@ index 00000000..4a3a5c1c
 +    serviceConfig = {
 +      Type = "simple";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        # Ensure Qualcomm bootdevice and platform by-name symlinks exist for rmt_storage
++        ${pkgs.coreutils}/bin/mkdir -p /dev/block/bootdevice/by-name /dev/block/platform/msm_sdcc.1/by-name
++        if [ -d /dev/disk/by-partlabel ]; then
++          for p in /dev/disk/by-partlabel/*; do
++            [ -e "$p" ] || continue
++            name=$(${pkgs.coreutils}/bin/basename "$p")
++            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/bootdevice/by-name/"$name"
++            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/platform/msm_sdcc.1/by-name/"$name"
++          done
++        fi
 +        if [ -d /system_root/system ] && [ ! -d /system/bin ]; then
 +          ${pkgs.util-linux}/bin/mount --bind /system_root/system /system || true
 +        elif [ -d /system_root/bin ] && [ ! -d /system/bin ]; then
 +          ${pkgs.util-linux}/bin/mount --bind /system_root /system || true
 +        fi
-+        ${pkgs.coreutils}/bin/cp -f ${initRc} /init.rc
++        ${pkgs.coreutils}/bin/cp -f ${patchedInitRc} /init.rc
 +        ${pkgs.coreutils}/bin/cp -f ${platPropertyContexts} /plat_property_contexts
 +        ${pkgs.coreutils}/bin/cp -f ${nonplatPropertyContexts} /nonplat_property_contexts
 +        if [ -f /system/etc/ld.config.28.txt ]; then
@@ -96,7 +127,7 @@ index 00000000..4a3a5c1c
 +  # AsteroidOS installs root property contexts and init.rc into / at image build time
 +  # Reference: meta-smartwatch meta-beluga/recipes-android/android-init/android-init_1.0.bbappend
 +  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
-+    cp -f ${initRc} ./init.rc
++    cp -f ${patchedInitRc} ./init.rc
 +    cp -f ${platPropertyContexts} ./plat_property_contexts
 +    cp -f ${nonplatPropertyContexts} ./nonplat_property_contexts
 +    if [ -f ./system/etc/ld.config.28.txt ]; then
@@ -105,7 +136,7 @@ index 00000000..4a3a5c1c
 +  '';
 +}
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
-index c2cef490..95786a25 100644
+index c2cef490..fbb7a582 100644
 --- a/devices/oppo-beluga/default.nix
 +++ b/devices/oppo-beluga/default.nix
 @@ -5,9 +5,14 @@
@@ -138,7 +169,7 @@ index c2cef490..95786a25 100644
      ram = 1024 * 1;
      screen = {
        width = 402;
-@@ -34,24 +39,157 @@
+@@ -34,24 +39,167 @@
      };
    };
  
@@ -174,7 +205,7 @@ index c2cef490..95786a25 100644
 +    "lpm_levels.sleep_disabled=1"
 +    "earlycon=msm_hsl_uart,0x78af000"
 +    "audit=0"
-+  ];
+   ];
 +
 +  # The stage-2 msm-fb-refresher pans /dev/fb0 continuously; it fights the Qt
 +  # linuxfb fallback's own panning. Keep it for stage 1 (splash) only.
@@ -188,6 +219,10 @@ index c2cef490..95786a25 100644
 +    KERNEL=="hwbinder", MODE="0666"
 +    KERNEL=="vndbinder", MODE="0666"
 +    SUBSYSTEM=="leds", KERNEL=="vibrator", ATTR{trigger}="transient", MODE="0666"
++
++    # Upstream AsteroidOS block device symlinks for Qualcomm rmt_storage and Android HALs
++    # Reference: meta-asteroid 998-droid-system.rules & Qualcomm bootdevice scheme
++    ENV{ID_PART_ENTRY_NAME}=="?*", SYMLINK+="block/bootdevice/by-name/$env{ID_PART_ENTRY_NAME}", SYMLINK+="block/platform/msm_sdcc.1/by-name/$env{ID_PART_ENTRY_NAME}"
 +  '';
 +
 +  # Stock Android 9 system and vendor: carrying the Pie linker,
@@ -241,7 +276,13 @@ index c2cef490..95786a25 100644
 +    "d /data/vendor 0755 root root -"
 +    "d /data/vendor/ssrdump 0755 root root -"
 +    "d /data/vendor/bgdaemon 0755 root root -"
-   ];
++    "d /dev/block 0755 root root -"
++    "d /dev/block/bootdevice 0755 root root -"
++    "L+ /dev/block/bootdevice/by-name - - - - /dev/disk/by-partlabel"
++    "d /dev/block/platform 0755 root root -"
++    "L+ /dev/block/platform/msm_sdcc.1/by-name - - - - /dev/disk/by-partlabel"
++    "p+ /run/psplash_fifo 0666 root root -"
++  ];
 +
 +  # Install compositor environment and hal-droid symlinks into rootfs
 +  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''

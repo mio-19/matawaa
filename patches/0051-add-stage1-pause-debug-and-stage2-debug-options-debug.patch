@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 087da61ba74b483b6fc718c2c462f5d20f46d6a2 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:00:58 +1100
 Subject: [PATCH] add stage1-pause-debug and stage2 debug options (debug)
@@ -180,7 +180,7 @@ index 397bbab1..375c235b 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 14c6b317..783271a7 100644
+index ebbaba31..c561595c 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -57,6 +57,9 @@ in

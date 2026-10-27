@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 14787fbc3d3450f5afd6f4fd741b0639a7df6919 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 11:41:21 +1100
 Subject: [PATCH] add native TDLib wearable Telegram client

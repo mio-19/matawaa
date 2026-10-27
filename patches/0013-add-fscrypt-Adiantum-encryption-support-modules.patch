@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From e3969be3affb7e5e7a7011c3ba34113fd022fa51 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:22:40 +1100
 Subject: [PATCH] add fscrypt Adiantum encryption support (modules)

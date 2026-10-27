@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 802ea1d520e17f9924cf4213e8cfaeb65db69cc3 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:21:49 +1100
 Subject: [PATCH] add wearable Qualcomm, Exynos, and MediaTek SoC options

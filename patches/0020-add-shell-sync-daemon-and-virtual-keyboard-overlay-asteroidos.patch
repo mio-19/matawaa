@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 35574fd3e69432bbfaa79aeecdff1d4b78de226d Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Tue, 20 Oct 2026 19:24:48 +1100
 Subject: [PATCH] add shell, sync daemon, and virtual keyboard
