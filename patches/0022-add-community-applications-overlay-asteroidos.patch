@@ -374,10 +374,10 @@ index 00000000..843b7c85
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 63fa2227..6b22231d 100644
+index 1db9da49..60eda2ac 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -58,5 +58,10 @@ rec {
+@@ -59,6 +59,11 @@ rec {
  
    virtualkeyboard = callPackage ./virtualkeyboard { };
  
@@ -386,5 +386,6 @@ index 63fa2227..6b22231d 100644
 +    inherit (pkgs) espeak-classic;
 +  };
 +
+   stubs = callPackage ./stubs { };
+ 
    inherit (pkgs) msm-fb-refresher;
- }

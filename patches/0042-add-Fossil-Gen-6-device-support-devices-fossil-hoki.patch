@@ -804,7 +804,7 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..6e772cbb
+index 00000000..7c3475e8
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
 @@ -0,0 +1,82 @@
@@ -869,10 +869,10 @@ index 00000000..6e772cbb
 +        chmod -R u+w $out
 +        find $out -name '*.so*' -delete
 +
-+        # Strip plugin and classname declarations so Qt QML engine loads this as a pure QML module
-+        # without failing on missing shared library plugins
-+        sed -i '/plugin /d; /classname /d; /typeinfo /d' $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/qmldir
-+        sed -i '/plugin /d; /classname /d; /typeinfo /d' $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
++        # Strip plugin, classname, and prefer declarations so Qt QML engine loads this as a pure QML module
++        # from the filesystem without failing on missing shared library plugins or qrc resources
++        sed -i '/plugin /d; /classname /d; /typeinfo /d; /prefer /d' $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/qmldir
++        sed -i '/plugin /d; /classname /d; /typeinfo /d; /prefer /d' $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
 +
 +        # Provide pure-QML fallback for private SourceProxy
 +        cat > $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/SourceProxy.qml <<'EOF'

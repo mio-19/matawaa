@@ -25,10 +25,10 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/mce-qt6/default.nix        | 100 +++++++++++
  overlay/asteroidos/mlite/CMakeLists.txt       | 124 +++++++++++++
  overlay/asteroidos/mlite/default.nix          |  52 ++++++
- overlay/asteroidos/ngf-qt6/default.nix        |  78 ++++++++
+ overlay/asteroidos/ngf-qt6/default.nix        |  96 ++++++++++
  overlay/asteroidos/timed-qt6/default.nix      | 162 +++++++++++++++++
  overlay/asteroidos/usb-moded-qt6/default.nix  | 113 ++++++++++++
- 11 files changed, 1030 insertions(+)
+ 11 files changed, 1048 insertions(+)
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
  create mode 100644 overlay/asteroidos/keepalive/default.nix
@@ -771,11 +771,11 @@ index 00000000..c3583bfd
 +})
 diff --git a/overlay/asteroidos/ngf-qt6/default.nix b/overlay/asteroidos/ngf-qt6/default.nix
 new file mode 100644
-index 00000000..3cbf568b
+index 00000000..d16b452f
 --- /dev/null
 +++ b/overlay/asteroidos/ngf-qt6/default.nix
-@@ -0,0 +1,78 @@
-+# Qt6 client library for Non-Graphic Feedback (NGF) daemon
+@@ -0,0 +1,96 @@
++# Qt6 client library and Nemo.Ngf QML plugin for Non-Graphic Feedback (NGF) daemon
 +# Upstream repository: https://github.com/sailfishos/libngf-qt
 +{
 +  lib,
@@ -784,6 +784,7 @@ index 00000000..3cbf568b
 +  cmake,
 +  pkg-config,
 +  qt6,
++  buildPackages,
 +}:
 +
 +stdenv.mkDerivation (finalAttrs: {
@@ -798,23 +799,30 @@ index 00000000..3cbf568b
 +  };
 +
 +  strictDeps = true;
++  dontWrapQtApps = true;
 +
 +  nativeBuildInputs = [
 +    cmake
 +    pkg-config
-+    qt6.wrapQtAppsHook
 +  ];
 +
 +  buildInputs = [
 +    qt6.qtbase
++    qt6.qtdeclarative
++  ];
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
 +  ];
 +
 +  postPatch = ''
-+        cat << "EOF" > CMakeLists.txt
++    cat << "EOF" > CMakeLists.txt
 +    cmake_minimum_required(VERSION 3.16)
 +    project(ngf-qt6 LANGUAGES CXX)
-+    find_package(Qt6 REQUIRED COMPONENTS Core DBus)
++    set(CMAKE_CXX_STANDARD 17)
 +    set(CMAKE_AUTOMOC ON)
++    find_package(Qt6 REQUIRED COMPONENTS Core DBus Qml)
 +    file(GLOB HEADERS "src/include/*")
 +    set(SOURCES src/dbus/client.cpp src/dbus/clientprivate.cpp)
 +    add_library(ngf-qt6 SHARED ''${SOURCES} ''${HEADERS})
@@ -830,8 +838,18 @@ index 00000000..3cbf568b
 +    install(FILES ''${HEADERS} DESTINATION include/ngf-qt6)
 +    configure_file(ngf-qt6.pc.in ngf-qt6.pc @ONLY)
 +    install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/ngf-qt6.pc DESTINATION lib/pkgconfig)
++
++    add_library(ngf-declarative MODULE
++      declarative/src/plugin.cpp
++      declarative/src/declarativengfevent.cpp
++      declarative/src/declarativengfeventproperty.cpp
++    )
++    target_include_directories(ngf-declarative PRIVATE src/include declarative/src)
++    target_link_libraries(ngf-declarative PRIVATE Qt6::Core Qt6::Qml ngf-qt6)
++    install(TARGETS ngf-declarative LIBRARY DESTINATION lib/qt-6/qml/Nemo/Ngf)
++    install(FILES declarative/qmldir declarative/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/Ngf)
 +    EOF
-+        cat << "EOF" > ngf-qt6.pc.in
++    cat << "EOF" > ngf-qt6.pc.in
 +    prefix=@CMAKE_INSTALL_PREFIX@
 +    exec_prefix=''${prefix}
 +    libdir=''${prefix}/lib
@@ -847,7 +865,7 @@ index 00000000..3cbf568b
 +  '';
 +
 +  meta = with lib; {
-+    description = "Qt6 client library for Non-Graphic Feedback daemon";
++    description = "Qt6 client library and Nemo.Ngf QML plugin for Non-Graphic Feedback daemon";
 +    homepage = "https://github.com/sailfishos/libngf-qt";
 +    license = licenses.lgpl21Only;
 +    platforms = platforms.linux;

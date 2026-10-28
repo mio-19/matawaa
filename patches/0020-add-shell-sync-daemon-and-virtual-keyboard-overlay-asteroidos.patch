@@ -20,18 +20,22 @@ current nightly.
  .../asteroidos/asteroid-launcher/default.nix  |  91 ++++++++
  .../org.nemomobile.compositor.conf            |  28 +++
  .../splash-no-opacitymask.patch               |  54 +++++
- overlay/asteroidos/default.nix                |  32 +++
+ overlay/asteroidos/default.nix                |  35 +++
  .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
+ .../nemo-qml-plugin-dbus/default.nix          |  80 +++++++
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 200 ++++++++++++++++++
+ overlay/asteroidos/stubs/default.nix          |  44 ++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 9 files changed, 607 insertions(+)
+ 11 files changed, 734 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
  create mode 100644 overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
+ create mode 100644 overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
  create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+ create mode 100644 overlay/asteroidos/stubs/default.nix
  create mode 100644 overlay/asteroidos/virtualkeyboard/default.nix
 
 diff --git a/overlay/asteroidos/asteroid-btsyncd/default.nix b/overlay/asteroidos/asteroid-btsyncd/default.nix
@@ -319,10 +323,10 @@ index 00000000..c8fc8896
 +-    }
 + }
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 90363944..6bddf6f8 100644
+index 90363944..d69658fc 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,8 +7,34 @@ rec {
+@@ -7,8 +7,35 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
@@ -354,10 +358,11 @@ index 90363944..6bddf6f8 100644
 +  nemo-qml-plugin-configuration = callPackage ./nemo-qml-plugin-configuration {
 +    inherit mlite;
 +  };
++  nemo-qml-plugin-dbus = callPackage ./nemo-qml-plugin-dbus { };
    mce-dev = callPackage ./mce-dev { };
    mce-qt6 = callPackage ./mce-qt6 {
      inherit mce-dev;
-@@ -18,5 +44,11 @@ rec {
+@@ -18,5 +45,13 @@ rec {
    keepalive = callPackage ./keepalive { };
    timed-qt6 = callPackage ./timed-qt6 { };
  
@@ -366,6 +371,8 @@ index 90363944..6bddf6f8 100644
 +  };
 +
 +  virtualkeyboard = callPackage ./virtualkeyboard { };
++
++  stubs = callPackage ./stubs { };
 +
    inherit (pkgs) msm-fb-refresher;
  }
@@ -441,6 +448,92 @@ index 00000000..214fc9e5
 +    description = "Nemo configuration QML plugin";
 +    homepage = "https://github.com/sailfishos/nemo-qml-plugin-configuration";
 +    license = licenses.bsd3;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
+new file mode 100644
+index 00000000..d4078b1a
+--- /dev/null
++++ b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
+@@ -0,0 +1,80 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "nemo-qml-plugin-dbus";
++  version = "2.1.39";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-qml-plugin-dbus";
++    rev = "df6e2415fe70e1844067f93b3216ca0442f17c8e";
++    sha256 = "0s7v5v4jixl07psb0y9wkq2zj168pr29v1g7fwyj5wjn9m76xrjc";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++  ];
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  postPatch = ''
++    cat > CMakeLists.txt <<'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(nemo-qml-plugin-dbus LANGUAGES CXX)
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_AUTOMOC ON)
++    find_package(Qt6 REQUIRED COMPONENTS Core DBus Qml)
++
++    add_library(nemodbus-core STATIC
++      src/nemo-dbus/connection.cpp
++      src/nemo-dbus/dbus.cpp
++      src/nemo-dbus/interface.cpp
++      src/nemo-dbus/logging.cpp
++      src/nemo-dbus/object.cpp
++      src/nemo-dbus/response.cpp
++      src/nemo-dbus/private/propertychanges.cpp
++    )
++    target_include_directories(nemodbus-core PUBLIC src src/nemo-dbus src/nemo-dbus/private)
++    target_link_libraries(nemodbus-core PUBLIC Qt6::Core Qt6::DBus)
++    set_target_properties(nemodbus-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
++
++    add_library(nemodbus MODULE
++      src/plugin/plugin.cpp
++      src/plugin/declarativedbus.cpp
++      src/plugin/declarativedbusadaptor.cpp
++      src/plugin/declarativedbusinterface.cpp
++    )
++    target_include_directories(nemodbus PRIVATE src src/plugin src/nemo-dbus src/nemo-dbus/private)
++    target_link_libraries(nemodbus PRIVATE Qt6::Core Qt6::DBus Qt6::Qml nemodbus-core)
++    install(TARGETS nemodbus LIBRARY DESTINATION lib/qt-6/qml/Nemo/DBus)
++    install(FILES src/plugin/qmldir src/plugin/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/DBus)
++    EOF
++  '';
++
++  meta = with lib; {
++    description = "Nemo D-Bus QML plugin";
++    homepage = "https://github.com/sailfishos/nemo-qml-plugin-dbus";
++    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
 +})
@@ -650,6 +743,56 @@ index 00000000..2810130f
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/stubs/default.nix b/overlay/asteroidos/stubs/default.nix
+new file mode 100644
+index 00000000..36407177
+--- /dev/null
++++ b/overlay/asteroidos/stubs/default.nix
+@@ -0,0 +1,44 @@
++{ runCommand }:
++
++runCommand "asteroid-qml-stubs" { } ''
++  mkdir -p $out/lib/qt-6/qml/Connman
++  cat > $out/lib/qt-6/qml/Connman/qmldir <<'EOF'
++module Connman
++NetworkTechnology 1.0 NetworkTechnology.qml
++EOF
++  cat > $out/lib/qt-6/qml/Connman/NetworkTechnology.qml <<'EOF'
++import QtQuick
++
++Item {
++    id: root
++    property string path: ""
++    property bool powered: false
++    property bool connected: false
++    property string name: ""
++    property string state: "idle"
++    property string type: "wifi"
++
++    signal scanFinished()
++    function requestScan() {
++        scanFinished()
++    }
++}
++EOF
++
++  mkdir -p $out/lib/qt-6/qml/org/nemomobile/calendar
++  cat > $out/lib/qt-6/qml/org/nemomobile/calendar/qmldir <<'EOF'
++module org.nemomobile.calendar
++AgendaModel 1.0 AgendaModel.qml
++EOF
++  cat > $out/lib/qt-6/qml/org/nemomobile/calendar/AgendaModel.qml <<'EOF'
++import QtQuick
++
++ListModel {
++    id: root
++    property var startDate
++    property var endDate
++    property int count: 0
++    property bool loading: false
++}
++EOF
++''
 diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
 new file mode 100644
 index 00000000..f5df8828

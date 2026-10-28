@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 ++
- examples/asteroid/asteroid-desktop.nix | 322 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 335 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++++
  examples/asteroid/default.nix          |  15 ++
- 4 files changed, 398 insertions(+)
+ 4 files changed, 411 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index 930807ef..a581225e 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..ac208e8d
+index 00000000..6517e167
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,335 @@
 +{
 +  config,
 +  lib,
@@ -104,6 +104,8 @@ index 00000000..ac208e8d
 +        asteroid.qml-asteroid
 +        asteroid.asteroid-launcher
 +        asteroid.asteroid-btsyncd
++        asteroid.nemo-qml-plugin-dbus
++        asteroid.stubs
 +        # QML module the launcher imports; the cross qt5compat lacks it.
 +        qt5compatQml
 +        # Asset suite
@@ -206,7 +208,18 @@ index 00000000..ac208e8d
 +      QT_VIRTUALKEYBOARD_STYLE = "watch";
 +      QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
 +      RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
-+      QML2_IMPORT_PATH = "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml:${pkgs.qt5compatQml}/lib/qt-6/qml:${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml:${pkgs.asteroid.mce-qt6}/lib/qt-6/qml:${pkgs.asteroid.mlite}/lib/qt-6/qml:${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml";
++      QML2_IMPORT_PATH = lib.concatStringsSep ":" [
++        "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml"
++        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml"
++        "${pkgs.qt5compatQml}/lib/qt-6/qml"
++        "${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml"
++        "${pkgs.asteroid.mce-qt6}/lib/qt-6/qml"
++        "${pkgs.asteroid.mlite}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-dbus}/lib/qt-6/qml"
++        "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
++        "${pkgs.asteroid.stubs}/lib/qt-6/qml"
++      ];
 +      QT_PLUGIN_PATH = "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins";
 +      # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
 +      QT_ENABLE_HIGHDPI_SCALING = "0";
