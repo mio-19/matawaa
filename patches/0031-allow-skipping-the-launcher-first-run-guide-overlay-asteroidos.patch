@@ -15,7 +15,7 @@ This is useful for preconfigured watch images and automated bring-up.
  create mode 100644 overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
 
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index bfc24190..1a58d148 100644
+index 83611779..ac3ed282 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -41,6 +41,8 @@ stdenv.mkDerivation (finalAttrs: {
@@ -24,9 +24,9 @@ index bfc24190..1a58d148 100644
      ./find-phone.patch
 +    # Visible skip button for first-time tutorial and initial setup guide
 +    ./skip-firstrun.patch
+     # Remove OpacityMask dependency from the 400ms initial splash animation
+     ./splash-no-opacitymask.patch
    ];
- 
-   nativeBuildInputs = [
 diff --git a/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
 new file mode 100644
 index 00000000..a3dc5d7b

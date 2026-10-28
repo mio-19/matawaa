@@ -23,7 +23,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/default.nix               | 461 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
- devices/fossil-hoki/hybris.nix                |  64 +++
+ devices/fossil-hoki/hybris.nix                |  82 ++++
  devices/fossil-hoki/kernel/default.nix        | 232 +++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 ++
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 +++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   8 +
- 21 files changed, 1868 insertions(+), 51 deletions(-)
+ 21 files changed, 1886 insertions(+), 51 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -804,10 +804,10 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..49e3092a
+index 00000000..6e772cbb
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,82 @@
 +{
 +  lib,
 +  pkgs,
@@ -868,6 +868,24 @@ index 00000000..49e3092a
 +        cp -r ${super.buildPackages.qt6.qt5compat}/lib/qt-6/qml/Qt5Compat $out/lib/qt-6/qml/
 +        chmod -R u+w $out
 +        find $out -name '*.so*' -delete
++
++        # Strip plugin and classname declarations so Qt QML engine loads this as a pure QML module
++        # without failing on missing shared library plugins
++        sed -i '/plugin /d; /classname /d; /typeinfo /d' $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/qmldir
++        sed -i '/plugin /d; /classname /d; /typeinfo /d' $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
++
++        # Provide pure-QML fallback for private SourceProxy
++        cat > $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/SourceProxy.qml <<'EOF'
++import QtQuick
++
++Item {
++    id: root
++    property var input
++    property var output: input
++}
++EOF
++        echo "SourceProxy 6.0 SourceProxy.qml" >> $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
++        echo "SourceProxy 1.0 SourceProxy.qml" >> $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
 +      '';
 +    })
 +  ];

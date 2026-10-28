@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 ++
- examples/asteroid/asteroid-desktop.nix | 319 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 322 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++++
  examples/asteroid/default.nix          |  15 ++
- 4 files changed, 395 insertions(+)
+ 4 files changed, 398 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index 930807ef..a581225e 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..9d08c5aa
+index 00000000..ac208e8d
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,319 @@
+@@ -0,0 +1,322 @@
 +{
 +  config,
 +  lib,
@@ -229,6 +229,9 @@ index 00000000..9d08c5aa
 +        QT_QPA_PLATFORM = "hwcomposer";
 +        QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
 +        QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
++        # Direct Qt diagnostic logs to stderr/launcher.log instead of hidden journal
++        QT_FORCE_STDERR_LOGGING = "1";
++        QT_ASSUME_STDERR_HAS_CONSOLE = "1";
 +      }
 +      // config.environment.variables;
 +      serviceConfig = {

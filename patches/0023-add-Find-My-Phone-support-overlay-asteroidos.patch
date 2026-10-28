@@ -13,9 +13,9 @@ Add Matawaa's "Find My Phone" feature on top of upstream AsteroidOS:
  .../asteroidos/asteroid-btsyncd/default.nix   |   9 +
  .../asteroid-btsyncd/find-phone.patch         | 206 ++++++++++++++++++
  .../asteroidos/asteroid-btsyncd/find-phone.sh |  37 ++++
- .../asteroidos/asteroid-launcher/default.nix  |   7 +
+ .../asteroidos/asteroid-launcher/default.nix  |   4 +
  .../asteroid-launcher/find-phone.patch        |  60 +++++
- 5 files changed, 319 insertions(+)
+ 5 files changed, 316 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/find-phone.patch
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/find-phone.sh
  create mode 100644 overlay/asteroidos/asteroid-launcher/find-phone.patch
@@ -303,23 +303,21 @@ index 00000000..d34883f4
 +        ;;
 +esac
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 20f9f747..bfc24190 100644
+index a439da61..83611779 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -36,6 +36,13 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -36,7 +36,11 @@ stdenv.mkDerivation (finalAttrs: {
  
    strictDeps = true;
  
 +  # AsteroidOS wayland compositor & shell
 +  # Upstream repository: https://github.com/AsteroidOS/asteroid-launcher
-+  patches = [
+   patches = [
 +    # QuickPanel quick-toggle button to trigger the find-phone alarm on the companion phone
 +    ./find-phone.patch
-+  ];
-+
-   nativeBuildInputs = [
-     cmake
-     kdePackages.extra-cmake-modules
+     # Remove OpacityMask dependency from the 400ms initial splash animation
+     ./splash-no-opacitymask.patch
+   ];
 diff --git a/overlay/asteroidos/asteroid-launcher/find-phone.patch b/overlay/asteroidos/asteroid-launcher/find-phone.patch
 new file mode 100644
 index 00000000..cb025507

@@ -17,15 +17,19 @@ current nightly.
 ---
  .../asteroidos/asteroid-btsyncd/default.nix   |  68 ++++++
  .../org.asteroidos.btsyncd.conf               |  13 ++
- .../asteroidos/asteroid-launcher/default.nix  |  82 +++++++
+ .../asteroidos/asteroid-launcher/default.nix  |  91 ++++++++
+ .../org.nemomobile.compositor.conf            |  28 +++
+ .../splash-no-opacitymask.patch               |  54 +++++
  overlay/asteroidos/default.nix                |  32 +++
  .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 200 ++++++++++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 7 files changed, 516 insertions(+)
+ 9 files changed, 607 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
+ create mode 100644 overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
+ create mode 100644 overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
  create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
  create mode 100644 overlay/asteroidos/virtualkeyboard/default.nix
@@ -125,10 +129,10 @@ index 00000000..a856e19c
 +</busconfig>
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
 new file mode 100644
-index 00000000..20f9f747
+index 00000000..a439da61
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,91 @@
 +{
 +  lib,
 +  stdenv,
@@ -167,6 +171,11 @@ index 00000000..20f9f747
 +
 +  strictDeps = true;
 +
++  patches = [
++    # Remove OpacityMask dependency from the 400ms initial splash animation
++    ./splash-no-opacitymask.patch
++  ];
++
 +  nativeBuildInputs = [
 +    cmake
 +    kdePackages.extra-cmake-modules
@@ -203,6 +212,10 @@ index 00000000..20f9f747
 +    systemd
 +  ];
 +
++  postInstall = ''
++    install -Dm644 ${./org.nemomobile.compositor.conf} $out/share/dbus-1/system.d/org.nemomobile.compositor.conf
++  '';
++
 +  meta = with lib; {
 +    description = "AsteroidOS Wayland compositor and smartwatch home shell";
 +    homepage = "https://asteroidos.org/";
@@ -211,6 +224,100 @@ index 00000000..20f9f747
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf b/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
+new file mode 100644
+index 00000000..b8271665
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
+@@ -0,0 +1,28 @@
++<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
++ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
++<busconfig>
++  <!-- Allow root and the unprivileged session user (ceres) to own the compositor
++       and lipstick service names on the D-Bus system bus. -->
++  <policy user="root">
++    <allow own="org.nemomobile.lipstick"/>
++    <allow own="org.nemomobile.compositor"/>
++    <allow send_destination="org.nemomobile.lipstick"/>
++    <allow send_destination="org.nemomobile.compositor"/>
++    <allow receive_sender="org.nemomobile.lipstick"/>
++    <allow receive_sender="org.nemomobile.compositor"/>
++  </policy>
++  <policy user="ceres">
++    <allow own="org.nemomobile.lipstick"/>
++    <allow own="org.nemomobile.compositor"/>
++    <allow send_destination="org.nemomobile.lipstick"/>
++    <allow send_destination="org.nemomobile.compositor"/>
++    <allow receive_sender="org.nemomobile.lipstick"/>
++    <allow receive_sender="org.nemomobile.compositor"/>
++  </policy>
++  <policy context="default">
++    <allow send_destination="org.nemomobile.lipstick"/>
++    <allow send_destination="org.nemomobile.compositor"/>
++    <allow receive_sender="org.nemomobile.lipstick"/>
++    <allow receive_sender="org.nemomobile.compositor"/>
++  </policy>
++</busconfig>
+diff --git a/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch b/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
+new file mode 100644
+index 00000000..c8fc8896
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
+@@ -0,0 +1,54 @@
++--- a/src/qml/misc/Splash.qml
+++++ b/src/qml/misc/Splash.qml
++@@ -30,7 +30,6 @@
++ 
++ import QtQuick
++ import org.asteroid.controls
++-import Qt5Compat.GraphicalEffects
++ 
++ Item {
++     anchors.fill: parent
++@@ -42,7 +41,6 @@
++         onTriggered: {
++             background.opacity = 0
++             logoTransform.scale = 14
++-            cutout.width = Dims.w(150)
++         }
++     }
++     Rectangle {
++@@ -60,8 +58,8 @@
++     Rectangle {
++         id: logo
++         anchors.fill: parent
++-        color: "black"
++-        visible: false
+++        color: "transparent"
+++        visible: true
++         Image {
++             property var logoSize: (parent.width > parent.height ? parent.height : parent.width) * 0.55
++             id: logoSvg
++@@ -80,24 +78,4 @@
++             }
++         }
++     }
++-    Item {
++-        id: mask
++-        anchors.fill: parent
++-        visible: false
++-        Rectangle {
++-            id: cutout
++-            width: 1
++-            height: width
++-            anchors.centerIn: parent
++-            anchors.verticalCenterOffset: -Dims.h(5)
++-            radius: parent.width / 2
++-            Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.InQuint } }
++-        }
++-    }
++-    OpacityMask {
++-        anchors.fill: logo
++-        source: logo
++-        maskSource: mask
++-        invert: true
++-    }
++ }
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index 90363944..6bddf6f8 100644
 --- a/overlay/asteroidos/default.nix
