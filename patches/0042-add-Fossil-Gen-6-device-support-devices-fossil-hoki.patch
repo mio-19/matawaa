@@ -23,7 +23,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/default.nix               | 481 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
- devices/fossil-hoki/hybris.nix                | 148 ++++++
+ devices/fossil-hoki/hybris.nix                | 156 ++++++
  devices/fossil-hoki/kernel/default.nix        | 232 +++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 +
@@ -37,8 +37,8 @@ they cannot hold multi-user.target.
  devices/fossil-ray/default.nix                |  56 ++
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
- .../qt6-qpa-hwcomposer-plugin/default.nix     |  18 +
- 21 files changed, 1982 insertions(+), 51 deletions(-)
+ .../qt6-qpa-hwcomposer-plugin/default.nix     |  61 +++
+ 21 files changed, 2033 insertions(+), 51 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -824,10 +824,10 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..a1de86f3
+index 00000000..8985d77e
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,156 @@
 +{
 +  lib,
 +  pkgs,
@@ -893,6 +893,14 @@ index 00000000..a1de86f3
 +        # from the filesystem without failing on missing shared library plugins or qrc resources
 +        sed -i '/plugin /d; /classname /d; /typeinfo /d; /prefer /d' $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/qmldir
 +        sed -i '/plugin /d; /classname /d; /typeinfo /d; /prefer /d' $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
++
++        # Extract the official precompiled Qt 6 shader files (.qsb) into GraphicalEffects/shaders_ng
++        tar -xf ${super.qt6.qt5compat.src} --strip-components=4 -C $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects "qt5compat-everywhere-src-6.12.0/src/imports/graphicaleffects5/shaders_ng"
++
++        # Update QML files to also resolve relative shader paths if loaded directly from the filesystem
++        sed -i 's|qrc:/qt-project.org/imports/Qt5Compat/GraphicalEffects/shaders_ng/|shaders_ng/|g' \
++          $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/*.qml \
++          $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/*.qml
 +
 +        # Provide pure-QML fallback for private SourceProxy
 +        cat > $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/SourceProxy.qml <<'EOF'
@@ -2226,10 +2234,10 @@ index 6c49de0b..246aca44 100644
                "space_cache=v2"
              ]
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-index 2810130f..b4f5b109 100644
+index 2810130f..2920cc4f 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-@@ -107,6 +107,14 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -107,6 +107,56 @@ stdenv.mkDerivation (finalAttrs: {
        --replace-fail 'Q_PLUGIN_METADATA(IID QPlatformIntegrationFactoryInterface_iid FILE "hwcomposer.json")' \
                       'Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QPA.QPlatformIntegrationFactoryInterface.5.3" FILE "hwcomposer.json")'
  
@@ -2241,10 +2249,60 @@ index 2810130f..b4f5b109 100644
 +      --replace-fail 'pwr_device->setInteractive(pwr_device, false);' 'if (pwr_device->setInteractive) pwr_device->setInteractive(pwr_device, false);' \
 +      --replace-fail 'pwr_device->setInteractive(pwr_device, true);' 'if (pwr_device->setInteractive) pwr_device->setInteractive(pwr_device, true);'
 +
++    # Embed precompiled Qt 6 GraphicalEffects shaders (.qsb) into the QPA plugin
++    # so they are registered in memory (qrc:/qt-project.org/imports/Qt5Compat/GraphicalEffects/shaders_ng/*)
++    # when asteroid-launcher loads the hwcomposer QPA platform plugin.
++    tar -xf ${qt6.qt5compat.src} --strip-components=4 "qt5compat-everywhere-src-6.12.0/src/imports/graphicaleffects5/shaders_ng"
++    cat > shaders.qrc << 'QRC'
++<RCC>
++    <qresource prefix="/qt-project.org/imports/Qt5Compat/GraphicalEffects">
++        <file>shaders_ng/brightnesscontrast.frag.qsb</file>
++        <file>shaders_ng/colorize.frag.qsb</file>
++        <file>shaders_ng/coloroverlay.frag.qsb</file>
++        <file>shaders_ng/conicalgradient_mask.frag.qsb</file>
++        <file>shaders_ng/conicalgradient_nomask.frag.qsb</file>
++        <file>shaders_ng/desaturate.frag.qsb</file>
++        <file>shaders_ng/displace.frag.qsb</file>
++        <file>shaders_ng/fastblur.frag.qsb</file>
++        <file>shaders_ng/fastblur_internal.frag.qsb</file>
++        <file>shaders_ng/fastblur_internal.vert.qsb</file>
++        <file>shaders_ng/fastinnershadow.frag.qsb</file>
++        <file>shaders_ng/fastinnershadow_level0.frag.qsb</file>
++        <file>shaders_ng/fastglow.frag.qsb</file>
++        <file>shaders_ng/gammaadjust.frag.qsb</file>
++        <file>shaders_ng/gaussianinnershadow.frag.qsb</file>
++        <file>shaders_ng/gaussianinnershadow_shadow.frag.qsb</file>
++        <file>shaders_ng/huesaturation.frag.qsb</file>
++        <file>shaders_ng/leveladjust.frag.qsb</file>
++        <file>shaders_ng/lineargradient.vert.qsb</file>
++        <file>shaders_ng/lineargradient_mask.frag.qsb</file>
++        <file>shaders_ng/lineargradient_nomask.frag.qsb</file>
++        <file>shaders_ng/opacitymask.frag.qsb</file>
++        <file>shaders_ng/opacitymask_invert.frag.qsb</file>
++        <file>shaders_ng/radialgradient.vert.qsb</file>
++        <file>shaders_ng/radialgradient_mask.frag.qsb</file>
++        <file>shaders_ng/radialgradient_nomask.frag.qsb</file>
++        <file>shaders_ng/recursiveblur.vert.qsb</file>
++        <file>shaders_ng/recursiveblur.frag.qsb</file>
++        <file>shaders_ng/rectangularglow.frag.qsb</file>
++        <file>shaders_ng/thresholdmask.frag.qsb</file>
++    </qresource>
++</RCC>
++QRC
++    ${buildPackages.qt6.qtbase}/libexec/rcc shaders.qrc -o qrc_shaders.cpp
++
      cat > CMakeLists.txt <<EOF
      cmake_minimum_required(VERSION 3.16)
      project(hwcomposer LANGUAGES CXX)
-@@ -181,6 +189,10 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -133,6 +183,7 @@ stdenv.mkDerivation (finalAttrs: {
+       qeglfsintegration.cpp
+       qeglfsscreen.cpp
+       qeglfswindow.cpp
++      qrc_shaders.cpp
+     )
+ 
+     target_include_directories(hwcomposer PRIVATE
+@@ -181,6 +232,10 @@ stdenv.mkDerivation (finalAttrs: {
        ''${GLIB_LIBRARIES}
        ''${LIBUDEV_LIBRARIES}
        ''${MTDEV_LIBRARIES}
@@ -2255,7 +2313,7 @@ index 2810130f..b4f5b109 100644
        ${libhybris}/lib/libhardware.so.2.0.0
        ${libhybris}/lib/libhwc2.so.1.0.0
        ${libhybris}/lib/libhybris-eglplatformcommon.so.1.0.0
-@@ -191,6 +203,12 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -191,6 +246,12 @@ stdenv.mkDerivation (finalAttrs: {
      EOF
    '';
  

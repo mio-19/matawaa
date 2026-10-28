@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 ++
- examples/asteroid/asteroid-desktop.nix | 370 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 371 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 +++
  examples/asteroid/default.nix          |  15 +
- 4 files changed, 446 insertions(+)
+ 4 files changed, 447 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index 930807ef..a581225e 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..37deb912
+index 00000000..d1ee63c3
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,370 @@
+@@ -0,0 +1,371 @@
 +{
 +  config,
 +  lib,
@@ -277,7 +277,8 @@ index 00000000..37deb912
 +      }
 +      // config.environment.variables;
 +      serviceConfig = {
-+        Type = "notify";
++        Type = "simple";
++        NotifyAccess = "all";
 +        WorkingDirectory = "/";
 +        # systemd does not glob EnvironmentFile=; explicitly list all compositor drop-ins
 +        # matching upstream AsteroidOS load order.
