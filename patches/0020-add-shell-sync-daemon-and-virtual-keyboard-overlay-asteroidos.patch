@@ -453,7 +453,7 @@ index 00000000..214fc9e5
 +})
 diff --git a/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
 new file mode 100644
-index 00000000..d4078b1a
+index 00000000..9cad05fc
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
 @@ -0,0 +1,80 @@
@@ -504,27 +504,27 @@ index 00000000..d4078b1a
 +    set(CMAKE_AUTOMOC ON)
 +    find_package(Qt6 REQUIRED COMPONENTS Core DBus Qml)
 +
++    file(GLOB CORE_HEADERS src/nemo-dbus/*.h src/nemo-dbus/private/*.h)
++    file(GLOB CORE_SOURCES src/nemo-dbus/*.cpp src/nemo-dbus/private/*.cpp)
++
 +    add_library(nemodbus-core STATIC
-+      src/nemo-dbus/connection.cpp
-+      src/nemo-dbus/dbus.cpp
-+      src/nemo-dbus/interface.cpp
-+      src/nemo-dbus/logging.cpp
-+      src/nemo-dbus/object.cpp
-+      src/nemo-dbus/response.cpp
-+      src/nemo-dbus/private/propertychanges.cpp
++      ''${CORE_SOURCES}
++      ''${CORE_HEADERS}
 +    )
 +    target_include_directories(nemodbus-core PUBLIC src src/nemo-dbus src/nemo-dbus/private)
 +    target_link_libraries(nemodbus-core PUBLIC Qt6::Core Qt6::DBus)
 +    set_target_properties(nemodbus-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 +
++    file(GLOB PLUGIN_HEADERS src/plugin/*.h)
++    file(GLOB PLUGIN_SOURCES src/plugin/*.cpp)
++
 +    add_library(nemodbus MODULE
-+      src/plugin/plugin.cpp
-+      src/plugin/declarativedbus.cpp
-+      src/plugin/declarativedbusadaptor.cpp
-+      src/plugin/declarativedbusinterface.cpp
++      ''${PLUGIN_SOURCES}
++      ''${PLUGIN_HEADERS}
 +    )
 +    target_include_directories(nemodbus PRIVATE src src/plugin src/nemo-dbus src/nemo-dbus/private)
 +    target_link_libraries(nemodbus PRIVATE Qt6::Core Qt6::DBus Qt6::Qml nemodbus-core)
++    target_link_options(nemodbus PRIVATE -Wl,--no-undefined)
 +    install(TARGETS nemodbus LIBRARY DESTINATION lib/qt-6/qml/Nemo/DBus)
 +    install(FILES src/plugin/qmldir src/plugin/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/DBus)
 +    EOF

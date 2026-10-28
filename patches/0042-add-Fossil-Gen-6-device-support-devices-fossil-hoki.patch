@@ -23,7 +23,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/default.nix               | 461 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
- devices/fossil-hoki/hybris.nix                |  82 ++++
+ devices/fossil-hoki/hybris.nix                | 148 ++++++
  devices/fossil-hoki/kernel/default.nix        | 232 +++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 ++
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 +++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   8 +
- 21 files changed, 1886 insertions(+), 51 deletions(-)
+ 21 files changed, 1952 insertions(+), 51 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -804,10 +804,10 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..7c3475e8
+index 00000000..a1de86f3
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,148 @@
 +{
 +  lib,
 +  pkgs,
@@ -880,12 +880,78 @@ index 00000000..7c3475e8
 +
 +Item {
 +    id: root
-+    property var input
-+    property var output: input
++
++    enum Interpolation {
++        AnyInterpolation,
++        NearestInterpolation,
++        LinearInterpolation
++    }
++
++    property Item input: null
++    property rect sourceRect: Qt.rect(0, 0, 0, 0)
++    property bool active: false
++    property int interpolation: SourceProxy.LinearInterpolation
++
++    readonly property Item output: (sourceRect.width > 0 && sourceRect.height > 0) || sourceRect.x < 0 || sourceRect.y < 0
++        ? proxy
++        : (input ? input : proxy)
++
++    ShaderEffectSource {
++        id: proxy
++        sourceItem: root.input
++        sourceRect: root.sourceRect
++        smooth: root.interpolation !== SourceProxy.NearestInterpolation
++        visible: false
++    }
 +}
 +EOF
 +        echo "SourceProxy 6.0 SourceProxy.qml" >> $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
 +        echo "SourceProxy 1.0 SourceProxy.qml" >> $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
++
++        # Provide pure-QML fallback for DropShadow to avoid runtime ShaderBuilder dependency
++        cat > $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/DropShadow.qml <<'EOF'
++import QtQuick
++
++Item {
++    id: root
++
++    property var source
++    property real radius: Math.floor(samples / 2)
++    property int samples: 9
++    property color color: "black"
++    property real horizontalOffset: 0.0
++    property real verticalOffset: 0.0
++    property real spread: 0.0
++    property bool fast: false
++    property bool cached: false
++    property bool transparentBorder: true
++
++    ShaderEffectSource {
++        id: shadowSource
++        sourceItem: root.source
++        visible: false
++        hideSource: false
++        smooth: true
++    }
++
++    ShaderEffect {
++        id: shadowEffect
++        anchors.fill: parent
++        anchors.horizontalCenterOffset: root.horizontalOffset
++        anchors.verticalCenterOffset: root.verticalOffset
++        property var source: shadowSource
++        opacity: 0.5
++        visible: root.source !== undefined && root.source !== null
++    }
++
++    ShaderEffect {
++        id: contentEffect
++        anchors.fill: parent
++        property var source: shadowSource
++        visible: root.source !== undefined && root.source !== null
++    }
++}
++EOF
 +      '';
 +    })
 +  ];
