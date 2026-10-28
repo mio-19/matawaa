@@ -37,8 +37,8 @@ they cannot hold multi-user.target.
  devices/fossil-ray/default.nix                |  56 ++
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
- .../qt6-qpa-hwcomposer-plugin/default.nix     |  61 +++
- 21 files changed, 2033 insertions(+), 51 deletions(-)
+ .../qt6-qpa-hwcomposer-plugin/default.nix     |  63 ++-
+ 21 files changed, 2034 insertions(+), 52 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -2234,7 +2234,7 @@ index 6c49de0b..246aca44 100644
                "space_cache=v2"
              ]
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-index 2810130f..2920cc4f 100644
+index 2810130f..78bf9a76 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 @@ -107,6 +107,56 @@ stdenv.mkDerivation (finalAttrs: {
@@ -2313,16 +2313,18 @@ index 2810130f..2920cc4f 100644
        ${libhybris}/lib/libhardware.so.2.0.0
        ${libhybris}/lib/libhwc2.so.1.0.0
        ${libhybris}/lib/libhybris-eglplatformcommon.so.1.0.0
-@@ -191,6 +246,12 @@ stdenv.mkDerivation (finalAttrs: {
-     EOF
-   '';
+@@ -188,7 +243,13 @@ stdenv.mkDerivation (finalAttrs: {
+     )
  
+     install(TARGETS hwcomposer LIBRARY DESTINATION lib/qt-6/plugins/platforms)
+-    EOF
++EOF
++  '';
++
 +  postFixup = ''
 +    ${buildPackages.patchelf}/bin/patchelf \
 +      --set-rpath "${libhybris}/lib:$(${buildPackages.patchelf}/bin/patchelf --print-rpath $out/lib/qt-6/plugins/platforms/libhwcomposer.so)" \
 +      $out/lib/qt-6/plugins/platforms/libhwcomposer.so
-+  '';
-+
+   '';
+ 
    meta = with lib; {
-     description = "Qt6 QPA plugin for libhybris hwcomposer";
-     homepage = "https://github.com/mer-hybris/qt5-qpa-hwcomposer-plugin";
