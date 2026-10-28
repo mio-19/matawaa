@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 ++
- examples/asteroid/asteroid-desktop.nix | 335 +++++++++++++++++++++++++
- examples/asteroid/configuration.nix    |  43 ++++
+ examples/asteroid/asteroid-desktop.nix | 360 +++++++++++++++++++++++++
+ examples/asteroid/configuration.nix    |  43 +++
  examples/asteroid/default.nix          |  15 ++
- 4 files changed, 411 insertions(+)
+ 4 files changed, 436 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index 930807ef..a581225e 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..6517e167
+index 00000000..3d7c3ed7
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,335 @@
+@@ -0,0 +1,360 @@
 +{
 +  config,
 +  lib,
@@ -161,7 +161,32 @@ index 00000000..6517e167
 +
 +    systemd.tmpfiles.rules = [
 +      "d /var/lib/kiwix 0775 ceres users -"
++      "L+ /usr/share - - - - /run/current-system/sw/share"
 +    ];
++
++    # Link AsteroidOS shared resources into /run/current-system/sw/share
++    environment.pathsToLink = [
++      "/share/asteroid-launcher"
++      "/share/icons"
++      "/share/sounds"
++      "/share/fonts"
++      "/share/lipstick"
++      "/share/translations"
++      "/share/rime-data"
++      "/share/supported-languages"
++      "/share/asteroid-docking-bay"
++    ];
++
++    # Expose smartwatch typography suite to fontconfig
++    fonts.packages = [
++      pkgs.asteroid.assets.fonts
++    ];
++
++    # Create /usr/share early in activation for AsteroidOS apps and shell
++    system.activationScripts.usrshare = ''
++      mkdir -p /usr
++      ln -sfn /run/current-system/sw/share /usr/share
++    '';
 +
 +    # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
 +    # Reference: https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/src/main.conf
