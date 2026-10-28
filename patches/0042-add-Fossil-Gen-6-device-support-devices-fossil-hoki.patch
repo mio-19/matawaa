@@ -17,16 +17,16 @@ Install the compositor environment as
 and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
- devices/fossil-firefish/default.nix           |  56 +++
+ devices/fossil-firefish/default.nix           |  56 ++
  devices/fossil-hoki/android-init.nix          | 148 ++++++
  devices/fossil-hoki/android-system-data.nix   |  18 +
- devices/fossil-hoki/default.nix               | 461 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 481 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
  devices/fossil-hoki/hybris.nix                | 148 ++++++
  devices/fossil-hoki/kernel/default.nix        | 232 +++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++
- .../kernel/linux-4.14.209-210.patch.patch     |  28 ++
+ .../kernel/linux-4.14.209-210.patch.patch     |  28 +
  .../kernel/linux-4.14.211-212.patch.patch     | 152 ++++++
  .../kernel/linux-4.14.212-213.patch.patch     |  99 ++++
  devices/fossil-hoki/wlan-firmware-hoki.sh     |  30 ++
@@ -34,11 +34,11 @@ they cannot hold multi-user.target.
  ...co_profile-fix-use-of-adapter-before.patch |  30 ++
  ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 +
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
- devices/fossil-ray/default.nix                |  56 +++
- devices/fossil-triggerfish/default.nix        |  56 +++
+ devices/fossil-ray/default.nix                |  56 ++
+ devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
- .../qt6-qpa-hwcomposer-plugin/default.nix     |   8 +
- 21 files changed, 1952 insertions(+), 51 deletions(-)
+ .../qt6-qpa-hwcomposer-plugin/default.nix     |  18 +
+ 21 files changed, 1982 insertions(+), 51 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -301,10 +301,10 @@ index 00000000..4373edde
 +''
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..6ff1dc3a
+index 00000000..4b3ed961
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,461 @@
+@@ -0,0 +1,481 @@
 +{
 +  config,
 +  lib,
@@ -604,15 +604,35 @@ index 00000000..6ff1dc3a
 +    fi
 +
 +    mkdir -p ./var/lib/environment/compositor
++    cp ${pkgs.writeText "00-default.conf" ''
++      QT_IM_MODULE=qtvirtualkeyboard
++    ''} ./var/lib/environment/compositor/00-default.conf
++
++    cp ${pkgs.writeText "10-platform.conf" ''
++      EGL_PLATFORM=hwcomposer
++      HYBRIS_EGLPLATFORM=hwcomposer
++      QT_QPA_PLATFORM=hwcomposer
++      QT_ENABLE_GLYPH_CACHE_WORKAROUND=true
++      QT_GSTREAMER_CAMERABIN_SRC=droidcamsrc
++      QT_QPA_NO_FRAMEBUFFER_FIRST=1
++    ''} ./var/lib/environment/compositor/10-platform.conf
++
 +    cp ${pkgs.writeText "20-device.conf" ''
 +      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"
 +      QPA_HWC_FORCE_GLES=1
 +      QPA_HWC2_FORCE_DOZE_UPDATE=1
 +      QT_OPENGL_NO_BGRA=1
++      HYBRIS_EGLPLATFORM=hwcomposer
++      EGL_PLATFORM=hwcomposer
++      QT_QPA_NO_FRAMEBUFFER_FIRST=1
 +      ${lib.optionalString debugBuild ''
 +        QT_DEBUG_PLUGINS=1
 +      ''}
 +    ''} ./var/lib/environment/compositor/20-device.conf
++
++    cp ${pkgs.writeText "qt6-hidpi.conf" ''
++      QT_ENABLE_HIGHDPI_SCALING=0
++    ''} ./var/lib/environment/compositor/qt6-hidpi.conf
 +  '';
 +
 +  # Symlink modem and bluetooth partition firmware into /lib/firmware
@@ -2206,7 +2226,7 @@ index 6c49de0b..246aca44 100644
                "space_cache=v2"
              ]
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-index 2810130f..350272ab 100644
+index 2810130f..b4f5b109 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 @@ -107,6 +107,14 @@ stdenv.mkDerivation (finalAttrs: {
@@ -2224,3 +2244,27 @@ index 2810130f..350272ab 100644
      cat > CMakeLists.txt <<EOF
      cmake_minimum_required(VERSION 3.16)
      project(hwcomposer LANGUAGES CXX)
+@@ -181,6 +189,10 @@ stdenv.mkDerivation (finalAttrs: {
+       ''${GLIB_LIBRARIES}
+       ''${LIBUDEV_LIBRARIES}
+       ''${MTDEV_LIBRARIES}
++      ${libhybris}/lib/libEGL.so.1
++      ${libhybris}/lib/libGLESv2.so.2
++      ${libhybris}/lib/libhybris-common.so.1
++      ${libhybris}/lib/libsync.so.2
+       ${libhybris}/lib/libhardware.so.2.0.0
+       ${libhybris}/lib/libhwc2.so.1.0.0
+       ${libhybris}/lib/libhybris-eglplatformcommon.so.1.0.0
+@@ -191,6 +203,12 @@ stdenv.mkDerivation (finalAttrs: {
+     EOF
+   '';
+ 
++  postFixup = ''
++    ${buildPackages.patchelf}/bin/patchelf \
++      --set-rpath "${libhybris}/lib:$(${buildPackages.patchelf}/bin/patchelf --print-rpath $out/lib/qt-6/plugins/platforms/libhwcomposer.so)" \
++      $out/lib/qt-6/plugins/platforms/libhwcomposer.so
++  '';
++
+   meta = with lib; {
+     description = "Qt6 QPA plugin for libhybris hwcomposer";
+     homepage = "https://github.com/mer-hybris/qt5-qpa-hwcomposer-plugin";

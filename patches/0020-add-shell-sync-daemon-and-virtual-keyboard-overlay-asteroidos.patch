@@ -17,7 +17,7 @@ current nightly.
 ---
  .../asteroidos/asteroid-btsyncd/default.nix   |  68 ++++++
  .../org.asteroidos.btsyncd.conf               |  13 ++
- .../asteroidos/asteroid-launcher/default.nix  |  91 ++++++++
+ .../asteroidos/asteroid-launcher/default.nix  | 100 +++++++++
  .../org.nemomobile.compositor.conf            |  28 +++
  .../splash-no-opacitymask.patch               |  54 +++++
  overlay/asteroidos/default.nix                |  35 +++
@@ -26,7 +26,7 @@ current nightly.
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 200 ++++++++++++++++++
  overlay/asteroidos/stubs/default.nix          |  44 ++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 11 files changed, 734 insertions(+)
+ 11 files changed, 743 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
@@ -133,10 +133,10 @@ index 00000000..a856e19c
 +</busconfig>
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
 new file mode 100644
-index 00000000..a439da61
+index 00000000..d71afe77
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,100 @@
 +{
 +  lib,
 +  stdenv,
@@ -157,6 +157,7 @@ index 00000000..a439da61
 +  systemd,
 +  kdePackages,
 +  buildPackages,
++  libhybris,
 +}:
 +
 +let
@@ -214,6 +215,14 @@ index 00000000..a439da61
 +    dbus
 +    dbus-glib
 +    systemd
++    libhybris
++  ];
++
++  qtWrapperArgs = [
++    "--prefix"
++    "LD_LIBRARY_PATH"
++    ":"
++    "${libhybris}/lib"
 +  ];
 +
 +  postInstall = ''

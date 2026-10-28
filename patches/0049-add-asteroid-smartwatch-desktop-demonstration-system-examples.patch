@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 ++
- examples/asteroid/asteroid-desktop.nix | 360 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 370 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 +++
- examples/asteroid/default.nix          |  15 ++
- 4 files changed, 436 insertions(+)
+ examples/asteroid/default.nix          |  15 +
+ 4 files changed, 446 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index 930807ef..a581225e 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..3d7c3ed7
+index 00000000..37deb912
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,360 @@
+@@ -0,0 +1,370 @@
 +{
 +  config,
 +  lib,
@@ -264,7 +264,11 @@ index 00000000..3d7c3ed7
 +        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
 +        # The launcher is the compositor: use the hwcomposer QPA, not xcb.
 +        EGL_PLATFORM = "hwcomposer";
++        HYBRIS_EGLPLATFORM = "hwcomposer";
 +        QT_QPA_PLATFORM = "hwcomposer";
++        QT_QPA_NO_FRAMEBUFFER_FIRST = "1";
++        LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++        LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
 +        QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
 +        QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
 +        # Direct Qt diagnostic logs to stderr/launcher.log instead of hidden journal
@@ -275,10 +279,14 @@ index 00000000..3d7c3ed7
 +      serviceConfig = {
 +        Type = "notify";
 +        WorkingDirectory = "/";
-+        # systemd does not glob EnvironmentFile=; the literal "*.conf" was
-+        # silently ignored, so none of the compositor environment (LIPSTICK_OPTIONS,
-+        # QPA_HWC_*, QT_DEBUG_PLUGINS) reached the launcher.
-+        EnvironmentFile = "-/var/lib/environment/compositor/20-device.conf";
++        # systemd does not glob EnvironmentFile=; explicitly list all compositor drop-ins
++        # matching upstream AsteroidOS load order.
++        EnvironmentFile = [
++          "-/var/lib/environment/compositor/00-default.conf"
++          "-/var/lib/environment/compositor/10-platform.conf"
++          "-/var/lib/environment/compositor/20-device.conf"
++          "-/var/lib/environment/compositor/qt6-hidpi.conf"
++        ];
 +        ExecStartPre = [
 +          "${pkgs.writeShellScript "asteroid-launcher-precondition" ''
 +            # android-init.service touches this marker once the property
@@ -304,9 +312,11 @@ index 00000000..3d7c3ed7
 +          # The hwcomposer QPA needs libhybris' HWC2 compatibility layer in the
 +          # Android image. Without it the plugin cannot be loaded, so fall back
 +          # to the framebuffer/software path instead of crash-looping.
-+          export QT_QPA_PLATFORM=linuxfb:fb=/dev/fb0
-+          export QT_QUICK_BACKEND=software
++          export LD_PRELOAD=
 +          export EGL_PLATFORM=
++          export HYBRIS_EGLPLATFORM=
++          export QT_QPA_PLATFORM=linuxfb:fb=/dev/fb0:nographicsmodeswitch
++          export QT_QUICK_BACKEND=software
 +          # Prefer the DRM backend of linuxfb when the msm DRM node exists.
 +          if [ -e /dev/dri/card0 ]; then
 +            export QT_QPA_FB_DRM=1

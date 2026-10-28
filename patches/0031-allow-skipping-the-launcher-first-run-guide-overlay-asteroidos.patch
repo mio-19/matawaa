@@ -15,10 +15,10 @@ This is useful for preconfigured watch images and automated bring-up.
  create mode 100644 overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
 
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 83611779..ac3ed282 100644
+index 971e26cf..df0f1e39 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -41,6 +41,8 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -42,6 +42,8 @@ stdenv.mkDerivation (finalAttrs: {
    patches = [
      # QuickPanel quick-toggle button to trigger the find-phone alarm on the companion phone
      ./find-phone.patch
