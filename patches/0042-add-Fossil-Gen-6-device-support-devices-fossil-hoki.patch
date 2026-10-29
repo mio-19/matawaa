@@ -23,7 +23,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/default.nix               | 482 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
- devices/fossil-hoki/hybris.nix                | 139 +++++
+ devices/fossil-hoki/hybris.nix                | 144 ++++++
  devices/fossil-hoki/kernel/default.nix        | 232 +++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 +
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  63 ++-
- 21 files changed, 2018 insertions(+), 52 deletions(-)
+ 21 files changed, 2023 insertions(+), 52 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -825,10 +825,10 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..1a259a78
+index 00000000..87dee6a6
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,139 @@
+@@ -0,0 +1,144 @@
 +{
 +  lib,
 +  pkgs,
@@ -937,7 +937,12 @@ index 00000000..1a259a78
 +        echo "SourceProxy 6.0 SourceProxy.qml" >> $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
 +        echo "SourceProxy 1.0 SourceProxy.qml" >> $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/private/qmldir
 +
-+        # Provide pure-QML fallback for DropShadow to avoid runtime ShaderBuilder dependency
++        # Provide pure-QML fallback for DropShadow to avoid runtime ShaderBuilder dependency.
++        # Upstream AsteroidOS installs qt5compat-qmlplugins via OpenEmbedded:
++        # https://github.com/AsteroidOS/meta-asteroid/blob/master/classes/asteroid-image.bbclass
++        # In cross-compilation where native C++ plugins (libqtgraphicaleffectsprivateplugin.so)
++        # are not built, ShaderEffectSource renders the watchface layer content safely via Qt Quick's
++        # internal texture node (QSGSimpleTextureNode) without bare ShaderEffect RHI assertion aborts.
 +        cat > $out/lib/qt-6/qml/Qt5Compat/GraphicalEffects/DropShadow.qml <<'EOF'
 +import QtQuick
 +

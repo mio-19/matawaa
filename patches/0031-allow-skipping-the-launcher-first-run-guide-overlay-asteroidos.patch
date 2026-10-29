@@ -15,7 +15,7 @@ This is useful for preconfigured watch images and automated bring-up.
  create mode 100644 overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
 
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 956e03a5..2dd9387b 100644
+index 235c277e..659bf6e4 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -42,6 +42,8 @@ stdenv.mkDerivation (finalAttrs: {

@@ -17,9 +17,9 @@ current nightly.
 ---
  .../asteroidos/asteroid-btsyncd/default.nix   |  68 ++++++
  .../org.asteroidos.btsyncd.conf               |  13 ++
- .../asteroid-launcher/circlemask-qrc.patch    |   9 +
- .../asteroidos/asteroid-launcher/default.nix  | 104 +++++++++
- .../display-on-startup.patch                  |  41 ++++
+ .../asteroid-launcher/circlemask-qrc.patch    |  15 ++
+ .../asteroidos/asteroid-launcher/default.nix  | 108 ++++++++++
+ .../display-on-startup.patch                  |  44 ++++
  .../org.nemomobile.compositor.conf            |  28 +++
  .../splash-no-opacitymask.patch               |  54 +++++
  overlay/asteroidos/default.nix                |  37 ++++
@@ -28,9 +28,9 @@ current nightly.
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 200 ++++++++++++++++++
  overlay/asteroidos/stubs/com.nokia.mce.conf   |  13 ++
  overlay/asteroidos/stubs/default.nix          |  66 ++++++
- overlay/asteroidos/stubs/mce-stub.c           | 113 ++++++++++
+ overlay/asteroidos/stubs/mce-stub.c           | 118 +++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 15 files changed, 947 insertions(+)
+ 15 files changed, 965 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
@@ -141,10 +141,16 @@ index 00000000..a856e19c
 +</busconfig>
 diff --git a/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
 new file mode 100644
-index 00000000..466caf81
+index 00000000..d8a0670d
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,15 @@
++# Upstream AsteroidOS asteroid-launcher:
++# https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
++# Commit 960a48d2 ("speed-dial: Fix cut-off launcher items") ported shaders to Qt 6 via qt_add_shaders(),
++# but CircleMaskShader.qml omitted the "qrc:" scheme, resolving against the Linux root fs and crashing QRhi.
++# See also upstream CMakeLists.txt:
++# https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
 +--- a/src/qml/compositor/CircleMaskShader.qml
 ++++ b/src/qml/compositor/CircleMaskShader.qml
 +@@ -40,5 +40,5 @@ ShaderEffect {
@@ -156,10 +162,10 @@ index 00000000..466caf81
 + }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
 new file mode 100644
-index 00000000..b450240e
+index 00000000..207c2c07
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,108 @@
 +{
 +  lib,
 +  stdenv,
@@ -203,8 +209,12 @@ index 00000000..b450240e
 +    # Remove OpacityMask dependency from the 400ms initial splash animation
 +    ./splash-no-opacitymask.patch
 +    # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
++    # Upstream Lipstick compositor display lifecycle:
++    # https://github.com/AsteroidOS/asteroid-launcher/blob/master/lipstick/src/compositor/lipstickcompositor.cpp#L364-L375
 +    ./display-on-startup.patch
 +    # Fix CircleMaskShader QSB fragment shader URI to use qrc scheme for round screen masking
++    # Upstream: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
++    # Upstream CMake qt_add_shaders: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
 +    ./circlemask-qrc.patch
 +  ];
 +
@@ -266,10 +276,13 @@ index 00000000..b450240e
 +})
 diff --git a/overlay/asteroidos/asteroid-launcher/display-on-startup.patch b/overlay/asteroidos/asteroid-launcher/display-on-startup.patch
 new file mode 100644
-index 00000000..07cf99c3
+index 00000000..6d842685
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/display-on-startup.patch
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,44 @@
++# Upstream reference:
++# https://github.com/AsteroidOS/asteroid-launcher/blob/master/lipstick/src/compositor/lipstickcompositor.cpp#L364-L375
++# LipstickCompositor requires DisplayOn to show and activate the compositor window.
 +--- a/lipstick/src/compositor/lipstickcompositor.cpp
 ++++ b/lipstick/src/compositor/lipstickcompositor.cpp
 +@@ -364,7 +364,13 @@
@@ -921,14 +934,19 @@ index 00000000..4e577049
 +}
 diff --git a/overlay/asteroidos/stubs/mce-stub.c b/overlay/asteroidos/stubs/mce-stub.c
 new file mode 100644
-index 00000000..e7619d27
+index 00000000..1b51e714
 --- /dev/null
 +++ b/overlay/asteroidos/stubs/mce-stub.c
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,118 @@
 +/*
 + * Lightweight Mode Control Entity (MCE) daemon stub for AsteroidOS.
 + * Provides the com.nokia.mce D-Bus service, signals, and methods
 + * expected by LipstickCompositor (QMceDisplay), QuickPanel, and AsteroidOS apps.
++ *
++ * Upstream references:
++ * - https://github.com/AsteroidOS/mce
++ * - https://github.com/AsteroidOS/libmce-qt
++ * - https://git.sailfishos.org/mer-core/mce
 + */
 +
 +#include <gio/gio.h>
