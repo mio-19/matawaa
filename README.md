@@ -21,6 +21,7 @@ For devices running EOL kernel, it is equivalent to every processes having root 
 ## TODO
 
 + move hoki hardcoded partitions to better places
++ instead of linking /usr/share for asteroid os launcher, patch them to use nix store path.
 
 ## LLM Policy
 
