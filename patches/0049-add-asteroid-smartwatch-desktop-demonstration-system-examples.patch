@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 +
- examples/asteroid/asteroid-desktop.nix | 540 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 544 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++
  examples/asteroid/default.nix          |  15 +
- 4 files changed, 616 insertions(+)
+ 4 files changed, 620 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..8b15803e
+index 00000000..e8bc9a49
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,540 @@
+@@ -0,0 +1,544 @@
 +{
 +  config,
 +  lib,
@@ -228,6 +228,10 @@ index 00000000..8b15803e
 +        pkgs.writeText "dsme-alarm-queue-status" "0\n"
 +      }"
 +      # Upstream asteroid-launcher_git.bb seeds the privileged notification DB.
++      # mkcal (used by nemo-qml-plugin-calendar) creates its database under
++      # ~/.local/share/system/Calendar, so that tree must belong to ceres.
++      "d /home/ceres/.local/share/system 0755 ceres users -"
++      "d /home/ceres/.local/share/system/Calendar 0755 ceres users -"
 +      "d /home/ceres/.local/share/system/privileged 0755 ceres users -"
 +      "d /home/ceres/.local/share/system/privileged/Notifications 0755 ceres users -"
 +      "C+ /home/ceres/.local/share/system/privileged/Notifications/notifications.db 0600 ceres users - ${launcherNotifications}"

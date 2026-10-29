@@ -25,9 +25,10 @@ current nightly.
  overlay/asteroidos/default.nix                |  29 +++
  .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
  .../nemo-qml-plugin-dbus/default.nix          |  80 +++++++
- .../qt6-qpa-hwcomposer-plugin/default.nix     | 200 ++++++++++++++++++
+ ...config-selection-when-no-exact-match.patch |  35 +++
+ .../qt6-qpa-hwcomposer-plugin/default.nix     | 204 ++++++++++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 12 files changed, 760 insertions(+)
+ 13 files changed, 799 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
@@ -37,6 +38,7 @@ current nightly.
  create mode 100644 overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
+ create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/0008-Relax-EGL-config-selection-when-no-exact-match.patch
  create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
  create mode 100644 overlay/asteroidos/virtualkeyboard/default.nix
 
@@ -619,12 +621,53 @@ index 00000000..9cad05fc
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/0008-Relax-EGL-config-selection-when-no-exact-match.patch b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/0008-Relax-EGL-config-selection-when-no-exact-match.patch
+new file mode 100644
+index 00000000..74fbe4c0
+--- /dev/null
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/0008-Relax-EGL-config-selection-when-no-exact-match.patch
+@@ -0,0 +1,35 @@
++diff --git a/hwcomposer/qeglfswindow.cpp b/hwcomposer/qeglfswindow.cpp
++index 23a663b..5673774 100644
++--- a/hwcomposer/qeglfswindow.cpp
+++++ b/hwcomposer/qeglfswindow.cpp
++@@ -87,6 +87,30 @@ void QEglFSWindow::create()
++     EGLDisplay display = (static_cast<QEglFSScreen *>(window()->screen()->handle()))->display();
++     QSurfaceFormat platformFormat = m_hwc->surfaceFormatFor(window()->requestedFormat());
++     m_config = QEglFSIntegration::chooseConfig(display, platformFormat);
+++    if (!m_config) {
+++        EGLint configCount = 0;
+++        eglGetConfigs(display, nullptr, 0, &configCount);
+++        qWarning("hwcomposer: no EGL config matches RGBA8888/stencil8, display offers %d config(s)", configCount);
+++
+++        QSurfaceFormat relaxed = platformFormat;
+++        relaxed.setStencilBufferSize(0);
+++        relaxed.setAlphaBufferSize(0);
+++        relaxed.setDepthBufferSize(0);
+++        m_config = QEglFSIntegration::chooseConfig(display, relaxed);
+++    }
+++    if (!m_config) {
+++        QSurfaceFormat relaxed = platformFormat;
+++        relaxed.setStencilBufferSize(0);
+++        relaxed.setAlphaBufferSize(0);
+++        relaxed.setDepthBufferSize(0);
+++        relaxed.setRedBufferSize(0);
+++        relaxed.setGreenBufferSize(0);
+++        relaxed.setBlueBufferSize(0);
+++        relaxed.setSamples(0);
+++        m_config = QEglFSIntegration::chooseConfig(display, relaxed);
+++    }
+++    if (!m_config)
+++        qFatal("hwcomposer: no usable EGL config");
++     m_format = q_glFormatFromConfig(display, m_config);
++     resetSurface();
++ }
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 new file mode 100644
-index 00000000..2810130f
+index 00000000..eb513284
 --- /dev/null
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,204 @@
 +{
 +  lib,
 +  stdenv,
@@ -702,6 +745,10 @@ index 00000000..2810130f
 +    (patch "0005-Explicitly-make-hwcomposer-a-shared-library.patch" "sha256-Z/zjAhKm6XRQ8zVuSYPiD+rDh7KqZuKzTiUAzmsu+ZE=")
 +    (patch "0006-v10-Fix-refresh-rate-fallback-unit.patch" "sha256-XOplqx7zKgbjPWIwlJ82O1qFDXXNkj2PDO/TdaP/ync=")
 +    (patch "0007-v10-Make-updates-request-driven-and-vsync-paced.patch" "sha256-EQhs66R9Vc2a2yH5zVmo8xtC+oVQHjMlKyNAIGrEsbA=")
++    # Qt 6's config chooser does not relax a format when eglChooseConfig()
++    # finds no exact match; the hwcomposer EGL blobs often lack the forced
++    # stencil/alpha bits, which made the compositor abort with EGL_BAD_CONFIG.
++    ./0008-Relax-EGL-config-selection-when-no-exact-match.patch
 +  ];
 +
 +  strictDeps = true;

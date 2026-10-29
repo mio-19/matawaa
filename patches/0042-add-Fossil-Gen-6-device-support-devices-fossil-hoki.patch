@@ -20,7 +20,7 @@ they cannot hold multi-user.target.
  devices/fossil-firefish/default.nix           |  56 ++
  devices/fossil-hoki/android-init.nix          | 148 ++++++
  devices/fossil-hoki/android-system-data.nix   |  18 +
- devices/fossil-hoki/default.nix               | 482 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 481 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
  devices/fossil-hoki/hybris.nix                |  55 ++
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  63 ++-
- 21 files changed, 1934 insertions(+), 52 deletions(-)
+ 21 files changed, 1933 insertions(+), 52 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -301,10 +301,10 @@ index 00000000..4373edde
 +''
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..da380408
+index 00000000..4b3ed961
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,482 @@
+@@ -0,0 +1,481 @@
 +{
 +  config,
 +  lib,
@@ -615,7 +615,6 @@ index 00000000..da380408
 +      QT_ENABLE_GLYPH_CACHE_WORKAROUND=true
 +      QT_GSTREAMER_CAMERABIN_SRC=droidcamsrc
 +      QT_QPA_NO_FRAMEBUFFER_FIRST=1
-+      QT_WAYLAND_SERVER_BUFFER_INTEGRATION=shm-emulation-server
 +    ''} ./var/lib/environment/compositor/10-platform.conf
 +
 +    cp ${pkgs.writeText "20-device.conf" ''
@@ -2134,10 +2133,10 @@ index 6c49de0b..246aca44 100644
                "space_cache=v2"
              ]
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-index 2810130f..78bf9a76 100644
+index eb513284..96687984 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-@@ -107,6 +107,56 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -111,6 +111,56 @@ stdenv.mkDerivation (finalAttrs: {
        --replace-fail 'Q_PLUGIN_METADATA(IID QPlatformIntegrationFactoryInterface_iid FILE "hwcomposer.json")' \
                       'Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QPA.QPlatformIntegrationFactoryInterface.5.3" FILE "hwcomposer.json")'
  
@@ -2194,7 +2193,7 @@ index 2810130f..78bf9a76 100644
      cat > CMakeLists.txt <<EOF
      cmake_minimum_required(VERSION 3.16)
      project(hwcomposer LANGUAGES CXX)
-@@ -133,6 +183,7 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -137,6 +187,7 @@ stdenv.mkDerivation (finalAttrs: {
        qeglfsintegration.cpp
        qeglfsscreen.cpp
        qeglfswindow.cpp
@@ -2202,7 +2201,7 @@ index 2810130f..78bf9a76 100644
      )
  
      target_include_directories(hwcomposer PRIVATE
-@@ -181,6 +232,10 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -185,6 +236,10 @@ stdenv.mkDerivation (finalAttrs: {
        ''${GLIB_LIBRARIES}
        ''${LIBUDEV_LIBRARIES}
        ''${MTDEV_LIBRARIES}
@@ -2213,7 +2212,7 @@ index 2810130f..78bf9a76 100644
        ${libhybris}/lib/libhardware.so.2.0.0
        ${libhybris}/lib/libhwc2.so.1.0.0
        ${libhybris}/lib/libhybris-eglplatformcommon.so.1.0.0
-@@ -188,7 +243,13 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -192,7 +247,13 @@ stdenv.mkDerivation (finalAttrs: {
      )
  
      install(TARGETS hwcomposer LIBRARY DESTINATION lib/qt-6/plugins/platforms)
