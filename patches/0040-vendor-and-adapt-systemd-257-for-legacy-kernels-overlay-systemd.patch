@@ -126,7 +126,7 @@ index 35ac4030..4ddb720f 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index ba450985..d0114800 100644
+index 6dd57021..dbcc64a2 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -32,13 +32,14 @@ else

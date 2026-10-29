@@ -7,18 +7,18 @@ Add overlay/cross-compile.nix, which fixes package builds for 32-bit
 ARMv7 wearable targets, and overlay/default.nix to compose the base
 Mobile-NixOS overlay with the cross-compilation hooks.
 ---
- overlay/cross-compile.nix | 256 ++++++++++++++++++++++++++++++++++++++
+ overlay/cross-compile.nix | 265 ++++++++++++++++++++++++++++++++++++++
  overlay/default.nix       |   8 ++
- 2 files changed, 264 insertions(+)
+ 2 files changed, 273 insertions(+)
  create mode 100644 overlay/cross-compile.nix
  create mode 100644 overlay/default.nix
 
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
 new file mode 100644
-index 00000000..c111af81
+index 00000000..16fa49d2
 --- /dev/null
 +++ b/overlay/cross-compile.nix
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,265 @@
 +# Overlays and package workarounds that only make sense during cross-compilation.
 +#
 +# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
@@ -135,6 +135,15 @@ index 00000000..c111af81
 +          ];
 +        });
 +        qtlocation = addCrossQuickTools qsuper.qtlocation;
++        # Enable Qt5Compat QML modules (Qt5Compat.GraphicalEffects and private C++ plugins)
++        # during cross-compilation, matching upstream AsteroidOS qt5compat-qmlplugins.
++        # Upstream reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/classes/asteroid-image.bbclass
++        qt5compat = (addCrossQuickTools qsuper.qt5compat).overrideAttrs (old: {
++          propagatedBuildInputs = (old.propagatedBuildInputs or [ ]) ++ [
++            qfinal.qtdeclarative
++            qfinal.qtshadertools
++          ];
++        });
 +      }
 +    );
 +
