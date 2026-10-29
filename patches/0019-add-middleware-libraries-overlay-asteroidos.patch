@@ -53,7 +53,9 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/timed-qt6/default.nix      | 111 ++++
  overlay/asteroidos/usb-moded-dev/default.nix  |  42 ++
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
- 36 files changed, 4350 insertions(+)
+ ...failing-test-for-wayland-less-builds.patch |  24 -
+ overlay/libhybris/default.nix                 |  62 +-
+ 38 files changed, 4400 insertions(+), 36 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -89,6 +91,7 @@ libraries, without wrapping the Qt apps.
  create mode 100644 overlay/asteroidos/timed-qt6/default.nix
  create mode 100644 overlay/asteroidos/usb-moded-dev/default.nix
  create mode 100644 overlay/asteroidos/usb-moded-qt6/default.nix
+ delete mode 100644 overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
 
 diff --git a/overlay/asteroidos/accounts-qt/default.nix b/overlay/asteroidos/accounts-qt/default.nix
 new file mode 100644
@@ -4661,3 +4664,150 @@ index 00000000..0e985634
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch b/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
+deleted file mode 100644
+index 20e222dc..00000000
+--- a/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
++++ /dev/null
+@@ -1,24 +0,0 @@
+-From 95d9181f725f06e4d00d920c9608cb1ed9c6537a Mon Sep 17 00:00:00 2001
+-From: Samuel Dionne-Riel <samuel@dionne-riel.com>
+-Date: Mon, 9 Dec 2019 23:38:59 -0500
+-Subject: [PATCH] Removes failing test for wayland-less builds
+-
+----
+- hybris/tests/Makefile.am | 1 -
+- 1 file changed, 1 deletion(-)
+-
+-diff --git a/hybris/tests/Makefile.am b/hybris/tests/Makefile.am
+-index 6f97c3e..1a1656d 100644
+---- a/tests/Makefile.am
+-+++ b/tests/Makefile.am
+-@@ -7,7 +7,6 @@ bin_PROGRAMS = \
+- 	test_sensors \
+- 	test_input \
+- 	test_lights \
+--	test_camera \
+- 	test_vibrator \
+- 	test_media \
+- 	test_recorder \
+--- 
+-2.23.0
+-
+diff --git a/overlay/libhybris/default.nix b/overlay/libhybris/default.nix
+index 37b0df7d..7e6c6eaf 100644
+--- a/overlay/libhybris/default.nix
++++ b/overlay/libhybris/default.nix
+@@ -1,12 +1,15 @@
+ {
+-stdenv
++  stdenv
+ , lib
+ , fetchFromGitHub
++, fetchurl
+ , autoreconfHook
+ , pkg-config
+ 
+ , android-headers
+ , file
++, wayland
++, buildPackages
+ , useLegacyProperties ? false
+ }:
+ 
+@@ -14,23 +17,43 @@ let
+   inherit (stdenv) targetPlatform buildPlatform;
+   libPrefix = if targetPlatform == buildPlatform then ""
+     else stdenv.targetPlatform.config;
++
++  # Upstream AsteroidOS pins libhybris to this revision and layers two patches
++  # on top of it. Keep this package identical to upstream instead of carrying
++  # local fork patches: the newer libhybris contains the EGL display reference
++  # counting that the hwcomposer QPA plugin relies on.
++  # https://github.com/AsteroidOS/meta-asteroid/blob/5af858f49f33efe6d6ef4aa027bee7eeffb27cee/recipes-core/libhybris/libhybris_git.bbappend
++  metaAsteroidRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
++  upstreamPatch = name: hash: fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-core/libhybris/libhybris/${name}";
++    inherit hash;
++  };
+ in
+ stdenv.mkDerivation {
+   pname = "libhybris";
+-  version = "2019-12-02";
++  version = "2024-11-07";
+ 
+   src = fetchFromGitHub {
+     owner = "libhybris";
+     repo = "libhybris";
+-    rev = "d27c1a85703db8dea4539ceb4d869792fd78ee37";
+-    sha256 = "014wrpzd1w2bbza5jsy51qhhn9lvffz5h8l6mkwvkkn98i3h9yzn";
++    rev = "9f61f26c44d9a3bf62efb67d4c32a7a0c89c21ca";
++    hash = "sha256-OH5lhpOAw5LtfmR0XkbF2hoDXlskmsuqfWb7DBub0uw=";
+   };
+ 
+-  patches = [
+-    ./0001-Removes-failing-test-for-wayland-less-builds.patch
+-  ]
+-    ++ lib.optional useLegacyProperties ./0001-HACK-Rely-on-legacy-properties-rather-than-native-pr.patch
+-  ;
++  patches = lib.optional useLegacyProperties ./0001-HACK-Rely-on-legacy-properties-rather-than-native-pr.patch;
++
++  postPatch = ''
++    # These upstream patches are generated from the repository root, while
++    # sourceRoot points at hybris/.
++    patch -p2 -i ${
++      upstreamPatch "0001-Remove-references-to-host-path-in-package-config-fil.patch"
++        "sha256-9JtlPyiqN8CrMikCBOwUDZ8+BShDCDefiiZZ5KPeVg8="
++    }
++    patch -p2 -i ${
++      upstreamPatch "0002-tests-workaround-Wimplicit-function-declaration-in-s.patch"
++        "sha256-B3ffNEfjJf8Xz7Wv+pK84Dk3jY6FvgAE3otf158+oLo="
++    }
++  '';
+ 
+   postAutoreconf = ''
+     substituteInPlace configure \
+@@ -38,9 +61,8 @@ stdenv.mkDerivation {
+   '';
+ 
+   NIX_CFLAGS_COMPILE = [
+-    # This libhybris is old, but even libhybris from 2024 fails to compile
+-    # due to many warnings. Let's instead ignore the warnings, and instead
+-    # plan to get an updated adbd that maybe does not depend on libhybris.
++    # libhybris trips -Werror=implicit-function-declaration / int-conversion /
++    # incompatible-pointer-types with modern toolchains.
+     "-Wno-implicit-function-declaration"
+     "-Wno-incompatible-pointer-types"
+     "-Wno-int-conversion"
+@@ -52,15 +74,31 @@ stdenv.mkDerivation {
+ 
+   configureFlags = [
+     "--with-android-headers=${android-headers}/include/android/"
++    # Upstream meta-asteroid libhybris_git.bbappend.
++    "--enable-wayland"
++    "--with-default-egl-platform=wayland"
+   ]
+   ++ lib.optional targetPlatform.isAarch64 "--enable-arch=arm64"
+   ++ lib.optional targetPlatform.isAarch32 "--enable-arch=arm"
+   ;
+ 
++  # configure.ac searches for wayland-scanner, but nixpkgs splits it into its
++  # own package; make the build-machine scanner explicit.
++  makeFlags = [
++    "WAYLAND_SCANNER=${buildPackages.wayland-scanner.bin}/bin/wayland-scanner"
++  ];
++
+   sourceRoot = "source/hybris";
+ 
+   nativeBuildInputs = [
+     autoreconfHook
+     pkg-config
++    # configure.ac looks for wayland-scanner in the target prefix first, then
++    # in $PATH; the target wayland package ships no runnable scanner.
++    buildPackages.wayland-scanner.bin
++  ];
++
++  buildInputs = [
++    wayland
+   ];
+ }
