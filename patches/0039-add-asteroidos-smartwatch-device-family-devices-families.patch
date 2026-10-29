@@ -15,7 +15,7 @@ This patch introduces devices/families/asteroidos.nix:
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 new file mode 100644
-index 00000000..f69a8058
+index 00000000..4417fb4b
 --- /dev/null
 +++ b/devices/families/asteroidos.nix
 @@ -0,0 +1,147 @@
@@ -61,7 +61,7 @@ index 00000000..f69a8058
 +    fi
 +
 +    # Set display backlight brightness (~50%)
-+    for bl in /sys/class/backlight/* /sys/class/leds/*backlight; do
++    for bl in /sys/class/backlight/* /sys/class/leds/*backlight /sys/class/leds/*lcd*; do
 +      if [ -e "$bl/max_brightness" ]; then
 +        max=$(cat "$bl/max_brightness")
 +        echo $(( max / 2 )) > "$bl/brightness" || true

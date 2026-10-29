@@ -303,7 +303,7 @@ index 00000000..d34883f4
 +        ;;
 +esac
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index d71afe77..971e26cf 100644
+index 92c1f71d..b8c17182 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -37,7 +37,11 @@ stdenv.mkDerivation (finalAttrs: {
@@ -317,7 +317,7 @@ index d71afe77..971e26cf 100644
 +    ./find-phone.patch
      # Remove OpacityMask dependency from the 400ms initial splash animation
      ./splash-no-opacitymask.patch
-   ];
+     # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
 diff --git a/overlay/asteroidos/asteroid-launcher/find-phone.patch b/overlay/asteroidos/asteroid-launcher/find-phone.patch
 new file mode 100644
 index 00000000..cb025507

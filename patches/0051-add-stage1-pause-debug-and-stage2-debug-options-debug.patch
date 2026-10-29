@@ -54,7 +54,7 @@ index b3a6045b..0644044c 100644
  
      Tasks::UDev.instance.teardown()
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index a581225e..fbdd8316 100644
+index f2b892bc..368d1cfa 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -10,12 +10,23 @@ let
@@ -180,7 +180,7 @@ index a581225e..fbdd8316 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 4b3ed961..e9e38ee2 100644
+index da380408..dce497f5 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -66,6 +66,9 @@ in

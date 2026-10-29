@@ -20,7 +20,7 @@ they cannot hold multi-user.target.
  devices/fossil-firefish/default.nix           |  56 ++
  devices/fossil-hoki/android-init.nix          | 148 ++++++
  devices/fossil-hoki/android-system-data.nix   |  18 +
- devices/fossil-hoki/default.nix               | 481 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 482 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
  devices/fossil-hoki/hybris.nix                | 156 ++++++
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  63 ++-
- 21 files changed, 2034 insertions(+), 52 deletions(-)
+ 21 files changed, 2035 insertions(+), 52 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -301,10 +301,10 @@ index 00000000..4373edde
 +''
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..4b3ed961
+index 00000000..da380408
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,481 @@
+@@ -0,0 +1,482 @@
 +{
 +  config,
 +  lib,
@@ -615,6 +615,7 @@ index 00000000..4b3ed961
 +      QT_ENABLE_GLYPH_CACHE_WORKAROUND=true
 +      QT_GSTREAMER_CAMERABIN_SRC=droidcamsrc
 +      QT_QPA_NO_FRAMEBUFFER_FIRST=1
++      QT_WAYLAND_SERVER_BUFFER_INTEGRATION=shm-emulation-server
 +    ''} ./var/lib/environment/compositor/10-platform.conf
 +
 +    cp ${pkgs.writeText "20-device.conf" ''

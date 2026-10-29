@@ -374,7 +374,7 @@ index 00000000..843b7c85
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 1db9da49..60eda2ac 100644
+index f65e1114..0992b203 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -59,6 +59,11 @@ rec {
@@ -386,6 +386,6 @@ index 1db9da49..60eda2ac 100644
 +    inherit (pkgs) espeak-classic;
 +  };
 +
-   stubs = callPackage ./stubs { };
- 
-   inherit (pkgs) msm-fb-refresher;
+   stubs = callPackage ./stubs {
+     inherit (pkgs) glib;
+   };

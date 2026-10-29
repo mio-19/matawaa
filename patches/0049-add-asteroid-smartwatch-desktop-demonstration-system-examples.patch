@@ -9,16 +9,16 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 ++
- examples/asteroid/asteroid-desktop.nix | 371 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 386 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 +++
  examples/asteroid/default.nix          |  15 +
- 4 files changed, 447 insertions(+)
+ 4 files changed, 462 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 930807ef..a581225e 100644
+index f9fc1173..f2b892bc 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -141,6 +141,24 @@ in
@@ -48,10 +48,10 @@ index 930807ef..a581225e 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..d1ee63c3
+index 00000000..a18d5c41
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,371 @@
+@@ -0,0 +1,386 @@
 +{
 +  config,
 +  lib,
@@ -210,6 +210,20 @@ index 00000000..d1ee63c3
 +      enable = false;
 +    };
 +
++    # Mode Control Entity (MCE) daemon stub for AsteroidOS display & power management
++    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/mce
++    systemd.services.mce = {
++      description = "Mode Control Entity (MCE) daemon";
++      wantedBy = [ "multi-user.target" "basic.target" ];
++      before = [ "asteroid-launcher.service" ];
++      serviceConfig = {
++        Type = "simple";
++        ExecStart = "${pkgs.asteroid.stubs}/bin/mce-stub";
++        Restart = "always";
++        RestartSec = "1s";
++      };
++    };
++
 +    # users.users.ceres.linger generates NixOS's linger-users.service, which
 +    # calls loginctl enable-linger after logind starts. Let the normal systemd
 +    # linger mechanism own the marker; do not pre-seed it or override the unit.
@@ -267,6 +281,7 @@ index 00000000..d1ee63c3
 +        HYBRIS_EGLPLATFORM = "hwcomposer";
 +        QT_QPA_PLATFORM = "hwcomposer";
 +        QT_QPA_NO_FRAMEBUFFER_FIRST = "1";
++        QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "shm-emulation-server";
 +        LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
 +        LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
 +        QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
