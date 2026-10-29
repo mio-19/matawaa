@@ -25,7 +25,7 @@ the old-kernel work is not split across unrelated commits.
  create mode 100644 overlay/patches/systemd-262-proc-credentials-old-kernel.patch
 
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index f8ebdd7d..ff85d87b 100644
+index 522bf6a7..5cd65291 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -28,6 +28,15 @@ else

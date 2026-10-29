@@ -413,7 +413,7 @@ index 00000000..c8fc8896
 +-    }
 + }
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index b0c0f85c..29cc9271 100644
+index 25911388..0a64241c 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -7,6 +7,29 @@ rec {
@@ -446,7 +446,7 @@ index b0c0f85c..29cc9271 100644
    amber-mpris = callPackage ./amber-mpris { };
    mlite = callPackage ./mlite { };
    nemo-qml-plugin-configuration = callPackage ./nemo-qml-plugin-configuration {
-@@ -60,5 +83,11 @@ rec {
+@@ -72,5 +95,11 @@ rec {
      inherit accounts-qt kcalendarcore mkcal timed-qt6 libiodata;
    };
  

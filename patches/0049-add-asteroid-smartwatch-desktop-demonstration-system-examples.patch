@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 +
- examples/asteroid/asteroid-desktop.nix | 472 +++++++++++++++++++++++++
- examples/asteroid/configuration.nix    |  43 +++
+ examples/asteroid/asteroid-desktop.nix | 540 +++++++++++++++++++++++++
+ examples/asteroid/configuration.nix    |  43 ++
  examples/asteroid/default.nix          |  15 +
- 4 files changed, 548 insertions(+)
+ 4 files changed, 616 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..8e4ff034
+index 00000000..8b15803e
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,472 @@
+@@ -0,0 +1,540 @@
 +{
 +  config,
 +  lib,
@@ -222,6 +222,11 @@ index 00000000..8e4ff034
 +          Tethering=false
 +        ''
 +      }"
++      # Upstream dsme_git.bb seeds /var/lib/dsme/alarm_queue_status.
++      "d /var/lib/dsme 0755 root root -"
++      "C+ /var/lib/dsme/alarm_queue_status 0644 root root - ${
++        pkgs.writeText "dsme-alarm-queue-status" "0\n"
++      }"
 +      # Upstream asteroid-launcher_git.bb seeds the privileged notification DB.
 +      "d /home/ceres/.local/share/system/privileged 0755 ceres users -"
 +      "d /home/ceres/.local/share/system/privileged/Notifications 0755 ceres users -"
@@ -306,6 +311,67 @@ index 00000000..8e4ff034
 +      };
 +    };
 +
++    # DSME device state machine — MCE's counterpart.
++    # Upstream unit: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/dsme/dsme/dsme.service
++    systemd.services.dsme = {
++      description = "DSME";
++      wantedBy = [ "multi-user.target" ];
++      requires = [ "dbus.service" ];
++      after = [
++        "local-fs.target"
++        "dbus.service"
++      ];
++      conflicts = [ "shutdown.target" ];
++      unitConfig.DefaultDependencies = false;
++      environment = {
++        BOOTSTATE = "USER";
++        DSME_SOCKFILE = "/run/dsme.socket";
++      };
++      serviceConfig = {
++        Type = "notify";
++        ExecStart = "${pkgs.asteroid.dsme}/sbin/dsme -- -v 4 -p ${pkgs.asteroid.dsme}/lib/dsme/startup.so --systemd";
++        Restart = "always";
++        RestartSec = 1;
++        StartLimitIntervalSec = 600;
++        StartLimitBurst = 3;
++        StartLimitAction = "reboot";
++      };
++    };
++
++    # SensorFW daemon — backend for the Qt Sensors sensorfw plugin.
++    # Upstream unit: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/sensorfw/files/sensorfwd.service
++    systemd.services.sensorfwd = {
++      description = "Sensor daemon for sensor framework";
++      wantedBy = [ "multi-user.target" ];
++      after = [ "dbus.socket" ];
++      requires = [ "dbus.service" ];
++      conflicts = [ "shutdown.target" ];
++      serviceConfig = {
++        Type = "notify";
++        ExecStart = "${pkgs.asteroid.sensorfw}/sbin/sensorfwd -c=/etc/sensorfw/primaryuse.conf --systemd --log-level=warning --no-magnetometer-bg-calibration";
++        ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
++        Restart = "always";
++        RestartSec = 2;
++        CapabilityBoundingSet = [
++          "CAP_BLOCK_SUSPEND"
++          "CAP_DAC_OVERRIDE"
++          "CAP_FOWNER"
++        ];
++        PrivateTmp = true;
++        ProtectHome = true;
++        ProtectSystem = "full";
++      };
++    };
++
++    # Upstream sensorfw installs its configs into /etc/sensorfw and the Qt
++    # Sensors type map into /etc/xdg/QtProject.
++    environment.etc."sensorfw/primaryuse.conf".source =
++      "${pkgs.asteroid.sensorfw}/etc/sensorfw/primaryuse.conf";
++    environment.etc."sensorfw/sensord.conf.d".source =
++      "${pkgs.asteroid.sensorfw}/etc/sensorfw/sensord.conf.d";
++    environment.etc."xdg/QtProject/Sensors.conf".source =
++      "${pkgs.qt6.qtsensors}/etc/xdg/QtProject/Sensors.conf";
++
 +    # Upstream AsteroidOS uses ConnMan as its network stack, and the distro
 +    # D-Bus policy grants the `ceres` user access to net.connman.
 +    # References:
@@ -322,6 +388,8 @@ index 00000000..8e4ff034
 +    # upstream AsteroidOS connman policy replaces connman's own one.
 +    services.dbus.packages = [
 +      pkgs.asteroid.mce
++      pkgs.asteroid.dsme
++      pkgs.asteroid.sensorfw
 +      connmanDbusPolicy
 +    ];
 +

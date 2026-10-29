@@ -7,18 +7,18 @@ Add overlay/cross-compile.nix, which fixes package builds for 32-bit
 ARMv7 wearable targets, and overlay/default.nix to compose the base
 Mobile-NixOS overlay with the cross-compilation hooks.
 ---
- overlay/cross-compile.nix | 299 ++++++++++++++++++++++++++++++++++++++
+ overlay/cross-compile.nix | 311 ++++++++++++++++++++++++++++++++++++++
  overlay/default.nix       |   8 +
- 2 files changed, 307 insertions(+)
+ 2 files changed, 319 insertions(+)
  create mode 100644 overlay/cross-compile.nix
  create mode 100644 overlay/default.nix
 
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
 new file mode 100644
-index 00000000..f8ebdd7d
+index 00000000..522bf6a7
 --- /dev/null
 +++ b/overlay/cross-compile.nix
-@@ -0,0 +1,299 @@
+@@ -0,0 +1,311 @@
 +# Overlays and package workarounds that only make sense during cross-compilation.
 +#
 +# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
@@ -136,6 +136,18 @@ index 00000000..f8ebdd7d
 +        # vendored here.
 +        # Reference: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-qt/qt6/qtsensors
 +        qtsensors = (addCrossQuickTools qsuper.qtsensors).overrideAttrs (old: {
++          # Upstream AsteroidOS enables the sensorfw backend on wearable
++          # builds; link it against our packaged SensorFW client library.
++          buildInputs = (old.buildInputs or [ ]) ++ [ final.asteroid.sensorfw ];
++          nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.pkg-config ];
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DFEATURE_sensorfw=ON" ];
++          # The upstream patch installs Sensors.conf to an absolute /etc path,
++          # which the sandbox rejects; install it under $out and expose it via
++          # environment.etc in the desktop module.
++          postPatch = (old.postPatch or "") + ''
++            substituteInPlace src/plugins/sensors/sensorfw/CMakeLists.txt \
++              --replace-fail 'DESTINATION /etc/xdg/QtProject' 'DESTINATION etc/xdg/QtProject'
++          '';
 +          patches = (old.patches or [ ]) ++ [
 +            (final.fetchpatch {
 +              name = "0001-Enable-sensorfw.patch";

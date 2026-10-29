@@ -20,7 +20,8 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/accounts-qt/default.nix    |  81 +++
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++
- overlay/asteroidos/default.nix                |  53 ++
+ overlay/asteroidos/default.nix                |  65 ++
+ overlay/asteroidos/dsme/default.nix           | 118 ++++
  overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
  overlay/asteroidos/keepalive/default.nix      | 131 ++++
  .../patches/0001-Disable-tests.patch          |  23 +
@@ -47,13 +48,16 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/mlite/default.nix          |  52 ++
  .../nemo-qml-plugin-calendar/default.nix      |  94 +++
  overlay/asteroidos/ngf-qt6/default.nix        |  96 +++
+ overlay/asteroidos/sensorfw/CMakeLists.txt    | 264 ++++++++
+ overlay/asteroidos/sensorfw/default.nix       |  82 +++
  overlay/asteroidos/timed-qt6/default.nix      | 111 ++++
  overlay/asteroidos/usb-moded-dev/default.nix  |  42 ++
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
- 33 files changed, 3870 insertions(+)
+ 36 files changed, 4346 insertions(+)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
+ create mode 100644 overlay/asteroidos/dsme/default.nix
  create mode 100644 overlay/asteroidos/kcalendarcore/default.nix
  create mode 100644 overlay/asteroidos/keepalive/default.nix
  create mode 100644 overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
@@ -80,6 +84,8 @@ libraries, without wrapping the Qt apps.
  create mode 100644 overlay/asteroidos/mlite/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
  create mode 100644 overlay/asteroidos/ngf-qt6/default.nix
+ create mode 100644 overlay/asteroidos/sensorfw/CMakeLists.txt
+ create mode 100644 overlay/asteroidos/sensorfw/default.nix
  create mode 100644 overlay/asteroidos/timed-qt6/default.nix
  create mode 100644 overlay/asteroidos/usb-moded-dev/default.nix
  create mode 100644 overlay/asteroidos/usb-moded-qt6/default.nix
@@ -366,10 +372,10 @@ index 00000000..bcdd9f13
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 2fc834f0..b0c0f85c 100644
+index 2fc834f0..25911388 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,5 +7,58 @@ rec {
+@@ -7,5 +7,70 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
@@ -405,6 +411,18 @@ index 2fc834f0..b0c0f85c 100644
 +    inherit libdsme libiphb libngf usb-moded-dev mce-dev;
 +  };
 +
++  # Nemomobile SensorFW daemon and client API (qtsensors sensorfw backend).
++  # Upstream: https://github.com/sailfishos/sensorfw
++  sensorfw = callPackage ./sensorfw {
++    inherit (pkgs) libhybris android-headers;
++  };
++
++  # Device state machine daemon MCE talks to.
++  # Upstream: https://github.com/sailfishos/dsme
++  dsme = callPackage ./dsme {
++    inherit libdsme libngf libiphb mce-dev;
++  };
++
 +  keepalive = callPackage ./keepalive {
 +    inherit mce-dev libiphb;
 +  };
@@ -428,6 +446,130 @@ index 2fc834f0..b0c0f85c 100644
 +
    inherit (pkgs) msm-fb-refresher;
  }
+diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
+new file mode 100644
+index 00000000..ddea6975
+--- /dev/null
++++ b/overlay/asteroidos/dsme/default.nix
+@@ -0,0 +1,118 @@
++# Nemomobile DSME (device state machine daemon) with AsteroidOS patches
++# Upstream repository: https://github.com/sailfishos/dsme
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/dsme
++{
++  lib,
++  stdenv,
++  fetchgit,
++  fetchpatch,
++  fetchurl,
++  autoreconfHook,
++  pkg-config,
++  glib,
++  dbus,
++  dbus-glib,
++  cryptsetup,
++  systemd,
++  mce-dev,
++  libngf,
++  libiphb,
++  libdsme,
++}:
++
++let
++  metaAsteroidRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
++
++  asteroidPatch =
++    name: hash:
++    fetchpatch {
++      inherit name hash;
++      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/dsme/dsme/${name}";
++    };
++
++  dsmeService = fetchurl {
++    name = "dsme.service";
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/dsme/dsme/dsme.service";
++    hash = "sha256-6IO1Q6tCkMRcYtlq5eU06ZlrHpRYGkKfurYMZwa4os4=";
++  };
++in
++stdenv.mkDerivation (finalAttrs: {
++  pname = "dsme";
++  version = "0.84.7";
++
++  src = fetchgit {
++    url = "https://github.com/sailfishos/dsme.git";
++    rev = "ab78f9c1945505c06beb3662878b6be9781565bd";
++    fetchSubmodules = true;
++    hash = "sha256-XJpDKqOe2X3nZTUgCudw3n0pa2m4MY6X7fJxU46Icik=";
++  };
++
++  patches = [
++    (asteroidPatch "0002-Fix-and-improve-alarm-time-serialization.patch" "sha256-GCpSPP8EtQsly7VC91s5PFJnx+uFqJHQ+GQR9yI6rqI=")
++  ];
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    autoreconfHook
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    dbus
++    dbus-glib
++    cryptsetup
++    systemd
++    mce-dev
++    libngf
++    libiphb
++    libdsme
++  ];
++
++  preConfigure = ''
++    # Upstream's autogen.sh; autoreconfHook covers libtoolize/aclocal/automake.
++    if [ ! -x configure ]; then
++      NOCONFIGURE=1 ./autogen.sh
++    fi
++  '';
++
++  postPatch = ''
++    # Upstream runs dsme as the desktop user on AsteroidOS.
++    substituteInPlace dsme/dsme.conf \
++      --replace-fail '<policy user="root">' '<policy user="ceres">'
++
++    # The unit tests do not build with GCC 16 (-Werror=parentheses on legacy
++    # asserts) and are not shipped by the upstream recipe's runtime package.
++    substituteInPlace Makefile.am \
++      --replace-fail 'SUBDIRS = dbus-gmain dsme modules util test tests getbootstate' \
++                     'SUBDIRS = dbus-gmain dsme modules util getbootstate'
++  '';
++
++  configureFlags = [
++    "--disable-poweron-timer"
++    "--disable-upstart"
++    "--enable-systemd"
++    "--enable-runlevel"
++    "--enable-pwrkeymonitor"
++    "--disable-validatorlistener"
++    "--disable-static"
++    "--enable-usewheel"
++  ];
++
++  # The tests are removed from SUBDIRS in postPatch; build and install then
++  # recurse into the daemon, modules and utilities only.
++
++  postInstall = ''
++    install -Dm644 reboot-via-dsme.sh $out/etc/profile.d/reboot-via-dsme.sh
++    install -Dm644 ${dsmeService} $out/lib/systemd/system/dsme.service
++  '';
++
++  meta = with lib; {
++    description = "Device state machine daemon for Nemomobile/AsteroidOS";
++    homepage = "https://github.com/sailfishos/dsme";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})
 diff --git a/overlay/asteroidos/kcalendarcore/default.nix b/overlay/asteroidos/kcalendarcore/default.nix
 new file mode 100644
 index 00000000..9b875b0d
@@ -3893,6 +4035,364 @@ index 00000000..d16b452f
 +    description = "Qt6 client library and Nemo.Ngf QML plugin for Non-Graphic Feedback daemon";
 +    homepage = "https://github.com/sailfishos/libngf-qt";
 +    license = licenses.lgpl21Only;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/sensorfw/CMakeLists.txt b/overlay/asteroidos/sensorfw/CMakeLists.txt
+new file mode 100644
+index 00000000..6ad5cc23
+--- /dev/null
++++ b/overlay/asteroidos/sensorfw/CMakeLists.txt
+@@ -0,0 +1,264 @@
++# CMake build for Nemomobile SensorFW.
++#
++# The upstream project ships qmake files only. nixpkgs' qmake cannot be used
++# for cross-compilation here (its installed mkspecs never load
++# mkspecs/modules/qmodule.pri, so even a trivial Qt project fails on
++# qtConfig()), so this file mirrors what the .pro files build:
++#   - libsensordatatypes-qt6, libsensorfw-qt6, libsensorclient-qt6
++#   - sensorfwd
++#   - sensor / filter / chain / adaptor plugins
++#   - the hybris adaptor library and plugins (option ENABLE_HYBRIS)
++cmake_minimum_required(VERSION 3.16)
++project(sensorfw LANGUAGES CXX)
++
++set(CMAKE_CXX_STANDARD 17)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
++set(CMAKE_POSITION_INDEPENDENT_CODE ON)
++set(CMAKE_AUTOMOC ON)
++
++option(ENABLE_HYBRIS "Build the libhybris sensor adaptors" OFF)
++
++find_package(Qt6 REQUIRED COMPONENTS Core DBus Network)
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(SYSTEMD REQUIRED IMPORTED_TARGET libsystemd)
++
++set(SFW_PLUGIN_DIR "${CMAKE_INSTALL_PREFIX}/lib/sensord-qt6")
++
++include_directories(
++  ${CMAKE_CURRENT_SOURCE_DIR}
++  ${CMAKE_CURRENT_SOURCE_DIR}/include
++  ${CMAKE_CURRENT_SOURCE_DIR}/core
++  ${CMAKE_CURRENT_SOURCE_DIR}/datatypes
++  ${CMAKE_CURRENT_SOURCE_DIR}/filters
++  ${CMAKE_CURRENT_SOURCE_DIR}/sensors/magnetometersensor
++  ${ANDROID_INCLUDE}
++  ${HYBRIS_LIB}/include/hybris/common
++)
++
++# --- datatypes ------------------------------------------------------------
++file(GLOB DATATYPES_SRC ${CMAKE_CURRENT_SOURCE_DIR}/datatypes/*.cpp)
++file(GLOB DATATYPES_HDR ${CMAKE_CURRENT_SOURCE_DIR}/datatypes/*.h)
++add_library(sensordatatypes-qt6 SHARED ${DATATYPES_SRC} ${DATATYPES_HDR})
++target_link_libraries(sensordatatypes-qt6 PUBLIC Qt6::Core Qt6::DBus)
++set_target_properties(sensordatatypes-qt6 PROPERTIES VERSION 0.9.0 SOVERSION 0)
++install(TARGETS sensordatatypes-qt6 LIBRARY DESTINATION lib)
++install(FILES ${DATATYPES_HDR} DESTINATION include/sensord-qt6/datatypes)
++
++file(GLOB SFW_PUBLIC_HDR ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h)
++install(FILES ${SFW_PUBLIC_HDR} DESTINATION include/sensord-qt6)
++
++# --- core (libsensorfw) ---------------------------------------------------
++set(CORE_SRC
++  core/sensormanager.cpp
++  core/sensormanager_a.cpp
++  core/pusher.cpp
++  core/ringbuffer.cpp
++  core/producer.cpp
++  core/source.cpp
++  core/consumer.cpp
++  core/bin.cpp
++  core/filter.cpp
++  core/deviceadaptor.cpp
++  core/loader.cpp
++  core/plugin.cpp
++  core/abstractsensor_a.cpp
++  core/abstractsensor.cpp
++  core/logging.cpp
++  core/parameterparser.cpp
++  core/abstractchain.cpp
++  core/sysfsadaptor.cpp
++  core/sockethandler.cpp
++  core/inputdevadaptor.cpp
++  core/config.cpp
++  core/nodebase.cpp
++  # Used by config.cpp (display/PSM state changes); part of the upstream core
++  # build even though it is not listed in core.pro.
++  core/mcewatcher.cpp
++)
++file(GLOB CORE_HDR ${CMAKE_CURRENT_SOURCE_DIR}/core/*.h)
++# hybrisadaptor.h is built by the hybris library, not the core one (it needs
++# the Android HAL headers). lsclient/hybrisbindertypes belong to the Sailfish
++# and binder variants that this build does not compile.
++list(REMOVE_ITEM CORE_HDR
++  ${CMAKE_CURRENT_SOURCE_DIR}/core/hybrisadaptor.h
++  ${CMAKE_CURRENT_SOURCE_DIR}/core/lsclient.h
++  ${CMAKE_CURRENT_SOURCE_DIR}/core/hybrisbindertypes.h
++)
++add_library(sensorfw-qt6 SHARED ${CORE_SRC} ${CORE_HDR})
++target_compile_definitions(sensorfw-qt6 PRIVATE PLUGIN_DIRECTORY="${SFW_PLUGIN_DIR}")
++target_link_libraries(sensorfw-qt6 PUBLIC Qt6::Core Qt6::DBus Qt6::Network sensordatatypes-qt6)
++set_target_properties(sensorfw-qt6 PROPERTIES VERSION 0.9.0 SOVERSION 0)
++install(TARGETS sensorfw-qt6 LIBRARY DESTINATION lib)
++
++# --- D-Bus client API -----------------------------------------------------
++file(GLOB CLIENT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/qt-api/*.cpp)
++file(GLOB CLIENT_HDR ${CMAKE_CURRENT_SOURCE_DIR}/qt-api/*.h)
++add_library(sensorclient-qt6 SHARED ${CLIENT_SRC} ${CLIENT_HDR})
++target_link_libraries(sensorclient-qt6 PUBLIC Qt6::Core Qt6::DBus Qt6::Network sensordatatypes-qt6)
++set_target_properties(sensorclient-qt6 PROPERTIES VERSION 0.9.0 SOVERSION 0)
++install(TARGETS sensorclient-qt6 LIBRARY DESTINATION lib)
++install(FILES ${CLIENT_HDR} DESTINATION include/sensord-qt6)
++
++# --- daemon ---------------------------------------------------------------
++add_executable(sensorfwd
++  sensord/main.cpp
++  sensord/parser.cpp
++  sensord/calibrationhandler.cpp
++)
++target_link_libraries(sensorfwd PRIVATE
++  sensorfw-qt6
++  sensordatatypes-qt6
++  Qt6::Core
++  Qt6::DBus
++  Qt6::Network
++  PkgConfig::SYSTEMD
++)
++install(TARGETS sensorfwd RUNTIME DESTINATION sbin)
++
++# --- plugins --------------------------------------------------------------
++# Each plugin directory is flat: globbing *.cpp reproduces the upstream
++# SOURCES lists (they never mix files in from other directories).
++function(sfw_plugin target dir)
++  file(GLOB srcs ${dir}/*.cpp)
++  file(GLOB hdrs ${dir}/*.h)
++  add_library(${target} MODULE ${srcs} ${hdrs})
++  target_include_directories(${target} PRIVATE ${dir})
++  target_link_libraries(${target} PRIVATE
++    sensorfw-qt6
++    sensordatatypes-qt6
++    Qt6::Core
++    Qt6::DBus
++    Qt6::Network
++  )
++  install(TARGETS ${target} LIBRARY DESTINATION lib/sensord-qt6)
++endfunction()
++
++file(GLOB SENSOR_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/sensors/*)
++file(GLOB FILTER_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/filters/*)
++file(GLOB CHAIN_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/chains/*)
++file(GLOB ADAPTOR_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/adaptors/*)
++
++# Plugins include headers from sibling plugin dirs (chains use filters/*),
++# so every plugin directory is on the include path.
++foreach(d ${SENSOR_DIRS} ${FILTER_DIRS} ${CHAIN_DIRS} ${ADAPTOR_DIRS})
++  if(IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${d})
++    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${d})
++  endif()
++endforeach()
++
++foreach(d ${SENSOR_DIRS})
++  get_filename_component(name ${d} NAME)
++  if(IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${d} AND NOT name STREQUAL "contextplugin")
++    sfw_plugin(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${d})
++  endif()
++endforeach()
++
++foreach(d ${FILTER_DIRS})
++  get_filename_component(name ${d} NAME)
++  if(IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${d})
++    sfw_plugin(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${d})
++  endif()
++endforeach()
++
++foreach(d ${CHAIN_DIRS})
++  get_filename_component(name ${d} NAME)
++  if(IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${d})
++    sfw_plugin(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${d})
++  endif()
++endforeach()
++
++# Legacy x86/tablet adaptors that no longer compile against Qt 6/GCC 16 and
++# are not referenced by the wearable (hybris) sensor configuration.
++set(SKIP_ADAPTORS
++  magnetometeradaptor-ncdk
++  mpu6050accelerometer
++  mrstaccelerometer
++  oaktrailaccelerometer
++  oemtabletaccelerometer
++  oemtabletalsadaptor-ascii
++  oemtabletgyroscopeadaptor
++  oemtabletmagnetometeradaptor
++  pegatronaccelerometeradaptor
++  steaccelerometeradaptor
++)
++
++foreach(d ${ADAPTOR_DIRS})
++  get_filename_component(name ${d} NAME)
++  if(NOT IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${d})
++    continue()
++  endif()
++  if(name MATCHES "^hybris")
++    continue()
++  endif()
++  if(name IN_LIST SKIP_ADAPTORS)
++    continue()
++  endif()
++  sfw_plugin(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${d})
++  if(name STREQUAL "iioadaptor")
++    pkg_check_modules(UDEV REQUIRED IMPORTED_TARGET libudev)
++    target_link_libraries(${name} PRIVATE PkgConfig::UDEV)
++  endif()
++endforeach()
++
++# --- hybris adaptors ------------------------------------------------------
++if(ENABLE_HYBRIS)
++  if(NOT HYBRIS_LIB)
++    message(FATAL_ERROR "HYBRIS_LIB must point at the libhybris prefix")
++  endif()
++  if(NOT ANDROID_INCLUDE)
++    message(FATAL_ERROR "ANDROID_INCLUDE must point at the Android headers")
++  endif()
++  find_library(HARDWARE_LIB hardware PATHS ${HYBRIS_LIB}/lib REQUIRED)
++  find_library(HYBRIS_COMMON_LIB hybris-common PATHS ${HYBRIS_LIB}/lib REQUIRED)
++
++  include_directories(${ANDROID_INCLUDE} ${HYBRIS_LIB}/include/hybris/common)
++
++  add_library(hybrissensorfw-qt6 SHARED core/hybrisadaptor.cpp core/hybrisadaptor.h)
++  target_link_libraries(hybrissensorfw-qt6 PUBLIC
++    sensorfw-qt6
++    sensordatatypes-qt6
++    Qt6::Core
++    ${HARDWARE_LIB}
++    ${HYBRIS_COMMON_LIB}
++  )
++  set_target_properties(hybrissensorfw-qt6 PROPERTIES VERSION 0.9.0 SOVERSION 0)
++  install(TARGETS hybrissensorfw-qt6 LIBRARY DESTINATION lib)
++
++  foreach(d ${ADAPTOR_DIRS})
++    get_filename_component(name ${d} NAME)
++    if(IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${d} AND name MATCHES "^hybris")
++      sfw_plugin(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${d})
++      target_link_libraries(${name} PRIVATE
++        hybrissensorfw-qt6
++        ${HARDWARE_LIB}
++        ${HYBRIS_COMMON_LIB}
++      )
++    endif()
++  endforeach()
++endif()
++
++# --- configuration, unit and pkg-config ----------------------------------
++install(FILES
++  config/10-sensord-default.conf
++  config/20-sensors-default.conf
++  DESTINATION etc/sensorfw/sensord.conf.d
++)
++install(FILES sensorfw.conf DESTINATION share/dbus-1/system.d)
++install(FILES rpm/sensorfwd.service DESTINATION lib/systemd/system)
++if(ENABLE_HYBRIS)
++  install(FILES config/sensord-hybris.conf DESTINATION etc/sensorfw RENAME primaryuse.conf)
++endif()
++
++file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/sensord-qt6.pc
++"prefix=${CMAKE_INSTALL_PREFIX}
++includedir=\${prefix}/include/sensord-qt6
++libdir=\${prefix}/lib
++
++Name: Sensorfw-qt6
++Description: Sensord for Qt 6
++Version: 0.15.1
++Requires: Qt6Core Qt6DBus Qt6Network
++Libs: -L\${libdir} -lsensorclient-qt6 -lsensordatatypes-qt6
++Cflags: -I\${includedir} -I\${includedir}/datatypes
++")
++install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sensord-qt6.pc DESTINATION lib/pkgconfig)
+diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
+new file mode 100644
+index 00000000..03131382
+--- /dev/null
++++ b/overlay/asteroidos/sensorfw/default.nix
+@@ -0,0 +1,82 @@
++# Nemomobile SensorFW sensor daemon and Qt client API
++# Upstream repository: https://github.com/sailfishos/sensorfw
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/sensorfw
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  fetchpatch,
++  cmake,
++  pkg-config,
++  qt6,
++  systemd,
++  libhybris,
++  android-headers,
++  udev,
++}:
++
++let
++  metaAsteroidRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
++
++  upstreamPatch =
++    name: hash:
++    fetchpatch {
++      inherit name hash;
++      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/sensorfw/files/${name}";
++    };
++in
++stdenv.mkDerivation (finalAttrs: {
++  pname = "sensorfw";
++  version = "0.15.1";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "sensorfw";
++    rev = "b62d0e591d736c904128fcfc8476f22cfdbe53b9";
++    hash = "sha256-+rTwVJSaYAV7lCUPISxtlPZvRyIeFiAgsdOfuBat98k=";
++  };
++
++  patches = [
++    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-FNjH+q3kjQDeJP5yaAZ24z8FpU0gZ8GJAFuElzM3bsM=")
++    (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-qRXs9vrszoG1bVnjkIVtRaXEvaLtNKs7Z1PsR759VQo=")
++    (upstreamPatch "0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch" "sha256-WyVwM0KEtADQhAeZTGy6we9BSyITchcClT+phNTdhuc=")
++    (upstreamPatch "0004-Fix-compilation-when-autohybris-is-used.patch" "sha256-RJ711Knze6feQOPfa/UD6r9jG870H//hOnbFPzhoS5s=")
++    (upstreamPatch "0005-Fix-compilation-when-hybris-is-used.patch" "sha256-evbbTXcBF/a6Y998373+p2vv7PnYWX71Ei9GFH+BaA8=")
++    (upstreamPatch "0006-hybrisadaptor-Queue-erroneous-events-too.patch" "sha256-k10UaeZO9dEa+VApzyr2itLv6ZEqwnMhA+RXGkiWYlk=")
++    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-7TRSkpcprdQczLhhsL9lqjTr4oRYMt3Z6JgbDcxCMjE=")
++  ];
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    systemd
++    libhybris
++    android-headers
++    udev
++  ];
++
++  # Upstream only ships qmake project files; CMakeLists.txt mirrors them.
++  postPatch = ''
++    cp ${./CMakeLists.txt} CMakeLists.txt
++  '';
++
++  cmakeFlags = [
++    "-DENABLE_HYBRIS=ON"
++    "-DHYBRIS_LIB=${libhybris}"
++    "-DANDROID_INCLUDE=${android-headers}/include/android"
++  ];
++
++  meta = with lib; {
++    description = "Nemomobile sensor daemon and Qt sensor client API";
++    homepage = "https://github.com/sailfishos/sensorfw";
++    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
 +})
