@@ -17,7 +17,8 @@ current nightly.
 ---
  .../asteroidos/asteroid-btsyncd/default.nix   |  68 ++++++
  .../org.asteroidos.btsyncd.conf               |  13 ++
- .../asteroidos/asteroid-launcher/default.nix  | 102 +++++++++
+ .../asteroid-launcher/circlemask-qrc.patch    |   9 +
+ .../asteroidos/asteroid-launcher/default.nix  | 104 +++++++++
  .../display-on-startup.patch                  |  41 ++++
  .../org.nemomobile.compositor.conf            |  28 +++
  .../splash-no-opacitymask.patch               |  54 +++++
@@ -29,9 +30,10 @@ current nightly.
  overlay/asteroidos/stubs/default.nix          |  66 ++++++
  overlay/asteroidos/stubs/mce-stub.c           | 113 ++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 14 files changed, 936 insertions(+)
+ 15 files changed, 947 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
+ create mode 100644 overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
  create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
  create mode 100644 overlay/asteroidos/asteroid-launcher/display-on-startup.patch
  create mode 100644 overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
@@ -137,12 +139,27 @@ index 00000000..a856e19c
 +    <allow receive_sender="org.asteroidos.btsyncd"/>
 +  </policy>
 +</busconfig>
+diff --git a/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
+new file mode 100644
+index 00000000..466caf81
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
+@@ -0,0 +1,9 @@
++--- a/src/qml/compositor/CircleMaskShader.qml
+++++ b/src/qml/compositor/CircleMaskShader.qml
++@@ -40,5 +40,5 @@ ShaderEffect {
++     property real end: 0.25
++     property real beginning: 0.25 - smoothness
++ 
++-    fragmentShader: "/qml/compositor/circlemaskshader.frag.qsb"
+++    fragmentShader: "qrc:/qml/compositor/circlemaskshader.frag.qsb"
++ }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
 new file mode 100644
-index 00000000..92c1f71d
+index 00000000..b450240e
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,104 @@
 +{
 +  lib,
 +  stdenv,
@@ -187,6 +204,8 @@ index 00000000..92c1f71d
 +    ./splash-no-opacitymask.patch
 +    # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
 +    ./display-on-startup.patch
++    # Fix CircleMaskShader QSB fragment shader URI to use qrc scheme for round screen masking
++    ./circlemask-qrc.patch
 +  ];
 +
 +  nativeBuildInputs = [

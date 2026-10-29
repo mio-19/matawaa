@@ -23,7 +23,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/default.nix               | 482 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
- devices/fossil-hoki/hybris.nix                | 156 ++++++
+ devices/fossil-hoki/hybris.nix                | 139 +++++
  devices/fossil-hoki/kernel/default.nix        | 232 +++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 +
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  63 ++-
- 21 files changed, 2035 insertions(+), 52 deletions(-)
+ 21 files changed, 2018 insertions(+), 52 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -825,10 +825,10 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..8985d77e
+index 00000000..1a259a78
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,156 @@
+@@ -0,0 +1,139 @@
 +{
 +  lib,
 +  pkgs,
@@ -957,27 +957,10 @@ index 00000000..8985d77e
 +
 +    ShaderEffectSource {
 +        id: shadowSource
++        anchors.fill: parent
 +        sourceItem: root.source
-+        visible: false
-+        hideSource: false
++        visible: root.source !== undefined && root.source !== null
 +        smooth: true
-+    }
-+
-+    ShaderEffect {
-+        id: shadowEffect
-+        anchors.fill: parent
-+        anchors.horizontalCenterOffset: root.horizontalOffset
-+        anchors.verticalCenterOffset: root.verticalOffset
-+        property var source: shadowSource
-+        opacity: 0.5
-+        visible: root.source !== undefined && root.source !== null
-+    }
-+
-+    ShaderEffect {
-+        id: contentEffect
-+        anchors.fill: parent
-+        property var source: shadowSource
-+        visible: root.source !== undefined && root.source !== null
 +    }
 +}
 +EOF
