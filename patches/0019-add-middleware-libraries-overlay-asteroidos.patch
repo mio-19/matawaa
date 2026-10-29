@@ -21,7 +21,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++
  overlay/asteroidos/default.nix                |  65 ++
- overlay/asteroidos/dsme/default.nix           | 118 ++++
+ overlay/asteroidos/dsme/default.nix           | 122 ++++
  overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
  overlay/asteroidos/keepalive/default.nix      | 131 ++++
  .../patches/0001-Disable-tests.patch          |  23 +
@@ -53,7 +53,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/timed-qt6/default.nix      | 111 ++++
  overlay/asteroidos/usb-moded-dev/default.nix  |  42 ++
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
- 36 files changed, 4346 insertions(+)
+ 36 files changed, 4350 insertions(+)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -448,10 +448,10 @@ index 2fc834f0..25911388 100644
  }
 diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
 new file mode 100644
-index 00000000..ddea6975
+index 00000000..285f6b58
 --- /dev/null
 +++ b/overlay/asteroidos/dsme/default.nix
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,122 @@
 +# Nemomobile DSME (device state machine daemon) with AsteroidOS patches
 +# Upstream repository: https://github.com/sailfishos/dsme
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/dsme
@@ -545,6 +545,10 @@ index 00000000..ddea6975
 +  '';
 +
 +  configureFlags = [
++    # configure bakes DSME_SBIN_PATH from $exec_prefix at configure time; without
++    # an explicit sbindir autoconf leaves it as "NONE/sbin", and the dsme
++    # watchdog then cannot exec dsme-server.
++    "--sbindir=${placeholder "out"}/sbin"
 +    "--disable-poweron-timer"
 +    "--disable-upstart"
 +    "--enable-systemd"
