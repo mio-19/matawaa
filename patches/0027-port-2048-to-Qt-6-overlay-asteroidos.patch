@@ -13,7 +13,7 @@ toolkit.
  create mode 100644 overlay/asteroidos/apps/twenty48-qt6.patch
 
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
-index 79e41d22..5a6d1018 100644
+index 2dd518be..fcef9ac1 100644
 --- a/overlay/asteroidos/apps/default.nix
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -136,5 +136,8 @@

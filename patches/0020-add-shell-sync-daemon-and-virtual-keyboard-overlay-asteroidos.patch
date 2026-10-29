@@ -22,15 +22,15 @@ current nightly.
  .../display-on-startup.patch                  |  44 ++++
  .../org.nemomobile.compositor.conf            |  28 +++
  .../splash-no-opacitymask.patch               |  54 +++++
- overlay/asteroidos/default.nix                |  37 ++++
+ overlay/asteroidos/default.nix                |  33 +++
  .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
  .../nemo-qml-plugin-dbus/default.nix          |  80 +++++++
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 200 ++++++++++++++++++
  overlay/asteroidos/stubs/com.nokia.mce.conf   |  13 ++
- overlay/asteroidos/stubs/default.nix          |  66 ++++++
- overlay/asteroidos/stubs/mce-stub.c           | 118 +++++++++++
+ overlay/asteroidos/stubs/default.nix          |  48 +++++
+ overlay/asteroidos/stubs/mce-stub.c           | 150 +++++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 15 files changed, 965 insertions(+)
+ 15 files changed, 975 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
@@ -419,10 +419,10 @@ index 00000000..c8fc8896
 +-    }
 + }
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 90363944..fb72d51f 100644
+index 7ecfadb4..a8d619c0 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,8 +7,35 @@ rec {
+@@ -7,6 +7,29 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
@@ -451,16 +451,10 @@ index 90363944..fb72d51f 100644
 +
    amber-mpris = callPackage ./amber-mpris { };
    mlite = callPackage ./mlite { };
-+  nemo-qml-plugin-configuration = callPackage ./nemo-qml-plugin-configuration {
-+    inherit mlite;
-+  };
-+  nemo-qml-plugin-dbus = callPackage ./nemo-qml-plugin-dbus { };
-   mce-dev = callPackage ./mce-dev { };
-   mce-qt6 = callPackage ./mce-qt6 {
-     inherit mce-dev;
-@@ -18,5 +45,15 @@ rec {
-   keepalive = callPackage ./keepalive { };
-   timed-qt6 = callPackage ./timed-qt6 { };
+   nemo-qml-plugin-configuration = callPackage ./nemo-qml-plugin-configuration {
+@@ -26,5 +49,15 @@ rec {
+     inherit libiodata;
+   };
  
 +  asteroid-btsyncd = callPackage ./asteroid-btsyncd {
 +    inherit qml-asteroid amber-mpris mlite;
@@ -862,10 +856,10 @@ index 00000000..582261fe
 +</busconfig>
 diff --git a/overlay/asteroidos/stubs/default.nix b/overlay/asteroidos/stubs/default.nix
 new file mode 100644
-index 00000000..4e577049
+index 00000000..63f80233
 --- /dev/null
 +++ b/overlay/asteroidos/stubs/default.nix
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,48 @@
 +{
 +  stdenv,
 +  glib,
@@ -890,30 +884,12 @@ index 00000000..4e577049
 +    install -Dm755 mce-stub $out/bin/mce-stub
 +    install -Dm644 com.nokia.mce.conf $out/share/dbus-1/system.d/com.nokia.mce.conf
 +
-+    mkdir -p $out/lib/qt-6/qml/Connman
-+    cat > $out/lib/qt-6/qml/Connman/qmldir <<'EOF'
-+module Connman
-+NetworkTechnology 1.0 NetworkTechnology.qml
-+EOF
-+    cat > $out/lib/qt-6/qml/Connman/NetworkTechnology.qml <<'EOF'
-+import QtQuick
++    # Note: Real Connman QML module is provided by pkgs.asteroid.libconnman-qt
++    # Upstream: https://github.com/sailfishos/libconnman-qt
 +
-+Item {
-+    id: root
-+    property string path: ""
-+    property bool powered: false
-+    property bool connected: false
-+    property string name: ""
-+    property string state: "idle"
-+    property string type: "wifi"
-+
-+    signal scanFinished()
-+    function requestScan() {
-+        scanFinished()
-+    }
-+}
-+EOF
-+
++    # Minimal fallback AgendaModel for org.nemomobile.calendar
++    # Upstream reference: https://github.com/sailfishos/nemo-qml-plugin-calendar
++    # Recipe reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-qml-plugins/nemo-qml-plugin-calendar_git.bb
 +    mkdir -p $out/lib/qt-6/qml/org/nemomobile/calendar
 +    cat > $out/lib/qt-6/qml/org/nemomobile/calendar/qmldir <<'EOF'
 +module org.nemomobile.calendar
@@ -934,12 +910,12 @@ index 00000000..4e577049
 +}
 diff --git a/overlay/asteroidos/stubs/mce-stub.c b/overlay/asteroidos/stubs/mce-stub.c
 new file mode 100644
-index 00000000..1b51e714
+index 00000000..b33c3849
 --- /dev/null
 +++ b/overlay/asteroidos/stubs/mce-stub.c
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,150 @@
 +/*
-+ * Lightweight Mode Control Entity (MCE) daemon stub for AsteroidOS.
++ * Mode Control Entity (MCE) daemon for AsteroidOS on Mobile-NixOS.
 + * Provides the com.nokia.mce D-Bus service, signals, and methods
 + * expected by LipstickCompositor (QMceDisplay), QuickPanel, and AsteroidOS apps.
 + *
@@ -947,9 +923,13 @@ index 00000000..1b51e714
 + * - https://github.com/AsteroidOS/mce
 + * - https://github.com/AsteroidOS/libmce-qt
 + * - https://git.sailfishos.org/mer-core/mce
++ * - https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/mce
 + */
 +
 +#include <gio/gio.h>
++
++static gchar current_display_status[16] = "on";
++static GDBusConnection *global_connection = NULL;
 +
 +static const gchar introspection_xml[] =
 +  "<node>"
@@ -983,6 +963,26 @@ index 00000000..1b51e714
 +  "</node>";
 +
 +static void
++emit_display_status_ind(const gchar *status)
++{
++    if (!global_connection)
++        return;
++
++    GError *error = NULL;
++    g_dbus_connection_emit_signal(global_connection,
++                                  NULL,
++                                  "/com/nokia/mce/signal",
++                                  "com.nokia.mce.signal",
++                                  "display_status_ind",
++                                  g_variant_new("(s)", status),
++                                  &error);
++    if (error) {
++        g_printerr("mce: Failed to emit display_status_ind: %s\n", error->message);
++        g_clear_error(&error);
++    }
++}
++
++static void
 +handle_method_call(GDBusConnection       *connection,
 +                   const gchar           *sender,
 +                   const gchar           *object_path,
@@ -993,7 +993,23 @@ index 00000000..1b51e714
 +                   gpointer               user_data)
 +{
 +    if (g_strcmp0(method_name, "get_display_status") == 0) {
-+        g_dbus_method_invocation_return_value(invocation, g_variant_new("(s)", "on"));
++        g_dbus_method_invocation_return_value(invocation, g_variant_new("(s)", current_display_status));
++    } else if (g_strcmp0(method_name, "req_display_state_on") == 0) {
++        g_strlcpy(current_display_status, "on", sizeof(current_display_status));
++        emit_display_status_ind("on");
++        g_dbus_method_invocation_return_value(invocation, NULL);
++    } else if (g_strcmp0(method_name, "req_display_state_dim") == 0) {
++        g_strlcpy(current_display_status, "dim", sizeof(current_display_status));
++        emit_display_status_ind("dim");
++        g_dbus_method_invocation_return_value(invocation, NULL);
++    } else if (g_strcmp0(method_name, "req_display_state_off") == 0) {
++        g_strlcpy(current_display_status, "off", sizeof(current_display_status));
++        emit_display_status_ind("off");
++        g_dbus_method_invocation_return_value(invocation, NULL);
++    } else if (g_strcmp0(method_name, "req_display_state_lpm") == 0) {
++        g_strlcpy(current_display_status, "lpm", sizeof(current_display_status));
++        emit_display_status_ind("lpm");
++        g_dbus_method_invocation_return_value(invocation, NULL);
 +    } else if (g_strcmp0(method_name, "get_cpr_mode") == 0) {
 +        g_dbus_method_invocation_return_value(invocation, g_variant_new("(s)", "normal"));
 +    } else {
@@ -1012,10 +1028,11 @@ index 00000000..1b51e714
 +                const gchar     *name,
 +                gpointer         user_data)
 +{
++    global_connection = connection;
 +    GError *error = NULL;
 +    GDBusNodeInfo *introspection_data = g_dbus_node_info_new_for_xml(introspection_xml, &error);
 +    if (!introspection_data) {
-+        g_printerr("mce-stub: Failed to parse introspection xml: %s\n", error ? error->message : "unknown");
++        g_printerr("mce: Failed to parse introspection xml: %s\n", error ? error->message : "unknown");
 +        return;
 +    }
 +
@@ -1025,21 +1042,12 @@ index 00000000..1b51e714
 +                                      &interface_vtable,
 +                                      NULL, NULL, &error);
 +    if (error) {
-+        g_printerr("mce-stub: Failed to register /com/nokia/mce/request: %s\n", error->message);
++        g_printerr("mce: Failed to register /com/nokia/mce/request: %s\n", error->message);
 +        g_clear_error(&error);
 +    }
 +
 +    /* Broadcast initial display_status_ind("on") */
-+    g_dbus_connection_emit_signal(connection,
-+                                  NULL,
-+                                  "/com/nokia/mce/signal",
-+                                  "com.nokia.mce.signal",
-+                                  "display_status_ind",
-+                                  g_variant_new("(s)", "on"),
-+                                  &error);
-+    if (error) {
-+        g_clear_error(&error);
-+    }
++    emit_display_status_ind(current_display_status);
 +}
 +
 +int main(int argc, char *argv[])

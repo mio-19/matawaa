@@ -800,7 +800,7 @@ index 00000000..2a57118f
 +
 +#endif // REMOTECAMERABRIDGE_H
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
-index 74b387c1..9a9b5455 100644
+index 695a8f0a..17222a4d 100644
 --- a/overlay/asteroidos/apps/default.nix
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -97,9 +97,20 @@

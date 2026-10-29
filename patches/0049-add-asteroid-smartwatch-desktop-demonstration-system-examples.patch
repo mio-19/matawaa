@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 ++
- examples/asteroid/asteroid-desktop.nix | 386 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 388 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 +++
  examples/asteroid/default.nix          |  15 +
- 4 files changed, 462 insertions(+)
+ 4 files changed, 464 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..a18d5c41
+index 00000000..496a0118
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,386 @@
+@@ -0,0 +1,388 @@
 +{
 +  config,
 +  lib,
@@ -105,6 +105,7 @@ index 00000000..a18d5c41
 +        asteroid.asteroid-launcher
 +        asteroid.asteroid-btsyncd
 +        asteroid.nemo-qml-plugin-dbus
++        asteroid.libconnman-qt
 +        asteroid.stubs
 +        # QML module the launcher imports; the cross qt5compat lacks it.
 +        qt5compatQml
@@ -256,6 +257,7 @@ index 00000000..a18d5c41
 +        "${pkgs.asteroid.mlite}/lib/qt-6/qml"
 +        "${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml"
 +        "${pkgs.asteroid.nemo-qml-plugin-dbus}/lib/qt-6/qml"
++        "${pkgs.asteroid.libconnman-qt}/lib/qt-6/qml"
 +        "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
 +        "${pkgs.asteroid.stubs}/lib/qt-6/qml"
 +      ];

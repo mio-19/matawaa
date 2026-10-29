@@ -19,19 +19,23 @@ libraries, without wrapping the Qt apps.
 ---
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++++++++++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++++++
- overlay/asteroidos/default.nix                |  11 ++
+ overlay/asteroidos/default.nix                |  19 ++
  overlay/asteroidos/keepalive/default.nix      | 167 ++++++++++++++++++
+ overlay/asteroidos/libconnman-qt/default.nix  | 139 +++++++++++++++
+ overlay/asteroidos/libiodata/default.nix      | 111 ++++++++++++
  overlay/asteroidos/mce-dev/default.nix        |  41 +++++
  overlay/asteroidos/mce-qt6/default.nix        | 100 +++++++++++
  overlay/asteroidos/mlite/CMakeLists.txt       | 124 +++++++++++++
  overlay/asteroidos/mlite/default.nix          |  52 ++++++
  overlay/asteroidos/ngf-qt6/default.nix        |  96 ++++++++++
- overlay/asteroidos/timed-qt6/default.nix      | 162 +++++++++++++++++
+ overlay/asteroidos/timed-qt6/default.nix      | 107 +++++++++++
  overlay/asteroidos/usb-moded-qt6/default.nix  | 113 ++++++++++++
- 11 files changed, 1048 insertions(+)
+ 13 files changed, 1251 insertions(+)
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
  create mode 100644 overlay/asteroidos/keepalive/default.nix
+ create mode 100644 overlay/asteroidos/libconnman-qt/default.nix
+ create mode 100644 overlay/asteroidos/libiodata/default.nix
  create mode 100644 overlay/asteroidos/mce-dev/default.nix
  create mode 100644 overlay/asteroidos/mce-qt6/default.nix
  create mode 100644 overlay/asteroidos/mlite/CMakeLists.txt
@@ -235,15 +239,21 @@ index 00000000..bcdd9f13
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 2fc834f0..90363944 100644
+index 2fc834f0..7ecfadb4 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,5 +7,16 @@ rec {
+@@ -7,5 +7,24 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
 +  amber-mpris = callPackage ./amber-mpris { };
 +  mlite = callPackage ./mlite { };
++  nemo-qml-plugin-configuration = callPackage ./nemo-qml-plugin-configuration {
++    inherit mlite;
++  };
++  nemo-qml-plugin-dbus = callPackage ./nemo-qml-plugin-dbus { };
++  libconnman-qt = callPackage ./libconnman-qt { };
++  libiodata = callPackage ./libiodata { };
 +  mce-dev = callPackage ./mce-dev { };
 +  mce-qt6 = callPackage ./mce-qt6 {
 +    inherit mce-dev;
@@ -251,7 +261,9 @@ index 2fc834f0..90363944 100644
 +  ngf-qt6 = callPackage ./ngf-qt6 { };
 +  usb-moded-qt6 = callPackage ./usb-moded-qt6 { };
 +  keepalive = callPackage ./keepalive { };
-+  timed-qt6 = callPackage ./timed-qt6 { };
++  timed-qt6 = callPackage ./timed-qt6 {
++    inherit libiodata;
++  };
 +
    inherit (pkgs) msm-fb-refresher;
  }
@@ -428,9 +440,271 @@ index 00000000..f9a34dfb
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/libconnman-qt/default.nix b/overlay/asteroidos/libconnman-qt/default.nix
+new file mode 100644
+index 00000000..38928a7b
+--- /dev/null
++++ b/overlay/asteroidos/libconnman-qt/default.nix
+@@ -0,0 +1,139 @@
++# Qt6 library and QML plugin for ConnMan
++# Upstream repository: https://github.com/sailfishos/libconnman-qt
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-connectivity/libconnman-qt
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "libconnman-qt";
++  version = "1.3.3";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "libconnman-qt";
++    rev = "6b5ad435bbe9cb306324fc5d09a3624543e2ff63";
++    sha256 = "0dwrbiy8zi18i3y7ars54gnszvmzkyjv856505vz322faiazbdxi";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++  ];
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  preConfigure = ''
++    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -p connman_clock_interface.h:connman_clock_interface.cpp libconnman-qt/connman_clock.xml
++    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -p connman_session_interface.h:connman_session_interface.cpp libconnman-qt/connman_session.xml
++    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -p connman_technology_interface.h:connman_technology_interface.cpp libconnman-qt/connman_technology.xml
++    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -i qdbusxml2cpp_dbus_types.h -p connman_service_interface.h:connman_service_interface.cpp libconnman-qt/connman_service.xml
++    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -i qdbusxml2cpp_dbus_types.h -p connman_vpn_manager_interface.h:connman_vpn_manager_interface.cpp libconnman-qt/connman_vpn_manager.xml
++    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -i qdbusxml2cpp_dbus_types.h -p connman_vpn_connection_interface.h:connman_vpn_connection_interface.cpp libconnman-qt/connman_vpn_connection.xml
++  '';
++
++  postPatch = ''
++    cat << "EOF" > CMakeLists.txt
++cmake_minimum_required(VERSION 3.16)
++project(libconnman-qt LANGUAGES CXX)
++set(CMAKE_CXX_STANDARD 17)
++set(CMAKE_AUTOMOC ON)
++
++find_package(Qt6 REQUIRED COMPONENTS Core DBus Network Qml)
++
++set(LIB_SRC
++  libconnman-qt/clockmodel.cpp
++  libconnman-qt/commondbustypes.cpp
++  libconnman-qt/connmannetworkproxyfactory.cpp
++  libconnman-qt/counter.cpp
++  libconnman-qt/logging.cpp
++  libconnman-qt/marshalutils.cpp
++  libconnman-qt/networkmanager.cpp
++  libconnman-qt/networkservice.cpp
++  libconnman-qt/networksession.cpp
++  libconnman-qt/networktechnology.cpp
++  libconnman-qt/sessionagent.cpp
++  libconnman-qt/useragent.cpp
++  libconnman-qt/vpnconnection.cpp
++  libconnman-qt/vpnmanager.cpp
++  libconnman-qt/vpnmodel.cpp
++  connman_clock_interface.cpp
++  connman_session_interface.cpp
++  connman_technology_interface.cpp
++  connman_service_interface.cpp
++  connman_vpn_manager_interface.cpp
++  connman_vpn_connection_interface.cpp
++)
++
++file(GLOB PUBLIC_HEADERS "libconnman-qt/*.h")
++
++add_library(connman-qt6 SHARED ''${LIB_SRC} ''${PUBLIC_HEADERS})
++target_compile_definitions(connman-qt6 PRIVATE HAVE_LIBDBUSACCESS=0)
++target_include_directories(connman-qt6 PUBLIC
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/libconnman-qt>
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_BINARY_DIR}>
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}>
++  $<INSTALL_INTERFACE:include/connman-qt6>
++)
++target_link_libraries(connman-qt6 PUBLIC Qt6::Core Qt6::DBus Qt6::Network)
++set_target_properties(connman-qt6 PROPERTIES VERSION 1.3.3 SOVERSION 1)
++
++install(TARGETS connman-qt6 DESTINATION lib)
++install(FILES ''${PUBLIC_HEADERS} DESTINATION include/connman-qt6)
++
++configure_file(connman-qt6.pc.in connman-qt6.pc @ONLY)
++install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/connman-qt6.pc DESTINATION lib/pkgconfig)
++
++add_library(ConnmanQtDeclarative MODULE
++  plugin/plugin.cpp
++  plugin/technologyservicemodel.cpp
++  plugin/savedservicemodel.cpp
++  plugin/declarativenetworkmanager.cpp
++)
++target_include_directories(ConnmanQtDeclarative PRIVATE libconnman-qt plugin ''${CMAKE_CURRENT_BINARY_DIR})
++target_link_libraries(ConnmanQtDeclarative PRIVATE Qt6::Core Qt6::DBus Qt6::Qml connman-qt6)
++target_link_options(ConnmanQtDeclarative PRIVATE -Wl,--no-undefined)
++
++install(TARGETS ConnmanQtDeclarative LIBRARY DESTINATION lib/qt-6/qml/Connman)
++install(FILES plugin/qmldir plugin/plugins.qmltypes DESTINATION lib/qt-6/qml/Connman)
++EOF
++
++    cat << "EOF" > connman-qt6.pc.in
++prefix=@CMAKE_INSTALL_PREFIX@
++exec_prefix=''${prefix}
++libdir=''${prefix}/lib
++includedir=''${prefix}/include/connman-qt6
++
++Name: connman-qt6
++Description: Qt Connman Library
++Version: 1.3.3
++Requires: Qt6Core Qt6DBus Qt6Network
++Libs: -L''${libdir} -lconnman-qt6
++Cflags: -I''${includedir}
++EOF
++  '';
++
++  meta = with lib; {
++    description = "Qt 6 library and QML plugin for ConnMan";
++    homepage = "https://github.com/sailfishos/libconnman-qt";
++    license = licenses.asl20;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/libiodata/default.nix b/overlay/asteroidos/libiodata/default.nix
+new file mode 100644
+index 00000000..36607b9c
+--- /dev/null
++++ b/overlay/asteroidos/libiodata/default.nix
+@@ -0,0 +1,111 @@
++# Nemomobile's libiodata library
++# Upstream repository: https://github.com/sailfishos/libiodata
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/libiodata/libiodata_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  bison,
++  flex,
++  qt6,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "libiodata";
++  version = "0.20.0";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "libiodata";
++    rev = "85517a9f2103e461cbb69dc195335df73b7a8b7e";
++    sha256 = "0d7k5db04npqygawsbq0sf05r3a0q90b0hksg83c55qdqz9kp1kv";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    bison
++    flex
++    qt6.wrapQtAppsHook
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++  ];
++
++  postPatch = ''
++    cat << "EOF" > CMakeLists.txt
++cmake_minimum_required(VERSION 3.16)
++project(iodata-qt6 LANGUAGES CXX)
++set(CMAKE_CXX_STANDARD 17)
++set(CMAKE_AUTOMOC ON)
++
++find_package(Qt6 REQUIRED COMPONENTS Core)
++find_package(BISON REQUIRED)
++find_package(FLEX REQUIRED)
++
++BISON_TARGET(DataLangParser src/datalang.y ''${CMAKE_CURRENT_BINARY_DIR}/parser.cpp DEFINES_FILE ''${CMAKE_CURRENT_BINARY_DIR}/parser.hpp)
++FLEX_TARGET(DataLangScanner src/datalang.l ''${CMAKE_CURRENT_BINARY_DIR}/tokens.cpp)
++ADD_FLEX_BISON_DEPENDENCY(DataLangScanner DataLangParser)
++
++set(LIB_SRC
++  src/iodata.cpp
++  src/validator.cpp
++  src/storage.cpp
++  src/misc.cpp
++  ''${BISON_DataLangParser_OUTPUTS}
++  ''${FLEX_DataLangScanner_OUTPUTS}
++)
++
++add_library(iodata-qt6 SHARED ''${LIB_SRC})
++target_include_directories(iodata-qt6 PUBLIC
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/src>
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_BINARY_DIR}>
++  $<INSTALL_INTERFACE:include/iodata-qt6>
++)
++target_link_libraries(iodata-qt6 PUBLIC Qt6::Core)
++set_target_properties(iodata-qt6 PROPERTIES VERSION 0.20.0 SOVERSION 0)
++
++install(TARGETS iodata-qt6 DESTINATION lib)
++install(FILES
++  src/iodata.h
++  src/validator.h
++  src/storage.h
++  src/misc.h
++  src/log.h
++  src/iodata
++  src/validator
++  src/storage
++  DESTINATION include/iodata-qt6
++)
++
++configure_file(iodata-qt6.pc.in iodata-qt6.pc @ONLY)
++install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/iodata-qt6.pc DESTINATION lib/pkgconfig)
++EOF
++
++    cat << "EOF" > iodata-qt6.pc.in
++prefix=@CMAKE_INSTALL_PREFIX@
++exec_prefix=''${prefix}
++libdir=''${prefix}/lib
++includedir=''${prefix}/include/iodata-qt6
++
++Name: iodata-qt6
++Description: Nemomobile libiodata Qt6 library
++Version: 0.20.0
++Requires: Qt6Core
++Libs: -L''${libdir} -liodata-qt6
++Cflags: -I''${includedir}
++EOF
++  '';
++
++  meta = with lib; {
++    description = "Nemomobile structured data library";
++    homepage = "https://github.com/sailfishos/libiodata";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})
 diff --git a/overlay/asteroidos/mce-dev/default.nix b/overlay/asteroidos/mce-dev/default.nix
 new file mode 100644
-index 00000000..ccf3ec5a
+index 00000000..945affdc
 --- /dev/null
 +++ b/overlay/asteroidos/mce-dev/default.nix
 @@ -0,0 +1,41 @@
@@ -451,8 +725,8 @@ index 00000000..ccf3ec5a
 +  src = fetchFromGitHub {
 +    owner = "sailfishos";
 +    repo = "mce-dev";
-+    rev = "5e351e2f17bba85423ee7ee13ae0d1bb10292cad";
-+    hash = "sha256-e1hCeZCYu9CC2w2ok2TGKXsaB72DCCnLRGoJYPR/7ZM=";
++    rev = "595cdec2a72f73b3864c516790d16231e016aa53";
++    hash = "sha256-rXt1opMndNEHcsxRUr+vkwQ4rcPiKaq65qDJ8DRwWBM=";
 +  };
 +
 +  nativeBuildInputs = [ pkg-config ];
@@ -873,24 +1147,33 @@ index 00000000..d16b452f
 +})
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
 new file mode 100644
-index 00000000..2fc3f7e0
+index 00000000..c4445327
 --- /dev/null
 +++ b/overlay/asteroidos/timed-qt6/default.nix
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,107 @@
 +# Timed Qt6 client library interface
 +# Upstream repository: https://github.com/sailfishos/timed
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/timed
 +{
 +  lib,
 +  stdenv,
++  fetchFromGitHub,
 +  cmake,
 +  pkg-config,
 +  qt6,
++  libiodata,
 +}:
 +
 +stdenv.mkDerivation (finalAttrs: {
 +  pname = "timed-qt6";
-+  version = "1.0.0";
-+  dontUnpack = true;
++  version = "3.6.0";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "timed";
++    rev = "80ea5e63cf58db616789adbfeb9cf3bfd63dddaa";
++    sha256 = "1byd00z946q2bd6xi4s2vyxb380gh84d143jc8p8n26ifmvlpb79";
++  };
 +
 +  strictDeps = true;
 +
@@ -902,140 +1185,76 @@ index 00000000..2fc3f7e0
 +
 +  buildInputs = [
 +    qt6.qtbase
++    libiodata
 +  ];
 +
++  preConfigure = ''
++    mkdir -p include/timed-qt6
++    cp src/lib/*.h include/timed-qt6/
++    cp src/lib/event src/lib/interface src/lib/wallclock src/lib/qmacro include/timed-qt6/
++    cp src/lib/hidden/exception include/timed-qt6/
++  '';
++
 +  postPatch = ''
-+        mkdir -p src include/timed-qt6
-+        cat << "EOF" > CMakeLists.txt
-+    cmake_minimum_required(VERSION 3.16)
-+    project(timed-qt6 LANGUAGES CXX)
-+    find_package(Qt6 REQUIRED COMPONENTS Core DBus)
-+    set(CMAKE_AUTOMOC ON)
-+    add_library(timed-qt6 SHARED src/timed.cpp src/interface.h)
-+    target_include_directories(timed-qt6 PUBLIC
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/include>
-+      $<INSTALL_INTERFACE:include>
-+    )
-+    target_link_libraries(timed-qt6 PUBLIC Qt6::Core Qt6::DBus)
-+    set_target_properties(timed-qt6 PROPERTIES VERSION 1.0.0 SOVERSION 1)
-+    install(TARGETS timed-qt6 DESTINATION lib)
-+    install(DIRECTORY include/timed-qt6 DESTINATION include)
-+    configure_file(timed-qt6.pc.in timed-qt6.pc @ONLY)
-+    install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/timed-qt6.pc DESTINATION lib/pkgconfig)
-+    EOF
-+        cat << "EOF" > include/timed-qt6/event-declarations.h
-+    #pragma once
-+    #include <QString>
-+    #include <ctime>
++    cat << "EOF" > CMakeLists.txt
++cmake_minimum_required(VERSION 3.16)
++project(timed-qt6 LANGUAGES CXX)
++set(CMAKE_CXX_STANDARD 17)
++set(CMAKE_AUTOMOC ON)
 +
-+    namespace Maemo {
-+    namespace Timed {
++find_package(Qt6 REQUIRED COMPONENTS Core DBus)
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(IODATA REQUIRED iodata-qt6)
 +
-+    class Event {
-+    public:
-+        class Action {
-+        public:
-+            void whenDue() {}
-+            void runCommand(const char *, const char *) {}
-+        };
++set(LIB_SRC
++  src/lib/interface.cpp
++  src/lib/event-io.cpp
++  src/lib/event-pimple.cpp
++  src/lib/exception.cpp
++  src/lib/nanotime.cpp
++  src/lib/aliases.cpp
++  src/lib/wall-settings.cpp
++  src/lib/wall-info.cpp
++  src/lib/qmacro.cpp
++)
 +
-+        Event() = default;
-+        void setTicker(const QString &) {}
-+        void setTicker(time_t) {}
-+        void setAttribute(const QString &, const QString &) {}
-+        void setActionWakeup() {}
-+        void setSingleShotFlag(bool = true) {}
-+        void setAlarmFlag(bool = true) {}
-+        void setBootFlag(bool = true) {}
-+        void setKeepAliveFlag(bool = true) {}
-+        void setReminderFlag(bool = true) {}
-+        Action &addAction() { static Action act; return act; }
-+    };
++add_library(timed-qt6 SHARED ''${LIB_SRC})
++target_include_directories(timed-qt6 PUBLIC
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/include>
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/src/lib>
++  $<INSTALL_INTERFACE:include/timed-qt6>
++  ''${IODATA_INCLUDE_DIRS}
++)
++target_link_libraries(timed-qt6 PUBLIC Qt6::Core Qt6::DBus ''${IODATA_LIBRARIES} rt)
++set_target_properties(timed-qt6 PROPERTIES VERSION 3.6.0 SOVERSION 3)
 +
-+    } // namespace Timed
-+    } // namespace Maemo
-+    EOF
-+        cat << "EOF" > include/timed-qt6/event
-+    #pragma once
-+    #include <timed-qt6/event-declarations.h>
-+    EOF
-+        cat << "EOF" > include/timed-qt6/event.h
-+    #pragma once
-+    #include <timed-qt6/event-declarations.h>
-+    EOF
-+        cat << "EOF" > include/timed-qt6/exception
-+    #pragma once
-+    #include <exception>
++install(TARGETS timed-qt6 DESTINATION lib)
++file(GLOB HEADERS "include/timed-qt6/*")
++install(FILES ''${HEADERS} DESTINATION include/timed-qt6)
 +
-+    namespace Maemo {
-+    namespace Timed {
-+    class Exception : public std::exception {};
-+    }
-+    }
-+    EOF
-+        cat << "EOF" > include/timed-qt6/exception.h
-+    #pragma once
-+    #include <timed-qt6/exception>
-+    EOF
-+        cat << "EOF" > include/timed-qt6/interface.h
-+    #pragma once
-+    #include <QObject>
-+    #include <QDBusReply>
-+    #include <QDBusError>
-+    #include <QList>
-+    #include <QMap>
-+    #include <QString>
-+    #include <QVariant>
-+    #include <timed-qt6/event-declarations.h>
++configure_file(timed-qt6.pc.in timed-qt6.pc @ONLY)
++install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/timed-qt6.pc DESTINATION lib/pkgconfig)
++EOF
 +
-+    namespace Maemo {
-+    namespace Timed {
++    cat << "EOF" > timed-qt6.pc.in
++prefix=@CMAKE_INSTALL_PREFIX@
++exec_prefix=''${prefix}
++libdir=''${prefix}/lib
++includedir=''${prefix}/include/timed-qt6
 +
-+    class Interface : public QObject {
-+        Q_OBJECT
-+    public:
-+        explicit Interface(QObject *parent = nullptr) : QObject(parent) {}
-+        virtual ~Interface() {}
-+
-+        bool isValid() const { return true; }
-+        QDBusError lastError() const { return QDBusError(); }
-+        QDBusReply<QList<QVariant>> query_sync(const QMap<QString, QVariant> &) { return QDBusReply<QList<QVariant>>(); }
-+        QDBusReply<bool> cancel_sync(uint) { return QDBusReply<bool>(); }
-+        QDBusReply<uint> replace_event_sync(const Event &, uint) { return QDBusReply<uint>(); }
-+        QDBusReply<uint> add_event_sync(const Event &) { return QDBusReply<uint>(); }
-+    };
-+
-+    } // namespace Timed
-+    } // namespace Maemo
-+    EOF
-+        cat << "EOF" > include/timed-qt6/interface
-+    #pragma once
-+    #include <timed-qt6/interface.h>
-+    EOF
-+        cp include/timed-qt6/* src/
-+        cat << "EOF" > src/timed.cpp
-+    #include "interface.h"
-+    #include "moc_interface.cpp"
-+    EOF
-+        cat << "EOF" > timed-qt6.pc.in
-+    prefix=@CMAKE_INSTALL_PREFIX@
-+    exec_prefix=''${prefix}
-+    libdir=''${prefix}/lib
-+    includedir=''${prefix}/include
-+
-+    Name: timed-qt6
-+    Description: Timed Qt6 client library
-+    Version: 1.0.0
-+    Requires: Qt6Core Qt6DBus
-+    Libs: -L''${libdir} -ltimed-qt6
-+    Cflags: -I''${includedir}
-+    EOF
++Name: timed-qt6
++Description: Timed Qt6 client library
++Version: 3.6.0
++Requires: Qt6Core Qt6DBus iodata-qt6
++Libs: -L''${libdir} -ltimed-qt6
++Cflags: -I''${includedir}
++EOF
 +  '';
 +
 +  meta = with lib; {
 +    description = "Time daemon Qt6 client library";
 +    homepage = "https://github.com/sailfishos/timed";
-+    license = licenses.lgpl21Only;
++    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
 +})

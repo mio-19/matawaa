@@ -12,10 +12,10 @@ compile with modern GCC 16 toolchains.
  create mode 100644 overlay/asteroidos/community-apps/weatherfetch-gcc16.patch
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
-index a17160f9..dd25bd98 100644
+index 9cb0865e..57ad6c31 100644
 --- a/overlay/asteroidos/community-apps/default.nix
 +++ b/overlay/asteroidos/community-apps/default.nix
-@@ -190,6 +190,9 @@ rec {
+@@ -193,6 +193,9 @@ rec {
      desc = "Direct internet weather forecast fetcher for AsteroidOS";
      rev = "70044bb4904d22f521fa7eb7448d5007bd863f97";
      sha256 = "04m1shcw9a36dpa5ibw5728c6d1vqiah9djlr79fq51c12sy7fvl";

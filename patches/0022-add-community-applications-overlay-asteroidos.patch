@@ -8,17 +8,17 @@ map, qmltester, skedaddle, weatherfetch, beatfork, benchymark,
 docking-bay, heliograph, horizon, meteormatch, pulsar, rag, shopper,
 toolwatch, and touchdown.
 ---
- overlay/asteroidos/community-apps/default.nix | 354 ++++++++++++++++++
+ overlay/asteroidos/community-apps/default.nix | 357 ++++++++++++++++++
  overlay/asteroidos/default.nix                |   5 +
- 2 files changed, 359 insertions(+)
+ 2 files changed, 362 insertions(+)
  create mode 100644 overlay/asteroidos/community-apps/default.nix
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
 new file mode 100644
-index 00000000..843b7c85
+index 00000000..59ecfe42
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/default.nix
-@@ -0,0 +1,354 @@
+@@ -0,0 +1,357 @@
 +{
 +  lib,
 +  stdenv,
@@ -37,8 +37,8 @@ index 00000000..843b7c85
 +    src = fetchFromGitHub {
 +      owner = "AsteroidOS";
 +      repo = "unofficial-watchfaces";
-+      rev = "2d8247c28262ba686f49a873beba4d6bff4183c1";
-+      sha256 = "0dg57c80dvbw9h5cnypljqshbz198wg66rap8l6qcrq3gx3f8js1";
++      rev = "e1b5a205b72f8a249a6d85c81493a933b5b5edcc";
++      sha256 = "0ml8i4p5h6fv3d3x0xqlz6qngf2063scbm2mrr7ssbbv4q3vsf36";
 +    };
 +
 +    installPhase = ''
@@ -87,6 +87,9 @@ index 00000000..843b7c85
 +    desc = "Background sensor logging daemon and QML plugin for health metrics on AsteroidOS";
 +    rev = "bdc9f0bb0fd6ef39f08fb01697d95cb2b98c86b6";
 +    sha256 = "1lb5m8g4k8sq9j9kynmffmzfj6q98rnwzbi7dr1i8fs6iq12a1ri";
++    # Upstream AsteroidOS patches qtsensors in meta-asteroid to provide stepcounter, HRM, and wrist sensors:
++    # https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-qt/qt6/qtsensors/0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch
++    # https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-qt/qt6/qtsensors/0003-Add-step-counter-sensor-with-sensorfw-backend.patch
 +    postPatch = ''
 +            for dir in . daemon qmlplugin; do
 +              mkdir -p $dir/QtSensors
@@ -374,10 +377,10 @@ index 00000000..843b7c85
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index f65e1114..0992b203 100644
+index 68ff8db1..c4dbf2cb 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -59,6 +59,11 @@ rec {
+@@ -63,6 +63,11 @@ rec {
  
    virtualkeyboard = callPackage ./virtualkeyboard { };
  

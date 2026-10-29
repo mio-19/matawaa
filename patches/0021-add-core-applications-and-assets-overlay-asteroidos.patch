@@ -19,7 +19,7 @@ Package the standard AsteroidOS application suite and its shared assets:
 
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
 new file mode 100644
-index 00000000..74b387c1
+index 00000000..695a8f0a
 --- /dev/null
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -0,0 +1,122 @@
@@ -63,8 +63,8 @@ index 00000000..74b387c1
 +  settings = mkAsteroidApp {
 +    name = "settings";
 +    desc = "Smartwatch preferences and configuration application";
-+    rev = "6e257e62524001d3438d3b161cbc0693afbee189";
-+    sha256 = "1sw38azmnkgmd1vv5c4galk6299z9zphff364d453ibvc8k1ixd3";
++    rev = "56c917fd82aa5cb1f679f424f4c226fcffd89a12";
++    sha256 = "1cbn5cg9q49ik7xwhsi4l6wph9mjxl8w5j4016rdwxq6w8y5ixx3";
 +    extraBuildInputs = [
 +      mce-dev
 +      ngf-qt6
@@ -264,10 +264,10 @@ index 00000000..5188043b
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index fb72d51f..f65e1114 100644
+index a8d619c0..68ff8db1 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -49,6 +49,14 @@ rec {
+@@ -53,6 +53,14 @@ rec {
      inherit qml-asteroid amber-mpris mlite;
    };
  
