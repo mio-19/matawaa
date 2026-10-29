@@ -10,6 +10,14 @@ This project is a patchset on top of [Mobile-NixOS](https://mobile.nixos.org/). 
 
 The patch series might be regarded as the real commit history, whereas the git commit history here can be relaxing and/or having meaningless commit messages.
 
+## Status
+
+For hoki (Fossil Gen 6):
+
++ [x] mobile-nixos stage1
++ [x] asteroid os splash
++ [ ] asteroid os launcher
+
 ## Devices, Linux Kernel
 
 + fossil-hoki running kernel 4.14.x EOL, but openela : <https://github.com/openela/kernel-lts/tree/linux-4.14.y>
