@@ -20,7 +20,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/accounts-qt/default.nix    |  81 +++
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++
- overlay/asteroidos/default.nix                |  65 ++
+ overlay/asteroidos/default.nix                |  66 ++
  overlay/asteroidos/dsme/default.nix           | 122 ++++
  overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
  overlay/asteroidos/keepalive/default.nix      | 131 ++++
@@ -32,9 +32,10 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/libiphb/default.nix        |  54 ++
  overlay/asteroidos/libngf/default.nix         |  53 ++
  overlay/asteroidos/mce-dev/default.nix        |  41 ++
+ .../mce-plugin-libhybris/default.nix          |  72 +++
  overlay/asteroidos/mce-qt6/default.nix        | 100 +++
  overlay/asteroidos/mce/builtin-gconf.values   |   1 +
- overlay/asteroidos/mce/default.nix            | 105 +++
+ overlay/asteroidos/mce/default.nix            | 107 ++++
  overlay/asteroidos/mce/mce.service            |  17 +
  ...tion-Adapts-the-state-machine-to-a-s.patch | 421 ++++++++++++
  ...ke-screen-when-wrist-gesture-arrives.patch | 606 ++++++++++++++++++
@@ -54,8 +55,8 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-dev/default.nix  |  42 ++
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
- overlay/libhybris/default.nix                 |  62 +-
- 38 files changed, 4400 insertions(+), 36 deletions(-)
+ overlay/libhybris/default.nix                 |  68 +-
+ 39 files changed, 4481 insertions(+), 36 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -70,6 +71,7 @@ libraries, without wrapping the Qt apps.
  create mode 100644 overlay/asteroidos/libiphb/default.nix
  create mode 100644 overlay/asteroidos/libngf/default.nix
  create mode 100644 overlay/asteroidos/mce-dev/default.nix
+ create mode 100644 overlay/asteroidos/mce-plugin-libhybris/default.nix
  create mode 100644 overlay/asteroidos/mce-qt6/default.nix
  create mode 100644 overlay/asteroidos/mce/builtin-gconf.values
  create mode 100644 overlay/asteroidos/mce/default.nix
@@ -375,10 +377,10 @@ index 00000000..bcdd9f13
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 2fc834f0..25911388 100644
+index 2fc834f0..515f584a 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,5 +7,70 @@ rec {
+@@ -7,5 +7,71 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
@@ -391,6 +393,7 @@ index 2fc834f0..25911388 100644
 +  libconnman-qt = callPackage ./libconnman-qt { };
 +  libiodata = callPackage ./libiodata { };
 +  mce-dev = callPackage ./mce-dev { };
++  mce-plugin-libhybris = callPackage ./mce-plugin-libhybris { };
 +  mce-qt6 = callPackage ./mce-qt6 {
 +    inherit mce-dev;
 +  };
@@ -411,7 +414,7 @@ index 2fc834f0..25911388 100644
 +  # Upstream repository: https://github.com/sailfishos/mce
 +  # AsteroidOS recipes: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/mce
 +  mce = callPackage ./mce {
-+    inherit libdsme libiphb libngf usb-moded-dev mce-dev;
++    inherit libdsme libiphb libngf usb-moded-dev mce-dev mce-plugin-libhybris;
 +  };
 +
 +  # Nemomobile SensorFW daemon and client API (qtsensors sensorfw backend).
@@ -1345,6 +1348,84 @@ index 00000000..945affdc
 +    platforms = platforms.linux;
 +  };
 +}
+diff --git a/overlay/asteroidos/mce-plugin-libhybris/default.nix b/overlay/asteroidos/mce-plugin-libhybris/default.nix
+new file mode 100644
+index 00000000..12ad147b
+--- /dev/null
++++ b/overlay/asteroidos/mce-plugin-libhybris/default.nix
+@@ -0,0 +1,72 @@
++# libhybris plugin for MCE: display brightness/blanking and LED control on
++# Android hardware. Without it MCE falls back to sysfs backlights, which do not
++# exist on Android devices, so the panel never gets powered/brightness set.
++#
++# Upstream recipe:
++# https://github.com/AsteroidOS/meta-asteroid/blob/5af858f49f33efe6d6ef4aa027bee7eeffb27cee/recipes-nemomobile/mce/mce-plugin-libhybris_git.bb
++{
++  lib,
++  stdenv,
++  fetchgit,
++  pkg-config,
++  glib,
++  libhybris,
++  # The plugin includes <android-config.h>, <system/window.h> and
++  # <hardware/lights.h>, which must match the headers libhybris was built
++  # against.
++  android-headers ? libhybris.passthru.androidHeaders,
++}:
++
++stdenv.mkDerivation {
++  pname = "mce-plugin-libhybris";
++  version = "2024-12-16";
++
++  src = fetchgit {
++    url = "https://github.com/nemomobile/mce-plugin-libhybris.git";
++    rev = "2c48a3f1724b9e82acd13addb70f3201508c811a";
++    hash = "sha256-YfPXKrqMRz1Nb+VdMtS7ViMp75/jElp16ggS4EGn548=";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    libhybris
++  ];
++
++  NIX_CFLAGS_COMPILE = [
++    "-I${glib.dev}/include/glib-2.0"
++    "-I${glib.dev}/lib/glib-2.0/include"
++    # glibconfig.h is arch-specific and lives in the main output.
++    "-I${glib}/lib/glib-2.0/include"
++    "-I${android-headers}/include"
++    "-I${android-headers}/include/android"
++    "-I${libhybris}/include"
++  ];
++
++  # The Makefile only links libhardware when the hybris support switch is on.
++  # Its defaults install into /usr/lib and a /tmp test dir, so pass the
++  # destinations explicitly.
++  buildPhase = ''
++    make ENABLE_HYBRIS_SUPPORT=1 PKG_NAMES="libhardware glib-2.0"
++  '';
++
++  installPhase = ''
++    make install \
++      ENABLE_HYBRIS_SUPPORT=1 \
++      PKG_NAMES="libhardware glib-2.0" \
++      DESTDIR=$out \
++      _LIBDIR=/lib
++  '';
++
++  meta = with lib; {
++    description = "libhybris plugin for the Nemomobile Mode Control Entity (MCE)";
++    homepage = "https://github.com/nemomobile/mce-plugin-libhybris";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++}
 diff --git a/overlay/asteroidos/mce-qt6/default.nix b/overlay/asteroidos/mce-qt6/default.nix
 new file mode 100644
 index 00000000..182d249c
@@ -1461,10 +1542,10 @@ index 00000000..617c1bc5
 \ No newline at end of file
 diff --git a/overlay/asteroidos/mce/default.nix b/overlay/asteroidos/mce/default.nix
 new file mode 100644
-index 00000000..9165f1c4
+index 00000000..b1ee31e3
 --- /dev/null
 +++ b/overlay/asteroidos/mce/default.nix
-@@ -0,0 +1,105 @@
+@@ -0,0 +1,107 @@
 +# Nemomobile Mode Control Entity (MCE) daemon with AsteroidOS patches
 +# Upstream repository: https://github.com/sailfishos/mce
 +# AsteroidOS recipes: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/mce
@@ -1483,6 +1564,7 @@ index 00000000..9165f1c4
 +  libngf,
 +  usb-moded-dev,
 +  mce-dev,
++  mce-plugin-libhybris,
 +}:
 +
 +stdenv.mkDerivation (finalAttrs: {
@@ -1547,6 +1629,7 @@ index 00000000..9165f1c4
 +    install -m755 tools/mcetool tools/evdev_trace tools/dummy_compositor $out/sbin/
 +
 +    install -m755 modules/*.so $out/lib/mce/modules/
++    install -m755 ${mce-plugin-libhybris}/lib/mce/modules/hybris.so $out/lib/mce/modules/
 +
 +    install -m644 mce.conf $out/share/dbus-1/system.d/com.nokia.mce.conf
 +
@@ -4695,7 +4778,7 @@ index 20e222dc..00000000
 -2.23.0
 -
 diff --git a/overlay/libhybris/default.nix b/overlay/libhybris/default.nix
-index 37b0df7d..7e6c6eaf 100644
+index 37b0df7d..37982c59 100644
 --- a/overlay/libhybris/default.nix
 +++ b/overlay/libhybris/default.nix
 @@ -1,12 +1,15 @@
@@ -4779,7 +4862,7 @@ index 37b0df7d..7e6c6eaf 100644
      "-Wno-implicit-function-declaration"
      "-Wno-incompatible-pointer-types"
      "-Wno-int-conversion"
-@@ -52,15 +74,31 @@ stdenv.mkDerivation {
+@@ -52,15 +74,37 @@ stdenv.mkDerivation {
  
    configureFlags = [
      "--with-android-headers=${android-headers}/include/android/"
@@ -4810,4 +4893,10 @@ index 37b0df7d..7e6c6eaf 100644
 +  buildInputs = [
 +    wayland
    ];
++
++  passthru = {
++    # Android headers this libhybris was configured against. Out-of-tree
++    # libhybris plugins must compile against the same set.
++    androidHeaders = android-headers;
++  };
  }

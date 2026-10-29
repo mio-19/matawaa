@@ -23,7 +23,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/default.nix               | 481 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
- devices/fossil-hoki/hybris.nix                |  38 ++
+ devices/fossil-hoki/hybris.nix                |  45 ++
  devices/fossil-hoki/kernel/default.nix        | 232 +++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 +
@@ -38,7 +38,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  63 ++-
- 21 files changed, 1916 insertions(+), 52 deletions(-)
+ 21 files changed, 1923 insertions(+), 52 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -824,10 +824,10 @@ index 00000000..1e97adce
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..cf81a9ad
+index 00000000..4dcaa20c
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,45 @@
 +{
 +  lib,
 +  pkgs,
@@ -855,6 +855,13 @@ index 00000000..cf81a9ad
 +            "--with-android-headers=${hybrisAndroid}/include"
 +            "--with-default-hybris-ld-library-path=/usr/libexec/hal-droid/system/lib:${hybrisAndroid}/usr/libexec/hal-droid/system/lib:/vendor/lib:/system/lib"
 +          ];
++
++        # mce-plugin-libhybris compiles against the Android headers libhybris
++        # was built with; android-headers 23 lacks android-config.h, so expose
++        # the device's pie headers.
++        passthru = (old.passthru or { }) // {
++          androidHeaders = hybrisAndroid;
++        };
 +      });
 +
 +      # Upstream AsteroidOS installs qt5compat-qmlplugins via OpenEmbedded:
