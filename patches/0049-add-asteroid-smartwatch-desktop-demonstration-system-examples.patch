@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 +
- examples/asteroid/asteroid-desktop.nix | 545 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 557 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++
  examples/asteroid/default.nix          |  15 +
- 4 files changed, 621 insertions(+)
+ 4 files changed, 633 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..8b64fa31
+index 00000000..51aba57b
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,545 @@
+@@ -0,0 +1,557 @@
 +{
 +  config,
 +  lib,
@@ -308,7 +308,7 @@ index 00000000..8b64fa31
 +      environment.DSME_SOCKFILE = "/run/dsme.socket";
 +      serviceConfig = {
 +        Type = "notify";
-+        ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd";
++        ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
 +        TimeoutSec = 2;
 +        Restart = "always";
 +        RestartSec = "1s";
@@ -352,7 +352,7 @@ index 00000000..8b64fa31
 +      conflicts = [ "shutdown.target" ];
 +      serviceConfig = {
 +        Type = "notify";
-+        ExecStart = "${pkgs.asteroid.sensorfw}/sbin/sensorfwd -c=/etc/sensorfw/primaryuse.conf --systemd --log-level=warning --no-magnetometer-bg-calibration";
++        ExecStart = "${pkgs.asteroid.sensorfw}/sbin/sensorfwd -c=/etc/sensorfw/primaryuse.conf --systemd --log-level=${if debugBuild then "debug" else "warning"} --no-magnetometer-bg-calibration";
 +        ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
 +        Restart = "always";
 +        RestartSec = 2;
@@ -464,7 +464,19 @@ index 00000000..8b64fa31
 +        QT_FORCE_STDERR_LOGGING = "1";
 +        QT_ASSUME_STDERR_HAS_CONSOLE = "1";
 +      }
-+      // config.environment.variables;
++      // config.environment.variables
++      // lib.optionalAttrs debugBuild {
++        # Debug builds: turn on every trace the graphics stack can emit.
++        # These are runtime switches only; the upstream code path is unchanged.
++        QT_LOGGING_RULES = "*=true";
++        QT_DEBUG_PLUGINS = "1";
++        WAYLAND_DEBUG = "1";
++        EGL_LOG_LEVEL = "debug";
++        LIBGL_DEBUG = "verbose";
++        MESA_DEBUG = "1";
++        HYBRIS_LOGGING_LEVEL = "debug";
++        HYBRIS_TRACE = "1";
++      };
 +      serviceConfig = {
 +        # Upstream asteroid-launcher.service: the launcher with --systemd sends
 +        # READY=1 itself, so notify is correct now that ExecStart is the real
