@@ -43,10 +43,10 @@ This patch provides an offline Wikipedia / Zim reader for AsteroidOS:
  create mode 100644 overlay/asteroidos/kiwix/src/zimmanager.h
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 72b1139d..1479a129 100644
+index 397db910..c7814d80 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -66,12 +66,19 @@ rec {
+@@ -100,12 +100,19 @@ rec {
      tdlib = if pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform then pkgs.tdlib else null;
    };
  

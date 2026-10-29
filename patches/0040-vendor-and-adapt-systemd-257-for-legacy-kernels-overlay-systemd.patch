@@ -126,10 +126,10 @@ index 35ac4030..4ddb720f 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index 6dd57021..dbcc64a2 100644
+index ff85d87b..e14d054f 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
-@@ -32,13 +32,14 @@ else
+@@ -37,13 +37,14 @@ else
        url = "https://raw.githubusercontent.com/openembedded/openembedded-core/99c96202a2c9aea84f5ceb267a8c63c0cff58b1e/meta/recipes-core/systemd/systemd/Handle-missing-STATX_MNT_ID-on-older-kernels.patch";
        hash = "sha256-griFG/VhaG1Y5CJeWPuwIo2tCFF5EN9R1YE6T7b80gQ=";
      };
@@ -151,7 +151,7 @@ index 6dd57021..dbcc64a2 100644
        (super.systemd.override (
          super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
            # systemd BPF framework fails when cross-compiling on 32-bit ARM
-@@ -58,6 +59,46 @@ else
+@@ -63,6 +64,46 @@ else
            ];
          });
  

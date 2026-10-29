@@ -12,10 +12,10 @@ caching and compass heading orientation for wearable navigation.
  create mode 100644 overlay/asteroidos/community-apps/map-comaps-improvements.patch
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
-index 59ecfe42..9cb0865e 100644
+index eb4f8d35..9b4c7382 100644
 --- a/overlay/asteroidos/community-apps/default.nix
 +++ b/overlay/asteroidos/community-apps/default.nix
-@@ -155,6 +155,9 @@ rec {
+@@ -94,6 +94,9 @@ rec {
      desc = "Touch and GPS map viewer for AsteroidOS smartwatches";
      rev = "8263b2175843e83c32baee2eec5380559db2b735";
      sha256 = "0f9rfbkr42fpa5f1bj3w9b8hwp1qn9v9zy7rwrjr10m1c5q64c7h";

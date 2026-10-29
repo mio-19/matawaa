@@ -8,17 +8,17 @@ map, qmltester, skedaddle, weatherfetch, beatfork, benchymark,
 docking-bay, heliograph, horizon, meteormatch, pulsar, rag, shopper,
 toolwatch, and touchdown.
 ---
- overlay/asteroidos/community-apps/default.nix | 357 ++++++++++++++++++
+ overlay/asteroidos/community-apps/default.nix | 296 ++++++++++++++++++
  overlay/asteroidos/default.nix                |   5 +
- 2 files changed, 362 insertions(+)
+ 2 files changed, 301 insertions(+)
  create mode 100644 overlay/asteroidos/community-apps/default.nix
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
 new file mode 100644
-index 00000000..59ecfe42
+index 00000000..eb4f8d35
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/default.nix
-@@ -0,0 +1,357 @@
+@@ -0,0 +1,296 @@
 +{
 +  lib,
 +  stdenv,
@@ -87,71 +87,10 @@ index 00000000..59ecfe42
 +    desc = "Background sensor logging daemon and QML plugin for health metrics on AsteroidOS";
 +    rev = "bdc9f0bb0fd6ef39f08fb01697d95cb2b98c86b6";
 +    sha256 = "1lb5m8g4k8sq9j9kynmffmzfj6q98rnwzbi7dr1i8fs6iq12a1ri";
-+    # Upstream AsteroidOS patches qtsensors in meta-asteroid to provide stepcounter, HRM, and wrist sensors:
-+    # https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-qt/qt6/qtsensors/0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch
-+    # https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-qt/qt6/qtsensors/0003-Add-step-counter-sensor-with-sensorfw-backend.patch
-+    postPatch = ''
-+            for dir in . daemon qmlplugin; do
-+              mkdir -p $dir/QtSensors
-+              cat <<'EOF' > $dir/QtSensors/QStepCounterSensor
-+      #pragma once
-+      #include <QtSensors/QSensor>
-+      #include <QtSensors/QSensorReading>
-+
-+      class QStepCounterReading : public QSensorReading {
-+      public:
-+          explicit QStepCounterReading(QObject *parent = nullptr) : QSensorReading(parent, nullptr), m_steps(0) {}
-+          int steps() const { return m_steps; }
-+          void setSteps(int steps) { m_steps = steps; }
-+      private:
-+          int m_steps;
-+      };
-+
-+      class QStepCounterSensor : public QSensor {
-+      public:
-+          explicit QStepCounterSensor(QObject *parent = nullptr)
-+              : QSensor(QByteArray("QStepCounterSensor"), parent), m_reading(new QStepCounterReading(this)) {}
-+          QStepCounterReading *reading() const { return m_reading; }
-+      private:
-+          QStepCounterReading *m_reading;
-+      };
-+      EOF
-+              cp $dir/QtSensors/QStepCounterSensor $dir/QtSensors/qstepcountersensor.h
-+
-+              cat <<'EOF' > $dir/QtSensors/QHrmSensor
-+      #pragma once
-+      #include <QtSensors/QSensor>
-+      #include <QtSensors/QSensorReading>
-+
-+      class QHrmReading : public QSensorReading {
-+      public:
-+          explicit QHrmReading(QObject *parent = nullptr) : QSensorReading(parent, nullptr), m_bpm(0) {}
-+          int bpm() const { return m_bpm; }
-+          void setBpm(int bpm) { m_bpm = bpm; }
-+      private:
-+          int m_bpm;
-+      };
-+
-+      class QHrmSensor : public QSensor {
-+      public:
-+          enum Status {
-+              NoContact,
-+              Unreliable,
-+              AccuracyLow,
-+              AccuracyMedium,
-+              AccuracyHigh
-+          };
-+          explicit QHrmSensor(QObject *parent = nullptr)
-+              : QSensor(QByteArray("QHrmSensor"), parent), m_reading(new QHrmReading(this)) {}
-+          QHrmReading *reading() const { return m_reading; }
-+          Status status() const { return AccuracyHigh; }
-+      private:
-+          QHrmReading *m_reading;
-+      };
-+      EOF
-+              cp $dir/QtSensors/QHrmSensor $dir/QtSensors/qhrmsensor.h
-+            done
-+    '';
++    # The wearable sensor types (QHrmSensor, QStepCounterSensor, …) come from
++    # Qt Sensors itself: the upstream AsteroidOS patches are applied to
++    # qt6.qtsensors in overlay/cross-compile.nix. No in-tree mock headers here.
++    # Upstream: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-qt/qt6/qtsensors
 +    extraBuildInputs = [
 +      qt6.qtsensors
 +      mlite
@@ -377,10 +316,10 @@ index 00000000..59ecfe42
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 68ff8db1..c4dbf2cb 100644
+index 8326cf05..5c10e89c 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -63,6 +63,11 @@ rec {
+@@ -97,5 +97,10 @@ rec {
  
    virtualkeyboard = callPackage ./virtualkeyboard { };
  
@@ -389,6 +328,5 @@ index 68ff8db1..c4dbf2cb 100644
 +    inherit (pkgs) espeak-classic;
 +  };
 +
-   stubs = callPackage ./stubs {
-     inherit (pkgs) glib;
-   };
+   inherit (pkgs) msm-fb-refresher;
+ }

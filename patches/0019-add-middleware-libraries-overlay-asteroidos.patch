@@ -17,33 +17,160 @@ applications:
 The mce-qt6 package builds the Nemo.Mce QML plugin against the target Qt
 libraries, without wrapping the Qt apps.
 ---
- overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++++++++++++
- overlay/asteroidos/amber-mpris/default.nix    |  54 ++++++
- overlay/asteroidos/default.nix                |  19 ++
- overlay/asteroidos/keepalive/default.nix      | 167 ++++++++++++++++++
- overlay/asteroidos/libconnman-qt/default.nix  | 139 +++++++++++++++
- overlay/asteroidos/libiodata/default.nix      | 111 ++++++++++++
- overlay/asteroidos/mce-dev/default.nix        |  41 +++++
- overlay/asteroidos/mce-qt6/default.nix        | 100 +++++++++++
- overlay/asteroidos/mlite/CMakeLists.txt       | 124 +++++++++++++
- overlay/asteroidos/mlite/default.nix          |  52 ++++++
- overlay/asteroidos/ngf-qt6/default.nix        |  96 ++++++++++
- overlay/asteroidos/timed-qt6/default.nix      | 107 +++++++++++
- overlay/asteroidos/usb-moded-qt6/default.nix  | 113 ++++++++++++
- 13 files changed, 1251 insertions(+)
+ overlay/asteroidos/accounts-qt/default.nix    |  81 +++
+ overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
+ overlay/asteroidos/amber-mpris/default.nix    |  54 ++
+ overlay/asteroidos/default.nix                |  53 ++
+ overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
+ overlay/asteroidos/keepalive/default.nix      | 131 ++++
+ .../patches/0001-Disable-tests.patch          |  23 +
+ .../keepalive/patches/0002-Fix-build.patch    |  23 +
+ overlay/asteroidos/libconnman-qt/default.nix  | 139 ++++
+ overlay/asteroidos/libdsme/default.nix        |  82 +++
+ overlay/asteroidos/libiodata/default.nix      | 111 ++++
+ overlay/asteroidos/libiphb/default.nix        |  54 ++
+ overlay/asteroidos/libngf/default.nix         |  53 ++
+ overlay/asteroidos/mce-dev/default.nix        |  41 ++
+ overlay/asteroidos/mce-qt6/default.nix        | 100 +++
+ overlay/asteroidos/mce/builtin-gconf.values   |   1 +
+ overlay/asteroidos/mce/default.nix            | 105 +++
+ overlay/asteroidos/mce/mce.service            |  17 +
+ ...tion-Adapts-the-state-machine-to-a-s.patch | 421 ++++++++++++
+ ...ke-screen-when-wrist-gesture-arrives.patch | 606 ++++++++++++++++++
+ ...-activities-in-lockscreen-mode.-aste.patch |  64 ++
+ ...pt-low-power-mode-to-allow-for-actua.patch | 574 +++++++++++++++++
+ ...t-for-compositor-when-sending-enable.patch |  61 ++
+ ...t-ambient-mode-when-touch-is-detecte.patch |  67 ++
+ ...owerkey-Also-suspend-on-palm-reports.patch | 161 +++++
+ overlay/asteroidos/mkcal/default.nix          |  60 ++
+ overlay/asteroidos/mlite/CMakeLists.txt       | 124 ++++
+ overlay/asteroidos/mlite/default.nix          |  52 ++
+ .../nemo-qml-plugin-calendar/default.nix      |  94 +++
+ overlay/asteroidos/ngf-qt6/default.nix        |  96 +++
+ overlay/asteroidos/timed-qt6/default.nix      | 111 ++++
+ overlay/asteroidos/usb-moded-dev/default.nix  |  42 ++
+ overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
+ 33 files changed, 3870 insertions(+)
+ create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
+ create mode 100644 overlay/asteroidos/kcalendarcore/default.nix
  create mode 100644 overlay/asteroidos/keepalive/default.nix
+ create mode 100644 overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
+ create mode 100644 overlay/asteroidos/keepalive/patches/0002-Fix-build.patch
  create mode 100644 overlay/asteroidos/libconnman-qt/default.nix
+ create mode 100644 overlay/asteroidos/libdsme/default.nix
  create mode 100644 overlay/asteroidos/libiodata/default.nix
+ create mode 100644 overlay/asteroidos/libiphb/default.nix
+ create mode 100644 overlay/asteroidos/libngf/default.nix
  create mode 100644 overlay/asteroidos/mce-dev/default.nix
  create mode 100644 overlay/asteroidos/mce-qt6/default.nix
+ create mode 100644 overlay/asteroidos/mce/builtin-gconf.values
+ create mode 100644 overlay/asteroidos/mce/default.nix
+ create mode 100644 overlay/asteroidos/mce/mce.service
+ create mode 100644 overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
+ create mode 100644 overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch
+ create mode 100644 overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch
+ create mode 100644 overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch
+ create mode 100644 overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
+ create mode 100644 overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
+ create mode 100644 overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch
+ create mode 100644 overlay/asteroidos/mkcal/default.nix
  create mode 100644 overlay/asteroidos/mlite/CMakeLists.txt
  create mode 100644 overlay/asteroidos/mlite/default.nix
+ create mode 100644 overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
  create mode 100644 overlay/asteroidos/ngf-qt6/default.nix
  create mode 100644 overlay/asteroidos/timed-qt6/default.nix
+ create mode 100644 overlay/asteroidos/usb-moded-dev/default.nix
  create mode 100644 overlay/asteroidos/usb-moded-qt6/default.nix
 
+diff --git a/overlay/asteroidos/accounts-qt/default.nix b/overlay/asteroidos/accounts-qt/default.nix
+new file mode 100644
+index 00000000..0edfec62
+--- /dev/null
++++ b/overlay/asteroidos/accounts-qt/default.nix
+@@ -0,0 +1,81 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitLab,
++  cmake,
++  pkg-config,
++  qt6,
++  libaccounts-glib,
++  glib,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "accounts-qt";
++  version = "1.17";
++
++  src = fetchFromGitLab {
++    owner = "accounts-sso";
++    repo = "libaccounts-qt";
++    rev = "VERSION_${finalAttrs.version}";
++    hash = "sha256-mPZgD4r7vlUP6wklvZVknGqTXZBckSOtNzK7p6e2qSA=";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    libaccounts-glib
++    glib
++  ];
++
++  postPatch = ''
++    cat > CMakeLists.txt <<'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(accounts-qt LANGUAGES CXX)
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_AUTOMOC ON)
++    add_compile_definitions(BUILDING_ACCOUNTS_QT QT_NO_KEYWORDS QT_NO_CAST_TO_ASCII QT_NO_CAST_FROM_ASCII)
++
++    find_package(PkgConfig REQUIRED)
++    pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET libaccounts-glib gio-2.0)
++    find_package(Qt6 REQUIRED COMPONENTS Core Xml)
++
++    file(GLOB SOURCES Accounts/*.cpp)
++    file(GLOB HEADERS Accounts/*.h)
++
++    add_library(accounts-qt6 SHARED ''${SOURCES} ''${HEADERS})
++    target_include_directories(accounts-qt6 PUBLIC
++      $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}>
++      $<INSTALL_INTERFACE:include/accounts-qt6>
++    )
++    target_link_libraries(accounts-qt6 PUBLIC Qt6::Core Qt6::Xml PkgConfig::GLIB)
++    set_target_properties(accounts-qt6 PROPERTIES OUTPUT_NAME accounts-qt6 SOVERSION 1 VERSION 1.17)
++
++    install(TARGETS accounts-qt6 LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
++
++    file(GLOB ROOT_HEADERS Accounts/Account Accounts/AccountService Accounts/Application Accounts/AuthData Accounts/Error Accounts/Manager Accounts/Provider Accounts/Service Accounts/ServiceType)
++    install(FILES ''${HEADERS} ''${ROOT_HEADERS} DESTINATION include/accounts-qt6/Accounts)
++
++    configure_file(Accounts/accounts-qt6.pc.in accounts-qt6.pc @ONLY)
++    install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/accounts-qt6.pc DESTINATION lib/pkgconfig)
++    EOF
++
++    substituteInPlace Accounts/accounts-qt6.pc.in \
++      --replace-fail '$$INSTALL_PREFIX' "$out" \
++      --replace-fail '$$INSTALL_LIBDIR' "$out/lib" \
++      --replace-fail '$$PROJECT_VERSION' '${finalAttrs.version}'
++  '';
++
++  meta = with lib; {
++    description = "Qt-based client library for the accounts-sso framework";
++    homepage = "https://gitlab.com/accounts-sso/accounts-qt";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})
 diff --git a/overlay/asteroidos/amber-mpris/CMakeLists.txt b/overlay/asteroidos/amber-mpris/CMakeLists.txt
 new file mode 100644
 index 00000000..03a35cfe
@@ -239,10 +366,10 @@ index 00000000..bcdd9f13
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 2fc834f0..7ecfadb4 100644
+index 2fc834f0..b0c0f85c 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,5 +7,24 @@ rec {
+@@ -7,5 +7,58 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
@@ -259,187 +386,300 @@ index 2fc834f0..7ecfadb4 100644
 +    inherit mce-dev;
 +  };
 +  ngf-qt6 = callPackage ./ngf-qt6 { };
-+  usb-moded-qt6 = callPackage ./usb-moded-qt6 { };
-+  keepalive = callPackage ./keepalive { };
++  usb-moded-dev = callPackage ./usb-moded-dev { };
++  usb-moded-qt6 = callPackage ./usb-moded-qt6 {
++    inherit usb-moded-dev;
++  };
++
++  # Low-level Nemomobile/SailfishOS libraries for MCE and KeepAlive
++  libdsme = callPackage ./libdsme { };
++  libiphb = callPackage ./libiphb {
++    inherit mce-dev libdsme;
++  };
++  libngf = callPackage ./libngf { };
++
++  # Mode Control Entity (MCE) daemon
++  # Upstream repository: https://github.com/sailfishos/mce
++  # AsteroidOS recipes: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/mce
++  mce = callPackage ./mce {
++    inherit libdsme libiphb libngf usb-moded-dev mce-dev;
++  };
++
++  keepalive = callPackage ./keepalive {
++    inherit mce-dev libiphb;
++  };
 +  timed-qt6 = callPackage ./timed-qt6 {
 +    inherit libiodata;
 +  };
 +
++  # Calendar subsystem: accounts-qt, kcalendarcore, mkcal, and nemo-qml-plugin-calendar
++  # Upstream repository: https://gitlab.com/accounts-sso/accounts-qt
++  # Upstream repository: https://github.com/sailfishos-mirror/kcalendarcore
++  # Upstream repository: https://github.com/sailfishos/mkcal
++  # Upstream repository: https://github.com/sailfishos/nemo-qml-plugin-calendar
++  accounts-qt = callPackage ./accounts-qt { };
++  kcalendarcore = callPackage ./kcalendarcore { };
++  mkcal = callPackage ./mkcal {
++    inherit kcalendarcore timed-qt6;
++  };
++  nemo-qml-plugin-calendar = callPackage ./nemo-qml-plugin-calendar {
++    inherit accounts-qt kcalendarcore mkcal timed-qt6 libiodata;
++  };
++
    inherit (pkgs) msm-fb-refresher;
  }
-diff --git a/overlay/asteroidos/keepalive/default.nix b/overlay/asteroidos/keepalive/default.nix
+diff --git a/overlay/asteroidos/kcalendarcore/default.nix b/overlay/asteroidos/kcalendarcore/default.nix
 new file mode 100644
-index 00000000..f9a34dfb
+index 00000000..9b875b0d
 --- /dev/null
-+++ b/overlay/asteroidos/keepalive/default.nix
-@@ -0,0 +1,167 @@
-+# Nemo keepalive background activity scheduling library
-+# Upstream repository: https://github.com/sailfishos/nemo-keepalive
++++ b/overlay/asteroidos/kcalendarcore/default.nix
+@@ -0,0 +1,51 @@
++# SailfishOS standalone kcalendarcore library for AsteroidOS
++# Upstream repository: https://github.com/sailfishos-mirror/kcalendarcore
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-qt/qt6/kcalendarcore_git.bb
 +{
 +  lib,
 +  stdenv,
++  fetchFromGitHub,
 +  cmake,
 +  pkg-config,
++  kdePackages,
 +  qt6,
++  libical,
 +}:
 +
 +stdenv.mkDerivation (finalAttrs: {
-+  pname = "keepalive";
++  pname = "kcalendarcore";
 +  version = "1.0.0";
-+  dontUnpack = true;
++
++  src = fetchFromGitHub {
++    owner = "sailfishos-mirror";
++    repo = "kcalendarcore";
++    rev = "fdbaae49832ef2154d0c7e05825ff410660fcbf4";
++    sha256 = "0ipjk8w9jbbd1s4lwrh56pk6v7bfxy6ni6a7308vynw03fr4dc3n";
++  };
 +
 +  strictDeps = true;
 +
 +  nativeBuildInputs = [
 +    cmake
 +    pkg-config
++    kdePackages.extra-cmake-modules
 +    qt6.wrapQtAppsHook
 +  ];
 +
 +  buildInputs = [
 +    qt6.qtbase
++    libical
 +  ];
 +
-+  postPatch = ''
-+        mkdir -p src include/keepalive
-+        cat << "EOF" > CMakeLists.txt
-+    cmake_minimum_required(VERSION 3.16)
-+    project(keepalive LANGUAGES CXX)
-+    find_package(Qt6 REQUIRED COMPONENTS Core)
-+    set(CMAKE_AUTOMOC ON)
-+    add_library(keepalive SHARED src/backgroundactivity.cpp src/backgroundactivity.h)
-+    target_include_directories(keepalive PUBLIC
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/include>
-+      $<INSTALL_INTERFACE:include>
-+    )
-+    target_link_libraries(keepalive PUBLIC Qt6::Core)
-+    set_target_properties(keepalive PROPERTIES VERSION 1.0.0 SOVERSION 1)
-+    install(TARGETS keepalive DESTINATION lib)
-+    install(DIRECTORY include/keepalive DESTINATION include)
-+    configure_file(keepalive.pc.in keepalive.pc @ONLY)
-+    install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/keepalive.pc DESTINATION lib/pkgconfig)
-+    EOF
-+        cat << "EOF" > include/keepalive/backgroundactivity.h
-+    #ifndef BACKGROUNDACTIVITY_H_
-+    #define BACKGROUNDACTIVITY_H_
-+    #include <QObject>
-+    #include <QTimer>
-+    class BackgroundActivity : public QObject {
-+        Q_OBJECT
-+        Q_ENUMS(State Frequency)
-+    public:
-+        enum State { Stopped, Waiting, Running };
-+        enum Frequency {
-+            Range = 0,
-+            ThirtySeconds = 30,
-+            TwoAndHalfMinutes = 150,
-+            FiveMinutes = 300,
-+            TenMinutes = 600,
-+            FifteenMinutes = 900,
-+            ThirtyMinutes = 1800,
-+            OneHour = 3600,
-+            TwoHours = 7200,
-+            FourHours = 14400,
-+            EightHours = 28800,
-+            TenHours = 36000,
-+            TwelveHours = 43200,
-+            TwentyFourHours = 86400,
-+            MaximumFrequency = 0x7fffffff
-+        };
-+        explicit BackgroundActivity(QObject *parent = nullptr);
-+        virtual ~BackgroundActivity();
-+        Frequency wakeupFrequency() const;
-+        void wakeupRange(int &min_delay, int &max_delay) const;
-+        bool isWaiting() const;
-+        bool isRunning() const;
-+        bool isStopped() const;
-+        BackgroundActivity::State state() const;
-+        void setWakeupFrequency(Frequency slot);
-+        void setWakeupRange(int min_delay, int max_delay);
-+        void setState(BackgroundActivity::State new_state);
-+        void wait(Frequency slot);
-+        void wait(int min_delay, int max_delay = -1);
-+        QString id() const;
-+    public Q_SLOTS:
-+        void wait();
-+        void run();
-+        void stop();
-+    Q_SIGNALS:
-+        void waiting();
-+        void running();
-+        void stopped();
-+        void stateChanged();
-+    private Q_SLOTS:
-+        void onTimeout();
-+    private:
-+        State m_state = Stopped;
-+        Frequency m_frequency = Range;
-+        int m_minDelay = 0;
-+        int m_maxDelay = 0;
-+        QTimer *m_timer;
-+    };
-+    #endif
-+    EOF
-+        cp include/keepalive/* src/
-+        cat << "EOF" > src/backgroundactivity.cpp
-+    #include <keepalive/backgroundactivity.h>
-+    BackgroundActivity::BackgroundActivity(QObject *parent) : QObject(parent), m_timer(new QTimer(this)) {
-+        m_timer->setSingleShot(true);
-+        connect(m_timer, &QTimer::timeout, this, &BackgroundActivity::onTimeout);
-+    }
-+    BackgroundActivity::~BackgroundActivity() {}
-+    BackgroundActivity::Frequency BackgroundActivity::wakeupFrequency() const { return m_frequency; }
-+    void BackgroundActivity::wakeupRange(int &min_delay, int &max_delay) const { min_delay = m_minDelay; max_delay = m_maxDelay; }
-+    bool BackgroundActivity::isWaiting() const { return m_state == Waiting; }
-+    bool BackgroundActivity::isRunning() const { return m_state == Running; }
-+    bool BackgroundActivity::isStopped() const { return m_state == Stopped; }
-+    BackgroundActivity::State BackgroundActivity::state() const { return m_state; }
-+    void BackgroundActivity::setWakeupFrequency(Frequency slot) { m_frequency = slot; }
-+    void BackgroundActivity::setWakeupRange(int min_delay, int max_delay) { m_minDelay = min_delay; m_maxDelay = max_delay; }
-+    void BackgroundActivity::setState(BackgroundActivity::State new_state) {
-+        if (m_state != new_state) {
-+            m_state = new_state;
-+            emit stateChanged();
-+            if (m_state == Waiting) emit waiting();
-+            else if (m_state == Running) emit running();
-+            else if (m_state == Stopped) emit stopped();
-+        }
-+    }
-+    void BackgroundActivity::wait(Frequency slot) { setWakeupFrequency(slot); wait((int)slot, (int)slot); }
-+    void BackgroundActivity::wait(int min_delay, int max_delay) { setWakeupRange(min_delay, max_delay); wait(); }
-+    void BackgroundActivity::wait() {
-+        setState(Waiting);
-+        int delay = (m_minDelay > 0) ? m_minDelay : 10;
-+        m_timer->start(delay * 1000);
-+    }
-+    void BackgroundActivity::run() { m_timer->stop(); setState(Running); }
-+    void BackgroundActivity::stop() { m_timer->stop(); setState(Stopped); }
-+    void BackgroundActivity::onTimeout() { run(); }
-+    QString BackgroundActivity::id() const { return QStringLiteral("activity"); }
-+    #include "moc_backgroundactivity.cpp"
-+    EOF
-+        cat << "EOF" > keepalive.pc.in
-+    prefix=@CMAKE_INSTALL_PREFIX@
-+    exec_prefix=''${prefix}
-+    libdir=''${prefix}/lib
-+    includedir=''${prefix}/include
++  cmakeFlags = [
++    "-DBUILD_TESTS=OFF"
++    "-DECM_DIR=${kdePackages.extra-cmake-modules}/share/ECM/cmake"
++  ];
 +
-+    Name: keepalive
-+    Description: CPU/display keepalive development library
-+    Version: 1.0.0
-+    Requires: Qt6Core
-+    Libs: -L''${libdir} -lkeepalive
-+    Cflags: -I''${includedir}
-+    EOF
++  meta = with lib; {
++    description = "SailfishOS KCalendarCore calendar library";
++    homepage = "https://github.com/sailfishos-mirror/kcalendarcore";
++    license = licenses.lgpl2Plus;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/keepalive/default.nix b/overlay/asteroidos/keepalive/default.nix
+new file mode 100644
+index 00000000..d98c0386
+--- /dev/null
++++ b/overlay/asteroidos/keepalive/default.nix
+@@ -0,0 +1,131 @@
++# Nemo keepalive background activity scheduling library and QML plugin
++# Upstream repository: https://github.com/sailfishos/nemo-keepalive
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-keepalive/nemo-keepalive_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  mce-dev,
++  libiphb,
++  buildPackages,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "keepalive";
++  version = "1.2.6";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-keepalive";
++    rev = "c38d05b5ebc871dc36561abaf9bbf1dfb8438e83";
++    sha256 = "02dw2z212cjajk98dk2xc6nf3f9j2pz5qnpgmrcmkfddm9kcnf70";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    mce-dev
++    libiphb
++  ];
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  preConfigure = ''
++    cd lib
++    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -p mceiface.h:mceiface.cpp mceiface.xml
++    cd ..
++  '';
++
++  postPatch = ''
++    cat << "EOF" > CMakeLists.txt
++cmake_minimum_required(VERSION 3.16)
++project(keepalive LANGUAGES CXX)
++set(CMAKE_CXX_STANDARD 17)
++set(CMAKE_AUTOMOC ON)
++
++find_package(Qt6 REQUIRED COMPONENTS Core DBus Qml)
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(IPHB REQUIRED IMPORTED_TARGET libiphb)
++pkg_check_modules(MCE REQUIRED IMPORTED_TARGET mce)
++
++set(LIB_SRC
++  lib/displayblanking.cpp
++  lib/displayblanking_p.cpp
++  lib/backgroundactivity.cpp
++  lib/backgroundactivity_p.cpp
++  lib/mceiface.cpp
++  lib/heartbeat.cpp
++)
++
++set(PUBLIC_HEADERS
++  lib/displayblanking.h
++  lib/backgroundactivity.h
++)
++
++add_library(keepalive SHARED ''${LIB_SRC} ''${PUBLIC_HEADERS})
++target_include_directories(keepalive PUBLIC
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/lib>
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_BINARY_DIR}>
++  $<INSTALL_INTERFACE:include/keepalive>
++)
++target_link_libraries(keepalive PUBLIC Qt6::Core Qt6::DBus PkgConfig::IPHB PkgConfig::MCE)
++set_target_properties(keepalive PROPERTIES VERSION 1.2.6 SOVERSION 1)
++
++install(TARGETS keepalive DESTINATION lib)
++install(FILES ''${PUBLIC_HEADERS} DESTINATION include/keepalive)
++
++configure_file(keepalive.pc.in keepalive.pc @ONLY)
++install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/keepalive.pc DESTINATION lib/pkgconfig)
++
++add_library(keepaliveplugin MODULE
++  plugin/plugin.cpp
++  plugin/declarativebackgroundactivity.cpp
++)
++target_include_directories(keepaliveplugin PRIVATE lib plugin)
++target_link_libraries(keepaliveplugin PRIVATE Qt6::Core Qt6::Qml keepalive)
++
++install(TARGETS keepaliveplugin LIBRARY DESTINATION lib/qt-6/qml/Nemo/KeepAlive)
++install(FILES plugin/qmldir plugin/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/KeepAlive)
++EOF
++
++    cat << "EOF" > keepalive.pc.in
++prefix=@CMAKE_INSTALL_PREFIX@
++exec_prefix=''${prefix}
++libdir=''${prefix}/lib
++includedir=''${prefix}/include/keepalive
++
++Name: libkeepalive
++Description: Nemomobile CPU/display keepalive development files
++Version: 1.2.6
++Requires: Qt6Core Qt6DBus
++Libs: -L''${libdir} -lkeepalive
++Cflags: -I''${includedir}
++EOF
++  '';
++
++  postInstall = ''
++    mkdir -p $out/lib/qt-6/qml/org/nemomobile
++    ln -s ../../Nemo/KeepAlive $out/lib/qt-6/qml/org/nemomobile/keepalive
 +  '';
 +
 +  meta = with lib; {
-+    description = "Nemomobile CPU and display keepalive library";
++    description = "Nemomobile CPU and display keepalive library and QML plugin";
 +    homepage = "https://github.com/sailfishos/nemo-keepalive";
 +    license = licenses.lgpl21Only;
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch b/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
+new file mode 100644
+index 00000000..fe431276
+--- /dev/null
++++ b/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
+@@ -0,0 +1,23 @@
++From 74f0bdde15478783aedc37f3d2130aa9441cac34 Mon Sep 17 00:00:00 2001
++From: Davids Paskevics <davids.paskevics@gmail.com>
++Date: Thu, 2 Oct 2025 20:05:48 +0200
++Subject: [PATCH] Disable tests
++
++Upstream-Status: Inappropriate
++
++---
++ keepalive.pro | 1 -
++ 1 file changed, 1 deletion(-)
++
++diff --git a/keepalive.pro b/keepalive.pro
++index 8f564cc..a8b20f2 100644
++--- a/keepalive.pro
+++++ b/keepalive.pro
++@@ -6,7 +6,6 @@ SUBDIRS += plugin
++ SUBDIRS += examples/backgroundactivity_periodic
++ SUBDIRS += examples/backgroundactivity_linger
++ SUBDIRS += examples/displayblanking
++-SUBDIRS += tests
++ SUBDIRS += doc
++ 
++ examples.files = examples/qml/*.qml
+diff --git a/overlay/asteroidos/keepalive/patches/0002-Fix-build.patch b/overlay/asteroidos/keepalive/patches/0002-Fix-build.patch
+new file mode 100644
+index 00000000..a430a281
+--- /dev/null
++++ b/overlay/asteroidos/keepalive/patches/0002-Fix-build.patch
+@@ -0,0 +1,23 @@
++From e9a25b9304e62fe22daaab78c4b2106503be88af Mon Sep 17 00:00:00 2001
++From: casept <davids.paskevics@gmail.com>
++Date: Tue, 3 Feb 2026 02:38:07 +0100
++Upstream-Status: Inappropriate
++Subject: [PATCH] Fix build
++
++---
++ lib/lib.pro | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/lib/lib.pro b/lib/lib.pro
++index e129e49..197ccec 100644
++--- a/lib/lib.pro
+++++ b/lib/lib.pro
++@@ -13,7 +13,7 @@ PKGCONFIG += libiphb
++ 
++ #DEFINES += DEBUG_TRACE
++ 
++-system($$[QT_INSTALL_BINS]/qdbusxml2cpp -p mceiface.h:mceiface.cpp mceiface.xml)
+++system(qdbusxml2cpp -p mceiface.h:mceiface.cpp mceiface.xml)
++ 
++ SOURCES += \
++     displayblanking.cpp \
 diff --git a/overlay/asteroidos/libconnman-qt/default.nix b/overlay/asteroidos/libconnman-qt/default.nix
 new file mode 100644
 index 00000000..38928a7b
@@ -585,6 +825,94 @@ index 00000000..38928a7b
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/libdsme/default.nix b/overlay/asteroidos/libdsme/default.nix
+new file mode 100644
+index 00000000..2278e470
+--- /dev/null
++++ b/overlay/asteroidos/libdsme/default.nix
+@@ -0,0 +1,82 @@
++# Nemomobile's libdsme library
++# Upstream repository: https://github.com/sailfishos/libdsme
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/dsme/libdsme_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  pkg-config,
++  glib,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "libdsme";
++  version = "0.67.0";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "libdsme";
++    rev = "67e57c5e90e37d4a53cf3ea4dae028444c62c8e8";
++    sha256 = "0cydr03c2qyaq1z231ahqfzydaib4qgi9l78mrb60ji56gg9q95v";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++  ];
++
++  buildPhase = ''
++    runHook preBuild
++    $CC -fPIC -c -o protocol.pic.o protocol.c -std=c99 -O2 -Wall $($PKG_CONFIG --cflags glib-2.0)
++    $CC -fPIC -c -o message.pic.o message.c -std=c99 -O2 -Wall $($PKG_CONFIG --cflags glib-2.0)
++    $CC -fPIC -c -o alarm_limit.pic.o alarm_limit.c -std=c99 -O2 -Wall $($PKG_CONFIG --cflags glib-2.0)
++    $CC -shared -Wl,-soname,libdsme.so.0 -o libdsme.so.0.3.0 protocol.pic.o message.pic.o alarm_limit.pic.o $($PKG_CONFIG --libs glib-2.0)
++
++    $CC -fPIC -c -o dsme_dbus_if.pic.o modules/dsme_dbus_if.c -std=c99 -O2 -Wall
++    $CC -shared -Wl,-soname,libdsme_dbus_if.so.0 -o libdsme_dbus_if.so.0.3.0 dsme_dbus_if.pic.o
++
++    $CC -fPIC -c -o thermalmanager_dbus_if.pic.o modules/thermalmanager_dbus_if.c -std=c99 -O2 -Wall
++    $CC -shared -Wl,-soname,libthermalmanager_dbus_if.so.0 -o libthermalmanager_dbus_if.so.0.3.0 thermalmanager_dbus_if.pic.o
++    runHook postBuild
++  '';
++
++  installPhase = ''
++    runHook preInstall
++    mkdir -p $out/lib/pkgconfig $out/include/dsme
++
++    install -m755 libdsme.so.0.3.0 $out/lib/
++    ln -s libdsme.so.0.3.0 $out/lib/libdsme.so.0
++    ln -s libdsme.so.0.3.0 $out/lib/libdsme.so
++
++    install -m755 libdsme_dbus_if.so.0.3.0 $out/lib/
++    ln -s libdsme_dbus_if.so.0.3.0 $out/lib/libdsme_dbus_if.so.0
++    ln -s libdsme_dbus_if.so.0.3.0 $out/lib/libdsme_dbus_if.so
++
++    install -m755 libthermalmanager_dbus_if.so.0.3.0 $out/lib/
++    ln -s libthermalmanager_dbus_if.so.0.3.0 $out/lib/libthermalmanager_dbus_if.so.0
++    ln -s libthermalmanager_dbus_if.so.0.3.0 $out/lib/libthermalmanager_dbus_if.so
++
++    install -m644 include/dsme/*.h $out/include/dsme/
++    install -m644 modules/*.h $out/include/dsme/
++
++    for pc in dsme.pc dsme_dbus_if.pc thermalmanager_dbus_if.pc; do
++      sed -e "s|prefix=/usr|prefix=$out|" \
++          -e "s|includedir=\''${prefix}/include|includedir=\''${prefix}/include/dsme|" \
++          -e "s|Cflags: -I\''${includedir}|Cflags: -I\''${includedir} -I$out/include|" \
++          $pc > $out/lib/pkgconfig/$pc
++    done
++    runHook postInstall
++  '';
++
++  meta = with lib; {
++    description = "Nemomobile DSME dynamic libraries";
++    homepage = "https://github.com/sailfishos/libdsme";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})
 diff --git a/overlay/asteroidos/libiodata/default.nix b/overlay/asteroidos/libiodata/default.nix
 new file mode 100644
 index 00000000..36607b9c
@@ -698,6 +1026,125 @@ index 00000000..36607b9c
 +  meta = with lib; {
 +    description = "Nemomobile structured data library";
 +    homepage = "https://github.com/sailfishos/libiodata";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/libiphb/default.nix b/overlay/asteroidos/libiphb/default.nix
+new file mode 100644
+index 00000000..6da52c87
+--- /dev/null
++++ b/overlay/asteroidos/libiphb/default.nix
+@@ -0,0 +1,54 @@
++# Nemomobile's libiphb library
++# Upstream repository: https://github.com/sailfishos/libiphb
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/libiphb/libiphb_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  autoreconfHook,
++  pkg-config,
++  glib,
++  dbus,
++  mce-dev,
++  libdsme,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "libiphb";
++  version = "1.2.8";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "libiphb";
++    rev = "69f059da35fdd7aa72e38a5f7c596631a2f839cc";
++    sha256 = "1pr94wna8lr7505667zhc7gc36d05nhfd71fmmxiq46xfd9hjlh2";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    autoreconfHook
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    dbus
++    mce-dev
++    libdsme
++  ];
++
++  postPatch = ''
++    mkdir -p m4
++    sed -i 's/SUBDIRS = dbus-gmain src tests/SUBDIRS = src/' Makefile.am
++    sed -i '/dbus-gmain\/Makefile/d' configure.ac
++    sed -i 's|tests/Makefile||' configure.ac
++  '';
++
++  meta = with lib; {
++    description = "Heartbeat timer library for Nemomobile";
++    homepage = "https://github.com/sailfishos/libiphb";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/libngf/default.nix b/overlay/asteroidos/libngf/default.nix
+new file mode 100644
+index 00000000..a2f16428
+--- /dev/null
++++ b/overlay/asteroidos/libngf/default.nix
+@@ -0,0 +1,53 @@
++# Nemomobile Non-Graphic Feedback (NGF) C client library
++# Upstream repository: https://github.com/sailfishos/libngf
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/libngf/libngf_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  autoreconfHook,
++  pkg-config,
++  glib,
++  dbus,
++  dbus-glib,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "libngf";
++  version = "0.24.0";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "libngf";
++    rev = "89ab179ea85ccd8202a0dbac119855f5f1321163";
++    sha256 = "1ch66jvs2p0zk9y70vcgzzkd0wf6q0bbvlk1mfr3hsvxr99x4il5";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    autoreconfHook
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    dbus
++    dbus-glib
++  ];
++
++  postPatch = ''
++    mkdir -p m4
++    sed -i 's|prefix=/usr|prefix=@prefix@|' libngf0.pc.in
++    sed -i 's/SUBDIRS = $(NGF_LIBRARY_NAME) examples tests/SUBDIRS = $(NGF_LIBRARY_NAME) examples/' Makefile.am
++    sed -i '/PKG_CHECK_MODULES(CHECK, check)/d' configure.ac
++    sed -i 's|tests/Makefile||' configure.ac
++  '';
++
++  meta = with lib; {
++    description = "Nemomobile Non-Graphic Feedback (NGF) C library";
++    homepage = "https://github.com/sailfishos/libngf";
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
@@ -852,6 +1299,2210 @@ index 00000000..182d249c
 +    description = "Qt6 client library and bindings for Mode Control Entity";
 +    homepage = "https://github.com/sailfishos/libmce-qt";
 +    license = licenses.lgpl21Only;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/mce/builtin-gconf.values b/overlay/asteroidos/mce/builtin-gconf.values
+new file mode 100644
+index 00000000..617c1bc5
+--- /dev/null
++++ b/overlay/asteroidos/mce/builtin-gconf.values
+@@ -0,0 +1 @@
++/system/osso/dsm/display/display_brightness=5
+\ No newline at end of file
+diff --git a/overlay/asteroidos/mce/default.nix b/overlay/asteroidos/mce/default.nix
+new file mode 100644
+index 00000000..9165f1c4
+--- /dev/null
++++ b/overlay/asteroidos/mce/default.nix
+@@ -0,0 +1,105 @@
++# Nemomobile Mode Control Entity (MCE) daemon with AsteroidOS patches
++# Upstream repository: https://github.com/sailfishos/mce
++# AsteroidOS recipes: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/mce
++{
++  lib,
++  stdenv,
++  fetchgit,
++  pkg-config,
++  glib,
++  dbus,
++  dbus-glib,
++  systemd,
++  udev,
++  libdsme,
++  libiphb,
++  libngf,
++  usb-moded-dev,
++  mce-dev,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "mce";
++  version = "1.109.2";
++
++  src = fetchgit {
++    url = "https://github.com/sailfishos/mce.git";
++    rev = "51135ea73ae162ec7708415801505e10a6f3fe5f";
++    sha256 = "1r2b5d0wqvz8xyix7iwwiry2clc89fpbb7fbqhykn5gf94qrb4rj";
++    fetchSubmodules = true;
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    dbus
++    dbus-glib
++    systemd
++    udev
++    libdsme
++    libiphb
++    libngf
++    usb-moded-dev
++    mce-dev
++  ];
++
++  patches = [
++    ./patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
++    ./patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch
++    ./patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch
++    ./patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch
++    ./patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
++    ./patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
++    ./patches/0007-powerkey-Also-suspend-on-palm-reports.patch
++  ];
++
++  postPatch = ''
++    substituteInPlace Makefile \
++      --replace-fail 'MODULEDIR             := $(_LIBDIR)/mce/modules' "MODULEDIR := $out/lib/mce/modules" \
++      --replace-fail 'DBUSDIR               := $(_SYSCONFDIR)/dbus-1/system.d' "DBUSDIR := $out/share/dbus-1/system.d" \
++      --replace-fail 'CONFDIR               := $(_SYSCONFDIR)/mce' "CONFDIR := $out/etc/mce"
++  '';
++
++  makeFlags = [
++    "PKG_CONFIG=${stdenv.cc.targetPrefix}pkg-config"
++    "ENABLE_SYSTEMD_SUPPORT=y"
++    "ENABLE_HYBRIS=y"
++    "ENABLE_DOUBLETAP_EMULATION=y"
++  ];
++
++  installPhase = ''
++    runHook preInstall
++    mkdir -p $out/sbin $out/lib/mce/modules $out/etc/mce $out/share/dbus-1/system.d $out/share/mce
++
++    install -m755 mce $out/sbin/mce
++    install -m755 tools/mcetool tools/evdev_trace tools/dummy_compositor $out/sbin/
++
++    install -m755 modules/*.so $out/lib/mce/modules/
++
++    install -m644 mce.conf $out/share/dbus-1/system.d/com.nokia.mce.conf
++
++    install -m644 inifiles/mce.ini $out/etc/mce/mce.ini
++    install -m644 inifiles/mce-radio-states.ini $out/etc/mce/mce-radio-states.ini
++    install -m644 inifiles/hybris-led.ini $out/etc/mce/20hybris-led.ini
++    install -m644 inifiles/hybris-features.ini $out/etc/mce/20hybris-features.ini
++    install -m644 inifiles/debug-led.ini $out/etc/mce/20debug-led.ini
++    install -m644 inifiles/als-defaults.ini $out/etc/mce/20als-defaults.ini
++    install -m644 inifiles/evdev-types.ini $out/etc/mce/20evdev-types.ini
++    install -m644 inifiles/legacy.ini $out/etc/mce/11legacy.ini
++
++    install -m644 ${./builtin-gconf.values} $out/share/mce/builtin-gconf.values
++    runHook postInstall
++  '';
++
++  meta = with lib; {
++    description = "Nemomobile Mode Control Entity (MCE) daemon with AsteroidOS gestures and ambient display support";
++    homepage = "https://github.com/sailfishos/mce";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/mce/mce.service b/overlay/asteroidos/mce/mce.service
+new file mode 100644
+index 00000000..d771f776
+--- /dev/null
++++ b/overlay/asteroidos/mce/mce.service
+@@ -0,0 +1,17 @@
++[Unit]
++Description=Mode Control Entity (MCE)
++DefaultDependencies=no
++Requires=dbus.socket
++After=dbus.socket
++After=local-fs.target
++Conflicts=shutdown.target
++
++[Service]
++Type=notify
++Environment=DSME_SOCKFILE=/run/dsme.socket
++ExecStart=/usr/sbin/mce --systemd
++TimeoutSec=2
++Restart=always
++
++[Install]
++WantedBy=multi-user.target
+diff --git a/overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch b/overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
+new file mode 100644
+index 00000000..8c408824
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
+@@ -0,0 +1,421 @@
++From bc63ea546b15fb422dbbc2b8b1635f89e9ddb5bc Mon Sep 17 00:00:00 2001
++From: Florent Revest <revestflo@gmail.com>
++Date: Wed, 21 Feb 2018 18:01:02 +0100
++Subject: [PATCH] Double-tap emulation: Adapts the state machine to a single
++ tap to unlock behavior (after 200ms the screen is unlocked)
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Upstream-Status: Inappropriate
++
++Signed-off-by: Darrel Griët <dgriet@gmail.com>
++---
++ event-input.c |  17 +---
++ multitouch.c  | 241 +++++++++++++++++++-------------------------------
++ multitouch.h  |   2 +-
++ 3 files changed, 94 insertions(+), 166 deletions(-)
++
++diff --git a/event-input.c b/event-input.c
++index 49726f3..de0d19c 100644
++--- a/event-input.c
+++++ b/event-input.c
++@@ -295,7 +295,7 @@ static evin_iomon_extra_t *evin_iomon_extra_create              (int fd, const c
++ 
++ // common rate limited activity generation
++ 
++-static void         evin_iomon_generate_activity                (struct input_event *ev, bool cooked, bool raw);
+++void         evin_iomon_generate_activity                (struct input_event *ev, bool cooked, bool raw);
++ 
++ // event handling by device type
++ 
++@@ -2024,7 +2024,7 @@ evin_iomon_device_rem_all(void)
++  * @param cooked   True, if generic activity should be sent
++  * @param raw      True, if non-synthetized activity should be sent
++  */
++-static void
+++void
++ evin_iomon_generate_activity(struct input_event *ev, bool cooked, bool raw)
++ {
++     static time_t t_cooked = 0;
++@@ -2128,27 +2128,16 @@ evin_iomon_touchscreen_cb(mce_io_mon_t *iomon, gpointer data, gsize bytes_read)
++ 
++     bool grabbed = touch_grab_wanted;
++ 
++-    bool doubletap = false;
++-
++     evin_iomon_extra_t *extra = mce_io_mon_get_user_data(iomon);
++     if( extra && extra->ex_mt_state ) {
++         bool touching_prev = mt_state_touching(extra->ex_mt_state);
++-        doubletap = mt_state_handle_event(extra->ex_mt_state, ev);
+++        mt_state_handle_event(extra->ex_mt_state, ev);
++         bool touching_curr = mt_state_touching(extra->ex_mt_state);
++ 
++         if( touching_prev != touching_curr )
++             evin_touchstate_schedule_update();
++     }
++ 
++-#ifdef ENABLE_DOUBLETAP_EMULATION
++-    if( doubletap && evin_iomon_sw_gestures_allowed() ) {
++-        mce_log(LL_DEVEL, "[doubletap] emulated from touch input");
++-        ev->type  = EV_MSC;
++-        ev->code  = MSC_GESTURE;
++-        ev->value = GESTURE_DOUBLETAP | GESTURE_SYNTHESIZED;
++-    }
++-#endif
++-
++     /* Power key up event from touch screen -> double tap gesture event */
++     if( ev->type == EV_KEY && ev->code == KEY_POWER && ev->value == 0 ) {
++         mce_log(LL_DEVEL, "[doubletap] as power key event; "
++diff --git a/multitouch.c b/multitouch.c
++index 6bab567..1cc3915 100644
++--- a/multitouch.c
+++++ b/multitouch.c
++@@ -29,6 +29,14 @@
++ #include <stdlib.h>
++ #include <string.h>
++ 
+++#include <glib/gstdio.h>
+++#include <gio/gio.h>
+++
+++#include "datapipe.h"
+++#include "evdev.h"
+++#include "mce.h"
+++#include "mce-log.h"
+++
++ /* ========================================================================= *
++  * TYPES & FUNCTIONS
++  * ========================================================================= */
++@@ -64,43 +72,6 @@ struct mt_point_t
++ static void        mt_point_invalidate (mt_point_t *self);
++ static int         mt_point_distance2  (const mt_point_t *a, const mt_point_t *b);
++ 
++-/* ------------------------------------------------------------------------- *
++- * TOUCH_VECTOR
++- * ------------------------------------------------------------------------- */
++-
++-typedef struct mt_touch_t mt_touch_t;
++-
++-/** Tracking data for start and end position of one touch sequence */
++-struct mt_touch_t
++-{
++-    /* Coordinate where first finger was detected on screen */
++-    mt_point_t mtt_beg_point;
++-
++-    /* Coordinate where last finger was lifted from screen */
++-    mt_point_t mtt_end_point;
++-
++-    /* Timestamp for: Touch started */
++-    int64_t    mtt_beg_tick;
++-
++-    /* Timestamp for: Touch ended */
++-    int64_t    mtt_end_tick;
++-
++-    /* Maximum number of fingers seen during the touch */
++-    size_t     mtt_max_fingers;
++-};
++-
++-/** Maximum jitter allowed in double tap (pixel) coordinates */
++-#define MT_TOUCH_DBLTAP_DIST_MAX   100
++-
++-/** Maximum delay between double tap presses and releases [ms] */
++-#define MT_TOUCH_DBLTAP_DELAY_MAX  500
++-
++-/** Minimum delay between double tap presses and releases [ms] */
++-#define MT_TOUCH_DBLTAP_DELAY_MIN    1
++-
++-static bool        mt_touch_is_single_tap(const mt_touch_t *self);
++-static bool        mt_touch_is_double_tap(const mt_touch_t *self, const mt_touch_t *prev);
++-
++ /* ------------------------------------------------------------------------- *
++  * TOUCH_STATE
++  * ------------------------------------------------------------------------- */
++@@ -135,18 +106,17 @@ struct mt_state_t
++     /** Currently tracked primary touch point */
++     mt_point_t mts_point_tracked;
++ 
++-    /** Stats for the last 3 taps, used for double tap detection */
++-    mt_touch_t mts_tap_arr[3];
+++    /** Timer used for long press detection */
+++    guint      tap_to_unlock_timer_id;
+++
+++    size_t     current_seq_max_fingers;
++ 
++     /** Device type / protocol specific input event handler function */
++     void     (*mts_event_handler_cb)(mt_state_t *, const struct input_event *);
++-
++-    /** Timestamp from latest evdev input event */
++-    struct timeval mts_event_time;
++ };
++ 
++ static void        mt_state_reset          (mt_state_t *self);
++-static bool        mt_state_update         (mt_state_t *self);
+++static void        mt_state_update         (mt_state_t *self);
++ 
++ static void        mt_state_handle_event_a (mt_state_t *self, const struct input_event *ev);
++ static void        mt_state_handle_event_b (mt_state_t *self, const struct input_event *ev);
++@@ -154,10 +124,65 @@ static void        mt_state_handle_event_b (mt_state_t *self, const struct input
++ mt_state_t        *mt_state_create         (bool protocol_b);
++ void               mt_state_delete         (mt_state_t *self);
++ 
++-bool               mt_state_handle_event   (mt_state_t *self, const struct input_event *ev);
+++void               mt_state_handle_event   (mt_state_t *self, const struct input_event *ev);
++ 
++ bool               mt_state_touching       (const mt_state_t *self);
++ 
+++
+++/* ------------------------------------------------------------------------- *
+++ * LONG PRESS HANDLER
+++ * ------------------------------------------------------------------------- */
+++
+++/** Minimum press time to unlock screen [ms] */
+++#define MT_TOUCH_LONGPRESS_DELAY_MIN  200
+++
+++extern void evin_iomon_generate_activity (struct input_event *ev, bool cooked, bool raw);
+++
+++static gboolean mt_state_long_tap_cb(gpointer data)
+++{
+++    struct input_event *ev;
+++    mt_state_t *self;
+++
+++    self = (mt_state_t *)data;
+++
+++    if(!self)
+++        goto EXIT;
+++
+++    self->tap_to_unlock_timer_id = 0;
+++
+++    if(self->current_seq_max_fingers != 1)
+++        goto EXIT;
+++
+++    ev = malloc(sizeof(struct input_event));
+++
+++    mce_log(LL_CRUCIAL, "[longpress] double tap emulated from touch input");
+++    mce_log(LL_DEVEL, "[longpress] double tap emulated from touch input");
+++
+++    ev->type  = EV_MSC;
+++    ev->code  = MSC_GESTURE;
+++    ev->value = GESTURE_DOUBLETAP;
+++
+++    /* Do not generate activity if ts input is grabbed */
+++    if( !datapipe_get_gint(touch_grab_wanted_pipe) )
+++        evin_iomon_generate_activity(ev, true, true);
+++
+++    submode_t submode = mce_get_submode_int32();
+++
+++    /* If the event eater is active, don't send anything */
+++    if( submode & MCE_SUBMODE_EVEATER )
+++        goto EXIT;
+++
+++    /* Gesture events count as actual non-synthetized
+++     * user activity. */
+++    evin_iomon_generate_activity(ev, false, true);
+++
+++    /* But otherwise are handled in powerkey.c. */
+++    datapipe_exec_full(&keypress_event_pipe, &ev);
+++
+++EXIT:
+++    return FALSE;
+++}
+++
++ /* ========================================================================= *
++  * TOUCH_POINT
++  * ========================================================================= */
++@@ -188,74 +213,6 @@ static int mt_point_distance2(const mt_point_t *a, const mt_point_t *b)
++     return x*x + y*y;
++ }
++ 
++-/* ========================================================================= *
++- * TOUCH_VECTOR
++- * ========================================================================= */
++-
++-/** Predicate for: Touch vector represents a single tap
++- *
++- * @param self Touch vector object
++- *
++- * @return true if touch vector is tap, false otherwise
++- */
++-static bool mt_touch_is_single_tap(const mt_touch_t *self)
++-{
++-    bool is_single_tap = false;
++-
++-    if( !self )
++-        goto EXIT;
++-
++-    /* A tap is done using one finger */
++-    if( self->mtt_max_fingers != 1 )
++-        goto EXIT;
++-
++-    /* Touch release must happen close to the point of initial contact */
++-    int d2 = mt_point_distance2(&self->mtt_beg_point, &self->mtt_end_point);
++-    if( d2 > MT_TOUCH_DBLTAP_DIST_MAX * MT_TOUCH_DBLTAP_DIST_MAX )
++-        goto EXIT;
++-
++-    /* The touch duration must not be too short or too long */
++-    int64_t t = self->mtt_end_tick - self->mtt_beg_tick;
++-    if( t < MT_TOUCH_DBLTAP_DELAY_MIN || t > MT_TOUCH_DBLTAP_DELAY_MAX )
++-        goto EXIT;
++-
++-    is_single_tap = true;
++-
++-EXIT:
++-    return is_single_tap;
++-}
++-
++-/** Predicate for: Two touch vectors represent a double tap
++- *
++- * @param self Current touch vector object
++- * @param prev Previous touch vector object
++- *
++- * @return true if touch vector is double tap, false otherwise
++- */
++-static bool mt_touch_is_double_tap(const mt_touch_t *self, const mt_touch_t *prev)
++-{
++-    bool is_double_tap = false;
++-
++-    /* Both touch vectors must classify as single taps */
++-    if( !mt_touch_is_single_tap(self) || !mt_touch_is_single_tap(prev) )
++-        goto EXIT;
++-
++-    /* The second tap must start near to the end point of the 1st one */
++-    int d2 = mt_point_distance2(&self->mtt_beg_point, &prev->mtt_end_point);
++-    if( d2 > MT_TOUCH_DBLTAP_DIST_MAX * MT_TOUCH_DBLTAP_DIST_MAX )
++-        goto EXIT;
++-
++-    /* The delay between the taps must be sufficiently small too */
++-    int64_t t = self->mtt_beg_tick - prev->mtt_end_tick;
++-    if( t < MT_TOUCH_DBLTAP_DELAY_MIN || t > MT_TOUCH_DBLTAP_DELAY_MAX )
++-        goto EXIT;
++-
++-    is_double_tap = true;
++-
++-EXIT:
++-    return is_double_tap;
++-}
++-
++ /* ========================================================================= *
++  * TOUCH_STATE
++  * ========================================================================= */
++@@ -273,6 +230,11 @@ mt_state_reset(mt_state_t *self)
++         mt_point_invalidate(self->mts_point_array + i);
++ 
++     self->mts_point_slot = 0;
+++
+++    if(self->tap_to_unlock_timer_id != 0) {
+++        g_source_remove(self->tap_to_unlock_timer_id);
+++        self->tap_to_unlock_timer_id = 0;
+++    }
++ }
++ 
++ /** Update touch position tracking state
++@@ -281,10 +243,9 @@ mt_state_reset(mt_state_t *self)
++  *
++  * @return true if a double tap was just detected, false otherwise
++  */
++-static bool
+++static void
++ mt_state_update(mt_state_t *self)
++ {
++-    bool   dbltap_seen  = false;
++     size_t finger_count = 0;
++ 
++     /* Count fingers on screen and update position of one finger touch */
++@@ -304,43 +265,25 @@ mt_state_update(mt_state_t *self)
++ 
++     /* Skip the rest if the number of fingers on screen does not change */
++     if( self->mts_point_count == finger_count )
++-        goto EXIT;
+++        return;
++ 
++-    /* Convert timestamp from input event to 1ms accurate tick counter */
++-    int64_t tick = self->mts_event_time.tv_sec * 1000LL + self->mts_event_time.tv_usec / 1000;
++-
++-    /* When initial touch is detected, update the history buffer to reflect
++-     * the current state of affairs */
++     if( self->mts_point_count == 0 ) {
++-        memmove(self->mts_tap_arr+1, self->mts_tap_arr+0,
++-                sizeof self->mts_tap_arr - sizeof *self->mts_tap_arr);
++-
++-        self->mts_tap_arr[0].mtt_max_fingers = finger_count;
++-        self->mts_tap_arr[0].mtt_beg_point = self->mts_point_tracked;
++-        self->mts_tap_arr[0].mtt_beg_tick  = tick;
+++        self->current_seq_max_fingers = finger_count;
+++        self->tap_to_unlock_timer_id =
+++            g_timeout_add(MT_TOUCH_LONGPRESS_DELAY_MIN,
+++                    mt_state_long_tap_cb, self);
++     }
++ 
++-    /* Maintain maximum number of fingers seen on screen */
++-    if( self->mts_tap_arr[0].mtt_max_fingers < finger_count )
++-        self->mts_tap_arr[0].mtt_max_fingers = finger_count;
++-
++-    /* Update touch end position and time */
++-    self->mts_tap_arr[0].mtt_end_point = self->mts_point_tracked;
++-    self->mts_tap_arr[0].mtt_end_tick  = tick;
+++    if( self->current_seq_max_fingers < finger_count )
+++        self->current_seq_max_fingers = finger_count;
++ 
++-    /* When final finger is lifted, check if the history buffer content
++-     * looks like a double tap */
++-    if( finger_count == 0 ) {
++-        if( mt_touch_is_double_tap(self->mts_tap_arr+0, self->mts_tap_arr+1) ) {
++-            if( ! mt_touch_is_double_tap(self->mts_tap_arr+1, self->mts_tap_arr+2) )
++-                dbltap_seen = true;
++-        }
+++    /* When last touch is detected, delete the current timeout */
+++    if( finger_count == 0 && self->tap_to_unlock_timer_id != 0 ) {
+++        g_source_remove(self->tap_to_unlock_timer_id);
+++        self->tap_to_unlock_timer_id = 0;
++     }
++ 
++     self->mts_point_count = finger_count;
++-
++-EXIT:
++-    return dbltap_seen;
++ }
++ 
++ /** Handle multitouch protocol A event stream
++@@ -479,19 +422,13 @@ mt_state_handle_event_b(mt_state_t *self, const struct input_event *ev)
++  * @param self  Multitouch state object
++  * @param ev    Input event
++  */
++-bool
+++void
++ mt_state_handle_event(mt_state_t *self, const struct input_event *ev)
++ {
++-    bool   dbltap = false;
++-
++-    self->mts_event_time = ev->time;
++-
++     self->mts_event_handler_cb(self, ev);
++ 
++     if( ev->type == EV_SYN && ev->code == SYN_REPORT )
++-        dbltap = mt_state_update(self);
++-
++-    return dbltap;
+++        mt_state_update(self);
++ }
++ 
++ /** Check if there is at least one finger on screen at the momement
++@@ -538,6 +475,8 @@ mt_state_create(bool protocol_b)
++ 
++     self->mts_point_count = 0;
++ 
+++    self->tap_to_unlock_timer_id = 0;
+++
++     mt_state_reset(self);
++ 
++     mt_point_invalidate(&self->mts_mouse);
++diff --git a/multitouch.h b/multitouch.h
++index b65a554..7f0b18c 100644
++--- a/multitouch.h
+++++ b/multitouch.h
++@@ -34,7 +34,7 @@ typedef struct mt_state_t mt_state_t;
++ 
++ mt_state_t        *mt_state_create       (bool protocol_b);
++ void               mt_state_delete       (mt_state_t *self);
++-bool               mt_state_handle_event (mt_state_t *self, const struct input_event *ev);
+++void               mt_state_handle_event (mt_state_t *self, const struct input_event *ev);
++ bool               mt_state_touching     (const mt_state_t *self);
++ 
++ #endif /* MCE_MULTITOUCH_H_ */
+diff --git a/overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch b/overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch
+new file mode 100644
+index 00000000..9868cf16
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch
+@@ -0,0 +1,606 @@
++From 9706e2e44acbf719aaf454707dc21b9809704943 Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Sun, 7 Mar 2021 21:44:09 +0100
++Subject: [PATCH] tilt-to-wake: Wake screen when wrist gesture arrives.
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Upstream-Status: Inappropriate
++
++Signed-off-by: Darrel Griët <dgriet@gmail.com>
++---
++ builtin-gconf.c           |  10 ++
++ datapipe.c                |   4 +
++ datapipe.h                |   1 +
++ evdev.h                   |   1 +
++ mce-sensorfw.c            | 206 ++++++++++++++++++++++++++++++++++++++
++ mce-sensorfw.h            |   4 +
++ modules/display.h         |   8 ++
++ modules/sensor-gestures.c |  26 +++++
++ tests/ut/ut_display.c     |   5 +
++ tools/mcetool.c           |  32 ++++++
++ 10 files changed, 297 insertions(+)
++
++diff --git a/builtin-gconf.c b/builtin-gconf.c
++index 5517292..b04689c 100644
++--- a/builtin-gconf.c
+++++ b/builtin-gconf.c
++@@ -1265,6 +1265,16 @@ static const setting_t gconf_defaults[] =
++     .type = "b",
++     .def  = G_STRINGIFY(MCE_DEFAULT_FLIPOVER_GESTURE_ENABLED),
++   },
+++  {
+++    .key  = MCE_SETTING_WRIST_GESTURE_ENABLED,
+++    .type = "b",
+++    .def  = G_STRINGIFY(MCE_DEFAULT_WRIST_GESTURE_ENABLED),
+++  },
+++  {
+++    .key  = MCE_SETTING_WRIST_GESTURE_AVAILABLE,
+++    .type = "i",
+++    .def  = G_STRINGIFY(MCE_DEFAULT_WRIST_GESTURE_AVAILABLE),
+++  },
++   {
++     .key  = MCE_SETTING_ORIENTATION_CHANGE_IS_ACTIVITY,
++     .type = "b",
++diff --git a/datapipe.c b/datapipe.c
++index 8daee62..89c550d 100644
++--- a/datapipe.c
+++++ b/datapipe.c
++@@ -700,6 +700,9 @@ datapipe_t proximity_sensor_required_pipe       = DATAPIPE_INIT(proximity_sensor
++ /** proximity blanking; read only */
++ datapipe_t proximity_blanked_pipe               = DATAPIPE_INIT(proximity_blanked, boolean, false, 0, DATAPIPE_FILTERING_DENIED, DATAPIPE_CACHE_DEFAULT);
++ 
+++/** wrist gesture; read only */
+++datapipe_t wristgesture_sensor_pipe             = DATAPIPE_INIT(wristgesture_sensor, boolean, false, 0, DATAPIPE_FILTERING_DENIED, DATAPIPE_CACHE_DEFAULT);
+++
++ /** Ambient light sensor; read only */
++ datapipe_t light_sensor_actual_pipe             = DATAPIPE_INIT(light_sensor_actual, int, 400, 0, DATAPIPE_FILTERING_DENIED, DATAPIPE_CACHE_DEFAULT);
++ 
++@@ -1346,6 +1349,7 @@ void mce_datapipe_quit(void)
++     datapipe_free(&proximity_sensor_effective_pipe);
++     datapipe_free(&proximity_sensor_required_pipe);
++     datapipe_free(&proximity_blanked_pipe);
+++    datapipe_free(&wristgesture_sensor_pipe);
++     datapipe_free(&light_sensor_actual_pipe);
++     datapipe_free(&light_sensor_filtered_pipe);
++     datapipe_free(&light_sensor_poll_request_pipe);
++diff --git a/datapipe.h b/datapipe.h
++index 780881f..f5827a3 100644
++--- a/datapipe.h
+++++ b/datapipe.h
++@@ -243,6 +243,7 @@ extern datapipe_t proximity_sensor_actual_pipe;
++ extern datapipe_t proximity_sensor_effective_pipe;
++ extern datapipe_t proximity_sensor_required_pipe;
++ extern datapipe_t proximity_blanked_pipe;
+++extern datapipe_t wristgesture_sensor_pipe;
++ extern datapipe_t light_sensor_actual_pipe;
++ extern datapipe_t light_sensor_filtered_pipe;
++ extern datapipe_t light_sensor_poll_request_pipe;
++diff --git a/evdev.h b/evdev.h
++index be89a42..e7faf7a 100644
++--- a/evdev.h
+++++ b/evdev.h
++@@ -55,6 +55,7 @@ typedef enum {
++     GESTURE_SWIPE_FROM_BOTTOM = 3,
++     GESTURE_DOUBLETAP         = 4, /* To conform with value used in
++                                     * Nokia N9 kernel driver */
+++    GESTURE_TILT_TO_WAKE      = 5,
++     GESTURE_FPWAKEUP          = 16,
++ 
++     /* Modifiers */
++diff --git a/mce-sensorfw.c b/mce-sensorfw.c
++index c71e5f7..7c49104 100644
++--- a/mce-sensorfw.c
+++++ b/mce-sensorfw.c
++@@ -30,6 +30,8 @@
++ #include "mce-log.h"
++ #include "mce-dbus.h"
++ #include "libwakelock.h"
+++#include "evdev.h"
+++#include "mce-setting.h"
++ 
++ #include <linux/input.h>
++ 
++@@ -195,6 +197,7 @@ typedef enum
++     SFW_SENSOR_ID_PS,
++     SFW_SENSOR_ID_ALS,
++     SFW_SENSOR_ID_ORIENT,
+++    SFW_SENSOR_ID_WRIST,
++     SFW_SENSOR_ID_ACCELEROMETER,
++     SFW_SENSOR_ID_COMPASS,
++     SFW_SENSOR_ID_GYROSCOPE,
++@@ -218,6 +221,7 @@ sensor_id_available(sensor_id_t id)
++     case SFW_SENSOR_ID_PS:
++     case SFW_SENSOR_ID_ALS:
++     case SFW_SENSOR_ID_ORIENT:
+++    case SFW_SENSOR_ID_WRIST:
++         break;
++     default:
++         available = mce_in_sensortest_mode();
++@@ -268,6 +272,7 @@ sensor_id_available(sensor_id_t id)
++ #define SFW_SENSOR_INTERFACE_PS             "local.ProximitySensor"
++ #define SFW_SENSOR_INTERFACE_ALS            "local.ALSSensor"
++ #define SFW_SENSOR_INTERFACE_ORIENT         "local.OrientationSensor"
+++#define SFW_SENSOR_INTERFACE_WRIST          "local.WristGestureSensor"
++ #define SFW_SENSOR_INTERFACE_ACCELEROMETER  "local.AccelerometerSensor"
++ #define SFW_SENSOR_INTERFACE_COMPASS        "local.CompassSensor"
++ #define SFW_SENSOR_INTERFACE_GYROSCOPE      "local.GyroscopeSensor"
++@@ -311,6 +316,7 @@ sensor_id_available(sensor_id_t id)
++ #define SFW_SENSOR_METHOD_READ_PS             "proximity"
++ #define SFW_SENSOR_METHOD_READ_ALS            "lux"
++ #define SFW_SENSOR_METHOD_READ_ORIENT         "orientation"
+++#define SFW_SENSOR_METHOD_READ_WRIST          "wristgesture"
++ #define SFW_SENSOR_METHOD_READ_ACCELEROMETER  "xyz"
++ #define SFW_SENSOR_METHOD_READ_COMPASS        "value" // or "declinationvalue"?
++ #define SFW_SENSOR_METHOD_READ_GYROSCOPE      "value"
++@@ -335,6 +341,7 @@ sensor_id_available(sensor_id_t id)
++ #define SFW_SENSOR_NAME_PS                "proximitysensor"
++ #define SFW_SENSOR_NAME_ALS               "alssensor"
++ #define SFW_SENSOR_NAME_ORIENT            "orientationsensor"
+++#define SFW_SENSOR_NAME_WRIST             "wristgesturesensor"
++ #define SFW_SENSOR_NAME_ACCELEROMETER     "accelerometersensor"
++ #define SFW_SENSOR_NAME_COMPASS           "compasssensor"
++ #define SFW_SENSOR_NAME_GYROSCOPE         "gyroscopesensor"
++@@ -348,6 +355,13 @@ sensor_id_available(sensor_id_t id)
++ #define SFW_SENSOR_NAME_TEMPERATURE       "temperaturesensor"
++ 
++ // ----------------------------------------------------------------
+++#ifndef MCE_SETTING_DISPLAY_PATH
+++#define MCE_SETTING_DISPLAY_PATH                       "/system/osso/dsm/display"
+++#endif
+++
+++#ifndef MCE_SETTING_WRIST_GESTURE_AVAILABLE
+++#define MCE_SETTING_WRIST_GESTURE_AVAILABLE            MCE_SETTING_DISPLAY_PATH "/wrist_sensor_available"
+++#endif
++ 
++ /* ========================================================================= *
++  * FORWARD_DECLARATIONS
++@@ -365,6 +379,7 @@ typedef struct sfw_backend_t              sfw_backend_t;
++ typedef struct sfw_sample_als_t           sfw_sample_als_t;
++ typedef struct sfw_sample_ps_t            sfw_sample_ps_t;
++ typedef struct sfw_sample_orient_t        sfw_sample_orient_t;
+++typedef struct sfw_sample_wrist_t         sfw_sample_wrist_t;
++ typedef struct sfw_sample_accelerometer_t sfw_sample_accelerometer_t;
++ typedef struct sfw_sample_compass_t       sfw_sample_compass_t;
++ typedef struct sfw_sample_gyroscope_t     sfw_sample_gyroscope_t;
++@@ -400,6 +415,9 @@ typedef struct sfw_sample_temperature_t   sfw_sample_temperature_t;
++ /** Ambient light level [lux] to use when sensor can't be enabled */
++ #define SFW_NOTIFY_DEFAULT_ALS 400
++ 
+++#define SFW_NOTIFY_DEFAULT_WRIST false
+++#define SFW_NOTIFY_EXCEPTION_WRIST false
+++
++ /** Orientation state to use when sensor can't be enabled */
++ #define SFW_NOTIFY_DEFAULT_ORIENT MCE_ORIENTATION_UNDEFINED
++ 
++@@ -479,6 +497,16 @@ struct sfw_sample_orient_t
++ 
++ static const char *sfw_sample_orient_repr(const sfw_sample_orient_t *self);
++ 
+++/** Wrist gesture data block as sensord sends them */
+++struct sfw_sample_wrist_t
+++{
+++    /* microseconds, monotonic */
+++    uint64_t wrist_timestamp;
+++
+++    /* wrist tilted [bool] */
+++    uint8_t  wrist_tilted;
+++};
+++
++ typedef enum sfw_lid_type_t
++ {
++     SFW_LID_TYPE_UNKNOWN = -1, // UnknownLid
++@@ -724,6 +752,7 @@ static bool sfw_backend_parse_data              (DBusMessageIter *data, int arg_
++ static bool sfw_backend_als_value_cb            (sfw_plugin_t *plugin, DBusMessageIter *data);
++ static bool sfw_backend_ps_value_cb             (sfw_plugin_t *plugin, DBusMessageIter *data);
++ static bool sfw_backend_orient_value_cb         (sfw_plugin_t *plugin, DBusMessageIter *data);
+++static bool sfw_backend_wrist_value_cb          (sfw_plugin_t *plugin, DBusMessageIter *data);
++ static bool sfw_backend_accelerometer_value_cb  (sfw_plugin_t *plugin, DBusMessageIter *data);
++ static bool sfw_backend_compass_value_cb        (sfw_plugin_t *plugin, DBusMessageIter *data);
++ static bool sfw_backend_gyroscope_value_cb      (sfw_plugin_t *plugin, DBusMessageIter *data);
++@@ -739,6 +768,7 @@ static bool sfw_backend_temperature_value_cb    (sfw_plugin_t *plugin, DBusMessa
++ static void sfw_backend_als_sample_cb           (sfw_plugin_t *plugin, sfw_notify_t type, const void *sample);
++ static void sfw_backend_ps_sample_cb            (sfw_plugin_t *plugin, sfw_notify_t type, const void *sample);
++ static void sfw_backend_orient_sample_cb        (sfw_plugin_t *plugin, sfw_notify_t type, const void *sample);
+++static void sfw_backend_wrist_sample_cb         (sfw_plugin_t *plugin, sfw_notify_t type, const void *sample);
++ static void sfw_backend_accelerometer_sample_cb (sfw_plugin_t *plugin, sfw_notify_t type, const void *sample);
++ static void sfw_backend_compass_sample_cb       (sfw_plugin_t *plugin, sfw_notify_t type, const void *sample);
++ static void sfw_backend_gyroscope_sample_cb     (sfw_plugin_t *plugin, sfw_notify_t type, const void *sample);
++@@ -1209,6 +1239,8 @@ static void              sfw_service_do_query           (sfw_service_t *self);
++ static sfw_plugin_t     *sfw_service_plugin             (const sfw_service_t *self, sensor_id_t id);
++ static void              sfw_service_set_sensor         (const sfw_service_t *self, sensor_id_t id, bool enable);
++ 
+++static void              sfw_set_wrist_available        (sfw_plugin_t * plugin);
+++
++ /* ========================================================================= *
++  * SENSORFW_EXCEPTION
++  * ========================================================================= */
++@@ -1246,6 +1278,9 @@ static void (*sfw_notify_als_cb)(int lux) = 0;
++ /** Orientation change callback used for notifying upper level logic */
++ static void (*sfw_notify_orient_cb)(int state) = 0;
++ 
+++/** Wrist gesture change callback used for notifying upper level logic */
+++static void (*sfw_notify_wrist_cb)(int state) = 0;
+++
++ // (exported API defined in "mce-sensorfw.h")
++ 
++ static gboolean mce_sensorfw_evdev_cb    (GIOChannel *chn, GIOCondition cnd, gpointer aptr);
++@@ -1582,6 +1617,31 @@ EXIT:
++     return ack;
++ }
++ 
+++static bool
+++sfw_backend_wrist_value_cb(sfw_plugin_t *plugin, DBusMessageIter *data)
+++{
+++    bool          ack = false;
+++    dbus_uint64_t tck  = 0;
+++    dbus_uint32_t val  = 0;
+++
+++    if( !sfw_backend_parse_data(data,
+++                                DBUS_TYPE_UINT64, &tck,
+++                                DBUS_TYPE_UINT32, &val,
+++                                DBUS_TYPE_INVALID) )
+++        goto EXIT;
+++
+++    const sfw_sample_wrist_t sample = {
+++        .wrist_timestamp = tck,
+++        .wrist_tilted    = (val < 1) ? true : false,
+++    };
+++
+++    sfw_plugin_handle_sample(plugin, &sample);
+++
+++    ack = true;
+++EXIT:
+++    return ack;
+++}
+++
++ static bool
++ sfw_backend_accelerometer_value_cb(sfw_plugin_t *plugin, DBusMessageIter *data)
++ {
++@@ -2116,6 +2176,114 @@ sfw_backend_orient_sample_cb(sfw_plugin_t *plugin, sfw_notify_t type, const void
++     return;
++ }
++ 
+++extern void evin_iomon_generate_activity (struct input_event *ev, bool cooked, bool raw);
+++
+++/** Callback for handling wrist events from sensord */
+++static void
+++sfw_backend_wrist_sample_cb(sfw_plugin_t *plugin, sfw_notify_t type, const void *sampledata)
+++{
+++    static const sfw_sample_wrist_t default_value = {
+++        .wrist_tilted = SFW_NOTIFY_DEFAULT_WRIST,
+++    };
+++
+++    static sfw_sample_wrist_t cached_value = {
+++        .wrist_tilted = SFW_NOTIFY_DEFAULT_WRIST,
+++    };
+++
+++    static bool     tracking_active = false;
+++
+++    struct input_event *ev;
+++
+++    (void)plugin;
+++    const sfw_sample_wrist_t *sample = sampledata;
+++
+++    if( sample ) {
+++        mce_log(LL_DEBUG, "WRIST: UPDATE %s %s",
+++                sfw_notify_name(type),
+++                sample ? "tiled" : "untiled");
+++    }
+++
+++    switch( type ) {
+++    default:
+++    case NOTIFY_REPEAT:
+++        break;
+++
+++    case NOTIFY_FORGET:
+++    case NOTIFY_RESET:
+++        sfw_set_wrist_available(plugin);
+++        tracking_active = false;
+++        cached_value = default_value;
+++        break;
+++
+++    case NOTIFY_RESTORE:
+++        sfw_set_wrist_available(plugin);
+++        tracking_active = true;
+++        break;
+++
+++    case NOTIFY_EVDEV:
+++    case NOTIFY_SENSORD:
+++        sfw_set_wrist_available(plugin);
+++        cached_value = *sample;
+++        break;
+++    }
+++
+++    /* Default value is used unless we are in fully working state */
+++    sample = tracking_active ? &cached_value : &default_value ;
+++
+++    if( sfw_notify_wrist_cb ) {
+++        mce_log(LL_DEBUG, "WRIST: NOTIFY %s %s",
+++                sfw_notify_name(type),
+++                sample ? "tiled" : "untiled");
+++        sfw_notify_wrist_cb(sample->wrist_tilted);
+++    }
+++
+++    ev = malloc(sizeof(struct input_event));
+++
+++    mce_log(LL_DEVEL, "tilt-to-wake gesture from wrist gesture");
+++
+++    ev->type  = EV_MSC;
+++    ev->code  = MSC_GESTURE;
+++    ev->value = GESTURE_TILT_TO_WAKE;
+++ 
+++    evin_iomon_generate_activity(ev, true, true);
+++
+++    submode_t submode = mce_get_submode_int32();
+++
+++    /* If the event eater is active, don't send anything */
+++    if( submode & MCE_SUBMODE_EVEATER )
+++        goto EXIT;
+++
+++    /* Gesture events count as actual non-synthetized
+++     * user activity. */
+++    evin_iomon_generate_activity(ev, false, true);
+++
+++    /* But otherwise are handled in powerkey.c. */
+++    datapipe_exec_full(&keypress_event_pipe, &ev);
+++EXIT:
+++    return;
+++}
+++
+++/** Set availability of wrist tilt sensor based on connection state.
+++ */
+++static void
+++sfw_set_wrist_available(sfw_plugin_t *plugin)
+++{
+++    mce_log(LL_DEBUG, "WRIST: sfw_set_wrist_available: %d", plugin->plg_session->ses_state);
+++    switch(plugin->plg_session->ses_state) {
+++        case SESSION_INITIAL:
+++        case SESSION_IDLE:
+++        case SESSION_REQUESTING:
+++        case SESSION_INVALID:
+++            mce_setting_set_int(MCE_SETTING_WRIST_GESTURE_AVAILABLE, 0);
+++            break;
+++        case SESSION_ACTIVE:
+++            /* Only when a session is active we know that the sensor can be enabled. */
+++            mce_setting_set_int(MCE_SETTING_WRIST_GESTURE_AVAILABLE, 1);
+++        case SESSION_ERROR:
+++            break;
+++    }
+++}
+++
++ /** Callback for handling accelerometer events from sensord */
++ static void
++ sfw_backend_accelerometer_sample_cb(sfw_plugin_t *plugin, sfw_notify_t type, const void *sampledata)
++@@ -2608,6 +2776,15 @@ static const sfw_backend_t sfw_backend_lut[SFW_SENSOR_ID_COUNT] =
++         .be_sample_cb        = sfw_backend_orient_sample_cb,
++         .be_value_method     = SFW_SENSOR_METHOD_READ_ORIENT,
++     },
+++    [SFW_SENSOR_ID_WRIST] = {
+++        .be_sensor_name      = SFW_SENSOR_NAME_WRIST,
+++        .be_sensor_object    = 0,
+++        .be_sensor_interface = SFW_SENSOR_INTERFACE_WRIST,
+++        .be_sample_size      = sizeof(sfw_sample_wrist_t),
+++        .be_value_cb         = sfw_backend_wrist_value_cb,
+++        .be_sample_cb        = sfw_backend_wrist_sample_cb,
+++        .be_value_method     = SFW_SENSOR_METHOD_READ_WRIST,
+++    },
++     [SFW_SENSOR_ID_ACCELEROMETER] = {
++         .be_sensor_name      = SFW_SENSOR_NAME_ACCELEROMETER,
++         .be_sensor_object    = 0,
++@@ -5183,6 +5360,35 @@ mce_sensorfw_orient_disable(void)
++ 
++ // ----------------------------------------------------------------
++ 
+++/** Set Wrist notification callback
+++ *
+++ * @param cb function to call when Orientation events are received
+++ */
+++void
+++mce_sensorfw_wrist_set_notify(void (*cb)(int state))
+++{
+++    sfw_plugin_t *plugin = sfw_service_plugin(sfw_service, SFW_SENSOR_ID_WRIST);
+++    sfw_plugin_repeat_value(plugin);
+++}
+++
+++/** Try to enable Wrist input
+++ */
+++void
+++mce_sensorfw_wrist_enable(void)
+++{
+++    sfw_service_set_sensor(sfw_service, SFW_SENSOR_ID_WRIST, true);
+++}
+++
+++/** Try to disable Wrist input
+++ */
+++void
+++mce_sensorfw_wrist_disable(void)
+++{
+++    sfw_service_set_sensor(sfw_service, SFW_SENSOR_ID_WRIST, false);
+++}
+++
+++// ----------------------------------------------------------------
+++
++ /** Callback function for processing evdev events
++  *
++  * @param chn  io channel
++diff --git a/mce-sensorfw.h b/mce-sensorfw.h
++index cfd8d66..1daf3c0 100644
++--- a/mce-sensorfw.h
+++++ b/mce-sensorfw.h
++@@ -50,6 +50,10 @@ void mce_sensorfw_orient_set_notify(void (*cb)(int state));
++ void mce_sensorfw_orient_enable(void);
++ void mce_sensorfw_orient_disable(void);
++ 
+++void mce_sensorfw_wrist_set_notify(void (*cb)(int state));
+++void mce_sensorfw_wrist_enable(void);
+++void mce_sensorfw_wrist_disable(void);
+++
++ # ifdef __cplusplus
++ };
++ # endif
++diff --git a/modules/display.h b/modules/display.h
++index bfb9d4d..8075401 100644
++--- a/modules/display.h
+++++ b/modules/display.h
++@@ -186,6 +186,14 @@
++ # define MCE_SETTING_ORIENTATION_CHANGE_IS_ACTIVITY      MCE_SETTING_DISPLAY_PATH "/orientation_change_is_activity"
++ # define MCE_DEFAULT_ORIENTATION_CHANGE_IS_ACTIVITY      true
++ 
+++/** Whether MCE is allowed to use wrist gesture sensor */
+++# define MCE_SETTING_WRIST_GESTURE_ENABLED              MCE_SETTING_DISPLAY_PATH "/wrist_sensor_enabled"
+++# define MCE_DEFAULT_WRIST_GESTURE_ENABLED              true
+++
+++/** Whether the wrist gesture sensor is available on the hardware */
+++# define MCE_SETTING_WRIST_GESTURE_AVAILABLE            MCE_SETTING_DISPLAY_PATH "/wrist_sensor_available"
+++# define MCE_DEFAULT_WRIST_GESTURE_AVAILABLE            1
+++
++ /* ------------------------------------------------------------------------- *
++  * Color profile related settings
++  * ------------------------------------------------------------------------- */
++diff --git a/modules/sensor-gestures.c b/modules/sensor-gestures.c
++index f648009..9487818 100644
++--- a/modules/sensor-gestures.c
+++++ b/modules/sensor-gestures.c
++@@ -24,6 +24,7 @@
++ #include "../mce-log.h"
++ #include "../mce-setting.h"
++ #include "../mce-dbus.h"
+++#include "../mce-sensorfw.h"
++ #include "display.h"
++ 
++ #include <mce/dbus-names.h>
++@@ -57,6 +58,9 @@ static gint orientation_sensor_effective_id = 0;
++ static gboolean sg_flipover_gesture_enabled = MCE_DEFAULT_FLIPOVER_GESTURE_ENABLED;
++ static guint    sg_flipover_gesture_enabled_setting_id = 0;
++ 
+++/** Use of wrist gesture enabled */
+++static gboolean sg_wrist_gesture_enabled = MCE_DEFAULT_WRIST_GESTURE_ENABLED;
+++static guint    sg_wrist_gesture_enabled_setting_id = 0;
++ /* ========================================================================= *
++  * FUNCTIONS
++  * ========================================================================= */
++@@ -465,6 +469,15 @@ static void sg_setting_cb(GConfClient *const gcc, const guint id,
++     if( id == sg_flipover_gesture_enabled_setting_id ) {
++         sg_flipover_gesture_enabled = gconf_value_get_bool(gcv);
++     }
+++    else if( id == sg_wrist_gesture_enabled_setting_id ) {
+++        sg_wrist_gesture_enabled = gconf_value_get_bool(gcv);
+++		mce_log(LL_CRIT, "sg_wrist_gesture_enabled: %d", sg_wrist_gesture_enabled);
+++        if (sg_wrist_gesture_enabled) {
+++            mce_sensorfw_wrist_enable();
+++        } else {
+++            mce_sensorfw_wrist_disable();
+++        }
+++    }
++     else {
++         mce_log(LL_WARN, "Spurious GConf value received; confused!");
++     }
++@@ -482,6 +495,11 @@ static void sg_setting_init(void)
++                            MCE_DEFAULT_FLIPOVER_GESTURE_ENABLED,
++                            sg_setting_cb,
++                            &sg_flipover_gesture_enabled_setting_id);
+++    mce_setting_track_bool(MCE_SETTING_WRIST_GESTURE_ENABLED,
+++                           &sg_wrist_gesture_enabled,
+++                           MCE_DEFAULT_WRIST_GESTURE_ENABLED,
+++                           sg_setting_cb,
+++                           &sg_wrist_gesture_enabled_setting_id);
++ }
++ 
++ /** Stop tracking setting changes */
++@@ -489,6 +507,8 @@ static void sg_setting_quit(void)
++ {
++     mce_setting_notifier_remove(sg_flipover_gesture_enabled_setting_id),
++         sg_flipover_gesture_enabled_setting_id = 0;
+++    mce_setting_notifier_remove(sg_wrist_gesture_enabled_setting_id),
+++        sg_wrist_gesture_enabled_setting_id = 0;
++ }
++ 
++ /* ========================================================================= *
++@@ -508,6 +528,12 @@ const gchar *g_module_check_init(GModule *module)
++     sg_setting_init();
++     sg_datapipe_init();
++ 
+++    if (sg_wrist_gesture_enabled) {
+++        mce_sensorfw_wrist_enable();
+++    } else {
+++        mce_sensorfw_wrist_disable();
+++    }
+++
++     return NULL;
++ }
++ 
++diff --git a/tests/ut/ut_display.c b/tests/ut/ut_display.c
++index 216b3d8..673d01c 100644
++--- a/tests/ut/ut_display.c
+++++ b/tests/ut/ut_display.c
++@@ -821,6 +821,11 @@ void, mce_sensorfw_orient_set_notify, (void (*cb)(int state)))
++ 	(void)cb;
++ }
++ 
+++EXTERN_STUB (
+++void, mce_sensorfw_wrist_enable, (void))
+++{
+++}
+++
++ /*
++  * tklock.c stubs {{{1
++  */
++diff --git a/tools/mcetool.c b/tools/mcetool.c
++index e067c43..f5d519d 100644
++--- a/tools/mcetool.c
+++++ b/tools/mcetool.c
++@@ -4159,6 +4159,29 @@ static void xmce_get_orientation_change_is_activity(void)
++         printf("%-"PAD1"s %s\n", "Orientation change is activity:", txt);
++ }
++ 
+++/** Set wrist gesture detection toggle
+++ *
+++ * @param args string suitable for interpreting as enabled/disabled
+++ */
+++static bool xmce_set_wrist_gesture_detection(const char *args)
+++{
+++        gboolean val = xmce_parse_enabled(args);
+++        xmce_setting_set_bool(MCE_SETTING_WRIST_GESTURE_ENABLED, val);
+++        return true;
+++}
+++
+++/** Show wrist gesture detection toggle
+++ */
+++static void xmce_get_wrist_gesture_detection(void)
+++{
+++        gboolean val = 0;
+++        char txt[32] = "unknown";
+++
+++        if( xmce_setting_get_bool(MCE_SETTING_WRIST_GESTURE_ENABLED, &val) )
+++                snprintf(txt, sizeof txt, "%s", val ? "enabled" : "disabled");
+++        printf("%-"PAD1"s %s\n", "Wrist tilt gesture detection:", txt);
+++}
+++
++ /** Set flipover gesture detection toggle
++  *
++  * @param args string suitable for interpreting as enabled/disabled
++@@ -6532,6 +6555,7 @@ static bool xmce_get_status(const char *args)
++         xmce_get_orientation_sensor_mode();
++         xmce_get_orientation_change_is_activity();
++         xmce_get_flipover_gesture_detection();
+++        xmce_get_wrist_gesture_detection();
++         xmce_get_ps_mode();
++         xmce_get_ps_on_demand();
++         xmce_get_ps_uncover_delay();
++@@ -7542,6 +7566,14 @@ static const mce_opt_t options[] =
++                         "  'enabled'  flipover gestures can be used to silence calls/alarms\n"
++                         "  'disabled' turning device over does not affect calls/alarms\n"
++         },
+++        {
+++                .name        = "set-wrist-gesture-detection",
+++                .with_arg    = xmce_set_wrist_gesture_detection,
+++                .values      = "enabled|disabled",
+++                        "set the wrist gesture detection toggle; valid modes are:\n"
+++                        "  'enabled'  flipover gestures can be used to silence calls/alarms\n"
+++                        "  'disabled' turning device over does not affect calls/alarms\n"
+++        },
++         {
++                 .name        = "get-color-profile-ids",
++                 .flag        = 'a',
+diff --git a/overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch b/overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch
+new file mode 100644
+index 00000000..8b448d15
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch
+@@ -0,0 +1,64 @@
++From 8ebc2b7059796bbb1b5aa1fff06e5549eb621002 Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Sun, 7 Mar 2021 22:36:05 +0100
++Subject: [PATCH] inactivity: Allow activities in lockscreen mode.
++ asteroid-launcher marks the watchface as the lockscreen. When the watchface
++ is visible taping the screen would not keep the screen awake.
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Upstream-Status: Inappropriate
++
++Signed-off-by: Darrel Griët <dgriet@gmail.com>
++---
++ modules/inactivity.c | 36 +++++++-----------------------------
++ 1 file changed, 7 insertions(+), 29 deletions(-)
++
++diff --git a/modules/inactivity.c b/modules/inactivity.c
++index 5ac9d19..74bde99 100644
++--- a/modules/inactivity.c
+++++ b/modules/inactivity.c
++@@ -360,35 +360,13 @@ static bool mia_activity_allowed(void)
++         goto DENY;
++     }
++ 
++-    /* Normally activity does not apply when lockscreen is active */
++-    if( submode & MCE_SUBMODE_TKLOCK ) {
++-
++-        /* Active alarm */
++-        switch( alarm_ui_state ) {
++-        case MCE_ALARM_UI_RINGING_INT32:
++-        case MCE_ALARM_UI_VISIBLE_INT32:
++-            goto ALLOW;
++-
++-        default:
++-            break;
++-        }
++-
++-        /* Active call */
++-        switch( call_state ) {
++-        case CALL_STATE_RINGING:
++-        case CALL_STATE_ACTIVE:
++-            goto ALLOW;
++-
++-        default:
++-            break;
++-        }
++-
++-        /* Expecting user interaction */
++-        if( interaction_expected )
++-            goto ALLOW;
++-
++-        goto DENY;
++-    }
+++    /* Allways allow activity when lockscreen is active.
+++     *
+++     * This allows the lockscreen to be longer visible,
+++     * because the blanking timer can be cancelled.
+++     */
+++    if( submode & MCE_SUBMODE_TKLOCK )
+++        goto ALLOW;
++ 
++ ALLOW:
++     allowed = true;
+diff --git a/overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch b/overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch
+new file mode 100644
+index 00000000..c653a26e
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch
+@@ -0,0 +1,574 @@
++From d126e60e67e77e2841adb7c225df0fa363cd1595 Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Sun, 7 Mar 2021 22:49:48 +0100
++Subject: [PATCH] Ambient mode: Adapt low-power-mode to allow for actual
++ ambient mode. Refactor the low power mode to actually work in low power
++ mode(deep sleep). There are some challenges when it comes to transitions
++ (i.e. screen on -> screen lpm). There are multiple parts responsible for
++ setting the next screen state.
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Upstream-Status: Inappropriate
++
++Depending on what state the screen is the following may happen:
++- Default, screen on (currently watchface is shown) -> screen lpm.
++- In the `long timeout`(from asteroid-launcher) state, the screen may first go from screen on -> screen dim -> screen lpm
++- When the screen is off and a notification arrives the screen isn't actually in the on state, so there is a change needed in tklock.c to fix that.
++
++Another part that is very important is the ambient light sensor module.
++There is also the filter-brightness-als module. This module is responsible for changing the range of the brightness depending on the currently set brightness and the ambient light sensor value.
++So if the brightness is set to 0% the brightness profile use is 0, for 100% the profile 20 is used. These profiles are defined in `als-defaults.ini`.
++For LPM/ambient mode a special profiles set is used (LPM).
++In LPM mode we want to limit the maximum brightness.
++So a default profile is used that limits the maximum brightness to 28%. If the als reports a lower value then a lower screen brightness is also possible.
++An important side note is that, the als mode is enabled even if no such sensor exist. For those devices, the als value of 400 is used.
++This value also signifies the maximum brightness in LPM mode.
++Because the minimum brightness can vary between devices it is suggested to create alternative profiles for such devices.
++
++Signed-off-by: Darrel Griët <dgriet@gmail.com>
++---
++ inifiles/als-defaults.ini       |  13 +-
++ inifiles/mce.ini                |   2 +-
++ mce-dbus.h                      |   4 +
++ mce-fbdev.c                     |  19 ++-
++ mce-fbdev.h                     |   1 +
++ mce.conf                        |   6 +
++ modules/display.c               | 210 ++++++++++++++++++++++++++++++--
++ modules/display.h               |   6 +-
++ modules/filter-brightness-als.c |  13 +-
++ powerkey.h                      |   2 +-
++ tklock.c                        |   2 +-
++ 11 files changed, 253 insertions(+), 25 deletions(-)
++
++diff --git a/inifiles/als-defaults.ini b/inifiles/als-defaults.ini
++index 4a77fc3..c5339c0 100644
++--- a/inifiles/als-defaults.ini
+++++ b/inifiles/als-defaults.ini
++@@ -1,10 +1,11 @@
++ # Configuration file for MCE - Automatic display/led/keypad brightness control
++ #
++-# Configuration for tuning lisplay backlight, keypad backlight and indication led
+++# Configuration for tuning display backlight, keypad backlight and indication led
++ # brightness base on data from Ambient Light Sensor
++ #
++ # Limits are Ambient light sensor values [lux]
++ # Levels are brightness percentages
+++# Profiles are input brightness percentages converted to profile range (40% -> Profile 8)
++ #
++ # Minimum, ..., Maximum correspond with brightness setting 1 ... 5
++ 
++@@ -85,5 +86,11 @@ LevelsProfile0=30;33;36;39;42;45;48;51;54;57;64;68;72;76;80;84;88;92;96;100
++ 
++ [BrightnessLPM]
++ 
++-LimitsProfile0=1;4;27;99;700;778;864;960;1066;1184;1315;1460;1622;1801;2000
++-LevelsProfile0=1;2;3;4;5;15;24;34;43;53;62;72;81;91;100
+++# Use Limits and Levels profiles to select the desired brightness for a given ALS and current brightness.
+++# When the device doesn't have an ambient light sensor the default value for 400 will be used.
+++# The value 400 is over 350, so the value for 100000(=> 28%) will be used.
+++# Profiles can be added to have different LPM brightness levels at different input brightness levels.
+++# This sets the maximum brightness to 28% in ambient mode.
+++# Why 28%? Because this is the brightness level when input brightness is set to 0 and als is not available.
+++LimitsProfile0=1;2;4;6;11;19;34;61;109;195;350;100000
+++LevelsProfile0=1;3;5;7;9;11;13;15;17;19;20;28
++\ No newline at end of file
++diff --git a/inifiles/mce.ini b/inifiles/mce.ini
++index ce0de99..1c8b91c 100644
++--- a/inifiles/mce.ini
+++++ b/inifiles/mce.ini
++@@ -16,7 +16,7 @@
++ # to avoid unnecessary brightness fluctuations on mce startup
++ #
++ # Note: the name should not include the "lib"-prefix
++-Modules=radiostates;filter-brightness-als;display;keypad;led;battery-udev;inactivity;alarm;callstate;audiorouting;proximity;powersavemode;cpu-keepalive;doubletap;packagekit;sensor-gestures;bluetooth;memnotify;mempressure;usbmode;buttonbacklight;fingerprint;
+++Modules=radiostates;display;filter-brightness-als;keypad;led;battery-udev;inactivity;alarm;callstate;audiorouting;proximity;powersavemode;cpu-keepalive;doubletap;packagekit;sensor-gestures;bluetooth;memnotify;mempressure;usbmode;buttonbacklight;fingerprint;
++ 
++ [KeyPad]
++ 
++diff --git a/mce-dbus.h b/mce-dbus.h
++index e43da0b..828ffb5 100644
++--- a/mce-dbus.h
+++++ b/mce-dbus.h
++@@ -101,6 +101,10 @@
++ /* Enabling/disabling display updates via compositor service */
++ # define COMPOSITOR_SET_UPDATES_ENABLED           "setUpdatesEnabled"
++ 
+++#define COMPOSITOR_SET_AMBIENT_UPDATES_ENABLED "setAmbientUpdatesEnabled"
+++#define COMPOSITOR_SET_AMBIENT_MODE_ENABLED "setAmbientEnabled"
+++#define MCE_DISPLAY_LPM_SET_SUPPORTED "set_lpm_supported"
+++
++ /** Query owner of topmost ui window */
++ # define COMPOSITOR_GET_TOPMOST_WINDOW_PID        "privateTopmostWindowProcessId"
++ 
++diff --git a/mce-fbdev.c b/mce-fbdev.c
++index 7db8762..6212a91 100644
++--- a/mce-fbdev.c
+++++ b/mce-fbdev.c
++@@ -58,6 +58,8 @@ static bool fbdev_use_hybris = false;
++ /** Flag for: Opening frame buffer device is allowed */
++ static bool mce_fbdev_allow_open = false;
++ 
+++static bool mce_fbdev_power_vsync_suspend = false;
+++
++ /* ========================================================================= *
++  * FBDEV_FILE_DESCRIPTOR
++  * ========================================================================= */
++@@ -239,6 +241,12 @@ void mce_fbdev_linger_after_exit(int delay_ms)
++  * FRAMEBUFFER_POWER
++  * ========================================================================= */
++ 
+++void mce_fbdev_set_suspend_mode(bool vsync_suspend)
+++{
+++    mce_log(LL_DEBUG, "fbdev suspend_mode %s", vsync_suspend ? "on" : "off");
+++    mce_fbdev_power_vsync_suspend = vsync_suspend;
+++}
+++
++ /** Set the frame buffer power state
++  *
++  * MCE uses this function for display power control only if autosuspend
++@@ -252,10 +260,17 @@ void mce_fbdev_linger_after_exit(int delay_ms)
++  */
++ void mce_fbdev_set_power(bool power_on)
++ {
++-    mce_log(LL_DEBUG, "fbdev power %s", power_on ? "up" : "down");
+++    mce_log(LL_DEBUG, "fbdev power %s", power_on ? "up" : (mce_fbdev_power_vsync_suspend ? "ambient" : "down"));
++ 
++     if( mce_fbdev_handle != -1 ) {
++-        int value = power_on ? FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
+++        int value;
+++        if (power_on) {
+++            value = FB_BLANK_UNBLANK;
+++        } else if (mce_fbdev_power_vsync_suspend) {
+++            value = FB_BLANK_VSYNC_SUSPEND;
+++        } else {
+++            value = FB_BLANK_POWERDOWN;
+++        }
++ 
++         if( ioctl(mce_fbdev_handle, FBIOBLANK, value) == -1 )
++             mce_log(LL_ERR, "%s: ioctl(FBIOBLANK,%d): %m", FB_DEVICE, value);
++diff --git a/mce-fbdev.h b/mce-fbdev.h
++index 03f09f5..18a1a08 100644
++--- a/mce-fbdev.h
+++++ b/mce-fbdev.h
++@@ -36,6 +36,7 @@ void mce_fbdev_close             (void);
++ void mce_fbdev_reopen            (void);
++ bool mce_fbdev_is_open           (void);
++ 
+++void mce_fbdev_set_suspend_mode  (bool vsync_suspend);
++ void mce_fbdev_set_power         (bool power_on);
++ 
++ void mce_fbdev_linger_after_exit (int delay_ms);
++diff --git a/mce.conf b/mce.conf
++index 11d764e..9b46094 100644
++--- a/mce.conf
+++++ b/mce.conf
++@@ -110,6 +110,12 @@
++ 		<allow send_destination="com.nokia.mce"
++ 		       send_interface="com.nokia.mce.request"
++ 		       send_member="req_display_state_lpm"/>
+++		<allow send_destination="com.nokia.mce"
+++		       send_interface="com.nokia.mce.request"
+++		       send_member="set_lpm_supported"/>
+++		<allow send_destination="com.nokia.mce"
+++		       send_interface="com.nokia.mce.request"
+++		       send_member="get_lpm_available"/>
++ 
++ 		<allow send_destination="com.nokia.mce"
++ 		       send_interface="com.nokia.mce.request"
++diff --git a/modules/display.c b/modules/display.c
++index f33ec64..42ca0e5 100644
++--- a/modules/display.c
+++++ b/modules/display.c
++@@ -412,6 +412,7 @@ static bool                mdy_shutdown_in_progress(void);
++  * DATAPIPE_TRACKING
++  * ------------------------------------------------------------------------- */
++ 
+++static void                mdy_datapipe_ambient_light_level_cb(gconstpointer data);;
++ static void                mdy_datapipe_packagekit_locked_cb(gconstpointer data);;
++ static void                mdy_datapipe_system_state_cb(gconstpointer data);
++ static void                mdy_datapipe_submode_cb(gconstpointer data);
++@@ -709,6 +710,9 @@ static void                 compositor_stm_send_pid_query    (compositor_stm_t *
++ static void                 compositor_stm_forget_pid_query  (compositor_stm_t *self);
++ static void                 compositor_stm_pid_query_cb      (DBusPendingCall *pc, void *aptr);
++ 
+++static void                 compositor_stm_send_lpm_request (compositor_stm_t *self);
+++static void                 compositor_stm_lpm_request_cb   (DBusPendingCall *pc, void *aptr);
+++
++ static void                 compositor_stm_send_ctrl_request (compositor_stm_t *self);
++ static void                 compositor_stm_forget_ctrl_request(compositor_stm_t *self);
++ static void                 compositor_stm_ctrl_request_cb   (DBusPendingCall *pc, void *aptr);
++@@ -1396,6 +1401,29 @@ xlat(int src_lo, int src_hi, int dst_lo, int dst_hi, int val)
++  * DATAPIPE_TRACKING
++  * ========================================================================= */
++ 
+++/** Ambient light level; assume sensor not available.
+++ * This is used to avoid changing the backlight when the als is disabled.
+++ */
+++static int ambient_light_level = -1;
+++/**
+++ * Handle ambient light level updates.
+++ *
+++ * @param data The ambient light level in a pointer
+++ */
+++static void mdy_datapipe_ambient_light_level_cb(gconstpointer data)
+++{
+++    bool prev = ambient_light_level;
+++    ambient_light_level = GPOINTER_TO_INT(data);
+++
+++    if( ambient_light_level == prev )
+++        goto EXIT;
+++
+++    /* Log by default as it might help analyzing lpm problems */
+++    mce_log(LL_DEBUG, "ambient_light_level = %d", ambient_light_level);
+++EXIT:
+++    return;
+++}
+++
++ /** Cached exceptional ui state */
++ static uiexception_type_t uiexception_type = UIEXCEPTION_TYPE_NONE;
++ 
++@@ -1827,7 +1855,9 @@ static void mdy_datapipe_lpm_brightness_cb(gconstpointer data)
++ 
++     mce_log(LL_DEBUG, "input: %d -> %d", prev, curr);
++ 
++-    if( curr == prev )
+++    // Sometimes it happens that the brightness changes while the als is disabled(ambient_light_level = -1), this cause the 
+++    // filter to return 100%, resulting in max brightness ambient mode.
+++    if( (curr == prev) || (ambient_light_level < 0))
++         goto EXIT;
++ 
++     mdy_brightness_set_lpm_level(curr);
++@@ -2242,6 +2272,10 @@ static datapipe_handler_t mdy_datapipe_handlers[] =
++         .datapipe  = &audio_route_pipe,
++         .output_cb = mdy_datapipe_audio_route_cb,
++     },
+++    {
+++        .datapipe  = &light_sensor_filtered_pipe,
+++        .output_cb = mdy_datapipe_ambient_light_level_cb,
+++    },
++     {
++         .datapipe  = &packagekit_locked_pipe,
++         .output_cb = mdy_datapipe_packagekit_locked_cb,
++@@ -3527,12 +3561,11 @@ static void mdy_brightness_set_lpm_level(gint level)
++      * display state we are in or transitioning to */
++     switch( display_state_next ) {
++     case MCE_DISPLAY_LPM_ON:
+++    case MCE_DISPLAY_OFF:
+++    case MCE_DISPLAY_LPM_OFF:
++         mdy_brightness_set_fade_target_als(mdy_brightness_level_display_lpm);
++         break;
++-
++     default:
++-    case MCE_DISPLAY_OFF:
++-    case MCE_DISPLAY_LPM_OFF:
++     case MCE_DISPLAY_DIM:
++     case MCE_DISPLAY_ON:
++     case MCE_DISPLAY_UNDEF:
++@@ -4159,8 +4192,7 @@ static gboolean mdy_blanking_off_cb(gpointer data)
++     case MCE_DISPLAY_DIM:
++         if( lipstick_service_state != SERVICE_STATE_RUNNING )
++             break;
++-        if( mdy_blanking_from_lockscreen() )
++-            next_state = MCE_DISPLAY_LPM_ON;
+++        next_state = MCE_DISPLAY_LPM_ON;
++         break;
++     default:
++         break;
++@@ -6164,6 +6196,12 @@ struct compositor_stm_t
++      */
++     DBusPendingCall       *csi_ctrl_request_pc;
++ 
+++    /** Currently pending compositor D-Bus method call
+++     *
+++     * Managed by compositor_stm_send_ctrl_request() & co
+++     */
+++    DBusPendingCall       *csi_lpm_request_pc;
+++
++     /** Timer id for killing unresponsive compositor process
++      *
++      * Managed by compositor_stm_schedule_killer() & co
++@@ -6213,6 +6251,7 @@ compositor_stm_ctor(compositor_stm_t *self)
++ 
++     /* No pending compositor dbus method call */
++     self->csi_ctrl_request_pc = 0;
+++    self->csi_lpm_request_pc = 0;
++ 
++     /* Retry timer is inactive */
++     self->csi_retry_timer_id = 0;
++@@ -6411,6 +6450,70 @@ EXIT:
++     return;
++ }
++ 
+++static void
+++compositor_stm_send_lpm_request(compositor_stm_t *self)
+++{
+++    mce_log(LL_DEBUG, "compositor_stm_send_lpm_request");
+++    dbus_bool_t dta = mdy_use_low_power_mode;
+++
+++    bool ack = dbus_send_ex2(COMPOSITOR_SERVICE,
+++                             COMPOSITOR_PATH,
+++                             COMPOSITOR_IFACE,
+++                             COMPOSITOR_SET_AMBIENT_MODE_ENABLED,
+++                             compositor_stm_lpm_request_cb,
+++                             COMPOSITOR_STM_DBUS_CALL_TIMEOUT,
+++                             self, 0,
+++                             &self->csi_lpm_request_pc,
+++                             DBUS_TYPE_BOOLEAN, &dta,
+++                             DBUS_TYPE_INVALID);
+++
+++    if( !ack )
+++        mce_log(LL_NOTICE, "Failed to send low power mode enable request");
+++}
+++
+++/** Handle reply to pending compositor state request
+++ */
+++static void
+++compositor_stm_lpm_request_cb(DBusPendingCall *pc, void *aptr)
+++{
+++    compositor_stm_t       *self = aptr;
+++    DBusMessage *rsp  = 0;
+++    DBusError    err  = DBUS_ERROR_INIT;
+++    bool         ack  = false;
+++    mce_log(LL_DEBUG, "compositor_stm_lpm_request_cb");
+++
+++    if( self->csi_lpm_request_pc != pc )
+++        goto EXIT;
+++
+++    dbus_pending_call_unref(self->csi_lpm_request_pc),
+++        self->csi_lpm_request_pc = 0;
+++
+++    if( !(rsp = dbus_pending_call_steal_reply(pc)) )
+++        goto EXIT;
+++
+++    if( dbus_set_error_from_message(&err, rsp) ) {
+++        mce_log(LL_WARN, "%s: %s", err.name, err.message);
+++        goto EXIT;
+++    }
+++
+++    ack = true;
+++
+++EXIT:
+++    if( ack ) {
+++        mce_log(LL_DEBUG, "Compositor ack LPM request support: %d, enable: %d",
+++                mdy_low_power_mode_supported, mdy_use_low_power_mode);
+++        mce_fbdev_set_suspend_mode(mdy_use_low_power_mode && mdy_low_power_mode_supported);
+++    } else {
+++        mce_log(LL_DEBUG, "LPM request wasn't acknowledged, is the compositor available?");
+++    }
+++
+++    if( rsp ) dbus_message_unref(rsp);
+++
+++    dbus_error_free(&err);
+++
+++    return;
+++}
+++
++ /* ------------------------------------------------------------------------- *
++  * managing org.nemomobile.compositor.setUpdatesEnabled() method calls
++  * ------------------------------------------------------------------------- */
++@@ -7662,7 +7765,8 @@ static void mdy_display_state_changed(void)
++     case MCE_DISPLAY_OFF:
++     case MCE_DISPLAY_LPM_OFF:
++         /* Blanking or already blanked -> set zero brightness */
++-        mdy_brightness_force_level(0);
+++        if (!mdy_use_low_power_mode || !mdy_low_power_mode_supported)
+++            mdy_brightness_force_level(0);
++         break;
++ 
++     case MCE_DISPLAY_LPM_ON:
++@@ -7753,8 +7857,8 @@ static void mdy_display_state_leave(display_state_t prev_state,
++     bool have_power = mdy_stm_display_state_needs_power(prev_state);
++     bool need_power = mdy_stm_display_state_needs_power(next_state);
++ 
++-    /* Deny ALS brightness when heading to powered off state */
++-    if( !need_power ) {
+++    /* Deny ALS brightness when heading to powered off state, but allow in ambient mode */
+++    if( !need_power && !(mdy_use_low_power_mode && mdy_low_power_mode_supported)) {
++         mce_log(LL_DEBUG, "deny als fade");
++         mdy_brightness_als_fade_allowed = false;
++     }
++@@ -7786,7 +7890,8 @@ static void mdy_display_state_leave(display_state_t prev_state,
++     case MCE_DISPLAY_OFF:
++     case MCE_DISPLAY_LPM_OFF:
++         mdy_brightness_level_display_resume = 0;
++-        mdy_brightness_set_fade_target_blank();
+++        if (!mdy_use_low_power_mode || !mdy_low_power_mode_supported)
+++            mdy_brightness_set_fade_target_blank();
++         break;
++ 
++     case MCE_DISPLAY_UNDEF:
++@@ -9786,6 +9891,39 @@ static gboolean mdy_dbus_handle_display_off_req(DBusMessage *const msg)
++     return TRUE;
++ }
++ 
+++static gboolean mdy_dbus_handle_lpm_enabled_req(DBusMessage *const msg)
+++{
+++    gboolean status = FALSE;
+++    dbus_bool_t low_power_mode_supported = false;
+++    DBusError error = DBUS_ERROR_INIT;
+++
+++    mce_log(LL_DEVEL, "Received lpm support from %s",
+++            mce_dbus_get_message_sender_ident(msg));
+++
+++    /* Extract result */
+++    if (dbus_message_get_args(msg, &error,
+++                              DBUS_TYPE_BOOLEAN, &low_power_mode_supported,
+++                              DBUS_TYPE_INVALID) == FALSE) {
+++        mce_log(LL_ERR, "Failed to get argument from %s.%s; %s",
+++                "org.freedesktop.DBus", "NameOwnerChanged",
+++                error.message);
+++        goto EXIT;
+++    }
+++    status = TRUE;
+++
+++EXIT:
+++    mce_log(LL_DEVEL, "The compositor %s support for ambient mode.",
+++            low_power_mode_supported ? "has" : "hasn't");
+++
+++    // We have a variable that we should use to set lpm mode availability based on ack.
+++    mdy_low_power_mode_supported = low_power_mode_supported;
+++
+++    // Enable/disable lpm mode based on support from the compositor.
+++    compositor_stm_send_lpm_request(mdy_compositor_ipc);
+++
+++    return status;
+++}
+++
++ /** D-Bus callback for the display lpm method call
++  *
++  * @param msg The D-Bus message
++@@ -10348,6 +10526,14 @@ static mce_dbus_handler_t mdy_dbus_handlers[] =
++         .args      =
++             "    <arg direction=\"out\" name=\"cabc_mode\" type=\"s\"/>\n"
++     },
+++    {
+++        .interface = MCE_REQUEST_IF,
+++        .name      = MCE_DISPLAY_LPM_SET_SUPPORTED,
+++        .type      = DBUS_MESSAGE_TYPE_METHOD_CALL,
+++        .callback  = mdy_dbus_handle_lpm_enabled_req,
+++        .args      =
+++            "    <arg direction=\"out\" name=\"enabled\" type=\"b\"/>\n"
+++    },
++     {
++         .interface = MCE_REQUEST_IF,
++         .name      = MCE_DISPLAY_ON_REQ,
++@@ -10829,6 +11015,7 @@ static void mdy_setting_cb(GConfClient *const gcc, const guint id,
++     }
++     else if (id == mdy_use_low_power_mode_setting_id) {
++         mdy_use_low_power_mode = gconf_value_get_bool(gcv);
+++        compositor_stm_send_lpm_request(mdy_compositor_ipc);
++ 
++         if (((display_state_curr == MCE_DISPLAY_LPM_OFF) ||
++              (display_state_curr == MCE_DISPLAY_LPM_ON)) &&
++@@ -11223,7 +11410,8 @@ static void mdy_setting_init(void)
++                            MCE_DEFAULT_USE_LOW_POWER_MODE,
++                            mdy_setting_cb,
++                            &mdy_use_low_power_mode_setting_id);
++-
+++    
+++    compositor_stm_send_lpm_request(mdy_compositor_ipc);
++     /* Blanking inhibit modes */
++     mce_setting_track_int(MCE_SETTING_BLANKING_INHIBIT_MODE,
++                           &mdy_blanking_inhibit_mode,
++diff --git a/modules/display.h b/modules/display.h
++index 8075401..8bd4513 100644
++--- a/modules/display.h
+++++ b/modules/display.h
++@@ -385,7 +385,7 @@
++ 
++ /** Display blanking delay from lpm-on state [s] */
++ # define MCE_SETTING_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   MCE_SETTING_DISPLAY_PATH "/display_blank_from_lpm_on_timeout"
++-# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   5
+++# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   1
++ 
++ /** Display blanking delay from lpm-off state [s]
++  *
++@@ -394,7 +394,7 @@
++  *       will cause transition back to lpm-on state.
++  */
++ # define MCE_SETTING_DISPLAY_BLANK_FROM_LPM_OFF_TIMEOUT  MCE_SETTING_DISPLAY_PATH "/display_blank_from_lpm_off_timeout"
++-# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_OFF_TIMEOUT  5
+++# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_OFF_TIMEOUT  1
++ 
++ /** Whether display blanking is forbidden
++  *
++@@ -512,7 +512,7 @@ typedef enum {
++  * to blank the screen after a while.
++  */
++ # define MCE_SETTING_USE_LOW_POWER_MODE                  MCE_SETTING_DISPLAY_PATH "/use_low_power_mode"
++-# define MCE_DEFAULT_USE_LOW_POWER_MODE                  false
+++# define MCE_DEFAULT_USE_LOW_POWER_MODE                  true
++ 
++ /* ------------------------------------------------------------------------- *
++  * Power Management related settings
++diff --git a/modules/filter-brightness-als.c b/modules/filter-brightness-als.c
++index 26ff3e2..54eed91 100644
++--- a/modules/filter-brightness-als.c
+++++ b/modules/filter-brightness-als.c
++@@ -810,11 +810,11 @@ fba_inputflt_sampling_output(int lux)
++ 
++     fba_inputflt_output_lux = lux;
++ 
++-    fba_datapipe_execute_brightness_change();
++-
++     /* Feed filtered sensor data to datapipe */
++     datapipe_exec_full(&light_sensor_filtered_pipe,
++                        GINT_TO_POINTER(fba_inputflt_output_lux));
+++
+++    fba_datapipe_execute_brightness_change();
++ EXIT:
++     return;
++ }
++@@ -1288,9 +1288,12 @@ fba_datapipe_lpm_brightness_filter(gpointer data)
++     if( lut_lpm.profiles < 1 )
++         goto EXIT;
++ 
+++    int max_prof = lut_lpm.profiles - 1;
+++
+++    int prof = mce_xlat_int(1,100, 0,max_prof, value);
++     /* Note: Input value is ignored and output is
++      *       determined only by the als config */
++-    value = fba_als_filter_run(&lut_lpm, 0, fba_inputflt_output_lux);
+++    value = fba_als_filter_run(&lut_lpm, prof, fba_inputflt_output_lux);
++ 
++ EXIT:
++     return GINT_TO_POINTER(value);
++@@ -1746,6 +1749,10 @@ fba_status_rethink(void)
++     mce_log(LL_DEBUG, "enabled=%d; autobright=%d; filter_lid=%d -> enable=%d",
++             fba_setting_als_enabled, fba_setting_als_autobrightness, fba_setting_filter_lid_with_als, enable_new);
++ 
+++    /* When the display module is loaded the function datapipe binding is inited, this causes a a brightness update without filtering.
+++     * fba_status_rethink is called when the module is loaded. Also execute the brightness filter pipe. Fixing als not filtering on boot. */
+++    fba_datapipe_execute_brightness_change();
+++
++     enable_old = enable_new;
++ 
++     if( enable_new ) {
++diff --git a/powerkey.h b/powerkey.h
++index 6d90108..4c342a0 100644
++--- a/powerkey.h
+++++ b/powerkey.h
++@@ -63,7 +63,7 @@ typedef enum
++ 
++ /** How power key "blank" action should behave */
++ # define MCE_SETTING_POWERKEY_BLANKING_MODE        MCE_SETTING_POWERKEY_PATH "/blanking_mode"
++-# define MCE_DEFAULT_POWERKEY_BLANKING_MODE        0 // = PWRKEY_BLANK_TO_OFF
+++# define MCE_DEFAULT_POWERKEY_BLANKING_MODE        1 // = PWRKEY_BLANK_TO_LPM
++ 
++ /** How many consequent power key presses trigger proximity override
++  *
++diff --git a/tklock.c b/tklock.c
++index 867deaa..1188cb6 100644
++--- a/tklock.c
+++++ b/tklock.c
++@@ -4100,7 +4100,7 @@ static void tklock_uiexception_finish(void)
++     default:
++         /* If the display was not clearly ON when exception started,
++          * turn it OFF after exceptions are over. */
++-        mce_datapipe_request_display_state(MCE_DISPLAY_OFF);
+++        mce_datapipe_request_display_state(MCE_DISPLAY_LPM_ON);
++         break;
++ 
++     case MCE_DISPLAY_ON:
+diff --git a/overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch b/overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
+new file mode 100644
+index 00000000..cb9f7a20
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
+@@ -0,0 +1,61 @@
++From 2b64065b5f8510258c93709ed2bf606d52a1cc71 Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Sun, 7 Mar 2021 23:03:41 +0100
++Subject: [PATCH] Ambient Mode: Wait for compositor when sending enable/disable
++ request. Low power mode wouldn't activate properly after boot sometimes, this
++ is likely due to the compositor not being available at the time. So wait
++ until we know that the compositor is available (ready to receive DBus
++ messages).
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Upstream-Status: Inappropriate
++
++Signed-off-by: Darrel Griët <dgriet@gmail.com>
++---
++ modules/display.c | 16 ++++++++++------
++ 1 file changed, 10 insertions(+), 6 deletions(-)
++
++diff --git a/modules/display.c b/modules/display.c
++index 42ca0e5..85d0df3 100644
++--- a/modules/display.c
+++++ b/modules/display.c
++@@ -7128,6 +7128,9 @@ compositor_stm_enter_state(compositor_stm_t *self)
++         compositor_stm_cancel_killer(self);
++         compositor_stm_cancel_panic(self);
++ 
+++        /* Compositor is ready to receive D-Bus messages, send request to enable/disable lpm. */
+++        compositor_stm_send_lpm_request(self);
+++
++         /* Wake display state machine */
++         mdy_stm_schedule_rethink();
++         break;
++@@ -9915,11 +9918,13 @@ EXIT:
++     mce_log(LL_DEVEL, "The compositor %s support for ambient mode.",
++             low_power_mode_supported ? "has" : "hasn't");
++ 
++-    // We have a variable that we should use to set lpm mode availability based on ack.
++-    mdy_low_power_mode_supported = low_power_mode_supported;
+++    if (!mdy_low_power_mode_supported != !low_power_mode_supported) {
+++        // We have a variable that we should use to set lpm mode availability based on ack.
+++        mdy_low_power_mode_supported = low_power_mode_supported;
++ 
++-    // Enable/disable lpm mode based on support from the compositor.
++-    compositor_stm_send_lpm_request(mdy_compositor_ipc);
+++        // Enable/disable lpm mode based on support from the compositor.
+++        compositor_stm_send_lpm_request(mdy_compositor_ipc);
+++    }
++ 
++     return status;
++ }
++@@ -11410,8 +11415,7 @@ static void mdy_setting_init(void)
++                            MCE_DEFAULT_USE_LOW_POWER_MODE,
++                            mdy_setting_cb,
++                            &mdy_use_low_power_mode_setting_id);
++-    
++-    compositor_stm_send_lpm_request(mdy_compositor_ipc);
+++
++     /* Blanking inhibit modes */
++     mce_setting_track_int(MCE_SETTING_BLANKING_INHIBIT_MODE,
++                           &mdy_blanking_inhibit_mode,
+diff --git a/overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch b/overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
+new file mode 100644
+index 00000000..aefe53f7
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
+@@ -0,0 +1,67 @@
++From 73ce23a858581541379275743cb528d079a1a045 Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Sun, 7 Mar 2021 23:07:09 +0100
++Subject: [PATCH] Ambient Mode: Exit ambient mode when touch is detected.
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Upstream-Status: Inappropriate
++
++Signed-off-by: Darrel Griët <dgriet@gmail.com>
++---
++ modules/display.c | 27 +++++++++++++++++++++++++++
++ 1 file changed, 27 insertions(+)
++
++diff --git a/modules/display.c b/modules/display.c
++index 85d0df3..3c50973 100644
++--- a/modules/display.c
+++++ b/modules/display.c
++@@ -413,6 +413,7 @@ static bool                mdy_shutdown_in_progress(void);
++  * ------------------------------------------------------------------------- */
++ 
++ static void                mdy_datapipe_ambient_light_level_cb(gconstpointer data);;
+++static void                mdy_datapipe_touch_detected_cb(gconstpointer data);
++ static void                mdy_datapipe_packagekit_locked_cb(gconstpointer data);;
++ static void                mdy_datapipe_system_state_cb(gconstpointer data);
++ static void                mdy_datapipe_submode_cb(gconstpointer data);
++@@ -1767,6 +1768,28 @@ EXIT:
++     return;
++ }
++ 
+++/**
+++ * Handle touchscreen detections.
+++ *
+++ * @param data The touch pressed/unpressed in a pointer
+++ */
+++static void mdy_datapipe_touch_detected_cb(gconstpointer data)
+++{
+++    gboolean touch_detected = GPOINTER_TO_INT(data);
+++
+++    /* Log by default as it might help analyzing lpm problems */
+++    mce_log(LL_DEBUG, "touch_detected = %d", touch_detected);
+++
+++    switch( display_state_curr ) {
+++    case MCE_DISPLAY_LPM_ON:
+++        /* Screen is in LPM mode, exit LPM mode when touch is detected. */
+++        mce_datapipe_request_display_state(MCE_DISPLAY_ON);
+++        break;
+++    default:
+++        break;
+++    }
+++}
+++
++ /** Keypad slide input state; assume closed */
++ static cover_state_t keyboard_slide_input_state = COVER_CLOSED;
++ 
++@@ -2276,6 +2299,10 @@ static datapipe_handler_t mdy_datapipe_handlers[] =
++         .datapipe  = &light_sensor_filtered_pipe,
++         .output_cb = mdy_datapipe_ambient_light_level_cb,
++     },
+++    {
+++        .datapipe  = &touch_detected_pipe,
+++        .output_cb = mdy_datapipe_touch_detected_cb,
+++    },
++     {
++         .datapipe  = &packagekit_locked_pipe,
++         .output_cb = mdy_datapipe_packagekit_locked_cb,
+diff --git a/overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch b/overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch
+new file mode 100644
+index 00000000..30575249
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch
+@@ -0,0 +1,161 @@
++From ca2c3e4d0192cf5612bb0d5f7684a9cd3df272b4 Mon Sep 17 00:00:00 2001
++From: MagneFire <dgriet@gmail.com>
++Date: Sun, 26 Dec 2021 19:40:13 +0100
++Subject: [PATCH] powerkey: Also suspend on palm reports.
++MIME-Version: 1.0
++Content-Type: text/plain; charset=UTF-8
++Content-Transfer-Encoding: 8bit
++
++Upstream-Status: Inappropriate
++
++%% original patch: 0007-powerkey-Also-suspend-on-palm-reports.patch
++
++Signed-off-by: Darrel Griët <dgriet@gmail.com>
++---
++ event-input.c |   5 +++
++ powerkey.c    | 102 ++++++++++++++++++++++++++++++++++++++++++++++++++
++ 2 files changed, 107 insertions(+)
++
++diff --git a/event-input.c b/event-input.c
++index de0d19c..10c4894 100644
++--- a/event-input.c
+++++ b/event-input.c
++@@ -2181,6 +2181,11 @@ evin_iomon_touchscreen_cb(mce_io_mon_t *iomon, gpointer data, gsize bytes_read)
++         /* Only send pressure events */
++         datapipe_exec_full(&touchscreen_event_pipe, &ev);
++     }
+++    else if( ev->type == EV_KEY && ev->code == KEY_SLEEP ) {
+++        /* Report palm events. */
+++        datapipe_exec_full(&touchscreen_event_pipe, &ev);
+++        goto EXIT;
+++    }
++ 
++ EXIT:
++     return flush;
++diff --git a/powerkey.c b/powerkey.c
++index e06e231..9c73be7 100644
++--- a/powerkey.c
+++++ b/powerkey.c
++@@ -596,6 +596,7 @@ static void     pwrkey_setting_quit            (void);
++  * ------------------------------------------------------------------------- */
++ 
++ static void pwrkey_datapipe_keypress_event_cb(gconstpointer const data);
+++static void pwrkey_datapipe_touchscreen_cb(gconstpointer data);
++ static void pwrkey_datapipe_ngfd_service_state_cb(gconstpointer data);
++ static void pwrkey_datapipe_system_state_cb(gconstpointer data);
++ static void pwrkey_datapipe_devicelock_state_cb(gconstpointer data);
++@@ -3159,6 +3160,103 @@ EXIT:
++     return;
++ }
++ 
+++/**
+++ * Datapipe trigger for the [sleep] key
+++ *
+++ * @param data A pointer to the input_event struct
+++ */
+++static void
+++pwrkey_datapipe_touchscreen_cb(gconstpointer const data)
+++{
+++    /* Faulty/aged physical power key buttons can generate
+++     * bursts of press and release events that are then
+++     * interpreted as double presses. To avoid this we
+++     * ignore power key presses that occur so soon after
+++     * previous release that they are unlikely to be
+++     * caused by human activity. */
+++
+++    /* Minimum delay between power key release and press. */
+++    static const int64_t press_delay = 50;
+++
+++    /* Time limit for accepting the next power key press */
+++    static int64_t press_limit = 0;
+++
+++    const struct input_event * const *evp;
+++    const struct input_event *ev;
+++
+++    if( !(evp = data) )
+++        goto EXIT;
+++
+++    if( !(ev = *evp) )
+++        goto EXIT;
+++
+++    switch( ev->type ) {
+++    case EV_KEY:
+++        switch( ev->code ) {
+++        case KEY_SLEEP:
+++            if( ev->value == 1 ) {
+++                if( mce_lib_get_boot_tick() < press_limit  || display_state_next == MCE_DISPLAY_OFF) {
+++                    /* Too soon after the previous powerkey
+++                     * release -> assume faulty hw sending
+++                     * bursts of presses */
+++                    mce_log(LL_CRUCIAL, "sleep press event ignored");
+++                }
+++                else {
+++                    mce_log(LL_CRUCIAL, "sleep press event");
+++                    /* Detect repeated power key pressing while
+++                     * proximity sensor is covered; assume it means
+++                     * the sensor is stuck and user wants to be able
+++                     * to turn on the display regardless of the sensor
+++                     * state */
+++                    pwrkey_ps_override_evaluate();
+++
+++                    /* Power key pressed */
+++                    pwrkey_stm_powerkey_pressed();
+++
+++                    /* Some devices report both power key press and release
+++                     * already when the physical button is pressed down.
+++                     * Other devices wait for physical release before
+++                     * reporting key release. And in some devices it depends
+++                     * on whether the device is suspended or not.
+++                     *
+++                     * To normalize behavior in default configuration (i.e.
+++                     * begin display power up already on power key press
+++                     * without waiting for user to lift finger off the button):
+++                     * Synthetize key release, if no actions are bound to long
+++                     * power key press from display off state. */
+++                    if( pwrkey_stm_display_state == MCE_DISPLAY_OFF ) {
+++                        if( !pwrkey_actions_from_display_off.mask_long ) {
+++                            mce_log(LL_DEBUG, "sleep release event simulated");
+++                            pwrkey_stm_powerkey_released();
+++                        }
+++                    }
+++                }
+++            }
+++            else if( ev->value == 0 ) {
+++                mce_log(LL_CRUCIAL, "sleep release event");
+++                /* Power key released */
+++                pwrkey_stm_powerkey_released();
+++
+++                /* Adjust time limit for accepting the next power
+++                 * key press */
+++                press_limit = mce_lib_get_boot_tick() + press_delay;
+++            }
+++
+++            pwrkey_stm_rethink_wakelock();
+++           break;
+++
+++        default:
+++            break;
+++        }
+++        break;
+++    default:
+++        break;
+++    }
+++
+++EXIT:
+++    return;
+++}
+++
++ /**
++  * Datapipe trigger for the [power] key
++  *
++@@ -3381,6 +3479,10 @@ static datapipe_handler_t pwrkey_datapipe_handlers[] =
++         .datapipe = &keypress_event_pipe,
++         .input_cb = pwrkey_datapipe_keypress_event_cb,
++     },
+++    {
+++        .datapipe = &touchscreen_event_pipe,
+++        .input_cb = pwrkey_datapipe_touchscreen_cb,
+++    },
++     {
++         .datapipe = &ngfd_event_request_pipe,
++         .input_cb = pwrkey_datapipe_ngfd_event_request_cb,
+diff --git a/overlay/asteroidos/mkcal/default.nix b/overlay/asteroidos/mkcal/default.nix
+new file mode 100644
+index 00000000..07fc7975
+--- /dev/null
++++ b/overlay/asteroidos/mkcal/default.nix
+@@ -0,0 +1,60 @@
++# SailfishOS / Nemomobile mkcal library
++# Upstream repository: https://github.com/sailfishos/mkcal
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-qt/qt6/mkcal_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  kdePackages,
++  kcalendarcore,
++  sqlite,
++  libical,
++  timed-qt6,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "mkcal";
++  version = "0.7.22";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "mkcal";
++    rev = "4687242710462999b4f55fd82104e2aee53f9fdf";
++    sha256 = "006ivpzg33bisdwz6hzwr45ay2qydyrr2wh9knq8yfhx5ygnsbjh";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    kdePackages.extra-cmake-modules
++    qt6.wrapQtAppsHook
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    kcalendarcore
++    sqlite
++    libical
++    timed-qt6
++  ];
++
++  cmakeFlags = [
++    "-DENABLE_QT6=ON"
++    "-DBUILD_TESTS=OFF"
++    "-DBUILD_PLUGINS=OFF"
++    "-DECM_DIR=${kdePackages.extra-cmake-modules}/share/ECM/cmake"
++    "-DKF6CalendarCore_DIR=${kcalendarcore}/lib/cmake/KF6CalendarCore"
++  ];
++
++  meta = with lib; {
++    description = "Nemomobile fork of KCal calendar storage library";
++    homepage = "https://github.com/sailfishos/mkcal";
++    license = licenses.lgpl2Only;
 +    platforms = platforms.linux;
 +  };
 +})
@@ -1043,6 +3694,106 @@ index 00000000..c3583bfd
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix b/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
+new file mode 100644
+index 00000000..7111ae88
+--- /dev/null
++++ b/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
+@@ -0,0 +1,94 @@
++# QML plugin for calendar on Nemo
++# Upstream repository: https://github.com/sailfishos/nemo-qml-plugin-calendar
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-qml-plugins/nemo-qml-plugin-calendar_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++  accounts-qt,
++  kcalendarcore,
++  mkcal,
++  timed-qt6,
++  libiodata,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "nemo-qml-plugin-calendar";
++  version = "0.7.8";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-qml-plugin-calendar";
++    rev = "8f790f1026dee5065cdc4112a273272f28d0f4f5";
++    sha256 = "0cbhd9m5gi8a99c62g08nkhg16z2rhzkj6xb09japc82p0r8rf07";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    accounts-qt
++    kcalendarcore
++    mkcal
++    timed-qt6
++    libiodata
++  ];
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  postPatch = ''
++    cat > CMakeLists.txt <<'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(nemo-qml-plugin-calendar LANGUAGES CXX)
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_AUTOMOC ON)
++
++    find_package(PkgConfig REQUIRED)
++    pkg_check_modules(KCAL REQUIRED IMPORTED_TARGET KF6CalendarCore)
++    pkg_check_modules(MKCAL REQUIRED IMPORTED_TARGET libmkcal-qt6)
++    pkg_check_modules(ACCOUNTS REQUIRED IMPORTED_TARGET accounts-qt6)
++    pkg_check_modules(TIMED REQUIRED IMPORTED_TARGET timed-qt6)
++
++    find_package(Qt6 REQUIRED COMPONENTS Core Qml Concurrent)
++
++    file(GLOB SOURCES src/*.cpp)
++    file(GLOB HEADERS src/*.h)
++
++    add_library(nemocalendar MODULE ''${SOURCES} ''${HEADERS})
++    target_include_directories(nemocalendar PRIVATE src)
++    target_link_libraries(nemocalendar PRIVATE
++      Qt6::Core
++      Qt6::Qml
++      Qt6::Concurrent
++      PkgConfig::KCAL
++      PkgConfig::MKCAL
++      PkgConfig::ACCOUNTS
++      PkgConfig::TIMED
++    )
++
++    install(TARGETS nemocalendar LIBRARY DESTINATION lib/qt-6/qml/org/nemomobile/calendar)
++    install(FILES src/qmldir src/plugins.qmltypes DESTINATION lib/qt-6/qml/org/nemomobile/calendar)
++    EOF
++  '';
++
++  meta = with lib; {
++    description = "Nemomobile calendar QML plugin";
++    homepage = "https://github.com/sailfishos/nemo-qml-plugin-calendar";
++    license = licenses.bsd3;
++    platforms = platforms.linux;
++  };
++})
 diff --git a/overlay/asteroidos/ngf-qt6/default.nix b/overlay/asteroidos/ngf-qt6/default.nix
 new file mode 100644
 index 00000000..d16b452f
@@ -1147,10 +3898,10 @@ index 00000000..d16b452f
 +})
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
 new file mode 100644
-index 00000000..c4445327
+index 00000000..acffe994
 --- /dev/null
 +++ b/overlay/asteroidos/timed-qt6/default.nix
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,111 @@
 +# Timed Qt6 client library interface
 +# Upstream repository: https://github.com/sailfishos/timed
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/timed
@@ -1192,7 +3943,11 @@ index 00000000..c4445327
 +    mkdir -p include/timed-qt6
 +    cp src/lib/*.h include/timed-qt6/
 +    cp src/lib/event src/lib/interface src/lib/wallclock src/lib/qmacro include/timed-qt6/
-+    cp src/lib/hidden/exception include/timed-qt6/
++    # NOTE: src/lib/hidden/exception is a qmake-only shim that makes the
++    # in-tree "#include <exception>" resolve to timed-qt6/exception.h. Do not
++    # install it: the public include dir is passed as -I to all consumers, and
++    # a file named "exception" there shadows the C++ standard <exception>
++    # header (breaking std::exception_ptr / <future> in every dependent).
 +  '';
 +
 +  postPatch = ''
@@ -1258,12 +4013,60 @@ index 00000000..c4445327
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/usb-moded-dev/default.nix b/overlay/asteroidos/usb-moded-dev/default.nix
+new file mode 100644
+index 00000000..e5b4858a
+--- /dev/null
++++ b/overlay/asteroidos/usb-moded-dev/default.nix
+@@ -0,0 +1,42 @@
++# Development headers and pkgconfig for usb_moded daemon
++# Upstream repository: https://github.com/sailfishos/usb-moded
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/usb-moded/usb-moded_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "usb-moded-dev";
++  version = "0.86.0";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "usb-moded";
++    rev = "6190edfe778df9896f1f3026a7ab087dbc02dd3f";
++    sha256 = "sha256-fv5jurY/ulGfWIc4VbTeuyVNs/QqNyxzC6Hyb6amg9c=";
++  };
++
++  strictDeps = true;
++
++  dontBuild = true;
++
++  installPhase = ''
++    runHook preInstall
++    mkdir -p $out/include/usb-moded $out/lib/pkgconfig
++    cp src/com.meego.usb_moded.xml $out/include/usb-moded/
++    cp src/usb_moded*.h $out/include/usb-moded/
++    sed -e "s|@VERSION@|${finalAttrs.version}|" \
++        -e "s|prefix=/usr|prefix=$out|" \
++        usb_moded.pc.in > $out/lib/pkgconfig/usb_moded.pc
++    runHook postInstall
++  '';
++
++  meta = with lib; {
++    description = "C headers and pkg-config for usb_moded daemon";
++    homepage = "https://github.com/sailfishos/usb-moded";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})
 diff --git a/overlay/asteroidos/usb-moded-qt6/default.nix b/overlay/asteroidos/usb-moded-qt6/default.nix
 new file mode 100644
-index 00000000..3d7c5b0e
+index 00000000..0e985634
 --- /dev/null
 +++ b/overlay/asteroidos/usb-moded-qt6/default.nix
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,90 @@
 +# Qt6 bindings and client library for usb-moded daemon
 +# Upstream repository: https://github.com/sailfishos/libusb-moded-qt
 +{
@@ -1275,32 +4078,9 @@ index 00000000..3d7c5b0e
 +  qt6,
 +  dbus,
 +  buildPackages,
++  usb-moded-dev,
 +}:
 +
-+let
-+  usb-moded-dev = stdenv.mkDerivation (finalAttrs: {
-+    pname = "usb-moded-dev";
-+    version = "nightly";
-+
-+    src = fetchFromGitHub {
-+      owner = "sailfishos";
-+      repo = "usb-moded";
-+      rev = "6190edfe778df9896f1f3026a7ab087dbc02dd3f";
-+      sha256 = "sha256-fv5jurY/ulGfWIc4VbTeuyVNs/QqNyxzC6Hyb6amg9c=";
-+    };
-+
-+    strictDeps = true;
-+
-+    installPhase = ''
-+      mkdir -p $out/include/usb-moded $out/lib/pkgconfig
-+      cp src/com.meego.usb_moded.xml $out/include/usb-moded/
-+      cp src/usb_moded*.h $out/include/usb-moded/
-+      sed -e "s|@VERSION@|0.86.0|" \
-+          -e "s|prefix=/usr|prefix=$out|" \
-+          usb_moded.pc.in > $out/lib/pkgconfig/usb_moded.pc
-+    '';
-+  });
-+in
 +stdenv.mkDerivation (finalAttrs: {
 +  pname = "usb-moded-qt6";
 +  version = "nightly";

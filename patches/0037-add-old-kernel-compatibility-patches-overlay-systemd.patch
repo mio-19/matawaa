@@ -25,10 +25,10 @@ the old-kernel work is not split across unrelated commits.
  create mode 100644 overlay/patches/systemd-262-proc-credentials-old-kernel.patch
 
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index 16fa49d2..6dd57021 100644
+index f8ebdd7d..ff85d87b 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
-@@ -23,6 +23,15 @@ else
+@@ -28,6 +28,15 @@ else
            "-DQt6ShaderToolsTools_DIR=${final.buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
          ];
        });
@@ -44,7 +44,7 @@ index 16fa49d2..6dd57021 100644
    in
    {
      # systemd 261 requires STATX_ATTR_MOUNT_ROOT (Linux 5.8+) for mount point
-@@ -41,7 +50,11 @@ else
+@@ -46,7 +55,11 @@ else
            patches = (old.patches or [ ]) ++ [
              ./patches/systemd-261-mountpoint-old-kernel.patch
              ./patches/systemd-261-faccessat-old-kernel.patch

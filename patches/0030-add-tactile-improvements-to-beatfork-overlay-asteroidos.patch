@@ -467,10 +467,10 @@ index 00000000..3887693a
 +         target: bpmSpinner
 +         function onCurrentIndexChanged() {
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
-index 57ad6c31..c16b1635 100644
+index 96c40e50..03d760b7 100644
 --- a/overlay/asteroidos/community-apps/default.nix
 +++ b/overlay/asteroidos/community-apps/default.nix
-@@ -203,6 +203,7 @@ rec {
+@@ -142,6 +142,7 @@ rec {
  
    # A metronome and chromatic tuning fork app for smartwatches
    # Upstream repository: https://github.com/moWerk/asteroid-beatfork
@@ -478,7 +478,7 @@ index 57ad6c31..c16b1635 100644
    beatfork = mkAsteroidApp {
      name = "beatfork";
      owner = "moWerk";
-@@ -210,6 +211,9 @@ rec {
+@@ -149,6 +150,9 @@ rec {
      desc = "Metronome and chromatic tuning fork app for smartwatches";
      rev = "e3fbc5dd6da40868e0f338c9a0d3f6e877afca25";
      sha256 = "1s4n5qfqximi05szksjbl806rpd37j3q7245z1iip5rrnlbkc7m2";
