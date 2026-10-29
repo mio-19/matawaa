@@ -15,7 +15,7 @@ Multimedia for network playback.
  create mode 100644 overlay/asteroidos/apps/music-ytmusic-streaming.patch
 
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
-index 17222a4d..2dd518be 100644
+index d704af2b..a1f35323 100644
 --- a/overlay/asteroidos/apps/default.nix
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -53,11 +53,18 @@

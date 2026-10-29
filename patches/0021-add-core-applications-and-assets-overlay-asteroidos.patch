@@ -19,7 +19,7 @@ Package the standard AsteroidOS application suite and its shared assets:
 
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
 new file mode 100644
-index 00000000..695a8f0a
+index 00000000..9758e955
 --- /dev/null
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -0,0 +1,122 @@
@@ -63,8 +63,8 @@ index 00000000..695a8f0a
 +  settings = mkAsteroidApp {
 +    name = "settings";
 +    desc = "Smartwatch preferences and configuration application";
-+    rev = "56c917fd82aa5cb1f679f424f4c226fcffd89a12";
-+    sha256 = "1cbn5cg9q49ik7xwhsi4l6wph9mjxl8w5j4016rdwxq6w8y5ixx3";
++    rev = "6e257e62524001d3438d3b161cbc0693afbee189";
++    sha256 = "sha256-o/UYJmJ7xVFII2Y4B+9PPyVhJlWPsLJ3aPVNW79Cg+s=";
 +    extraBuildInputs = [
 +      mce-dev
 +      ngf-qt6

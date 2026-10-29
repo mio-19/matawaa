@@ -45,7 +45,7 @@ libraries, without wrapping the Qt apps.
  ...t-ambient-mode-when-touch-is-detecte.patch |  67 ++
  ...owerkey-Also-suspend-on-palm-reports.patch | 161 +++++
  overlay/asteroidos/mkcal/default.nix          |  60 ++
- overlay/asteroidos/mlite/CMakeLists.txt       | 124 ++++
+ overlay/asteroidos/mlite/CMakeLists.txt       | 122 ++++
  overlay/asteroidos/mlite/default.nix          |  52 ++
  .../nemo-qml-plugin-calendar/default.nix      |  94 +++
  overlay/asteroidos/ngf-qt6/default.nix        |  96 +++
@@ -56,7 +56,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
  overlay/libhybris/default.nix                 |  68 +-
- 39 files changed, 4481 insertions(+), 36 deletions(-)
+ 39 files changed, 4479 insertions(+), 36 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -1303,7 +1303,7 @@ index 00000000..a2f16428
 +})
 diff --git a/overlay/asteroidos/mce-dev/default.nix b/overlay/asteroidos/mce-dev/default.nix
 new file mode 100644
-index 00000000..945affdc
+index 00000000..29cca049
 --- /dev/null
 +++ b/overlay/asteroidos/mce-dev/default.nix
 @@ -0,0 +1,41 @@
@@ -1324,8 +1324,8 @@ index 00000000..945affdc
 +  src = fetchFromGitHub {
 +    owner = "sailfishos";
 +    repo = "mce-dev";
-+    rev = "595cdec2a72f73b3864c516790d16231e016aa53";
-+    hash = "sha256-rXt1opMndNEHcsxRUr+vkwQ4rcPiKaq65qDJ8DRwWBM=";
++    rev = "01d50d9670eef183bd6d0f1e1e3656a69af3ac2d";
++    hash = "sha256-PJKHg25oiBdiBlB1yiQMsf84fczXHU7duL6p3HMwnWw=";
 +  };
 +
 +  nativeBuildInputs = [ pkg-config ];
@@ -1428,7 +1428,7 @@ index 00000000..12ad147b
 +}
 diff --git a/overlay/asteroidos/mce-qt6/default.nix b/overlay/asteroidos/mce-qt6/default.nix
 new file mode 100644
-index 00000000..182d249c
+index 00000000..3e1c5c4d
 --- /dev/null
 +++ b/overlay/asteroidos/mce-qt6/default.nix
 @@ -0,0 +1,100 @@
@@ -1452,8 +1452,8 @@ index 00000000..182d249c
 +  src = fetchFromGitHub {
 +    owner = "sailfishos";
 +    repo = "libmce-qt";
-+    rev = "a8bbbdc63a70401bf8c1fe8a2a85ee9e7644af97";
-+    sha256 = "sha256-xTKBW1G3BZn518IumbUs1yRToEdlbolkeVXJ/8aXBgg=";
++    rev = "7fb63aa8258fd96bf121fa4f28c03aa43f7dc703";
++    sha256 = "sha256-fWEI0eisU5mPcPNt8EdB3blrOqTREjGDysCjf0FaRLU=";
 +  };
 +
 +  strictDeps = true;
@@ -3740,10 +3740,10 @@ index 00000000..07fc7975
 +})
 diff --git a/overlay/asteroidos/mlite/CMakeLists.txt b/overlay/asteroidos/mlite/CMakeLists.txt
 new file mode 100644
-index 00000000..a2a2eb96
+index 00000000..b82207f8
 --- /dev/null
 +++ b/overlay/asteroidos/mlite/CMakeLists.txt
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,122 @@
 +cmake_minimum_required(VERSION 3.16)
 +project(mlite VERSION 0.4.10 LANGUAGES CXX)
 +
@@ -3765,7 +3765,6 @@ index 00000000..a2a2eb96
 +    src/mdesktopentry.cpp
 +    src/mpermission.cpp
 +    src/mfiledatastore.cpp
-+    src/logging.cpp
 +)
 +
 +set(HEADERS
@@ -3779,7 +3778,6 @@ index 00000000..a2a2eb96
 +    src/mdatastore.h
 +    src/mlite-global.h
 +    src/metatypedeclarations.h
-+    src/logging.h
 +    src/MNotification
 +    src/MNotificationGroup
 +    src/MRemoteAction
@@ -3870,7 +3868,7 @@ index 00000000..a2a2eb96
 +)
 diff --git a/overlay/asteroidos/mlite/default.nix b/overlay/asteroidos/mlite/default.nix
 new file mode 100644
-index 00000000..c3583bfd
+index 00000000..87a963eb
 --- /dev/null
 +++ b/overlay/asteroidos/mlite/default.nix
 @@ -0,0 +1,52 @@
@@ -3895,8 +3893,8 @@ index 00000000..c3583bfd
 +  src = fetchFromGitHub {
 +    owner = "sailfishos";
 +    repo = "mlite";
-+    rev = "42c3b2102dadfc54a2cc7c87c6e4cfb28437c908";
-+    hash = "sha256-rtWtDJhSUpamqj61aLr2QTopY9QfighPcMlUxdACTlg=";
++    rev = "387404e357d1d4bdfc445d3dafda2dc8f5f64a81";
++    hash = "sha256-G4m1ein9j5A1/yb1Nc9mXxrbhgD+oWFx5vIKd1n3ZNw=";
 +  };
 +
 +  strictDeps = true;
@@ -4605,7 +4603,7 @@ index 00000000..acffe994
 +})
 diff --git a/overlay/asteroidos/usb-moded-dev/default.nix b/overlay/asteroidos/usb-moded-dev/default.nix
 new file mode 100644
-index 00000000..e5b4858a
+index 00000000..6f957515
 --- /dev/null
 +++ b/overlay/asteroidos/usb-moded-dev/default.nix
 @@ -0,0 +1,42 @@
@@ -4625,8 +4623,8 @@ index 00000000..e5b4858a
 +  src = fetchFromGitHub {
 +    owner = "sailfishos";
 +    repo = "usb-moded";
-+    rev = "6190edfe778df9896f1f3026a7ab087dbc02dd3f";
-+    sha256 = "sha256-fv5jurY/ulGfWIc4VbTeuyVNs/QqNyxzC6Hyb6amg9c=";
++    rev = "4b7da5afee06332ac175a5b2772a55e416756f74";
++    sha256 = "sha256-oY952MePyRWtCKAyHJ4SpjdeTglG24d4zeYiZ5zUNcw=";
 +  };
 +
 +  strictDeps = true;
