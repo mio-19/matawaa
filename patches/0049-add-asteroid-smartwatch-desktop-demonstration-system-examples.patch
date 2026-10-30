@@ -9,10 +9,10 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix        |  18 +
- examples/asteroid/asteroid-desktop.nix | 557 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 559 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++
  examples/asteroid/default.nix          |  15 +
- 4 files changed, 633 insertions(+)
+ 4 files changed, 635 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -48,10 +48,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..51aba57b
+index 00000000..e7bc3d94
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,557 @@
+@@ -0,0 +1,559 @@
 +{
 +  config,
 +  lib,
@@ -503,13 +503,11 @@ index 00000000..51aba57b
 +          ''}"
 +          "-${pkgs.bash}/bin/bash -c '(echo QUIT > /run/psplash_fifo) 2>/dev/null || true'"
 +        ];
-+        # Upstream asteroid-launcher.service runs the launcher directly, but
-+        # upstream's recipe also does:
-+        #   setcap cap_wake_alarm,cap_block_suspend+ep $D/usr/bin/asteroid-launcher
-+        # File capabilities cannot be stored in the read-only Nix store, so run
-+        # the NixOS setcap wrapper defined below: it raises the same caps into
-+        # the ambient set before exec'ing the launcher.
-+        ExecStart = "${config.security.wrapperDir}/asteroid-launcher -plugin evdevtouch $LIPSTICK_OPTIONS --systemd";
++        # Upstream asteroid-launcher.service runs the launcher directly. The
++        # capabilities upstream attaches with setcap are provided as ambient
++        # capabilities on the user manager instead (see below), so the real
++        # binary runs without the AT_SECURE side effects of file capabilities.
++        ExecStart = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher -plugin evdevtouch $LIPSTICK_OPTIONS --systemd";
 +        TimeoutStartSec = "180s";
 +        TimeoutStopSec = "3s";
 +        Restart = "always";
@@ -538,14 +536,18 @@ index 00000000..51aba57b
 +    };
 +
 +    # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
-+    # cap_block_suspend for always-on-display ticks; expose the same file
-+    # capabilities through the NixOS wrapper.
++    # cap_block_suspend for always-on-display ticks. File capabilities make the
++    # kernel set AT_SECURE, and glibc then discards LD_PRELOAD/LD_LIBRARY_PATH —
++    # which the launcher needs to load libhybris' EGL (Qt links glvnd's libEGL).
++    # Grant the same capabilities to the user manager as ambient capabilities
++    # instead: they are inherited by the launcher and do not set AT_SECURE.
 +    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
-+    security.wrappers.asteroid-launcher = {
-+      source = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher";
-+      capabilities = "cap_wake_alarm,cap_block_suspend+ep";
-+      owner = "root";
-+      group = "root";
++    systemd.services."user@1000" = {
++      overrideStrategy = "asDropin";
++      serviceConfig.AmbientCapabilities = [
++        "CAP_WAKE_ALARM"
++        "CAP_BLOCK_SUSPEND"
++      ];
 +    };
 +
 +    # logind authorizes SetUserLinger through polkit.
