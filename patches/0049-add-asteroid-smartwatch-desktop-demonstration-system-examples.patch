@@ -9,22 +9,24 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 689 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 702 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 ++
  examples/asteroid/default.nix                 |  15 +
  overlay/asteroidos/bluebinder/default.nix     |  81 ++
- overlay/asteroidos/default.nix                |  15 +
+ overlay/asteroidos/default.nix                |  16 +
  overlay/asteroidos/egl-probe/default.nix      |  35 +
  overlay/asteroidos/egl-probe/egl-probe.c      | 120 +++
+ overlay/asteroidos/ngfd/default.nix           | 101 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 10 files changed, 1070 insertions(+)
+ 11 files changed, 1185 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
  create mode 100644 overlay/asteroidos/bluebinder/default.nix
  create mode 100644 overlay/asteroidos/egl-probe/default.nix
  create mode 100644 overlay/asteroidos/egl-probe/egl-probe.c
+ create mode 100644 overlay/asteroidos/ngfd/default.nix
  create mode 100644 overlay/asteroidos/swclock-offset/default.nix
  create mode 100644 overlay/asteroidos/udev-droid-system/default.nix
 
@@ -59,10 +61,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..7d67ff51
+index 00000000..c89fee46
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,689 @@
+@@ -0,0 +1,702 @@
 +{
 +  config,
 +  lib,
@@ -574,6 +576,19 @@ index 00000000..7d67ff51
 +      QT_ENABLE_HIGHDPI_SCALING = "0";
 +    };
 +
++    # Upstream meta-asteroid: ngfd, the non graphical feedback daemon.
++    # Haptics/sounds are requested through D-Bus by the launcher and apps.
++    systemd.user.services.ngfd = {
++      description = "Non Graphical Feedback Daemon";
++      wantedBy = [ "default.target" ];
++      requires = [ "dbus.socket" ];
++      unitConfig.ConditionUser = "!root";
++      serviceConfig = {
++        Type = "simple";
++        ExecStart = "${pkgs.asteroid.ngfd}/bin/ngfd";
++      };
++    };
++
 +    # Wayland compositor and watchface launcher user service (runs under user session)
 +    # Upstream reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher/asteroid-launcher.service
 +    systemd.user.services.asteroid-launcher = {
@@ -910,10 +925,10 @@ index 00000000..e38bf0b5
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 71d04c60..f0a0aecf 100644
+index 71d04c60..ab6df62d 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,6 +7,19 @@ rec {
+@@ -7,6 +7,20 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
@@ -929,11 +944,12 @@ index 71d04c60..f0a0aecf 100644
 +  udev-droid-system = callPackage ./udev-droid-system { inherit metaAsteroidSrc; };
 +  swclock-offset = callPackage ./swclock-offset { };
 +  bluebinder = callPackage ./bluebinder { inherit metaAsteroidSrc; };
++  ngfd = callPackage ./ngfd { inherit metaAsteroidSrc mce-dev; };
 +
    qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
      inherit (pkgs)
        libhybris
-@@ -71,6 +84,8 @@ rec {
+@@ -71,6 +85,8 @@ rec {
  
    # Device state machine daemon MCE talks to.
    # Upstream: https://github.com/sailfishos/dsme
@@ -1109,6 +1125,113 @@ index 00000000..20d8a19c
 +    eglTerminate(d);
 +    return 0;
 +}
+diff --git a/overlay/asteroidos/ngfd/default.nix b/overlay/asteroidos/ngfd/default.nix
+new file mode 100644
+index 00000000..6490cf3d
+--- /dev/null
++++ b/overlay/asteroidos/ngfd/default.nix
+@@ -0,0 +1,101 @@
++# Upstream: meta-asteroid/recipes-nemomobile/ngfd/ngfd_git.bb
++# Nemomobile's non graphical feedback daemon (haptics / system sounds).
++{
++  lib,
++  stdenv,
++  fetchgit,
++  autoreconfHook,
++  pkg-config,
++  glib,
++  libpulseaudio,
++  dbus,
++  gst_all_1,
++  json_c,
++  zlib,
++  libsndfile,
++  libffi,
++  libcap,
++  dbus-glib,
++  dconf,
++  mce-dev,
++  check,
++  metaAsteroidSrc,
++}:
++
++let
++  # fetchgit does not materialise ngfd's dbus-gmain submodule (a dbus-glib
++  # mirror) in this build, so fetch the pinned submodule explicitly.
++  dbusGmain = fetchgit {
++    url = "https://github.com/sailfishos-mirror/dbus-glib.git";
++    rev = "d42176ae4763e5288ef37ea314fe58387faf2005";
++    hash = "sha256-1puASaoWx56lOGv2ScYg94wkiKwFeff0lljOcVX7icg=";
++  };
++in
++stdenv.mkDerivation (finalAttrs: {
++  pname = "ngfd";
++  version = "1.4.0";
++
++  src = fetchgit {
++    url = "https://github.com/sailfishos/ngfd.git";
++    rev = "3372625b3a221fdbdcc3dbb225e93df34ac307c0";
++    hash = "sha256-gHN+rGjzMAUazu6mWpzrGNatN44R+b4+FX2JHQxhqMM=";
++    fetchSubmodules = true;
++  };
++
++  # Same patches as the upstream AsteroidOS recipe.
++  patches = [
++    "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0001-ngf-Use-relative-path.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0002-ffmemless-Reserve-enough-space-for-sprintf.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0003-ffmemless-support-FF_PERIODIC-only-haptic-drivers.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0004-profile-source-vibration-gate-from-dconf.patch"
++  ];
++
++  nativeBuildInputs = [
++    autoreconfHook
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    libpulseaudio
++    dbus
++    gst_all_1.gstreamer
++    gst_all_1.gst-plugins-base
++    json_c
++    zlib
++    libsndfile
++    libffi
++    libcap
++    dbus-glib
++    dconf
++    mce-dev
++    check
++  ];
++
++  postPatch = ''
++    rm -rf dbus-gmain
++    cp -r ${dbusGmain} dbus-gmain
++    chmod -R u+w dbus-gmain
++    # Upstream recipe drops doc and tests to avoid extra build-time deps.
++    sed -i 's@src data doc tests@src data@' Makefile.am
++  '';
++
++  postInstall = ''
++    # Upstream ships its own configuration instead of the source tree's.
++    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/ngfd.ini \
++      $out/share/ngfd/ngfd.ini
++    install -d $out/share/ngfd/events.d
++    cp -r ${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/events.d/. \
++      $out/share/ngfd/events.d/
++    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/50-ffmemless.ini \
++      $out/share/ngfd/plugins.d/50-ffmemless.ini
++    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/ngfd.service \
++      $out/lib/systemd/user/ngfd.service
++  '';
++
++  meta = {
++    description = "Nemomobile non graphical feedback daemon";
++    license = lib.licenses.lgpl21Plus;
++    platforms = [ "armv7l-linux" ];
++  };
++})
 diff --git a/overlay/asteroidos/swclock-offset/default.nix b/overlay/asteroidos/swclock-offset/default.nix
 new file mode 100644
 index 00000000..d7e91032
