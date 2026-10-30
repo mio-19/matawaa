@@ -16,7 +16,7 @@ systemd262oldkernel.
 ---
  devices/families/asteroidos.nix               |    4 +
  modules/hardware-watch.nix                    |   30 +
- overlay/cross-compile.nix                     |   71 +-
+ overlay/cross-compile.nix                     |   92 +-
  .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
  ...on-t-try-to-unmount-nix-or-nix-store.patch |   45 +
@@ -42,7 +42,7 @@ systemd262oldkernel.
  ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
- 28 files changed, 2359 insertions(+), 8 deletions(-)
+ 28 files changed, 2379 insertions(+), 9 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -126,7 +126,7 @@ index 35ac4030..4ddb720f 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index 5cd65291..5096ea8c 100644
+index 5cd65291..6169ce18 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -17,7 +17,7 @@ else
@@ -228,6 +228,34 @@ index 5cd65291..5096ea8c 100644
          qtdeclarative = qsuper.qtdeclarative.overrideAttrs (old: {
            cmakeFlags =
              (map (
+@@ -98,7 +153,26 @@ else
+               "-DQt6QuickTools_DIR=${final.pkgsBuildBuild.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
+             ];
+         });
+-        qtwayland = addCrossQuickTools qsuper.qtwayland;
++        # Upstream AsteroidOS builds qtwayland's libhybris-egl-server buffer
++        # integration (meta-asteroid recipes-qt/qt6/qtwayland_%.bbappend +
++        # 0001-Fix-libhybris-egl-server-compilation.patch). Qt 6.12 no longer
++        # defines the feature, but it still ships the plugin sources and the
++        # guard is a plain CMake variable, so enable it explicitly and apply
++        # the same upstream patch. Selected at runtime through
++        # QT_WAYLAND_SERVER_BUFFER_INTEGRATION=libhybris-egl-server.
++        qtwayland = (addCrossQuickTools qsuper.qtwayland).overrideAttrs (old: {
++          patches = (old.patches or [ ]) ++ [
++            (final.fetchpatch {
++              name = "0001-Fix-libhybris-egl-server-compilation.patch";
++              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch";
++              hash = "sha256-emo6w37aUY8ujwzvVJZ9zPFXbvSZHKA8/0lByzo06Zs=";
++            })
++          ];
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [
++            "-DQT_FEATURE_wayland_libhybris_egl_server_buffer=ON"
++          ];
++          buildInputs = (old.buildInputs or [ ]) ++ [ final.libhybris ];
++        });
+         qtvirtualkeyboard = addCrossQuickTools qsuper.qtvirtualkeyboard;
+         qtmultimedia = (addCrossQuickTools qsuper.qtmultimedia).overrideAttrs (old: {
+           buildInputs = final.lib.filter (
 diff --git a/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch b/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
 new file mode 100644
 index 00000000..17006966
