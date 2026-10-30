@@ -10,11 +10,13 @@ package set in the Mobile-NixOS overlay.
  overlay/asteroidos/default.nix              |  11 ++
  overlay/asteroidos/lib/mk-asteroid-app.nix  | 100 ++++++++++++++++++
  overlay/asteroidos/qml-asteroid/default.nix | 107 ++++++++++++++++++++
- overlay/overlay.nix                         |   4 +
- 4 files changed, 222 insertions(+)
+ overlay/oans/default.nix                    |  61 +++++++++++
+ overlay/overlay.nix                         |   5 +
+ 5 files changed, 284 insertions(+)
  create mode 100644 overlay/asteroidos/default.nix
  create mode 100644 overlay/asteroidos/lib/mk-asteroid-app.nix
  create mode 100644 overlay/asteroidos/qml-asteroid/default.nix
+ create mode 100644 overlay/oans/default.nix
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 new file mode 100644
@@ -252,11 +254,78 @@ index 00000000..e7c38aa8
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/oans/default.nix b/overlay/oans/default.nix
+new file mode 100644
+index 00000000..e6888d6f
+--- /dev/null
++++ b/overlay/oans/default.nix
+@@ -0,0 +1,61 @@
++# oans: fast deduplication tool for btrfs/XFS, forked from duperemove.
++# Used as a build-time pass over the generated btrfs image.
++# https://github.com/martinus/oans
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  pkg-config,
++  glib,
++  sqlite,
++  util-linux,
++  libuuid,
++  libbsd,
++  xxhash,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "oans";
++  version = "1.14.1";
++
++  src = fetchFromGitHub {
++    owner = "martinus";
++    repo = "oans";
++    rev = "v${finalAttrs.version}";
++    hash = "sha256-rWUNNLCmmO/OLcuASBCRBe4d4Lpq4LqsB+QdLv3TNOw=";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    sqlite
++    util-linux
++    libuuid
++    libbsd
++    xxhash
++  ];
++
++  # The Makefile derives the version from git; the release tarball has none.
++  makeFlags = [
++    "VERSION=${finalAttrs.version}"
++  ];
++
++  installPhase = ''
++    runHook preInstall
++    make install PREFIX=$out DESTDIR=
++    runHook postInstall
++  '';
++
++  meta = with lib; {
++    description = "Faster deduplication for btrfs and XFS (duperemove fork)";
++    homepage = "https://github.com/martinus/oans";
++    license = licenses.gpl2Only;
++    platforms = platforms.linux;
++    mainProgram = "oans";
++  };
++})
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index 9598347c..765a0608 100644
+index 9598347c..f60c2311 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
-@@ -8,6 +8,10 @@ in
+@@ -8,10 +8,15 @@ in
      # Keep sorted.
      adbd = callPackage ./adbd { };
      android-headers = callPackage ./android-headers { };
@@ -267,3 +336,8 @@ index 9598347c..765a0608 100644
      dtbTool = callPackage ./dtbtool { };
      dtbTool-exynos = callPackage ./dtbtool-exynos { };
      libhybris = callPackage ./libhybris { };
+     mkbootimg = callPackage ./mkbootimg { };
++    oans = callPackage ./oans { };
+     msm-fb-refresher = callPackage ./msm-fb-refresher { };
+     ply-image = callPackage ./ply-image { };
+     qc-image-unpacker = callPackage ./qc-image-unpacker { };

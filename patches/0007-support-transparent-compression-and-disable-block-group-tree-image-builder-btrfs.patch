@@ -12,14 +12,27 @@ This patch updates the btrfs image builder module:
 - Adjust minimal filesystem size calculation to account for btrfs metadata
   overhead and transparent compression workspace before shrinking.
 ---
- .../filesystem-image/filesystem/btrfs.nix           | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ .../filesystem-image/filesystem/btrfs.nix     | 91 ++++++++++++++++++-
+ 1 file changed, 90 insertions(+), 1 deletion(-)
 
 diff --git a/overlay/image-builder/filesystem-image/filesystem/btrfs.nix b/overlay/image-builder/filesystem-image/filesystem/btrfs.nix
-index f6d95e13..18665072 100644
+index f6d95e13..a25d9181 100644
 --- a/overlay/image-builder/filesystem-image/filesystem/btrfs.nix
 +++ b/overlay/image-builder/filesystem-image/filesystem/btrfs.nix
-@@ -24,6 +24,14 @@ in
+@@ -12,7 +12,11 @@ let
+   ;
+ 
+   inherit (config) label;
+-  inherit (config.btrfs) partitionID;
++  inherit (config.btrfs) partitionID dedupe;
++
++  # The image as built by the generic builder. The dedupe pass below copies it
++  # into a VM, mounts it, deduplicates it, and shrinks it again.
++  rawImage = pkgs.callPackage ../builder.nix { config = config; };
+ in
+ {
+   options.btrfs = {
+@@ -24,6 +28,31 @@ in
          Volume ID of the filesystem.
        '';
      };
@@ -31,10 +44,27 @@ index f6d95e13..18665072 100644
 +        Transparent compression algorithm and level for files populated into the image.
 +      '';
 +    };
++    dedupe = mkOption {
++      type = types.bool;
++      # Measured on the fossil-hoki rootfs (Android sparse system.img, the
++      # size that is actually flashed):
++      #   zstd compression only:            1 290 399 244 bytes
++      #   zstd + oans dedupe:               1 429 898 552 bytes
++      #   zstd + oans + balance:            1 393 098 540 bytes
++      # Deduplication reclaims ~124 MiB of data, but the extra shared-extent
++      # metadata outweighs that here, so compression alone is the smaller
++      # image. Enable per-device when the content has large duplicate files.
++      default = false;
++      description = ''
++        Deduplicate the populated filesystem with oans before finalizing the
++        image. Deduplication needs a mounted btrfs, so this runs in a VM; the
++        image is re-shrunk afterwards.
++      '';
++    };
    };
  
    config = mkMerge [
-@@ -41,12 +49,17 @@ in
+@@ -41,12 +70,17 @@ in
        minimumSize = config.helpers.size.MiB 110;
  
        computeMinimalSize = ''
@@ -52,3 +82,65 @@ index f6d95e13..18665072 100644
              ${optionalString (partitionID != null) "-U ${partitionID}"} \
              ${optionalString (label != null) "-L ${escapeShellArg label}"} \
              ${optionalString (config.size == null) "--shrink"} \
+@@ -57,6 +91,61 @@ in
+           faketime -f "1970-01-01 00:00:01" btrfs check "$img"
+         '';
+       };
++
++      # oans needs the filesystem mounted (FIDEDUPERANGE ioctl), which the
++      # sandboxed builder cannot do. Run the pass in a VM, then consolidate and
++      # shrink the image to the space it actually needs.
++      output = mkIf dedupe (lib.mkForce (
++        pkgs.buildPackages.vmTools.runInLinuxVM (
++          pkgs.buildPackages.runCommand "filesystem-image-dedupe" {
++            nativeBuildInputs = with pkgs.buildPackages; [
++              oans
++              btrfs-progs
++              util-linux
++              coreutils
++              kmod
++            ];
++            outputs = [ "out" "metadata" ];
++            memSize = 2048;
++          } ''
++            set -eu
++
++            mkdir -p "$(dirname "$out${config.location}")"
++            cp "${rawImage}${config.location}" "$out${config.location}"
++            cp -r ${rawImage.metadata}/. "$metadata/"
++
++            img="$out${config.location}"
++            chmod u+w "$img"
++
++            # mkfs shrank the filesystem to its minimum; give the dedupe pass
++            # room to allocate metadata, then shrink back afterwards.
++            truncate -s +512M "$img"
++
++            mkdir -p /mnt
++            modprobe loop 2>/dev/null || true
++            [ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237
++            [ -e /dev/loop0 ] || mknod /dev/loop0 b 7 0
++            losetup /dev/loop0 "$img"
++            mount /dev/loop0 /mnt
++            btrfs filesystem resize max /mnt
++
++            oans -rd --hashfile=/tmp/oans.hash /mnt
++            sync
++
++            # Shrink in steps; btrfs refuses beyond its minimum, which is
++            # exactly where we want to stop.
++            while btrfs filesystem resize -128m /mnt 2>/dev/null; do :; done
++
++            umount /mnt
++            losetup -d /dev/loop0
++
++            total=$(btrfs inspect-internal dump-super -f "$img" | sed -n 's/^total_bytes *//p' | head -1)
++            truncate -s "$total" "$img"
++
++            btrfs check "$img"
++          ''
++        )
++      ));
+     })
+   ];
+ }

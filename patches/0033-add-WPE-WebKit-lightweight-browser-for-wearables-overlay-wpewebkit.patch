@@ -950,10 +950,10 @@ index 00000000..e2a9aedc
 +  };
 +})
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index 765a0608..e096cb9a 100644
+index f60c2311..78fdbdd7 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
-@@ -53,6 +53,8 @@ in
+@@ -54,6 +54,8 @@ in
      pd-mapper = callPackage ./qrtr/pd-mapper.nix { };
      rmtfs = callPackage ./qrtr/rmtfs.nix { };
  
