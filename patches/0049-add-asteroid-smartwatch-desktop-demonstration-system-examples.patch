@@ -9,18 +9,20 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 669 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 689 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 ++
  examples/asteroid/default.nix                 |  15 +
- overlay/asteroidos/default.nix                |  14 +
+ overlay/asteroidos/bluebinder/default.nix     |  81 ++
+ overlay/asteroidos/default.nix                |  15 +
  overlay/asteroidos/egl-probe/default.nix      |  35 +
- overlay/asteroidos/egl-probe/egl-probe.c      | 120 ++++
+ overlay/asteroidos/egl-probe/egl-probe.c      | 120 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 9 files changed, 968 insertions(+)
+ 10 files changed, 1070 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
+ create mode 100644 overlay/asteroidos/bluebinder/default.nix
  create mode 100644 overlay/asteroidos/egl-probe/default.nix
  create mode 100644 overlay/asteroidos/egl-probe/egl-probe.c
  create mode 100644 overlay/asteroidos/swclock-offset/default.nix
@@ -57,10 +59,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..844669f3
+index 00000000..7d67ff51
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,669 @@
+@@ -0,0 +1,689 @@
 +{
 +  config,
 +  lib,
@@ -486,6 +488,26 @@ index 00000000..844669f3
 +      };
 +    };
 +
++    # Upstream meta-hoki IMAGE_INSTALL: bluebinder.
++    # Proxies the Android binder based Bluetooth HAL to BlueZ over vhci.
++    systemd.services.bluebinder = {
++      description = "Android binder based bluetooth proxy (vhci)";
++      wantedBy = [ "graphical.target" ];
++      after = [
++        "android-init.service"
++        "dbus.service"
++      ];
++      before = [ "bluetooth.service" ];
++      serviceConfig = {
++        Type = "notify";
++        ExecStartPre = "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_wait.sh";
++        ExecStart = "${pkgs.asteroid.bluebinder}/sbin/bluebinder";
++        ExecStartPost = "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_post.sh";
++        Restart = "always";
++        TimeoutStartSec = 60;
++      };
++    };
++
 +    # Upstream hoki ships geoclue + geoclue-provider-hybris for location.
 +    services.geoclue2.enable = true;
 +
@@ -800,11 +822,98 @@ index 00000000..5eca754f
 +    '';
 +  }
 +)
+diff --git a/overlay/asteroidos/bluebinder/default.nix b/overlay/asteroidos/bluebinder/default.nix
+new file mode 100644
+index 00000000..e38bf0b5
+--- /dev/null
++++ b/overlay/asteroidos/bluebinder/default.nix
+@@ -0,0 +1,81 @@
++# Upstream: meta-asteroid/recipes-core/bluebinder/bluebinder.bb
++# Simple proxy for using Android binder based bluetooth through vhci.
++{
++  lib,
++  stdenv,
++  fetchgit,
++  libgbinder,
++  glib,
++  libglibutil,
++  bluez,
++  systemd,
++  metaAsteroidSrc,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "bluebinder";
++  version = "1.0.20";
++
++  src = fetchgit {
++    url = "https://github.com/mer-hybris/bluebinder.git";
++    rev = "c3e1b155e308f6df9c9a02dbd909a44e7319ab7d";
++    hash = "sha256-D7rRnLCkoroYyVrV8fmfi408MIcq1LReI7Qu7gcAyK4=";
++  };
++
++  # Same patches as the upstream recipe.
++  patches = [
++    "${metaAsteroidSrc}/recipes-core/bluebinder/bluebinder/0001-service-fixes.patch"
++    "${metaAsteroidSrc}/recipes-core/bluebinder/bluebinder/0002-Hold-a-wakelock-while-forwarding-HAL-packets-to-vhci.patch"
++  ];
++
++  buildInputs = [
++    libgbinder
++    glib
++    libglibutil
++    bluez
++    systemd
++  ];
++
++  dontConfigure = true;
++
++  # The upstream Makefile shells out to pkg-config, which is not available for
++  # the target in this cross build; pass the same flags explicitly instead.
++  buildPhase = ''
++    runHook preBuild
++    $CC -Wall -flto bluebinder.c -DUSE_SYSTEMD=1 -o bluebinder \
++      -I${libgbinder.dev}/include/gbinder \
++      -I${libglibutil.dev}/include \
++      -I${libglibutil.dev}/include/gutil \
++      -I${glib.dev}/include/glib-2.0 \
++      -I${lib.getOutput "out" glib}/lib/glib-2.0/include \
++      -I${bluez.dev}/include \
++      -I${systemd.dev}/include \
++      -L${libgbinder}/lib -lgbinder \
++      -L${libglibutil}/lib -lglibutil \
++      -L${lib.getOutput "out" glib}/lib -lglib-2.0 \
++      -L${bluez}/lib -lbluetooth \
++      -L${systemd}/lib -lsystemd
++    runHook postBuild
++  '';
++
++  installPhase = ''
++    runHook preInstall
++    install -Dm755 bluebinder $out/sbin/bluebinder
++    install -Dm755 bluebinder_post.sh $out/libexec/bluebinder_post.sh
++    install -Dm755 bluebinder_wait.sh $out/libexec/bluebinder_wait.sh
++    # The vendor getprop and droid helpers live under /system/bin on this
++    # image, not /usr/bin.
++    substituteInPlace $out/libexec/bluebinder_post.sh \
++      --replace-fail /usr/bin/getprop /system/bin/getprop \
++      --replace-fail /usr/bin/droid/droid-get-bt-address.sh /system/bin/droid-get-bt-address.sh
++    substituteInPlace $out/libexec/bluebinder_wait.sh \
++      --replace-fail /usr/bin/getprop /system/bin/getprop
++    runHook postInstall
++  '';
++
++  meta = {
++    description = "Android binder based bluetooth proxy through vhci";
++    license = lib.licenses.gpl2Plus;
++    platforms = [ "armv7l-linux" ];
++  };
++})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 71d04c60..950d13d9 100644
+index 71d04c60..f0a0aecf 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,6 +7,18 @@ rec {
+@@ -7,6 +7,19 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
@@ -819,11 +928,12 @@ index 71d04c60..950d13d9 100644
 +  # Device features shipped by upstream meta-hoki (IMAGE_INSTALL).
 +  udev-droid-system = callPackage ./udev-droid-system { inherit metaAsteroidSrc; };
 +  swclock-offset = callPackage ./swclock-offset { };
++  bluebinder = callPackage ./bluebinder { inherit metaAsteroidSrc; };
 +
    qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
      inherit (pkgs)
        libhybris
-@@ -71,6 +83,8 @@ rec {
+@@ -71,6 +84,8 @@ rec {
  
    # Device state machine daemon MCE talks to.
    # Upstream: https://github.com/sailfishos/dsme
