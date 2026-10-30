@@ -4,7 +4,7 @@ let
   nixpkgsLock = flakeLock.nodes.nixpkgs.locked;
 
   # Use the exact nixpkgs revision the flake pins, so plain `nix-build`
-  # matches `nix build`. The flake tracks the 26.05 branch for Qt 6.11.3,
+  # matches `nix build`. The flake tracks the 26.05 branch for Qt 6.11.2,
   # the version AsteroidOS upstream builds against.
   nixpkgsSrc =
     if nixpkgsLock ? url then
