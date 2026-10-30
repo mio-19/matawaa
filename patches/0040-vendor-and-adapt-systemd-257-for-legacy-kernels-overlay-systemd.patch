@@ -16,7 +16,7 @@ systemd262oldkernel.
 ---
  devices/families/asteroidos.nix               |    4 +
  modules/hardware-watch.nix                    |   30 +
- overlay/cross-compile.nix                     |   57 +-
+ overlay/cross-compile.nix                     |   71 +-
  .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
  ...on-t-try-to-unmount-nix-or-nix-store.patch |   45 +
@@ -42,7 +42,7 @@ systemd262oldkernel.
  ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
- 28 files changed, 2345 insertions(+), 8 deletions(-)
+ 28 files changed, 2359 insertions(+), 8 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -126,7 +126,7 @@ index 35ac4030..4ddb720f 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index 5cd65291..4b5559fa 100644
+index 5cd65291..5096ea8c 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -17,7 +17,7 @@ else
@@ -207,6 +207,27 @@ index 5cd65291..4b5559fa 100644
      # ModemManager's generated GDBus sources race with the static archive link
      # when building in parallel; serialize its build.
      modemmanager = super.modemmanager.overrideAttrs (old: {
+@@ -83,6 +124,20 @@ else
+     # because cross Qt6QuickTools, Qt6QmlTools, and Qt6ShaderToolsTools cmake flags are missing.
+     qt6 = super.qt6.overrideScope (
+       qfinal: qsuper: {
++        # Upstream AsteroidOS builds Qt without desktop GL on hybris machines:
++        # meta-asteroid/recipes-qt/qt6/qtbase_git.bbappend does
++        #   PACKAGECONFIG:append = " gles2 "
++        #   PACKAGECONFIG:remove:hybris-machine = " ... gl ... "
++        # i.e. `-opengl es2`. With the nixpkgs default (desktop GL only),
++        # QOpenGLContext::openGLModuleType() returns LibGL, so
++        # QEGLConfigChooser asks for EGL_OPENGL_BIT; the vendor EGL only
++        # exposes ES configs (renderable=0x45 in the egl-probe dump), so
++        # eglChooseConfig() returns no config and eglCreateWindowSurface()
++        # fails with EGL_BAD_CONFIG. `-opengl es2` makes Qt request
++        # EGL_OPENGL_ES2_BIT, which the vendor EGL does provide.
++        qtbase = qsuper.qtbase.overrideAttrs (old: {
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DINPUT_opengl=es2" ];
++        });
+         qtdeclarative = qsuper.qtdeclarative.overrideAttrs (old: {
+           cmakeFlags =
+             (map (
 diff --git a/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch b/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
 new file mode 100644
 index 00000000..17006966
