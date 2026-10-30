@@ -15,7 +15,7 @@ current systemd 262. Keep the old-kernel-patched 262 package as
 systemd262oldkernel.
 ---
  devices/families/asteroidos.nix               |    4 +
- modules/hardware-watch.nix                    |   30 +
+ modules/hardware-watch.nix                    |   40 +
  overlay/cross-compile.nix                     |   92 +-
  .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
@@ -42,7 +42,7 @@ systemd262oldkernel.
  ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
- 28 files changed, 2379 insertions(+), 9 deletions(-)
+ 28 files changed, 2389 insertions(+), 9 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -85,10 +85,27 @@ index 4417fb4b..f9fc1173 100644
    mobile.system.system = mkDefault "armv7l-linux";
  
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
-index 35ac4030..4ddb720f 100644
+index 35ac4030..1dfe1365 100644
 --- a/modules/hardware-watch.nix
 +++ b/modules/hardware-watch.nix
-@@ -117,6 +117,36 @@ in
+@@ -92,6 +92,16 @@ in
+       '';
+     };
+ 
++    hasSpeaker = mkOption {
++      type = types.bool;
++      default = false;
++      description = ''
++        Whether the device has a loudspeaker. Mirrors upstream
++        MACHINE_HAS_SPEAKER and is exposed to the UI through
++        /etc/asteroid/machine.conf.
++      '';
++    };
++
+     aodSupport = mkOption {
+       type = types.bool;
+       default = true;
+@@ -117,6 +127,36 @@ in
        '';
      };
  

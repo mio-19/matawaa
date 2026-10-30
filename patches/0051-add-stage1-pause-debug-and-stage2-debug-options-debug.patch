@@ -12,9 +12,9 @@ Add the development-only stage debugging modes:
 ---
  boot/init/tasks/switch_root.rb  | 19 +++++++
  devices/families/asteroidos.nix | 97 +++++++++++++++++++++++++++++++++
- devices/fossil-hoki/default.nix | 17 ++++--
+ devices/fossil-hoki/default.nix | 21 +++++--
  modules/initrd-ssh.nix          | 72 +++++++++++++++++++-----
- 4 files changed, 185 insertions(+), 20 deletions(-)
+ 4 files changed, 189 insertions(+), 20 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
 index b3a6045b..0644044c 100644
@@ -180,10 +180,21 @@ index f2b892bc..368d1cfa 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 4b3ed961..f6a20342 100644
+index 4b3ed961..751f099e 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -66,6 +66,9 @@ in
+@@ -42,6 +42,10 @@ in
+ 
+   mobile.device.supportLevel = "supported";
+ 
++  # Upstream meta-hoki/conf/machine/hoki.conf: MACHINE_HAS_SPEAKER = "true".
++  # Exposed to the launcher/QML through /etc/asteroid/machine.conf.
++  mobile.hardware.watch.hasSpeaker = true;
++
+   # Linux 4.14 btrfs supports compress=zstd (without a level), noatime and
+   # space_cache=v2. It rejects compress=zstd:3 / zstd3 and space_cache v1.
+   # The image builder disables block-group-tree for this kernel.
+@@ -66,6 +70,9 @@ in
        hasCrown = true;
        hasHaptics = true;
        aodSupport = true;
@@ -193,7 +204,7 @@ index 4b3ed961..f6a20342 100644
      };
    };
  
-@@ -110,10 +113,19 @@ in
+@@ -110,10 +117,19 @@ in
      "androidboot.usbconfigfs=true"
      "loop.max_part=7"
      "cgroup.memory=nokmem,nosocket"
@@ -213,7 +224,7 @@ index 4b3ed961..f6a20342 100644
    # Ensure stage-1 udev immediately links userdata to /dev/disk/by-label/NIXOS_SYSTEM and /dev/disk/by-partlabel/userdata
    mobile.boot.stage-1.extraUdevRules = ''
      KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
-@@ -303,11 +315,9 @@ in
+@@ -303,11 +319,9 @@ in
  
      cp ${pkgs.writeText "10-platform.conf" ''
        EGL_PLATFORM=hwcomposer
@@ -225,7 +236,7 @@ index 4b3ed961..f6a20342 100644
      ''} ./var/lib/environment/compositor/10-platform.conf
  
      cp ${pkgs.writeText "20-device.conf" ''
-@@ -315,9 +325,6 @@ in
+@@ -315,9 +329,6 @@ in
        QPA_HWC_FORCE_GLES=1
        QPA_HWC2_FORCE_DOZE_UPDATE=1
        QT_OPENGL_NO_BGRA=1

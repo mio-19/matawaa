@@ -14,7 +14,7 @@ correct watchface layout, display shape, and hardware capabilities.
 
 diff --git a/modules/asteroid-config.nix b/modules/asteroid-config.nix
 new file mode 100644
-index 00000000..52acbff6
+index 00000000..e7f2f5a3
 --- /dev/null
 +++ b/modules/asteroid-config.nix
 @@ -0,0 +1,39 @@
@@ -46,7 +46,7 @@ index 00000000..52acbff6
 +
 +    [Capabilities]
 +    HAS_WLAN=true
-+    HAS_SPEAKER=false
++    HAS_SPEAKER=${if watchCfg.hasSpeaker then "true" else "false"}
 +
 +    [Identity]
 +    MACHINE=${devName}
