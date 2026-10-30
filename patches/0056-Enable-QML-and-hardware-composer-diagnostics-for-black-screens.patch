@@ -1,0 +1,259 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 31 Oct 2026 00:09:12 +1100
+Subject: [PATCH] Enable QML and hardware composer diagnostics for black
+ screens
+
+---
+ examples/asteroid/asteroid-desktop.nix        |   7 +-
+ .../qt6-qpa-hwcomposer-plugin/default.nix     |   1 +
+ .../hwc-present-diagnostics.patch             | 204 ++++++++++++++++++
+ 3 files changed, 211 insertions(+), 1 deletion(-)
+ create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 3b47d97a..cb1b0dcb 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -653,13 +653,18 @@ in
+         # import/instantiation errors and the QML_IMPORT_TRACE output are
+         # reported, so keep `default` warnings and debug on; otherwise a black
+         # screen leaves nothing but renderloop chatter in launcher.log.
+-        QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
++        # QML `console.log/info` (and QML runtime warnings) are logged under the
++        # plain `qml` category, so `*=false` silences them as well: the
++        # diagnostics below would never reach launcher.log without enabling that
++        # category explicitly. `qt.qml.*` only covers its subcategories.
++        QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
+         QT_DEBUG_PLUGINS = "1";
+         # Log every QML import attempt (module, version, and the directory each
+         # candidate was looked up in) plus the scene graph the renderer picked.
+         # Both are runtime switches; a missing QML module shows up here as a
+         # failing import line even before any component error is printed.
+         QML_IMPORT_TRACE = "1";
++        QPA_HWC_DEBUG = "1";
+         QSG_INFO = "1";
+         EGL_LOG_LEVEL = "debug";
+         LIBGL_DEBUG = "verbose";
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+index 9b3ef899..b4cd0f72 100644
+--- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+@@ -75,6 +75,7 @@ stdenv.mkDerivation (finalAttrs: {
+     (patch "0005-Explicitly-make-hwcomposer-a-shared-library.patch" "sha256-Z/zjAhKm6XRQ8zVuSYPiD+rDh7KqZuKzTiUAzmsu+ZE=")
+     (patch "0006-v10-Fix-refresh-rate-fallback-unit.patch" "sha256-XOplqx7zKgbjPWIwlJ82O1qFDXXNkj2PDO/TdaP/ync=")
+     (patch "0007-v10-Make-updates-request-driven-and-vsync-paced.patch" "sha256-EQhs66R9Vc2a2yH5zVmo8xtC+oVQHjMlKyNAIGrEsbA=")
++    ./hwc-present-diagnostics.patch
+   ];
+ 
+   strictDeps = true;
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
+new file mode 100644
+index 00000000..fb5f9bd6
+--- /dev/null
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
+@@ -0,0 +1,204 @@
++--- a/hwcomposer/hwcomposer_backend.cpp
+++++ b/hwcomposer/hwcomposer_backend.cpp
++@@ -109,6 +109,7 @@
++         // Create hwcomposer backend directly without opening hardware module
++         // because on some devices loading hwc2 module twice breaks graphics
++         // (The first load is in the composer android service.)
+++        fprintf(stderr, "== hwcomposer: using HWC2 backend ==\n");
++         return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
++     }
++ #endif
++@@ -196,7 +197,8 @@
++ #endif /* HWC_PLUGIN_HAVE_HWCOMPOSER1_API */
++ #ifdef HWC_PLUGIN_HAVE_HWCOMPOSER2_API
++             case HWC_DEVICE_API_VERSION_2_0:
++-                return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
+++                fprintf(stderr, "== hwcomposer: using HWC2 backend ==\n");
+++        return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
++ #endif
++             default:
++                 fprintf(stderr, "Unknown hwcomposer API: 0x%x/0x%x/0x%x\n",
++@@ -209,6 +211,7 @@
++ #ifdef HWC_PLUGIN_HAVE_HWCOMPOSER2_API
++     else {
++         // Create hwc2 backend directly if opening hardware module fails
+++        fprintf(stderr, "== hwcomposer: using HWC2 backend ==\n");
++         return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
++     }
++ #endif
++--- a/hwcomposer/hwcomposer_backend_v20.cpp
+++++ b/hwcomposer/hwcomposer_backend_v20.cpp
++@@ -88,6 +88,54 @@
++                                 new QEvent(QEvent::User));
++ }
++ 
+++// Composition diagnostics (Matawaa debug builds).
+++//
+++// QPA_HWC_FORCE_GLES=1 (upstream meta-hoki 20-device.conf) hands the
+++// compositor's gralloc buffers straight to the display HAL. When the vendor
+++// MDP rejects those buffers the only symptom is a black screen: the scene
+++// graph still reports rendered frames, so nothing in Qt's own logging points
+++// at the display path. QPA_HWC_DEBUG=1 logs the buffer handle and every HWC2
+++// return code, which is what identifies a failing buffer import.
+++static bool hwcDebugEnabled()
+++{
+++    static const bool enabled = qEnvironmentVariableIsSet("QPA_HWC_DEBUG");
+++    return enabled;
+++}
+++
+++static const char *hwcErrorName(hwc2_error_t error)
+++{
+++    switch (error) {
+++    case HWC2_ERROR_NONE: return "NONE";
+++    case HWC2_ERROR_BAD_CONFIG: return "BAD_CONFIG";
+++    case HWC2_ERROR_BAD_DISPLAY: return "BAD_DISPLAY";
+++    case HWC2_ERROR_BAD_LAYER: return "BAD_LAYER";
+++    case HWC2_ERROR_BAD_PARAMETER: return "BAD_PARAMETER";
+++    case HWC2_ERROR_HAS_CHANGES: return "HAS_CHANGES";
+++    case HWC2_ERROR_NO_RESOURCES: return "NO_RESOURCES";
+++    case HWC2_ERROR_NOT_VALIDATED: return "NOT_VALIDATED";
+++    case HWC2_ERROR_UNSUPPORTED: return "UNSUPPORTED";
+++    default: return "UNKNOWN";
+++    }
+++}
+++
+++static void hwcLogBuffer(const char *what, int index,
+++                         HWComposerNativeWindowBuffer *buffer, int acquireFenceFd)
+++{
+++    if (!hwcDebugEnabled())
+++        return;
+++
+++    const native_handle_t *handle = buffer ? buffer->handle : nullptr;
+++    qDebug("hwc: %s #%d buffer=%p %ux%u stride=%d format=0x%x usage=0x%llx "
+++           "handleFds=%d handleFd0=%d acquireFence=%d",
+++           what, index, static_cast<void *>(buffer),
+++           buffer ? buffer->width : 0u, buffer ? buffer->height : 0u,
+++           buffer ? buffer->stride : 0, buffer ? buffer->format : 0,
+++           buffer ? static_cast<unsigned long long>(buffer->usage) : 0ULL,
+++           handle ? handle->numFds : -1,
+++           (handle && handle->numFds > 0) ? handle->data[0] : -1,
+++           acquireFenceFd);
+++}
+++
++ void hwc2_callback_hotplug(HWC2EventListener* listener, int32_t sequenceId,
++                            hwc2_display_t display, bool connected,
++                            bool primaryDisplay)
++@@ -167,6 +215,11 @@
++ 
++     int acquireFenceFd = getFenceBufferFd(buffer);
++ 
+++    static int presentCount = 0;
+++    const int presentIndex = presentCount++;
+++    if (presentIndex < 5 || (presentIndex % 300) == 0)
+++        hwcLogBuffer("present", presentIndex, buffer, acquireFenceFd);
+++
++     if (m_syncBeforeSet && acquireFenceFd >= 0) {
++         sync_wait(acquireFenceFd, -1);
++         close(acquireFenceFd);
++@@ -182,33 +235,48 @@
++     error = hwc2_compat_display_validate(hwcDisplay, &numTypes,
++                                                     &numRequests);
++     if (error != HWC2_ERROR_NONE && error != HWC2_ERROR_HAS_CHANGES) {
++-        qDebug("prepare: validate failed for display %d: %d", displayId, error);
+++        qWarning("hwc: validate failed for display %d: %s (%d), frame dropped",
+++                 displayId, hwcErrorName(error), error);
++         return;
++     }
++ 
++     if (numTypes || numRequests) {
++-        qDebug("prepare: validate required changes for display %d: %d",
++-               displayId, error);
+++        qDebug("hwc: validate requested changes for display %d: %s (%d), "
+++               "types=%u requests=%u, frame dropped",
+++               displayId, hwcErrorName(error), error, numTypes, numRequests);
++         return;
++     }
++ 
++     error = hwc2_compat_display_accept_changes(hwcDisplay);
++     if (error != HWC2_ERROR_NONE) {
++-        qDebug("prepare: acceptChanges failed: %d", error);
+++        qWarning("hwc: accept_changes failed: %s (%d), frame dropped",
+++                 hwcErrorName(error), error);
++         return;
++     }
++ 
++     QPA_HWC_TIMING_SAMPLE(prepareTime);
++ 
++     QSystrace::begin("graphics", "QPA::set_client_target", "");
++-    hwc2_compat_display_set_client_target(hwcDisplay, /* slot */0, buffer,
++-                                          acquireFenceFd,
++-                                          HAL_DATASPACE_UNKNOWN);
+++    const hwc2_error_t setTargetError =
+++        hwc2_compat_display_set_client_target(hwcDisplay, /* slot */0, buffer,
+++                                              acquireFenceFd,
+++                                              HAL_DATASPACE_UNKNOWN);
++     QSystrace::end("graphics", "QPA::set_client_target", "");
+++    if (setTargetError != HWC2_ERROR_NONE) {
+++        qWarning("hwc: set_client_target failed: %s (%d), buffer fd=%d",
+++                 hwcErrorName(setTargetError), setTargetError,
+++                 (buffer && buffer->handle && buffer->handle->numFds > 0)
+++                     ? buffer->handle->data[0] : -1);
+++    }
++ 
++     QSystrace::begin("graphics", "QPA::present", "");
++     int presentFence = -1;
++-    hwc2_compat_display_present(hwcDisplay, &presentFence);
+++    const hwc2_error_t presentError =
+++        hwc2_compat_display_present(hwcDisplay, &presentFence);
+++    if (presentError != HWC2_ERROR_NONE) {
+++        qWarning("hwc: present failed: %s (%d)",
+++                 hwcErrorName(presentError), presentError);
+++    }
++     QSystrace::end("graphics", "QPA::present", "");
++ 
++     QPA_HWC_TIMING_SAMPLE(setTime);
++@@ -221,6 +289,9 @@
++     lastPresentFence = presentFence != -1 ? dup(presentFence) : -1;
++ 
++     setFenceBufferFd(buffer, presentFence);
+++
+++    if (hwcDebugEnabled() && (presentIndex < 5 || (presentIndex % 300) == 0))
+++        qDebug("hwc: present #%d done, fence=%d", presentIndex, presentFence);
++ 
++     if (m_dozeWorkaround && m_backend->isDozing()) {
++         hwc2_compat_display_set_power_mode(hwcDisplay, HWC2_POWER_MODE_DOZE_SUSPEND);
++@@ -263,6 +334,17 @@
++     }
++     HWC_PLUGIN_ASSERT_NOT_NULL(hwc2_primary_display);
++ 
+++    if (hwcDebugEnabled()) {
+++        HWC2DisplayConfig *config =
+++            hwc2_compat_display_get_active_config(hwc2_primary_display);
+++        qDebug("hwc: primary display id=%" PRIu64 " config=%dx%d "
+++               "vsyncPeriod=%" PRId64 " dpi=%.1fx%.1f",
+++               static_cast<uint64_t>(procs->primaryDisplayId),
+++               config ? config->width : 0, config ? config->height : 0,
+++               config ? config->vsyncPeriod : int64_t(0),
+++               config ? config->dpiX : 0.0, config ? config->dpiY : 0.0);
+++    }
+++
++     sleepDisplay(false);
++ }
++ 
++@@ -309,6 +391,10 @@
++                                          HAL_PIXEL_FORMAT_RGBA_8888,
++                                          hwc2_primary_display, layer, this);
++ 
+++    if (hwcDebugEnabled())
+++        qDebug("hwc: window %dx%d format=0x%x layer=%p", width, height,
+++               HAL_PIXEL_FORMAT_RGBA_8888, static_cast<void *>(layer));
+++
++     return (EGLNativeWindowType) static_cast<ANativeWindow *>(hwc_win);
++ }
++ 
++@@ -325,7 +411,9 @@
++     timer.start();
++ #endif
++ 
++-    eglSwapBuffers(display, surface);
+++    const EGLBoolean swapped = eglSwapBuffers(display, surface);
+++    if (hwcDebugEnabled() && swapped != EGL_TRUE)
+++        qWarning("hwc: eglSwapBuffers failed: 0x%x", eglGetError());
++ 
++ #ifdef QPA_HWC_TIMING
++     qDebug("HWComposerBackend::swap(), present=%.3f, sync=%.3f, prepare=%.3f, set=%.3f, total=%.3f",

@@ -10,6 +10,18 @@ This project is a patchset on top of [Mobile-NixOS](https://mobile.nixos.org/). 
 
 The patch series might be regarded as the real commit history, whereas the git commit history here can be relaxing and/or having meaningless commit messages.
 
+Image builds use the `staging-26.05` nixpkgs revision in `flake.lock` and
+`work/mobile-nixos/npins/sources.json` (exported in the patch series). Keep
+both pins in sync when updating. The current pin provides Qt 6.11.3.
+The Hoki and Beluga vendor kernels separately retain their old nixpkgs pin
+for GCC 8, which is unavailable in the main package set.
+
+Build the AsteroidOS image from the patched checkout:
+
+```sh
+nix-build work/mobile-nixos/examples/asteroid --argstr device fossil-hoki -A outputs.default
+```
+
 ## Status
 
 For hoki (Fossil Gen 6):

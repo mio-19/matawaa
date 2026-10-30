@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 31 Oct 2026 00:10:56 +1100
+Subject: [PATCH] Use journald options supported by staging-26.05
+
+---
+ devices/families/asteroidos.nix | 6 +++---
+ modules/watch-power.nix         | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 368d1cfa..b37a17d8 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -182,9 +182,9 @@ in
+ 
+   # Persist the journal and coredumps only for stage1 debug/ssh bring-up;
+   # production watches keep the volatile journal to avoid eMMC/UFS writes.
+-  services.journald.settings.Journal = mkIf journalCfg.enable {
+-    Storage = lib.mkForce "persistent";
+-    SystemMaxUse = lib.mkForce "64M";
++  services.journald = mkIf journalCfg.enable {
++    storage = lib.mkForce "persistent";
++    extraConfig = "SystemMaxUse=64M";
+   };
+ 
+   # systemd-coredump writes external files for the launcher/compositor
+diff --git a/modules/watch-power.nix b/modules/watch-power.nix
+index 5b936f61..21807cee 100644
+--- a/modules/watch-power.nix
++++ b/modules/watch-power.nix
+@@ -39,9 +39,9 @@ in
+ 
+     # Systemd journal volatile storage reduces write cycles on watch eMMC/UFS storage
+     # and saves flash controller power draw.
+-    services.journald.settings.Journal = {
+-      Storage = "volatile";
+-      RuntimeMaxUse = "16M";
++    services.journald = {
++      storage = "volatile";
++      extraConfig = "RuntimeMaxUse=16M";
+     };
+ 
+     # Sysctl kernel tuning for battery life and wrist devices

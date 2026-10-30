@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 31 Oct 2026 00:06:08 +1100
+Subject: [PATCH] Pin image builds to staging-26.05 for Qt 6.11.3
+
+---
+ npins/sources.json | 16 +++++++++++-----
+ pkgs.nix           | 15 ++++-----------
+ 2 files changed, 15 insertions(+), 16 deletions(-)
+
+diff --git a/npins/sources.json b/npins/sources.json
+index b8ea3558..5de2861a 100644
+--- a/npins/sources.json
++++ b/npins/sources.json
+@@ -1,11 +1,17 @@
+ {
+   "pins": {
+     "nixpkgs": {
+-      "type": "Channel",
+-      "name": "nixos-unstable",
+-      "artifact": "nixexprs.tar.zst",
+-      "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1103272.31ecbaca1bde/nixexprs.tar.zst",
+-      "hash": "sha256-yXRSdZdZZqccEL+j11lc1gFG1f7V5j8N7oPBTHwf7n4="
++      "type": "Git",
++      "repository": {
++        "type": "GitHub",
++        "owner": "NixOS",
++        "repo": "nixpkgs"
++      },
++      "branch": "staging-26.05",
++      "revision": "141fd3604320e9250ae88d93ca306ae4db0e5aa9",
++      "url": "https://github.com/NixOS/nixpkgs/archive/141fd3604320e9250ae88d93ca306ae4db0e5aa9.tar.gz",
++      "submodules": false,
++      "hash": "sha256-o73IL5zqycdwz4gTesIwNHMT4UEjwrFxLmBOQ9IFONE="
+     }
+   },
+   "version": 8
+diff --git a/pkgs.nix b/pkgs.nix
+index 4c458690..5c720cc7 100644
+--- a/pkgs.nix
++++ b/pkgs.nix
+@@ -8,16 +8,9 @@
+ #
+ let
+   rawNixpkgs = (import ./npins).nixpkgs;
+-  channelInfo =
+-    builtins.match
+-      # https://releases.nixos.org/nixos/unstable/nixos-25.05beta723344.d3c42f187194/nixexprs.tar.xz
+-      "https?://(.*)/([^/]+)/([^/]+)/([^/]+)/.*"
+-      rawNixpkgs.url;
+-  channelName = builtins.concatStringsSep "-" [
+-    (builtins.elemAt channelInfo 1)
+-    (builtins.elemAt channelInfo 2)
+-  ];
+-  identifier = builtins.elemAt channelInfo 3;
++  pin = (builtins.fromJSON (builtins.readFile ./npins/sources.json)).pins.nixpkgs;
++  identifier = pin.revision;
++  branch = pin.branch;
+ 
+   bootstrapPkgs = import rawNixpkgs { };
+ 
+@@ -29,4 +22,4 @@ let
+     ];
+   };
+ in
+-builtins.trace "(Using pinned Nixpkgs; ${channelName} @ ${identifier})" (import nixpkgs)
++builtins.trace "(Using pinned Nixpkgs; ${branch} @ ${identifier})" (import nixpkgs)
