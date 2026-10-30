@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 31 Oct 2026 08:51:57 +1100
+Subject: [PATCH] Disable broken ARM x265 CLI build
+
+---
+ overlay/cross-compile.nix | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index 60413860..0888185b 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -105,10 +105,16 @@ else
+         NIX_CFLAGS_COMPILE = ((old.env or { }).NIX_CFLAGS_COMPILE or "") + " -Wno-error=array-bounds";
+       };
+     });
++
++    # The x265 command-line encoder cannot link its ARM NEON test symbols
++    # under this cross toolchain. FFmpeg links the shared library, not the CLI.
++    x265 = super.x265.overrideAttrs (old: {
++      cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DENABLE_CLI=OFF" ];
++    });
+   in
+   {
+     inherit systemd257;
+-    inherit mbedtls;
++    inherit mbedtls x265;
+     # Keep the patched systemd 262 for old kernels available for debugging
+     # or fallback even when the legacy profile selects systemd 257.
+     systemd262oldkernel = systemd262OldKernel;
