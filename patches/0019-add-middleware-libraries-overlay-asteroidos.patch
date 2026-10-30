@@ -17,7 +17,7 @@ applications:
 The mce-qt6 package builds the Nemo.Mce QML plugin against the target Qt
 libraries, without wrapping the Qt apps.
 ---
- overlay/asteroidos/accounts-qt/default.nix    |  81 +++
+ overlay/asteroidos/accounts-qt/default.nix    |  85 +++
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++
  overlay/asteroidos/default.nix                |  66 ++
@@ -56,7 +56,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
  overlay/libhybris/default.nix                 |  68 +-
- 39 files changed, 4479 insertions(+), 36 deletions(-)
+ 39 files changed, 4483 insertions(+), 36 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -97,10 +97,10 @@ libraries, without wrapping the Qt apps.
 
 diff --git a/overlay/asteroidos/accounts-qt/default.nix b/overlay/asteroidos/accounts-qt/default.nix
 new file mode 100644
-index 00000000..0edfec62
+index 00000000..b0ba7f11
 --- /dev/null
 +++ b/overlay/asteroidos/accounts-qt/default.nix
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,85 @@
 +{
 +  lib,
 +  stdenv,
@@ -116,10 +116,14 @@ index 00000000..0edfec62
 +  pname = "accounts-qt";
 +  version = "1.17";
 +
++  # Same revision as upstream:
++  # meta-asteroid/recipes-nemomobile/libaccounts/libaccounts-qt6_1.17.bb
++  # (SRCREV c8fdd05f1a1ff5886f4649d24f2ba8c5f61cfa3a, which is the VERSION_1.17
++  #  tree; verified by prefetch - the hash below is identical for both).
 +  src = fetchFromGitLab {
 +    owner = "accounts-sso";
 +    repo = "libaccounts-qt";
-+    rev = "VERSION_${finalAttrs.version}";
++    rev = "c8fdd05f1a1ff5886f4649d24f2ba8c5f61cfa3a";
 +    hash = "sha256-mPZgD4r7vlUP6wklvZVknGqTXZBckSOtNzK7p6e2qSA=";
 +  };
 +
