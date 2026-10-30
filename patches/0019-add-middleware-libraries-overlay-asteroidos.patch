@@ -454,7 +454,7 @@ index 2fc834f0..515f584a 100644
  }
 diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
 new file mode 100644
-index 00000000..285f6b58
+index 00000000..8e4ee589
 --- /dev/null
 +++ b/overlay/asteroidos/dsme/default.nix
 @@ -0,0 +1,122 @@
@@ -481,7 +481,7 @@ index 00000000..285f6b58
 +}:
 +
 +let
-+  metaAsteroidRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
++  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
 +
 +  asteroidPatch =
 +    name: hash:
@@ -1350,7 +1350,7 @@ index 00000000..29cca049
 +}
 diff --git a/overlay/asteroidos/mce-plugin-libhybris/default.nix b/overlay/asteroidos/mce-plugin-libhybris/default.nix
 new file mode 100644
-index 00000000..12ad147b
+index 00000000..b8e68a89
 --- /dev/null
 +++ b/overlay/asteroidos/mce-plugin-libhybris/default.nix
 @@ -0,0 +1,72 @@
@@ -1359,7 +1359,7 @@ index 00000000..12ad147b
 +# exist on Android devices, so the panel never gets powered/brightness set.
 +#
 +# Upstream recipe:
-+# https://github.com/AsteroidOS/meta-asteroid/blob/5af858f49f33efe6d6ef4aa027bee7eeffb27cee/recipes-nemomobile/mce/mce-plugin-libhybris_git.bb
++# https://github.com/AsteroidOS/meta-asteroid/blob/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-nemomobile/mce/mce-plugin-libhybris_git.bb
 +{
 +  lib,
 +  stdenv,
@@ -4398,7 +4398,7 @@ index 00000000..6ad5cc23
 +install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sensord-qt6.pc DESTINATION lib/pkgconfig)
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
 new file mode 100644
-index 00000000..03131382
+index 00000000..aef62b0b
 --- /dev/null
 +++ b/overlay/asteroidos/sensorfw/default.nix
 @@ -0,0 +1,82 @@
@@ -4420,7 +4420,7 @@ index 00000000..03131382
 +}:
 +
 +let
-+  metaAsteroidRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
++  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
 +
 +  upstreamPatch =
 +    name: hash:
@@ -4776,7 +4776,7 @@ index 20e222dc..00000000
 -2.23.0
 -
 diff --git a/overlay/libhybris/default.nix b/overlay/libhybris/default.nix
-index 37b0df7d..37982c59 100644
+index 37b0df7d..807ec78e 100644
 --- a/overlay/libhybris/default.nix
 +++ b/overlay/libhybris/default.nix
 @@ -1,12 +1,15 @@
@@ -4805,8 +4805,8 @@ index 37b0df7d..37982c59 100644
 +  # on top of it. Keep this package identical to upstream instead of carrying
 +  # local fork patches: the newer libhybris contains the EGL display reference
 +  # counting that the hwcomposer QPA plugin relies on.
-+  # https://github.com/AsteroidOS/meta-asteroid/blob/5af858f49f33efe6d6ef4aa027bee7eeffb27cee/recipes-core/libhybris/libhybris_git.bbappend
-+  metaAsteroidRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
++  # https://github.com/AsteroidOS/meta-asteroid/blob/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-core/libhybris/libhybris_git.bbappend
++  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
 +  upstreamPatch = name: hash: fetchurl {
 +    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-core/libhybris/libhybris/${name}";
 +    inherit hash;

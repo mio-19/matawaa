@@ -16,7 +16,7 @@ systemd262oldkernel.
 ---
  devices/families/asteroidos.nix               |    4 +
  modules/hardware-watch.nix                    |   30 +
- overlay/cross-compile.nix                     |   55 +-
+ overlay/cross-compile.nix                     |   57 +-
  .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
  ...on-t-try-to-unmount-nix-or-nix-store.patch |   45 +
@@ -42,7 +42,7 @@ systemd262oldkernel.
  ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
- 28 files changed, 2344 insertions(+), 7 deletions(-)
+ 28 files changed, 2345 insertions(+), 8 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -126,9 +126,18 @@ index 35ac4030..4ddb720f 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index 5cd65291..d9b25f5f 100644
+index 5cd65291..4b5559fa 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
+@@ -17,7 +17,7 @@ else
+     # Pinned revision of AsteroidOS meta-asteroid used as the source for
+     # upstream patches, so nothing has to be vendored in this repository.
+     # https://github.com/AsteroidOS/meta-asteroid
+-    asteroidOSRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
++    asteroidOSRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+ 
+     addCrossQuickTools =
+       pkg:
 @@ -37,13 +37,14 @@ else
        url = "https://raw.githubusercontent.com/openembedded/openembedded-core/99c96202a2c9aea84f5ceb267a8c63c0cff58b1e/meta/recipes-core/systemd/systemd/Handle-missing-STATX_MNT_ID-on-older-kernels.patch";
        hash = "sha256-griFG/VhaG1Y5CJeWPuwIo2tCFF5EN9R1YE6T7b80gQ=";

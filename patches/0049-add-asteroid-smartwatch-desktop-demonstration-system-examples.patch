@@ -53,7 +53,7 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..4ae5d717
+index 00000000..d8ffaa03
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
 @@ -0,0 +1,563 @@
@@ -78,7 +78,7 @@ index 00000000..4ae5d717
 +  # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
 +  # policies at build time instead of vendoring copies in this repository.
 +  # https://github.com/AsteroidOS/meta-asteroid
-+  asteroidOSRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
++  asteroidOSRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
 +
 +  # Upstream asteroid-launcher_git.bb installs a seeded notification database
 +  # into the ceres user's privileged data directory.

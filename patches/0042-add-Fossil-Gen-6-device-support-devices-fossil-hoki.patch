@@ -37,8 +37,8 @@ they cannot hold multi-user.target.
  devices/fossil-ray/default.nix                |  56 ++
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
- .../qt6-qpa-hwcomposer-plugin/default.nix     |  63 ++-
- 21 files changed, 1923 insertions(+), 52 deletions(-)
+ .../qt6-qpa-hwcomposer-plugin/default.nix     |  65 ++-
+ 21 files changed, 1924 insertions(+), 53 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -2123,9 +2123,18 @@ index 6c49de0b..246aca44 100644
                "space_cache=v2"
              ]
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-index f426aead..136af638 100644
+index f426aead..9b3ef899 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+@@ -16,7 +16,7 @@
+ }:
+ 
+ let
+-  metaAsteroid = "6c1daa5cc617cf49ad316cdc9ddc4cbd290bfbe8";
++  metaAsteroid = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+   patch =
+     name: hash:
+     fetchurl {
 @@ -107,6 +107,56 @@ stdenv.mkDerivation (finalAttrs: {
        --replace-fail 'Q_PLUGIN_METADATA(IID QPlatformIntegrationFactoryInterface_iid FILE "hwcomposer.json")' \
                       'Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QPA.QPlatformIntegrationFactoryInterface.5.3" FILE "hwcomposer.json")'
