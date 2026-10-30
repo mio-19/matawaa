@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 30 Oct 2026 21:37:12 +1100
+Subject: [PATCH] Keep QML diagnostics in the launcher's logged categories
+
+`QT_LOGGING_RULES` started with `*=false`, which also disables the default
+category, so QML import and instantiation errors were never written to
+launcher.log or the console. On a black-screen boot that left only
+renderloop chatter, with no trace of why the launcher's scene was empty.
+Re-enable default warnings and qt.qml.* so the failure is visible.
+---
+ examples/asteroid/asteroid-desktop.nix | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index c7a27ff7..6964ccad 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -651,7 +651,11 @@ in
+         # These are runtime switches only; the upstream code path is unchanged.
+         # Keep the graphics/EGL diagnostics, drop the QML import flood so the
+         # actual failure stays at the end of launcher.log.
+-        QT_LOGGING_RULES = "*=false;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
++        # Keep default-category warnings and QML diagnostics on: `*=false`
++        # also silences qWarning(), which is where QML import/instantiation
++        # errors are reported, leaving nothing but renderloop chatter in the
++        # log when the launcher's scene comes up empty (black screen).
++        QT_LOGGING_RULES = "*=false;default.warning=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
+         QT_DEBUG_PLUGINS = "1";
+         EGL_LOG_LEVEL = "debug";
+         LIBGL_DEBUG = "verbose";

@@ -1,0 +1,126 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 30 Oct 2026 22:01:58 +1100
+Subject: [PATCH] Log the launcher's scene stages and trace QML imports
+
+A black screen reports only renderloop chatter, because lipstick's loader
+speaks through the default category and an empty scene leaves no trace.
+Log the compositor root size, the home screen and watchface Loader status,
+and enable QML_IMPORT_TRACE plus QSG_INFO for the debug build so a missing
+module or backend is named in launcher.log.
+---
+ examples/asteroid/asteroid-desktop.nix        | 18 +++---
+ .../asteroidos/asteroid-launcher/default.nix  |  4 ++
+ .../qml-boot-diagnostics.patch                | 58 +++++++++++++++++++
+ 3 files changed, 73 insertions(+), 7 deletions(-)
+ create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 6964ccad..3b47d97a 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -649,14 +649,18 @@ in
+       // lib.optionalAttrs debugBuild {
+         # Debug builds: turn on every trace the graphics stack can emit.
+         # These are runtime switches only; the upstream code path is unchanged.
+-        # Keep the graphics/EGL diagnostics, drop the QML import flood so the
+-        # actual failure stays at the end of launcher.log.
+-        # Keep default-category warnings and QML diagnostics on: `*=false`
+-        # also silences qWarning(), which is where QML import/instantiation
+-        # errors are reported, leaving nothing but renderloop chatter in the
+-        # log when the launcher's scene comes up empty (black screen).
+-        QT_LOGGING_RULES = "*=false;default.warning=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
++        # `*=false` also silences the default category, which is where QML
++        # import/instantiation errors and the QML_IMPORT_TRACE output are
++        # reported, so keep `default` warnings and debug on; otherwise a black
++        # screen leaves nothing but renderloop chatter in launcher.log.
++        QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
+         QT_DEBUG_PLUGINS = "1";
++        # Log every QML import attempt (module, version, and the directory each
++        # candidate was looked up in) plus the scene graph the renderer picked.
++        # Both are runtime switches; a missing QML module shows up here as a
++        # failing import line even before any component error is printed.
++        QML_IMPORT_TRACE = "1";
++        QSG_INFO = "1";
+         EGL_LOG_LEVEL = "debug";
+         LIBGL_DEBUG = "verbose";
+         MESA_DEBUG = "1";
+diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
+index d03ede7a..13c77920 100644
+--- a/overlay/asteroidos/asteroid-launcher/default.nix
++++ b/overlay/asteroidos/asteroid-launcher/default.nix
+@@ -54,6 +54,10 @@ stdenv.mkDerivation (finalAttrs: {
+     # Upstream: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
+     # Upstream CMake qt_add_shaders: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
+     ./circlemask-qrc.patch
++    # Log which stage of the compositor scene came up, so an empty scene (black
++    # screen with a live render loop) names the failing Loader instead of
++    # leaving only "update from item" chatter in the log.
++    ./qml-boot-diagnostics.patch
+   ];
+ 
+   nativeBuildInputs = [
+diff --git a/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+new file mode 100644
+index 00000000..858ba581
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+@@ -0,0 +1,58 @@
++# Bring-up diagnostics: report what actually made it into the compositor scene.
++#
++# A black screen with a live render loop (frames swapping while the renderer
++# reports no geometry) means the QML tree came up empty, and lipstick's own
++# loader only reports that through the default logging category. These lines
++# make the three stages observable in launcher.log: the compositor root and its
++# scene size, the home screen Loader, and the watchface Loader.
++--- a/src/qml/compositor/compositor.qml
+++++ b/src/qml/compositor/compositor.qml
++@@ -44,6 +44,10 @@
++     height: Dims.h(100)
++     rotation: Screen.angleBetween(Screen.primaryScreen, Lipstick.compositor.screenOrientation)
++ 
+++    Component.onCompleted: console.info("compositor: scene root", width, "x", height,
+++                                        "round screen:", DeviceSpecs.hasRoundScreen,
+++                                        "orientation:", rotation)
+++
++     // The home screen is a persistent item at the bottom of the z-stack, not
++     // an in-process "window". Its z follows MainScreen's own z (raised while
++     // the splash is up) so it can sit above running apps when needed.
++@@ -57,6 +61,15 @@
++             anchors.fill: parent
++             source: "MainScreen.qml"
++             onLoaded: item.aboutToOpen = Qt.binding(function() { return !comp.homeActive && !appLayer.ready })
+++
+++            // A failing Loader leaves the scene empty and the screen black with
+++            // no further trace, so name the stage that failed.
+++            onStatusChanged: {
+++                if (status === Loader.Ready)
+++                    console.info("compositor: home screen loaded,", width, "x", height)
+++                else if (status === Loader.Error)
+++                    console.warn("compositor: home screen failed to load (see the QML error above)")
+++            }
++         }
++     }
++ 
++--- a/src/qml/MainScreen.qml
+++++ b/src/qml/MainScreen.qml
++@@ -113,6 +113,9 @@
++         lipstickSettings.lockScreen(true)
++         if(firstRun.isFirstRun())
++             firstRunComponent.createObject(desktop)
+++        console.info("launcher: home screen", width, "x", height, "visible:", visible,
+++                     "dims:", Dims.w(100), "x", Dims.h(100),
+++                     "first run:", firstRun.isFirstRun())
++     }
++ 
++     Splash {
++@@ -396,6 +399,9 @@
++                 anchors.fill: parent
++                 source: watchFaceSource.value
++ 
+++                onStatusChanged: console.info("launcher: watchface", source,
+++                                              "status:", status)
+++
++                 // Reinstantiate to re-read the source from disk. Toggling the
++                 // Loader instead of rewriting the dconf-backed watchFaceSource
++                 // avoids a cross-process write that can clobber a concurrent
