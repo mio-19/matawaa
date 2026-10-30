@@ -8,14 +8,19 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
- devices/families/asteroidos.nix        |  18 +
- examples/asteroid/asteroid-desktop.nix | 559 +++++++++++++++++++++++++
- examples/asteroid/configuration.nix    |  43 ++
- examples/asteroid/default.nix          |  15 +
- 4 files changed, 635 insertions(+)
+ devices/families/asteroidos.nix          |  18 +
+ examples/asteroid/asteroid-desktop.nix   | 563 +++++++++++++++++++++++
+ examples/asteroid/configuration.nix      |  43 ++
+ examples/asteroid/default.nix            |  15 +
+ overlay/asteroidos/default.nix           |   2 +
+ overlay/asteroidos/egl-probe/default.nix |  35 ++
+ overlay/asteroidos/egl-probe/egl-probe.c | 120 +++++
+ 7 files changed, 796 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
+ create mode 100644 overlay/asteroidos/egl-probe/default.nix
+ create mode 100644 overlay/asteroidos/egl-probe/egl-probe.c
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 index f9fc1173..f2b892bc 100644
@@ -48,10 +53,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..e7bc3d94
+index 00000000..4ae5d717
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,559 @@
+@@ -0,0 +1,563 @@
 +{
 +  config,
 +  lib,
@@ -468,9 +473,10 @@ index 00000000..e7bc3d94
 +      // lib.optionalAttrs debugBuild {
 +        # Debug builds: turn on every trace the graphics stack can emit.
 +        # These are runtime switches only; the upstream code path is unchanged.
-+        QT_LOGGING_RULES = "*=true";
++        # Keep the graphics/EGL diagnostics, drop the QML import flood so the
++        # actual failure stays at the end of launcher.log.
++        QT_LOGGING_RULES = "*=false;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
 +        QT_DEBUG_PLUGINS = "1";
-+        WAYLAND_DEBUG = "1";
 +        EGL_LOG_LEVEL = "debug";
 +        LIBGL_DEBUG = "verbose";
 +        MESA_DEBUG = "1";
@@ -492,6 +498,9 @@ index 00000000..e7bc3d94
 +          "-/var/lib/environment/compositor/qt6-hidpi.conf"
 +        ];
 +        ExecStartPre = [
++          # Debug builds: dump the EGL display/config inventory from this exact
++          # environment (libhybris EGL, EGL_PLATFORM=hwcomposer) into launcher.log.
++          "-${pkgs.asteroid.egl-probe}/bin/egl-probe"
 +          "${pkgs.writeShellScript "asteroid-launcher-precondition" ''
 +            # android-init.service touches this marker once the property
 +            # service and the vendor HALs are up; wait for it with a bound.
@@ -681,3 +690,183 @@ index 00000000..5eca754f
 +    '';
 +  }
 +)
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index 71d04c60..758783c5 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -71,6 +71,8 @@ rec {
+ 
+   # Device state machine daemon MCE talks to.
+   # Upstream: https://github.com/sailfishos/dsme
++  egl-probe = callPackage ./egl-probe { };
++
+   dsme = callPackage ./dsme {
+     inherit libdsme libngf libiphb mce-dev;
+   };
+diff --git a/overlay/asteroidos/egl-probe/default.nix b/overlay/asteroidos/egl-probe/default.nix
+new file mode 100644
+index 00000000..81ca384f
+--- /dev/null
++++ b/overlay/asteroidos/egl-probe/default.nix
+@@ -0,0 +1,35 @@
++# Diagnostic binary used by the debug launcher service to report the EGL
++# config inventory of libhybris' hwcomposer platform.
++{
++  lib,
++  stdenv,
++  libhybris,
++}:
++
++stdenv.mkDerivation {
++  pname = "egl-probe";
++  version = "0";
++
++  src = ./.;
++
++  buildPhase = ''
++    runHook preBuild
++    $CC -O2 -Wall -o egl-probe egl-probe.c \
++      -I${libhybris}/include \
++      -L${libhybris}/lib \
++      -Wl,-rpath,${libhybris}/lib \
++      -lEGL
++    runHook postBuild
++  '';
++
++  installPhase = ''
++    runHook preInstall
++    install -Dm755 egl-probe $out/bin/egl-probe
++    runHook postInstall
++  '';
++
++  meta = with lib; {
++    description = "EGL config inventory probe for libhybris hwcomposer";
++    platforms = platforms.linux;
++  };
++}
+diff --git a/overlay/asteroidos/egl-probe/egl-probe.c b/overlay/asteroidos/egl-probe/egl-probe.c
+new file mode 100644
+index 00000000..20d8a19c
+--- /dev/null
++++ b/overlay/asteroidos/egl-probe/egl-probe.c
+@@ -0,0 +1,120 @@
++/* Diagnostic: dump the EGL display/config inventory from the launcher's
++ * environment (libhybris EGL, EGL_PLATFORM=hwcomposer). Run as an
++ * ExecStartPre of asteroid-launcher so the output lands in launcher.log. */
++#include <EGL/egl.h>
++#include <stdio.h>
++
++static const char *errname(EGLint e)
++{
++    switch (e) {
++    case EGL_SUCCESS: return "SUCCESS";
++    case EGL_NOT_INITIALIZED: return "NOT_INITIALIZED";
++    case EGL_BAD_ACCESS: return "BAD_ACCESS";
++    case EGL_BAD_ALLOC: return "BAD_ALLOC";
++    case EGL_BAD_ATTRIBUTE: return "BAD_ATTRIBUTE";
++    case EGL_BAD_CONFIG: return "BAD_CONFIG";
++    case EGL_BAD_CONTEXT: return "BAD_CONTEXT";
++    case EGL_BAD_CURRENT_SURFACE: return "BAD_CURRENT_SURFACE";
++    case EGL_BAD_DISPLAY: return "BAD_DISPLAY";
++    case EGL_BAD_MATCH: return "BAD_MATCH";
++    case EGL_BAD_NATIVE_PIXMAP: return "BAD_NATIVE_PIXMAP";
++    case EGL_BAD_NATIVE_WINDOW: return "BAD_NATIVE_WINDOW";
++    case EGL_BAD_PARAMETER: return "BAD_PARAMETER";
++    case EGL_BAD_SURFACE: return "BAD_SURFACE";
++    case EGL_CONTEXT_LOST: return "CONTEXT_LOST";
++    default: return "?";
++    }
++}
++
++static int get(EGLDisplay d, EGLConfig c, EGLint attr)
++{
++    EGLint v = -1;
++    eglGetConfigAttrib(d, c, attr, &v);
++    return v;
++}
++
++int main(void)
++{
++    EGLDisplay d = eglGetDisplay(EGL_DEFAULT_DISPLAY);
++    printf("egl-probe: display=%p\n", (void *)d);
++    if (d == EGL_NO_DISPLAY) {
++        EGLint e = eglGetError();
++        printf("egl-probe: eglGetDisplay failed 0x%x (%s)\n", e, errname(e));
++        return 1;
++    }
++
++    EGLint maj = 0, min = 0;
++    if (!eglInitialize(d, &maj, &min)) {
++        EGLint e = eglGetError();
++        printf("egl-probe: eglInitialize failed 0x%x (%s)\n", e, errname(e));
++        return 1;
++    }
++    printf("egl-probe: EGL %d.%d vendor=%s version=%s apis=%s\n",
++           maj, min,
++           eglQueryString(d, EGL_VENDOR),
++           eglQueryString(d, EGL_VERSION),
++           eglQueryString(d, EGL_CLIENT_APIS));
++
++    EGLint n = 0;
++    eglGetConfigs(d, NULL, 0, &n);
++    printf("egl-probe: configs=%d\n", n);
++    if (n > 0 && n <= 4096) {
++        static EGLConfig cfgs[4096];
++        eglGetConfigs(d, cfgs, n, &n);
++        for (EGLint i = 0; i < n; i++) {
++            printf("egl-probe: cfg id=%d rgba=%d/%d/%d/%d depth=%d stencil=%d samples=%d surface=0x%x renderable=0x%x caveat=0x%x\n",
++                   get(d, cfgs[i], EGL_CONFIG_ID),
++                   get(d, cfgs[i], EGL_RED_SIZE),
++                   get(d, cfgs[i], EGL_GREEN_SIZE),
++                   get(d, cfgs[i], EGL_BLUE_SIZE),
++                   get(d, cfgs[i], EGL_ALPHA_SIZE),
++                   get(d, cfgs[i], EGL_DEPTH_SIZE),
++                   get(d, cfgs[i], EGL_STENCIL_SIZE),
++                   get(d, cfgs[i], EGL_SAMPLES),
++                   get(d, cfgs[i], EGL_SURFACE_TYPE),
++                   get(d, cfgs[i], EGL_RENDERABLE_TYPE),
++                   get(d, cfgs[i], EGL_CONFIG_CAVEAT));
++        }
++    }
++
++    /* Exactly what qt6-qpa-hwcomposer-plugin's HwComposerContext forces for a
++     * 32-bit screen: RGBA8888 + depth 24 + stencil 8, ES2, window surface. */
++    EGLint strict[] = {
++        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
++        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
++        EGL_RED_SIZE, 8,
++        EGL_GREEN_SIZE, 8,
++        EGL_BLUE_SIZE, 8,
++        EGL_ALPHA_SIZE, 8,
++        EGL_DEPTH_SIZE, 24,
++        EGL_STENCIL_SIZE, 8,
++        EGL_SAMPLES, 0,
++        EGL_NONE
++    };
++    EGLConfig c = NULL;
++    EGLint m = 0;
++    EGLBoolean ok = eglChooseConfig(d, strict, &c, 1, &m);
++    {
++        EGLint e = eglGetError();
++        printf("egl-probe: chooseConfig(strict rgba8888/stencil8)=%d matched=%d err=0x%x (%s)\n",
++               ok, m, e, errname(e));
++    }
++
++    EGLint relaxed[] = {
++        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
++        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
++        EGL_RED_SIZE, 8,
++        EGL_GREEN_SIZE, 8,
++        EGL_BLUE_SIZE, 8,
++        EGL_NONE
++    };
++    ok = eglChooseConfig(d, relaxed, &c, 1, &m);
++    {
++        EGLint e = eglGetError();
++        printf("egl-probe: chooseConfig(relaxed rgb888)=%d matched=%d err=0x%x (%s)\n",
++               ok, m, e, errname(e));
++    }
++
++    eglTerminate(d);
++    return 0;
++}
