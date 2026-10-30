@@ -9,13 +9,13 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix          |  18 +
- examples/asteroid/asteroid-desktop.nix   | 602 +++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix   | 630 +++++++++++++++++++++++
  examples/asteroid/configuration.nix      |  43 ++
  examples/asteroid/default.nix            |  15 +
  overlay/asteroidos/default.nix           |   2 +
  overlay/asteroidos/egl-probe/default.nix |  35 ++
  overlay/asteroidos/egl-probe/egl-probe.c | 120 +++++
- 7 files changed, 835 insertions(+)
+ 7 files changed, 863 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -53,10 +53,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..9bf4c554
+index 00000000..ab9995a4
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,602 @@
+@@ -0,0 +1,630 @@
 +{
 +  config,
 +  lib,
@@ -311,6 +311,17 @@ index 00000000..9bf4c554
 +      unitConfig.DefaultDependencies = false;
 +      # Upstream mce.service talks to DSME (the device state machine) over this socket.
 +      environment.DSME_SOCKFILE = "/run/dsme.socket";
++      # MCE's display module decides "compositor startup triggers display on"
++      # only when /run/systemd/boot-status/init-done does NOT exist yet, and it
++      # reads BOOTSTATE from /run/systemd/boot-status/bootstate (else it assumes
++      # ACT_DEAD). Sailfish's boot-status provides both before MCE starts:
++      #   modules/display.c: mdy_flagfiles_start_tracking()
++      # Without the directory MCE sets mdy_init_done=TRUE and skips the
++      # display-on at compositor startup - the panel stays black.
++      preStart = ''
++        ${pkgs.coreutils}/bin/mkdir -p /run/systemd/boot-status
++        printf 'BOOTSTATE=USER' > /run/systemd/boot-status/bootstate
++      '';
 +      serviceConfig = {
 +        Type = "notify";
 +        # MCE writes its boot marker to $MCE_RUN_DIR/boot (/run/mce/boot) at
@@ -349,9 +360,26 @@ index 00000000..9bf4c554
 +        # Upstream creates the same marker in usb-moded.service:
 +        #   ExecStartPre=-/bin/mkdir -p /run/systemd/boot-status/
 +        #   ExecStartPre=-/bin/touch /run/systemd/boot-status/init-done
-+        # MCE (modules/display.c), DSME (diskmonitor, batterytracker,
-+        # bootreasonlogger) and usb-moded all watch this flag file.
++        # but only after the compositor is up: MCE's display module only takes
++        # the "display on due to compositor startup" path while init-done is
++        # still absent (modules/display.c). So wait for lipstick's bus name
++        # before creating the marker, then emit the boot-completion signal.
 +        ExecStartPre = [
++          "${pkgs.writeShellScript "asteroid-wait-for-lipstick" ''
++            i=0
++            while [ "$i" -lt 60 ]; do
++              if ${pkgs.dbus}/bin/dbus-send --system --print-reply \
++                   --dest=org.freedesktop.DBus /org/freedesktop/DBus \
++                   org.freedesktop.DBus.NameHasOwner \
++                   string:org.nemomobile.lipstick 2>/dev/null \
++                 | ${pkgs.gnugrep}/bin/grep -q "boolean true"; then
++                exit 0
++              fi
++              i=$((i + 1))
++              sleep 1
++            done
++            exit 0
++          ''}"
 +          "${pkgs.coreutils}/bin/mkdir -p /run/systemd/boot-status"
 +          "${pkgs.coreutils}/bin/touch /run/systemd/boot-status/init-done"
 +        ];
