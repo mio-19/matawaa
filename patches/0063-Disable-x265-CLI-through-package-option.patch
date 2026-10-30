@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 31 Oct 2026 08:58:21 +1100
+Subject: [PATCH] Disable x265 CLI through package option
+
+---
+ overlay/cross-compile.nix | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index 023f6aff..2d7b2966 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -366,13 +366,14 @@ else
+ 
+     # x265 4.2 in nixpkgs contains an obsolete patch for 32-bit ARM that was
+     # already incorporated upstream, causing patch rejects during cross builds.
+-    x265 = super.x265.overrideAttrs (old: {
++    x265 = (super.x265.override {
++      # The command-line encoder fails to link its ARM NEON test symbols.
++      # FFmpeg uses the shared library and does not need this executable.
++      cliSupport = false;
++    }).overrideAttrs (old: {
+       patches = super.lib.filter (p: !(super.lib.hasInfix "raw" (builtins.baseNameOf (toString p)))) (
+         old.patches or [ ]
+       );
+-      # The command-line encoder fails to link its ARM NEON test symbols.
+-      # FFmpeg uses the shared library and does not need this executable.
+-      cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DENABLE_CLI=OFF" ];
+     });
+ 
+     # Skia gnFlags cpu mapping expects "arm" instead of "armv7l".
