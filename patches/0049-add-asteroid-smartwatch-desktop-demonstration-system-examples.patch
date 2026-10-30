@@ -8,19 +8,23 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
- devices/families/asteroidos.nix          |  18 +
- examples/asteroid/asteroid-desktop.nix   | 632 +++++++++++++++++++++++
- examples/asteroid/configuration.nix      |  43 ++
- examples/asteroid/default.nix            |  15 +
- overlay/asteroidos/default.nix           |   2 +
- overlay/asteroidos/egl-probe/default.nix |  35 ++
- overlay/asteroidos/egl-probe/egl-probe.c | 120 +++++
- 7 files changed, 865 insertions(+)
+ devices/families/asteroidos.nix               |  18 +
+ examples/asteroid/asteroid-desktop.nix        | 669 ++++++++++++++++++
+ examples/asteroid/configuration.nix           |  43 ++
+ examples/asteroid/default.nix                 |  15 +
+ overlay/asteroidos/default.nix                |  14 +
+ overlay/asteroidos/egl-probe/default.nix      |  35 +
+ overlay/asteroidos/egl-probe/egl-probe.c      | 120 ++++
+ overlay/asteroidos/swclock-offset/default.nix |  30 +
+ .../asteroidos/udev-droid-system/default.nix  |  24 +
+ 9 files changed, 968 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
  create mode 100644 overlay/asteroidos/egl-probe/default.nix
  create mode 100644 overlay/asteroidos/egl-probe/egl-probe.c
+ create mode 100644 overlay/asteroidos/swclock-offset/default.nix
+ create mode 100644 overlay/asteroidos/udev-droid-system/default.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 index f9fc1173..f2b892bc 100644
@@ -53,10 +57,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..5b0e0dc6
+index 00000000..844669f3
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,632 @@
+@@ -0,0 +1,669 @@
 +{
 +  config,
 +  lib,
@@ -448,6 +452,43 @@ index 00000000..5b0e0dc6
 +    environment.etc."xdg/QtProject/Sensors.conf".source =
 +      "${pkgs.qt6.qtsensors}/etc/xdg/QtProject/Sensors.conf";
 +
++    # Upstream meta-hoki IMAGE_INSTALL: udev-droid-system.
++    # Android-style /dev/block/platform/.../by-name links for the vendor HALs.
++    services.udev.packages = [ pkgs.asteroid.udev-droid-system ];
++
++    # Upstream meta-hoki IMAGE_INSTALL: swclock-offset.
++    # hoki's RTC is not writable; the offset between RTC and system clock is
++    # cached at shutdown and re-applied at boot.
++    systemd.services.swclock-offset-boot = {
++      description = "Set system time from the cached RTC offset";
++      wantedBy = [ "sysinit.target" ];
++      before = [
++        "systemd-fsck-root.service"
++        "systemd-fsck@.service"
++      ];
++      unitConfig.DefaultDependencies = false;
++      serviceConfig = {
++        Type = "oneshot";
++        TimeoutSec = 0;
++        ExecStart = "${pkgs.asteroid.swclock-offset}/bin/swclock-offset-boot";
++      };
++    };
++    systemd.services.swclock-offset-shutdown = {
++      description = "Cache the RTC offset before shutdown";
++      wantedBy = [ "shutdown.target" ];
++      before = [ "shutdown.target" ];
++      conflicts = [ "shutdown.target" ];
++      unitConfig.DefaultDependencies = false;
++      serviceConfig = {
++        Type = "oneshot";
++        TimeoutSec = 0;
++        ExecStart = "${pkgs.asteroid.swclock-offset}/bin/swclock-offset-shutdown";
++      };
++    };
++
++    # Upstream hoki ships geoclue + geoclue-provider-hybris for location.
++    services.geoclue2.enable = true;
++
 +    # Upstream AsteroidOS uses ConnMan as its network stack, and the distro
 +    # D-Bus policy grants the `ceres` user access to net.connman.
 +    # References:
@@ -760,10 +801,29 @@ index 00000000..5eca754f
 +  }
 +)
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 71d04c60..758783c5 100644
+index 71d04c60..950d13d9 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -71,6 +71,8 @@ rec {
+@@ -7,6 +7,18 @@ rec {
+ 
+   qml-asteroid = callPackage ./qml-asteroid { };
+ 
++  # Upstream meta-asteroid checkout, used for unmodified recipe payloads
++  # (udev rules, unit files, patches) instead of vendoring them.
++  metaAsteroidSrc = pkgs.fetchgit {
++    url = "https://github.com/AsteroidOS/meta-asteroid";
++    rev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
++    hash = "sha256-Z9Hu9zOHodSioy6oqQqWMoD/0FUGHH9nnDv72F5GweI=";
++  };
++
++  # Device features shipped by upstream meta-hoki (IMAGE_INSTALL).
++  udev-droid-system = callPackage ./udev-droid-system { inherit metaAsteroidSrc; };
++  swclock-offset = callPackage ./swclock-offset { };
++
+   qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
+     inherit (pkgs)
+       libhybris
+@@ -71,6 +83,8 @@ rec {
  
    # Device state machine daemon MCE talks to.
    # Upstream: https://github.com/sailfishos/dsme
@@ -938,4 +998,70 @@ index 00000000..20d8a19c
 +
 +    eglTerminate(d);
 +    return 0;
++}
+diff --git a/overlay/asteroidos/swclock-offset/default.nix b/overlay/asteroidos/swclock-offset/default.nix
+new file mode 100644
+index 00000000..d7e91032
+--- /dev/null
++++ b/overlay/asteroidos/swclock-offset/default.nix
+@@ -0,0 +1,30 @@
++# Upstream: meta-asteroid/recipes-android/swclock-offset/swclock-offset_git.bb
++# Restores the system clock at boot from a non-writable RTC using a cached
++# offset file written at shutdown.
++{ stdenv, fetchgit }:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "swclock-offset";
++  version = "0.1";
++
++  src = fetchgit {
++    url = "https://gitlab.com/postmarketOS/swclock-offset.git";
++    rev = "6a4e4dcee814c7cfc22e0f69a6dc510086cb7abf";
++    hash = "sha256-Qqvu4GH016pz8+iMDECE2zXCPKhDPHo3CPzPPgJhITw=";
++  };
++
++  dontConfigure = true;
++  dontBuild = true;
++
++  installPhase = ''
++    runHook preInstall
++    install -Dm755 src/swclock-offset-boot.sh $out/bin/swclock-offset-boot
++    install -Dm755 src/swclock-offset-shutdown.sh $out/bin/swclock-offset-shutdown
++    runHook postInstall
++  '';
++
++  meta = {
++    description = "Synchronise time from a non-writable RTC using a cached offset";
++    platforms = [ "armv7l-linux" ];
++  };
++})
+diff --git a/overlay/asteroidos/udev-droid-system/default.nix b/overlay/asteroidos/udev-droid-system/default.nix
+new file mode 100644
+index 00000000..a4170a61
+--- /dev/null
++++ b/overlay/asteroidos/udev-droid-system/default.nix
+@@ -0,0 +1,24 @@
++# Upstream: meta-asteroid/recipes-android/udev-droid-system/udev-droid-system_1.0.bb
++# Creates the Android-style /dev/block/platform/msm_sdcc.1/by-name/ links and
++# the subsystem symlinks the vendor HALs expect.
++{ stdenvNoCC, metaAsteroidSrc }:
++
++stdenvNoCC.mkDerivation {
++  pname = "udev-droid-system";
++  version = "1.0";
++
++  dontUnpack = true;
++
++  installPhase = ''
++    runHook preInstall
++    install -Dm644 \
++      ${metaAsteroidSrc}/recipes-android/udev-droid-system/udev-droid-system/998-droid-system.rules \
++      $out/lib/udev/rules.d/998-droid-system.rules
++    runHook postInstall
++  '';
++
++  meta = {
++    description = "Android-compatible /dev symlinks for vendor HALs";
++    platforms = [ "armv7l-linux" ];
++  };
 +}
