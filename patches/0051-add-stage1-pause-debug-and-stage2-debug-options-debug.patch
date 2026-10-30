@@ -12,9 +12,9 @@ Add the development-only stage debugging modes:
 ---
  boot/init/tasks/switch_root.rb  | 19 +++++++
  devices/families/asteroidos.nix | 97 +++++++++++++++++++++++++++++++++
- devices/fossil-hoki/default.nix | 12 ++++
+ devices/fossil-hoki/default.nix | 17 ++++--
  modules/initrd-ssh.nix          | 72 +++++++++++++++++++-----
- 4 files changed, 185 insertions(+), 15 deletions(-)
+ 4 files changed, 185 insertions(+), 20 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
 index b3a6045b..0644044c 100644
@@ -180,7 +180,7 @@ index f2b892bc..368d1cfa 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 4b3ed961..e9e38ee2 100644
+index 4b3ed961..f6a20342 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -66,6 +66,9 @@ in
@@ -213,6 +213,28 @@ index 4b3ed961..e9e38ee2 100644
    # Ensure stage-1 udev immediately links userdata to /dev/disk/by-label/NIXOS_SYSTEM and /dev/disk/by-partlabel/userdata
    mobile.boot.stage-1.extraUdevRules = ''
      KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
+@@ -303,11 +315,9 @@ in
+ 
+     cp ${pkgs.writeText "10-platform.conf" ''
+       EGL_PLATFORM=hwcomposer
+-      HYBRIS_EGLPLATFORM=hwcomposer
+       QT_QPA_PLATFORM=hwcomposer
+       QT_ENABLE_GLYPH_CACHE_WORKAROUND=true
+       QT_GSTREAMER_CAMERABIN_SRC=droidcamsrc
+-      QT_QPA_NO_FRAMEBUFFER_FIRST=1
+     ''} ./var/lib/environment/compositor/10-platform.conf
+ 
+     cp ${pkgs.writeText "20-device.conf" ''
+@@ -315,9 +325,6 @@ in
+       QPA_HWC_FORCE_GLES=1
+       QPA_HWC2_FORCE_DOZE_UPDATE=1
+       QT_OPENGL_NO_BGRA=1
+-      HYBRIS_EGLPLATFORM=hwcomposer
+-      EGL_PLATFORM=hwcomposer
+-      QT_QPA_NO_FRAMEBUFFER_FIRST=1
+       ${lib.optionalString debugBuild ''
+         QT_DEBUG_PLUGINS=1
+       ''}
 diff --git a/modules/initrd-ssh.nix b/modules/initrd-ssh.nix
 index db771346..b4842997 100644
 --- a/modules/initrd-ssh.nix

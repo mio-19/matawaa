@@ -9,13 +9,13 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix          |  18 +
- examples/asteroid/asteroid-desktop.nix   | 630 +++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix   | 628 +++++++++++++++++++++++
  examples/asteroid/configuration.nix      |  43 ++
  examples/asteroid/default.nix            |  15 +
  overlay/asteroidos/default.nix           |   2 +
  overlay/asteroidos/egl-probe/default.nix |  35 ++
  overlay/asteroidos/egl-probe/egl-probe.c | 120 +++++
- 7 files changed, 863 insertions(+)
+ 7 files changed, 861 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -53,10 +53,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..ab9995a4
+index 00000000..6f2bdf02
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,630 @@
+@@ -0,0 +1,628 @@
 +{
 +  config,
 +  lib,
@@ -525,9 +525,7 @@ index 00000000..ab9995a4
 +        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
 +        # The launcher is the compositor: use the hwcomposer QPA, not xcb.
 +        EGL_PLATFORM = "hwcomposer";
-+        HYBRIS_EGLPLATFORM = "hwcomposer";
 +        QT_QPA_PLATFORM = "hwcomposer";
-+        QT_QPA_NO_FRAMEBUFFER_FIRST = "1";
 +        LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
 +        LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
 +        QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
