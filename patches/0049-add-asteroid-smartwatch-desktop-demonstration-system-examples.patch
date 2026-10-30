@@ -9,13 +9,13 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix          |  18 +
- examples/asteroid/asteroid-desktop.nix   | 563 +++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix   | 593 +++++++++++++++++++++++
  examples/asteroid/configuration.nix      |  43 ++
  examples/asteroid/default.nix            |  15 +
  overlay/asteroidos/default.nix           |   2 +
  overlay/asteroidos/egl-probe/default.nix |  35 ++
  overlay/asteroidos/egl-probe/egl-probe.c | 120 +++++
- 7 files changed, 796 insertions(+)
+ 7 files changed, 826 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -53,10 +53,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..d8ffaa03
+index 00000000..1b3d7c35
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,563 @@
+@@ -0,0 +1,593 @@
 +{
 +  config,
 +  lib,
@@ -313,10 +313,40 @@ index 00000000..d8ffaa03
 +      environment.DSME_SOCKFILE = "/run/dsme.socket";
 +      serviceConfig = {
 +        Type = "notify";
++        # MCE writes its boot marker to $MCE_RUN_DIR/boot (/run/mce/boot) at
++        # startup; upstream's rootfs provides /run/mce. Without it the write
++        # fails ("Cannot open `/var/run/mce/boot' for writing").
++        RuntimeDirectory = "mce";
++        RuntimeDirectoryMode = "0755";
 +        ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
 +        TimeoutSec = 2;
 +        Restart = "always";
 +        RestartSec = "1s";
++      };
++    };
++
++    # MCE leaves its TRANSITION submode - and only then powers the panel on -
++    # when it receives the Nokia boot-completion signal:
++    #   mce-dsme.c: mce_dsme_dbus_init_done_cb() -> mce_dsme_transition_schedule()
++    # On Sailfish that signal is emitted by init once boot has finished. DSME
++    # only listens for it (modules/diskmonitor.c, modules/batterytracker.c) and
++    # the launcher only sends com.nokia.startup.signal.desktop_visible, so the
++    # signal has to be emitted here after MCE and the user session are up.
++    # Without it MCE keeps display=UNDEF and the panel stays black even though
++    # the compositor is rendering.
++    systemd.services."nokia-init-done" = {
++      description = "Emit com.nokia.startup.signal.init_done";
++      wantedBy = [ "multi-user.target" ];
++      requires = [ "dbus.service" ];
++      after = [
++        "dbus.service"
++        "mce.service"
++        "user@1000.service"
++      ];
++      serviceConfig = {
++        Type = "oneshot";
++        RemainAfterExit = true;
++        ExecStart = "${pkgs.dbus}/bin/dbus-send --system --type=signal /com/nokia/startup/signal com.nokia.startup.signal.init_done";
 +      };
 +    };
 +
