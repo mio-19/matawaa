@@ -9,23 +9,31 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 702 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 729 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 ++
  examples/asteroid/default.nix                 |  15 +
  overlay/asteroidos/bluebinder/default.nix     |  81 ++
- overlay/asteroidos/default.nix                |  16 +
+ overlay/asteroidos/default.nix                |  30 +
  overlay/asteroidos/egl-probe/default.nix      |  35 +
  overlay/asteroidos/egl-probe/egl-probe.c      | 120 +++
- overlay/asteroidos/ngfd/default.nix           | 101 +++
+ overlay/asteroidos/libncicore/default.nix     |  71 ++
+ overlay/asteroidos/libnciplugin/default.nix   |  90 +++
+ overlay/asteroidos/libnfcdef/default.nix      |  71 ++
+ overlay/asteroidos/nfcd/default.nix           | 197 +++++
+ overlay/asteroidos/ngfd/default.nix           | 105 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 11 files changed, 1185 insertions(+)
+ 15 files changed, 1659 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
  create mode 100644 overlay/asteroidos/bluebinder/default.nix
  create mode 100644 overlay/asteroidos/egl-probe/default.nix
  create mode 100644 overlay/asteroidos/egl-probe/egl-probe.c
+ create mode 100644 overlay/asteroidos/libncicore/default.nix
+ create mode 100644 overlay/asteroidos/libnciplugin/default.nix
+ create mode 100644 overlay/asteroidos/libnfcdef/default.nix
+ create mode 100644 overlay/asteroidos/nfcd/default.nix
  create mode 100644 overlay/asteroidos/ngfd/default.nix
  create mode 100644 overlay/asteroidos/swclock-offset/default.nix
  create mode 100644 overlay/asteroidos/udev-droid-system/default.nix
@@ -61,10 +69,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..c89fee46
+index 00000000..3c44bae3
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,702 @@
+@@ -0,0 +1,729 @@
 +{
 +  config,
 +  lib,
@@ -156,6 +164,8 @@ index 00000000..c89fee46
 +        asteroid.nemo-qml-plugin-dbus
 +        asteroid.libconnman-qt
 +        asteroid.mce
++        asteroid.ngfd
++        asteroid.nfcd
 +        asteroid.keepalive
 +        asteroid.nemo-qml-plugin-calendar
 +        # QML module the launcher imports; the cross qt5compat lacks it.
@@ -240,6 +250,8 @@ index 00000000..c89fee46
 +      "C+ /var/lib/dsme/alarm_queue_status 0644 root root - ${
 +        pkgs.writeText "dsme-alarm-queue-status" "0\n"
 +      }"
++      # Upstream nfcd state storage directory.
++      "d /var/lib/nfcd 0700 root root -"
 +      # Upstream asteroid-launcher_git.bb seeds the privileged notification DB.
 +      # mkcal (used by nemo-qml-plugin-calendar) creates its database under
 +      # ~/.local/share/system/Calendar, so that tree must belong to ceres.
@@ -259,6 +271,7 @@ index 00000000..c89fee46
 +      "/share/sounds"
 +      "/share/fonts"
 +      "/share/lipstick"
++      "/share/ngfd"
 +      "/share/translations"
 +      "/share/rime-data"
 +      "/share/supported-languages"
@@ -510,6 +523,26 @@ index 00000000..c89fee46
 +      };
 +    };
 +
++    # Upstream meta-hoki IMAGE_INSTALL: nfcd + nfcd-binder-plugin + nfcd-mce-plugin.
++    # Provides org.sailfishos.nfc.daemon over D-Bus and talks to the Android
++    # hardware.nxp.nfc@1.0 / android.hardware.nfc@1.1 HIDL HAL via libgbinder.
++    systemd.services.nfcd = {
++      description = "NFC daemon";
++      wantedBy = [ "multi-user.target" ];
++      requires = [ "dbus.service" ];
++      after = [
++        "dbus.service"
++        "android-init.service"
++      ];
++      serviceConfig = {
++        Type = "dbus";
++        BusName = "org.sailfishos.nfc.daemon";
++        ExecStart = "${pkgs.asteroid.nfcd}/sbin/nfcd -o syslog";
++        Restart = "on-failure";
++        RestartSec = 1;
++      };
++    };
++
 +    # Upstream hoki ships geoclue + geoclue-provider-hybris for location.
 +    services.geoclue2.enable = true;
 +
@@ -531,6 +564,8 @@ index 00000000..c89fee46
 +      pkgs.asteroid.mce
 +      pkgs.asteroid.dsme
 +      pkgs.asteroid.sensorfw
++      pkgs.asteroid.ngfd
++      pkgs.asteroid.nfcd
 +      connmanDbusPolicy
 +    ];
 +
@@ -925,10 +960,10 @@ index 00000000..e38bf0b5
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 71d04c60..ab6df62d 100644
+index 71d04c60..8e75b57b 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,6 +7,20 @@ rec {
+@@ -7,6 +7,34 @@ rec {
  
    qml-asteroid = callPackage ./qml-asteroid { };
  
@@ -940,16 +975,30 @@ index 71d04c60..ab6df62d 100644
 +    hash = "sha256-Z9Hu9zOHodSioy6oqQqWMoD/0FUGHH9nnDv72F5GweI=";
 +  };
 +
-+  # Device features shipped by upstream meta-hoki (IMAGE_INSTALL).
++  # Device features shipped by upstream meta-hoki (IMAGE_INSTALL) and asteroid-image.
 +  udev-droid-system = callPackage ./udev-droid-system { inherit metaAsteroidSrc; };
 +  swclock-offset = callPackage ./swclock-offset { };
 +  bluebinder = callPackage ./bluebinder { inherit metaAsteroidSrc; };
 +  ngfd = callPackage ./ngfd { inherit metaAsteroidSrc mce-dev; };
++  libncicore = callPackage ./libncicore { inherit metaAsteroidSrc; };
++  libnfcdef = callPackage ./libnfcdef { inherit metaAsteroidSrc; };
++  libnciplugin = callPackage ./libnciplugin {
++    inherit metaAsteroidSrc libncicore libnfcdef;
++  };
++  nfcd = callPackage ./nfcd {
++    inherit
++      metaAsteroidSrc
++      mce-dev
++      libncicore
++      libnfcdef
++      libnciplugin
++      ;
++  };
 +
    qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
      inherit (pkgs)
        libhybris
-@@ -71,6 +85,8 @@ rec {
+@@ -71,6 +99,8 @@ rec {
  
    # Device state machine daemon MCE talks to.
    # Upstream: https://github.com/sailfishos/dsme
@@ -1125,12 +1174,465 @@ index 00000000..20d8a19c
 +    eglTerminate(d);
 +    return 0;
 +}
+diff --git a/overlay/asteroidos/libncicore/default.nix b/overlay/asteroidos/libncicore/default.nix
+new file mode 100644
+index 00000000..180de45a
+--- /dev/null
++++ b/overlay/asteroidos/libncicore/default.nix
+@@ -0,0 +1,71 @@
++# Upstream: meta-asteroid/recipes-nemomobile/libnci/libncicore_git.bb
++# mer-hybris NCI state machine library.
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  pkg-config,
++  glib,
++  libglibutil,
++  metaAsteroidSrc,
++}:
++
++stdenv.mkDerivation {
++  pname = "libncicore";
++  version = "1.1.24";
++
++  src = fetchFromGitHub {
++    owner = "mer-hybris";
++    repo = "libncicore";
++    rev = "7063aead7fb89938d5c248c1695f2dd657341da0";
++    hash = "sha256-ev73o2qy0YjSn4bVDKsj7xuM/iuDMY+33rxB0dXC6no=";
++  };
++
++  patches = [
++    "${metaAsteroidSrc}/recipes-nemomobile/libnci/libncicore/0001-Makefile-Allow-for-CC-to-be-overridden.patch"
++  ];
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    libglibutil
++  ];
++
++  postPatch = ''
++    substituteInPlace Makefile \
++      --replace-fail "pkg-config" "\$(PKG_CONFIG)"
++    substituteInPlace libncicore.pc.in \
++      --replace-fail "includedir=/usr/include" "includedir=${placeholder "out"}/include"
++  '';
++
++  makeFlags = [
++    "KEEP_SYMBOLS=1"
++    "CC=${stdenv.cc.targetPrefix}gcc"
++    "LIBDIR=${placeholder "out"}/lib"
++    "INSTALL_LIB_DIR=${placeholder "out"}/lib"
++    "INSTALL_INCLUDE_DIR=${placeholder "out"}/include/ncicore"
++    "INSTALL_PKGCONFIG_DIR=${placeholder "out"}/lib/pkgconfig"
++  ];
++
++  buildFlags = [
++    "release"
++    "pkgconfig"
++  ];
++
++  installTargets = [
++    "install"
++    "install-dev"
++  ];
++
++  meta = {
++    description = "mer-hybris NCI state machine library";
++    homepage = "https://github.com/mer-hybris/libncicore";
++    license = lib.licenses.bsd3;
++    platforms = lib.platforms.linux;
++  };
++}
+diff --git a/overlay/asteroidos/libnciplugin/default.nix b/overlay/asteroidos/libnciplugin/default.nix
+new file mode 100644
+index 00000000..6506319e
+--- /dev/null
++++ b/overlay/asteroidos/libnciplugin/default.nix
+@@ -0,0 +1,90 @@
++# Upstream: meta-asteroid/recipes-nemomobile/libnci/libnciplugin_git.bb
++# mer-hybris support library for NCI-based nfcd plugins.
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  pkg-config,
++  glib,
++  libglibutil,
++  libgbinder,
++  libncicore,
++  libnfcdef,
++  metaAsteroidSrc,
++}:
++
++let
++  # libnciplugin only needs nfcd's plugin headers (core/include/*.h).
++  nfcdSrc = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nfcd";
++    rev = "482ca8bc3eca4ce2fc04cb9ab368d173353a1c65";
++    hash = "sha256-DAKjLW6RtGBer6aDTvCAjEABuKLjwcUQXvRKC0+Wzdc=";
++  };
++in
++stdenv.mkDerivation {
++  pname = "libnciplugin";
++  version = "1.2.2";
++
++  src = fetchFromGitHub {
++    owner = "mer-hybris";
++    repo = "libnciplugin";
++    rev = "0b543f1aa1f2d88fb14c38c15c8a6beb6ce13b0f";
++    hash = "sha256-KHWqea3aDhNdJKfZHYZXOXNe3/rXzRvS+KW1I3zv+zI=";
++  };
++
++  patches = [
++    "${metaAsteroidSrc}/recipes-nemomobile/libnci/libnciplugin/0001-Makefile-Allow-for-CC-to-be-overridden.patch"
++  ];
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    libglibutil
++    libgbinder
++    libncicore
++    libnfcdef
++  ];
++
++  postPatch = ''
++    substituteInPlace Makefile \
++      --replace-fail "PKGS = nfcd-plugin libncicore libglibutil gobject-2.0 glib-2.0" \
++        "PKGS = libncicore libnfcdef libglibutil gobject-2.0 glib-2.0" \
++      --replace-fail "INCLUDES = -I\$(INCLUDE_DIR)" \
++        "INCLUDES = -I\$(INCLUDE_DIR) -I${nfcdSrc}/core/include" \
++      --replace-fail "pkg-config" "\$(PKG_CONFIG)"
++    substituteInPlace libnciplugin.pc.in \
++      --replace-fail "includedir=/usr/include" "includedir=${placeholder "out"}/include"
++  '';
++
++  makeFlags = [
++    "KEEP_SYMBOLS=1"
++    "CC=${stdenv.cc.targetPrefix}gcc"
++    "LIBDIR=${placeholder "out"}/lib"
++    "INSTALL_LIB_DIR=${placeholder "out"}/lib"
++    "INSTALL_INCLUDE_DIR=${placeholder "out"}/include/nciplugin"
++    "INSTALL_PKGCONFIG_DIR=${placeholder "out"}/lib/pkgconfig"
++  ];
++
++  buildFlags = [
++    "release"
++    "pkgconfig"
++  ];
++
++  installTargets = [
++    "install"
++    "install-dev"
++  ];
++
++  meta = {
++    description = "mer-hybris support library for NCI-based nfcd plugins";
++    homepage = "https://github.com/mer-hybris/libnciplugin";
++    license = lib.licenses.bsd3;
++    platforms = lib.platforms.linux;
++  };
++}
+diff --git a/overlay/asteroidos/libnfcdef/default.nix b/overlay/asteroidos/libnfcdef/default.nix
+new file mode 100644
+index 00000000..b3eda168
+--- /dev/null
++++ b/overlay/asteroidos/libnfcdef/default.nix
+@@ -0,0 +1,71 @@
++# Upstream: meta-asteroid/recipes-nemomobile/nfcd/libnfcdef_git.bb
++# Library for parsing and building NFC Data Exchange Format (NDEF) messages.
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  pkg-config,
++  glib,
++  libglibutil,
++  metaAsteroidSrc,
++}:
++
++stdenv.mkDerivation {
++  pname = "libnfcdef";
++  version = "1.0.8";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "libnfcdef";
++    rev = "2f4d115c977919de74fbf1ab30ce8d43b1d7ed32";
++    hash = "sha256-H9zKlxrZVBiwRr0Iv4ZnE9fdp7h7hMGI6GaXzgkLoBk=";
++  };
++
++  patches = [
++    "${metaAsteroidSrc}/recipes-nemomobile/nfcd/libnfcdef/0001-Fix-build.patch"
++  ];
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    libglibutil
++  ];
++
++  postPatch = ''
++    substituteInPlace Makefile \
++      --replace-fail "pkg-config" "\$(PKG_CONFIG)"
++    substituteInPlace libnfcdef.pc.in \
++      --replace-fail "includedir=/usr/include" "includedir=${placeholder "out"}/include"
++  '';
++
++  makeFlags = [
++    "KEEP_SYMBOLS=1"
++    "CC=${stdenv.cc.targetPrefix}gcc"
++    "LIBDIR=${placeholder "out"}/lib"
++    "INSTALL_LIB_DIR=${placeholder "out"}/lib"
++    "INSTALL_INCLUDE_DIR=${placeholder "out"}/include/nfcdef"
++    "INSTALL_PKGCONFIG_DIR=${placeholder "out"}/lib/pkgconfig"
++  ];
++
++  buildFlags = [
++    "release"
++    "pkgconfig"
++  ];
++
++  installTargets = [
++    "install"
++    "install-dev"
++  ];
++
++  meta = {
++    description = "Library for parsing and building NFC Data Exchange Format (NDEF) messages";
++    homepage = "https://github.com/sailfishos/libnfcdef";
++    license = lib.licenses.bsd3;
++    platforms = lib.platforms.linux;
++  };
++}
+diff --git a/overlay/asteroidos/nfcd/default.nix b/overlay/asteroidos/nfcd/default.nix
+new file mode 100644
+index 00000000..d12414ad
+--- /dev/null
++++ b/overlay/asteroidos/nfcd/default.nix
+@@ -0,0 +1,197 @@
++# Upstream:
++#   meta-asteroid/recipes-nemomobile/nfcd/nfcd_git.bb
++#   meta-asteroid/recipes-nemomobile/nfcd/nfcd-mce-plugin_git.bb
++#   meta-asteroid/recipes-nemomobile/nfcd/nfcd-binder-plugin_git.bb
++#   meta-asteroid/recipes-nemomobile/mce/libmce-glib_git.bb
++#   meta-smartwatch/meta-hoki/recipes-nemomobile/nfcd/nfcd_git.bbappend
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  pkg-config,
++  glib,
++  libglibutil,
++  libgbinder,
++  systemd,
++  file,
++  mce-dev,
++  libncicore,
++  libnfcdef,
++  libnciplugin,
++  metaAsteroidSrc,
++}:
++
++let
++  libmceGlibSrc = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "libmce-glib";
++    rev = "49cff7f515979777d137cbb6a78076a50fdb99f2";
++    hash = "sha256-CIqhZUIYFwsfm0OgpjHTBTaa581MDK11ehsBI0hJDHI=";
++  };
++
++  nfcdMcePluginSrc = fetchFromGitHub {
++    owner = "mer-hybris";
++    repo = "nfcd-mce-plugin";
++    rev = "87e762e063f9c645762ee7e4bb6f9d1df80a052b";
++    hash = "sha256-oLiLfg5zh+Wm8BVKsRVT0MecZIXke7At8x52I9qnCxU=";
++  };
++
++  nfcdBinderPluginSrc = fetchFromGitHub {
++    owner = "mer-hybris";
++    repo = "nfcd-binder-plugin";
++    rev = "4e9210573118eee93359bdd2653488de4a36649f";
++    hash = "sha256-euBgshG41V0LxqZuVobyYyONn+A+rLT/S/QwcmUpAaQ=";
++  };
++in
++stdenv.mkDerivation {
++  pname = "nfcd";
++  version = "1.2.4";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nfcd";
++    rev = "482ca8bc3eca4ce2fc04cb9ab368d173353a1c65";
++    hash = "sha256-DAKjLW6RtGBer6aDTvCAjEABuKLjwcUQXvRKC0+Wzdc=";
++  };
++
++  patches = [
++    "${metaAsteroidSrc}/recipes-nemomobile/nfcd/nfcd/0001-Makefile-Allow-for-CC-to-be-overridden.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/nfcd/nfcd/0002-Makefile-Allow-for-INSTALL_SYSTEMD_DIR-to-be-overrid.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/nfcd/nfcd/0003-systemd-Allow-the-service-to-be-started-as-root.patch"
++  ];
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    pkg-config
++    glib # gdbus-codegen
++  ];
++
++  buildInputs = [
++    glib
++    libglibutil
++    libgbinder
++    systemd
++    file
++    mce-dev
++    libncicore
++    libnfcdef
++    libnciplugin
++  ];
++
++  postPatch = ''
++    for mf in core/Makefile plugins/Makefile src/Makefile \
++              tools/iso-dep/Makefile tools/ndef-read/Makefile \
++              tools/ndef-share/Makefile tools/ndef-write/Makefile \
++              tools/nfc-io/Makefile; do
++      substituteInPlace "$mf" \
++        --replace-quiet "pkg-config" "\$(PKG_CONFIG)" \
++        --replace-quiet "	ranlib " "	\$(RANLIB) "
++    done
++    substituteInPlace core/nfcd-plugin.pc.in \
++      --replace-fail "includedir=/usr/include" "includedir=${placeholder "out"}/include"
++  '';
++
++  buildPhase = ''
++    runHook preBuild
++
++    commonFlags=(
++      "KEEP_SYMBOLS=1"
++      "HAVE_DBUSACCESS=0"
++      "CC=${stdenv.cc.targetPrefix}gcc"
++      "AR=${stdenv.cc.targetPrefix}ar"
++      "RANLIB=${stdenv.cc.targetPrefix}ranlib"
++      "LIBDIR=${placeholder "out"}/lib"
++    )
++
++    make -C core "''${commonFlags[@]}" release pkgconfig
++    make -C plugins "''${commonFlags[@]}" release
++    make -C src "''${commonFlags[@]}" release
++    make -C tools "''${commonFlags[@]}" release
++
++    # Build libmce-glib (required by nfcd-mce-plugin).
++    cp -r ${libmceGlibSrc} libmce-glib
++    chmod -R u+w libmce-glib
++    substituteInPlace libmce-glib/Makefile \
++      --replace-fail "pkg-config" "\$(PKG_CONFIG)" \
++      --replace-fail "INCLUDES = -I\$(INCLUDE_DIR) -I\$(GEN_DIR)" \
++        "INCLUDES = -I\$(INCLUDE_DIR) -I\$(GEN_DIR) -I${mce-dev}/include"
++    make -C libmce-glib "''${commonFlags[@]}" release
++    ln -sf libmce-glib.so.1 libmce-glib/build/release/libmce-glib.so
++
++    # Build nfcd-mce-plugin (RDEPENDS of nfcd_git.bb).
++    cp -r ${nfcdMcePluginSrc} nfcd-mce-plugin
++    chmod -R u+w nfcd-mce-plugin
++    patch -d nfcd-mce-plugin -p1 < ${metaAsteroidSrc}/recipes-nemomobile/nfcd/nfcd-mce-plugin/0001-Makefile-Allow-for-CC-to-be-overridden.patch
++    substituteInPlace nfcd-mce-plugin/Makefile \
++      --replace-fail "LDPKGS = libmce-glib libglibutil gobject-2.0 glib-2.0" \
++        "LDPKGS = libglibutil gobject-2.0 glib-2.0" \
++      --replace-fail "PKGS = \$(LDPKGS) nfcd-plugin" \
++        "PKGS = \$(LDPKGS) libnfcdef" \
++      --replace-fail "pkg-config" "\$(PKG_CONFIG)"
++    make -C nfcd-mce-plugin "''${commonFlags[@]}" \
++      CFLAGS="-I$(pwd)/core/include -I$(pwd)/libmce-glib/include -I${mce-dev}/include" \
++      LDFLAGS="-L$(pwd)/libmce-glib/build/release -Wl,-rpath,${placeholder "out"}/lib -lmce-glib" \
++      release
++
++    # Build nfcd-binder-plugin (RDEPENDS added by meta-hoki/recipes-nemomobile/nfcd/nfcd_git.bbappend).
++    cp -r ${nfcdBinderPluginSrc} nfcd-binder-plugin
++    chmod -R u+w nfcd-binder-plugin
++    patch -d nfcd-binder-plugin -p1 < ${metaAsteroidSrc}/recipes-nemomobile/nfcd/nfcd-binder-plugin/0001-Makefile-Allow-for-CC-to-be-overridden.patch
++    substituteInPlace nfcd-binder-plugin/Makefile \
++      --replace-fail "PKGS = \$(LDPKGS) nfcd-plugin" \
++        "PKGS = \$(LDPKGS) libnfcdef" \
++      --replace-fail "pkg-config" "\$(PKG_CONFIG)"
++    make -C nfcd-binder-plugin "''${commonFlags[@]}" \
++      CFLAGS="-I$(pwd)/core/include" \
++      release
++
++    runHook postBuild
++  '';
++
++  installPhase = ''
++    runHook preInstall
++
++    mkdir -p $out/sbin $out/bin $out/lib/nfcd/plugins $out/lib/pkgconfig \
++      $out/include/nfcd $out/lib/systemd/system $out/etc/dbus-1/system.d \
++      $out/share/dbus-1/system.d
++
++    install -m755 src/build/release/nfcd $out/sbin/nfcd
++    install -m644 src/nfcd.service $out/lib/systemd/system/nfcd.service
++    substituteInPlace $out/lib/systemd/system/nfcd.service \
++      --replace-fail "/usr/sbin/nfcd" "$out/sbin/nfcd"
++
++    install -m644 core/include/*.h $out/include/nfcd/
++    install -m644 core/build/nfcd-plugin.pc $out/lib/pkgconfig/nfcd-plugin.pc
++
++    for tool in iso-dep ndef-read ndef-share ndef-write nfc-io; do
++      install -m755 "tools/$tool/build/release/$tool" "$out/bin/$tool"
++    done
++
++    # Install libmce-glib shared library and plugins
++    install -m755 libmce-glib/build/release/libmce-glib.so.1.1.0 $out/lib/
++    ln -sf libmce-glib.so.1.1.0 $out/lib/libmce-glib.so.1.1
++    ln -sf libmce-glib.so.1.1 $out/lib/libmce-glib.so.1
++    ln -sf libmce-glib.so.1 $out/lib/libmce-glib.so
++
++    install -m755 nfcd-mce-plugin/build/release/mce.so $out/lib/nfcd/plugins/mce.so
++    install -m755 nfcd-binder-plugin/build/release/binder.so $out/lib/nfcd/plugins/binder.so
++
++    # Install D-Bus system policies (removing non-existent 'nfc' user block since
++    # AsteroidOS runs nfcd as root via patch 0003).
++    for conf in plugins/*/*.conf; do
++      base=$(basename "$conf")
++      sed '/<policy user="nfc">/,/<\/policy>/d' "$conf" > "$out/etc/dbus-1/system.d/$base"
++      cp "$out/etc/dbus-1/system.d/$base" "$out/share/dbus-1/system.d/$base"
++    done
++
++    runHook postInstall
++  '';
++
++  meta = {
++    description = "SailfishOS NFC daemon with MCE and Android hwbinder plugins";
++    homepage = "https://github.com/sailfishos/nfcd";
++    license = lib.licenses.bsd3;
++    platforms = lib.platforms.linux;
++  };
++}
 diff --git a/overlay/asteroidos/ngfd/default.nix b/overlay/asteroidos/ngfd/default.nix
 new file mode 100644
-index 00000000..6490cf3d
+index 00000000..18a9e1d1
 --- /dev/null
 +++ b/overlay/asteroidos/ngfd/default.nix
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,105 @@
 +# Upstream: meta-asteroid/recipes-nemomobile/ngfd/ngfd_git.bb
 +# Nemomobile's non graphical feedback daemon (haptics / system sounds).
 +{
@@ -1224,6 +1726,10 @@ index 00000000..6490cf3d
 +      $out/share/ngfd/plugins.d/50-ffmemless.ini
 +    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/ngfd.service \
 +      $out/lib/systemd/user/ngfd.service
++    if [ -f $out/etc/dbus-1/system.d/ngfd.conf ]; then
++      install -Dm644 $out/etc/dbus-1/system.d/ngfd.conf \
++        $out/share/dbus-1/system.d/ngfd.conf
++    fi
 +  '';
 +
 +  meta = {

@@ -180,10 +180,10 @@ index f2b892bc..368d1cfa 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 4b3ed961..751f099e 100644
+index b7793a6a..a42c951a 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -42,6 +42,10 @@ in
+@@ -54,6 +54,10 @@ in
  
    mobile.device.supportLevel = "supported";
  
@@ -194,7 +194,7 @@ index 4b3ed961..751f099e 100644
    # Linux 4.14 btrfs supports compress=zstd (without a level), noatime and
    # space_cache=v2. It rejects compress=zstd:3 / zstd3 and space_cache v1.
    # The image builder disables block-group-tree for this kernel.
-@@ -66,6 +70,9 @@ in
+@@ -78,6 +82,9 @@ in
        hasCrown = true;
        hasHaptics = true;
        aodSupport = true;
@@ -204,7 +204,7 @@ index 4b3ed961..751f099e 100644
      };
    };
  
-@@ -110,10 +117,19 @@ in
+@@ -122,10 +129,19 @@ in
      "androidboot.usbconfigfs=true"
      "loop.max_part=7"
      "cgroup.memory=nokmem,nosocket"
@@ -224,7 +224,7 @@ index 4b3ed961..751f099e 100644
    # Ensure stage-1 udev immediately links userdata to /dev/disk/by-label/NIXOS_SYSTEM and /dev/disk/by-partlabel/userdata
    mobile.boot.stage-1.extraUdevRules = ''
      KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
-@@ -303,11 +319,9 @@ in
+@@ -319,11 +335,9 @@ in
  
      cp ${pkgs.writeText "10-platform.conf" ''
        EGL_PLATFORM=hwcomposer
@@ -236,7 +236,7 @@ index 4b3ed961..751f099e 100644
      ''} ./var/lib/environment/compositor/10-platform.conf
  
      cp ${pkgs.writeText "20-device.conf" ''
-@@ -315,9 +329,6 @@ in
+@@ -331,9 +345,6 @@ in
        QPA_HWC_FORCE_GLES=1
        QPA_HWC2_FORCE_DOZE_UPDATE=1
        QT_OPENGL_NO_BGRA=1

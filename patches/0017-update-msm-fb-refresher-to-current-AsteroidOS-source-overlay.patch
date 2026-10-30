@@ -10,7 +10,8 @@ arguments. This keeps the Qualcomm framebuffer refresher compatible with
 the watch display stack.
 ---
  overlay/msm-fb-refresher/default.nix | 43 +++++++++++++++++-----------
- 1 file changed, 26 insertions(+), 17 deletions(-)
+ overlay/qrtr/qrtr.nix                | 16 +++++++----
+ 2 files changed, 36 insertions(+), 23 deletions(-)
 
 diff --git a/overlay/msm-fb-refresher/default.nix b/overlay/msm-fb-refresher/default.nix
 index fec3de71..37ce451f 100644
@@ -69,4 +70,40 @@ index fec3de71..37ce451f 100644
 +    license = licenses.gpl3Only;
 +    platforms = platforms.linux;
 +  };
+ }
+diff --git a/overlay/qrtr/qrtr.nix b/overlay/qrtr/qrtr.nix
+index c4c8cf84..ee05a620 100644
+--- a/overlay/qrtr/qrtr.nix
++++ b/overlay/qrtr/qrtr.nix
+@@ -2,21 +2,25 @@
+ 
+ stdenv.mkDerivation {
+   pname = "qrtr";
+-  version = "unstable-2020-12-07";
++  version = "1.0-unstable-2020-11-11";
+ 
++  # Matches upstream meta-asteroid/recipes-core/qrtr/qrtr_git.bb
+   src = fetchFromGitHub {
+     owner = "andersson";
+     repo = "qrtr";
+-    rev = "9dc7a88548c27983e06465d3fbba2ba27d4bc050";
+-    hash = "sha256-eJyErfLpIv4ndX2MPtjLTOQXrcWugQo/03Kz4S8S0xw=";
++    rev = "d0d471c96e7d112fac6f48bd11f9e8ce209c04d2";
++    hash = "sha256-KF0gCBRw3BDJdK1s+dYhHkokVTHwRFO58ho0IwHPehc=";
+   };
+ 
+-  installFlags = [ "prefix=$(out)" ];
++  makeFlags = [
++    "prefix=$(out)"
++    "CC=${stdenv.cc.targetPrefix}gcc"
++  ];
+ 
+   meta = with lib; {
+-    description = "QMI IDL compiler";
++    description = "Userspace reference for net/qrtr in the Linux kernel";
+     homepage = "https://github.com/andersson/qrtr";
+     license = licenses.bsd3;
+-    platforms = platforms.aarch64;
++    platforms = platforms.linux;
+   };
  }

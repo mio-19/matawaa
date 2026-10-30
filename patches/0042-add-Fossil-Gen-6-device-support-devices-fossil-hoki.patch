@@ -18,19 +18,20 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 ++
- devices/fossil-hoki/android-init.nix          | 148 ++++++
+ devices/fossil-hoki/android-init.nix          | 148 +++++
  devices/fossil-hoki/android-system-data.nix   |  18 +
- devices/fossil-hoki/default.nix               | 481 ++++++++++++++++++
+ devices/fossil-hoki/audio-modules.nix         | 122 +++++
+ devices/fossil-hoki/default.nix               | 506 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  22 +
  devices/fossil-hoki/hybris.nix                |  45 ++
- devices/fossil-hoki/kernel/default.nix        | 232 +++++++++
- .../kernel/linux-4.14.206-207.patch.patch     | 228 +++++++++
+ devices/fossil-hoki/kernel/default.nix        | 232 ++++++++
+ .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 +
  .../kernel/linux-4.14.211-212.patch.patch     | 152 ++++++
  .../kernel/linux-4.14.212-213.patch.patch     |  99 ++++
  devices/fossil-hoki/wlan-firmware-hoki.sh     |  30 ++
- devices/fossil-hoki/wlan.nix                  |  81 +++
+ devices/fossil-hoki/wlan.nix                  | 112 ++++
  ...co_profile-fix-use-of-adapter-before.patch |  30 ++
  ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 +
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
@@ -38,10 +39,11 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  65 ++-
- 21 files changed, 1924 insertions(+), 53 deletions(-)
+ 22 files changed, 2102 insertions(+), 53 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
+ create mode 100644 devices/fossil-hoki/audio-modules.nix
  create mode 100644 devices/fossil-hoki/default.nix
  create mode 100644 devices/fossil-hoki/gps_xtra.ini
  create mode 100644 devices/fossil-hoki/hybris-android.nix
@@ -299,12 +301,140 @@ index 00000000..4373edde
 +  ln -sfn android.hardware.gnss@1.0-service-qti \
 +    $out/vendor/bin/hw/android.hardware.gnss@1.0-service
 +''
+diff --git a/devices/fossil-hoki/audio-modules.nix b/devices/fossil-hoki/audio-modules.nix
+new file mode 100644
+index 00000000..4bcf1878
+--- /dev/null
++++ b/devices/fossil-hoki/audio-modules.nix
+@@ -0,0 +1,122 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  kernel = config.mobile.boot.stage-1.kernel.package;
++
++  # Upstream AsteroidOS recipe:
++  # https://github.com/AsteroidOS/meta-smartwatch/blob/88b4ac9/meta-hoki/recipes-kernel/modules/linux-audio-modules-hoki_p.bb
++  audioSrc = pkgs.fetchFromGitHub {
++    owner = "fossil-engineering";
++    repo = "kernel-msm-fossil-extra-cw-audiokernel";
++    rev = "c984389253fc58bc316af06bf3504dd2c25382be";
++    hash = "sha256-dcg4NBM8fMuhY1J/Fm4mZrhzSNIaFXQlebcNiTwvB2Q=";
++  };
++
++  upstreamPatch =
++    name: hash:
++    pkgs.fetchurl {
++      url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/88b4ac9/meta-hoki/recipes-kernel/modules/linux-audio-modules-hoki/${name}";
++      inherit hash;
++    };
++
++  audioModules = kernel.stdenv.mkDerivation {
++    pname = "linux-audio-modules-hoki";
++    version = kernel.version;
++    src = audioSrc;
++
++    patches = [
++      (upstreamPatch "0001-Remove-export-from-Kbuild-files.patch" "sha256-vjptUX54W5JCTL1wxFuba6fJC5mSl27sYaBYDF/xL2o=")
++      (upstreamPatch "0002-Avoid-shell-expansion-in-recursively-expanded-variab.patch" "sha256-11a78Tdzw37koeax5WYEu0HvCzxN4ABecyjWG5QHHmc=")
++      (upstreamPatch "0003-Import-beluga-makefile.patch" "sha256-VLbhbVGqJdbYYxAumcyoXpFIHHm3XPHHUqwEBXo4nHc=")
++      (upstreamPatch "0004-Ignore-compilation-warnings.patch" "sha256-5NAHGsk7Go//CPf85rNyjAzbhpnM653ThevAeSik/dQ=")
++      (upstreamPatch "0005-dsp-Compile-codecs-for-out-of-tree-builds.patch" "sha256-/hY0VsLIEY2Xwol3LFqjWaatMZFKiwWsrA7q1uZ33yQ=")
++    ];
++
++    nativeBuildInputs =
++      (with pkgs.buildPackages; [
++        bc
++        bison
++        flex
++        openssl
++        python3
++      ])
++      ++ [ pkgs.buildPackages.buildPackages.gcc ];
++    buildInputs = [ kernel ];
++
++    # Prepare the kernel source tree (with the same stable/device patches as the
++    # running kernel so vermagic matches 4.14.213) and the sibling
++    # kernel-build-artifacts directory expected by 0003-Import-beluga-makefile.patch.
++    configurePhase = ''
++      runHook preConfigure
++      cp -r ${kernel.src} kernel-src
++      chmod -R u+w kernel-src
++      for p in ${lib.concatMapStringsSep " " (p: "${p}") kernel.patches}; do
++        patch -d kernel-src -p1 < "$p"
++      done
++      cp ${kernel.configfile} kernel-src/.config
++      make -C kernel-src ARCH=arm CROSS_COMPILE=${kernel.stdenv.cc.targetPrefix} CC=${kernel.stdenv.cc}/bin/${kernel.stdenv.cc.targetPrefix}cc HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc olddefconfig
++      make -C kernel-src ARCH=arm CROSS_COMPILE=${kernel.stdenv.cc.targetPrefix} CC=${kernel.stdenv.cc}/bin/${kernel.stdenv.cc.targetPrefix}cc HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc modules_prepare
++
++      mkdir -p kernel-build-artifacts/usr/include/linux kernel-build-artifacts/scripts
++      ${pkgs.buildPackages.buildPackages.gcc}/bin/gcc -std=gnu11 kernel-src/scripts/unifdef.c -o kernel-build-artifacts/scripts/unifdef
++
++      # Extract vmlinux Module.symvers from the built kernel zImage + System.map
++      # so CONFIG_MODVERSIONS=y CRC checks (including module_layout) pass at load time.
++      python3 - "${kernel}" kernel-src/Module.symvers <<'PY'
++      import struct, sys, zlib
++      kdir, out_path = sys.argv[1], sys.argv[2]
++      zimg = open(kdir + "/zImage", "rb").read()
++      img = zlib.decompress(zimg[zimg.find(b"\x1f\x8b\x08"):], 16 + zlib.MAX_WBITS)
++      syms, ksymtab = {}, []
++      for line in open(kdir + "/System.map"):
++          addr_s, _, name = line.split()
++          addr = int(addr_s, 16)
++          syms[name] = addr
++          if name.startswith("__ksymtab_"):
++              ksymtab.append((addr, name[len("__ksymtab_"):]))
++      base = syms["_text"]
++      with open(out_path, "w") as out:
++          for saddr, sname in sorted(ksymtab):
++              if saddr < syms["__start___ksymtab_gpl"]:
++                  i = (saddr - syms["__start___ksymtab"]) // 8
++                  crc_addr, lic = syms["__start___kcrctab"] + i * 4, "EXPORT_SYMBOL"
++              else:
++                  i = (saddr - syms["__start___ksymtab_gpl"]) // 8
++                  crc_addr, lic = syms["__start___kcrctab_gpl"] + i * 4, "EXPORT_SYMBOL_GPL"
++              crc = struct.unpack_from("<I", img, crc_addr - base)[0]
++              out.write(f"0x{crc:08x}\t{sname}\tvmlinux\t{lic}\n")
++      PY
++      runHook postConfigure
++    '';
++
++    makeFlags = [
++      "ARCH=arm"
++      "CROSS_COMPILE=${kernel.stdenv.cc.targetPrefix}"
++      "CC=${kernel.stdenv.cc}/bin/${kernel.stdenv.cc.targetPrefix}cc"
++      "HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc"
++      "KERNEL_SRC=$(PWD)/kernel-src"
++    ];
++
++    installPhase = ''
++      runHook preInstall
++      modDir=$out/lib/modules/${kernel.modDirVersion}
++      mkdir -p "$modDir/extra"
++      find asoc dsp ipc soc -name '*.ko' -exec cp -v {} "$modDir/extra/" \;
++      for ko in "$modDir/extra"/*.ko; do
++        touch "$ko.cer"
++      done
++      touch "$modDir/modules.cer" "$modDir/modules.builtin" "$modDir/modules.builtin.modinfo"
++      echo "#" > "$modDir/modules.order"
++      runHook postInstall
++    '';
++  };
++in
++{
++  # Loaded by init.rc (`exec -- /sbin/modprobe -a audio_apr ...`) before booting ADSP.
++  boot.extraModulePackages = [ audioModules ];
++}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..4b3ed961
+index 00000000..b7793a6a
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,481 @@
+@@ -0,0 +1,506 @@
 +{
 +  config,
 +  lib,
@@ -325,6 +455,17 @@ index 00000000..4b3ed961
 +    fi
 +  '';
 +
++  # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd_git.bbappend
++  hokiNgfdIni = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd/51-ffmemless.ini";
++    sha256 = "19bzmmhhn526wyqcg163x1hc8czrmxli22m68s07srr4zza9dman";
++  };
++
++  hokiNgfdConfig = pkgs.runCommand "hoki-ngfd-config" { } ''
++    install -Dm644 ${hokiNgfdIni} $out/share/ngfd/plugins.d/51-ffmemless.ini
++  '';
++
 +  # Debug builds get Qt plugin/loader tracing in the compositor environment,
 +  # so a launcher dlopen/EGL failure is visible in the journal without
 +  # hand-editing 20-device.conf on the device.
@@ -339,6 +480,7 @@ index 00000000..4b3ed961
 +    ./hybris.nix
 +    ./android-init.nix
 +    ./wlan.nix
++    ./audio-modules.nix
 +  ];
 +
 +  mobile.device.name = "fossil-hoki";
@@ -431,6 +573,8 @@ index 00000000..4b3ed961
 +  environment.systemPackages = [
 +    pkgs.alsa-utils
 +    pkgs.btrfs-progs
++    pkgs.qrtr
++    hokiNgfdConfig
 +  ];
 +
 +  # Include static Qualcomm Adreno GPU, audio DSP and Wi-Fi firmware in the system
@@ -560,6 +704,7 @@ index 00000000..4b3ed961
 +    "d /sbin 0755 root root -"
 +    "L+ /sbin/modprobe - - - - ${pkgs.kmod}/bin/modprobe"
 +    "d /lib/firmware 0755 root root -"
++    "L+ /lib/modules - - - - /run/current-system/kernel-modules/lib/modules"
 +    "L+ /etc/firmware - - - - /vendor/firmware"
 +  ];
 +
@@ -576,6 +721,7 @@ index 00000000..4b3ed961
 +    # AsteroidOS installs the Fossil Gen 6 Android 9 system and vendor data
 +    # Reference: meta-smartwatch meta-hoki/recipes-android/android/android-system-data_hoki-p.bb
 +    mkdir -p ./system ./vendor ./lib/firmware ./etc
++    ln -sfn /run/current-system/kernel-modules/lib/modules ./lib/modules
 +    cp -a ${androidSystemData}/system/* ./system/
 +    cp -a ${androidSystemData}/vendor/* ./vendor/
 +    chmod -R u+w ./system ./vendor
@@ -770,9 +916,18 @@ index 00000000..4b3ed961
 +
 +  # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
 +  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd/51-ffmemless.ini
-+  environment.etc."ngf/51-ffmemless.ini".source = pkgs.fetchurl {
-+    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd/51-ffmemless.ini";
-+    sha256 = "19bzmmhhn526wyqcg163x1hc8czrmxli22m68s07srr4zza9dman";
++  environment.etc."ngf/51-ffmemless.ini".source = hokiNgfdIni;
++  environment.etc."ngfd/plugins.d/51-ffmemless.ini".source = hokiNgfdIni;
++
++  # Qualcomm IPC Router name service
++  # Upstream reference: meta-hoki/conf/machine/hoki.conf (IMAGE_INSTALL += "qrtr")
++  systemd.services.qrtr-ns = {
++    description = "QIPCRTR Name Service";
++    wantedBy = [ "multi-user.target" ];
++    serviceConfig = {
++      ExecStart = "${pkgs.qrtr}/bin/qrtr-ns -f 1";
++      Restart = "always";
++    };
 +  };
 +
 +  # Near Field Communication (NFC) controller configuration
@@ -1680,10 +1835,10 @@ index 00000000..f1682bdf
 +modprobe wlan
 diff --git a/devices/fossil-hoki/wlan.nix b/devices/fossil-hoki/wlan.nix
 new file mode 100644
-index 00000000..cfcf4fbd
+index 00000000..18d05338
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan.nix
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,112 @@
 +{
 +  config,
 +  lib,
@@ -1735,10 +1890,40 @@ index 00000000..cfcf4fbd
 +      runHook preConfigure
 +      cp -r ${kernel.src} kernel-src
 +      chmod -R u+w kernel-src
++      for p in ${lib.concatMapStringsSep " " (p: "${p}") kernel.patches}; do
++        patch -d kernel-src -p1 < "$p"
++      done
 +      cp ${kernel.configfile} kernel-src/.config
 +      cp ${./wlan/wakelock.h} kernel-src/include/linux/wakelock.h
 +      make -C kernel-src ARCH=arm CROSS_COMPILE=${pkgs.stdenv.cc.targetPrefix} HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc olddefconfig
 +      make -C kernel-src ARCH=arm CROSS_COMPILE=${pkgs.stdenv.cc.targetPrefix} HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc modules_prepare
++
++      # Extract vmlinux Module.symvers from the built kernel zImage + System.map
++      # so CONFIG_MODVERSIONS=y CRC checks (including module_layout) pass at load time.
++      python3 - "${kernel}" kernel-src/Module.symvers <<'PY'
++      import struct, sys, zlib
++      kdir, out_path = sys.argv[1], sys.argv[2]
++      zimg = open(kdir + "/zImage", "rb").read()
++      img = zlib.decompress(zimg[zimg.find(b"\x1f\x8b\x08"):], 16 + zlib.MAX_WBITS)
++      syms, ksymtab = {}, []
++      for line in open(kdir + "/System.map"):
++          addr_s, _, name = line.split()
++          addr = int(addr_s, 16)
++          syms[name] = addr
++          if name.startswith("__ksymtab_"):
++              ksymtab.append((addr, name[len("__ksymtab_"):]))
++      base = syms["_text"]
++      with open(out_path, "w") as out:
++          for saddr, sname in sorted(ksymtab):
++              if saddr < syms["__start___ksymtab_gpl"]:
++                  i = (saddr - syms["__start___ksymtab"]) // 8
++                  crc_addr, lic = syms["__start___kcrctab"] + i * 4, "EXPORT_SYMBOL"
++              else:
++                  i = (saddr - syms["__start___ksymtab_gpl"]) // 8
++                  crc_addr, lic = syms["__start___kcrctab_gpl"] + i * 4, "EXPORT_SYMBOL_GPL"
++              crc = struct.unpack_from("<I", img, crc_addr - base)[0]
++              out.write(f"0x{crc:08x}\t{sname}\tvmlinux\t{lic}\n")
++      PY
 +      runHook postConfigure
 +    '';
 +
@@ -1756,6 +1941,7 @@ index 00000000..cfcf4fbd
 +    installPhase = ''
 +      mkdir -p $out/lib/modules/${kernel.modDirVersion}/extra
 +      cp wlan.ko $out/lib/modules/${kernel.modDirVersion}/extra/wlan.ko
++      touch $out/lib/modules/${kernel.modDirVersion}/extra/wlan.ko.cer
 +    '';
 +  };
 +in
