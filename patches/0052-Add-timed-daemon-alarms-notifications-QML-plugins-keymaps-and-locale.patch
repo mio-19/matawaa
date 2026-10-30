@@ -1,0 +1,866 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Fri, 30 Oct 2026 18:01:18 +1100
+Subject: [PATCH] Add timed daemon, alarms/notifications QML plugins, keymaps
+ and locale
+
+Complete the remaining reasonix-alignment items: package the timed server
+and voland client library, add the Nemo.Alarms/Nemo.Notifications QML
+plugins, ship the patched kmap2qmap keymap and supported-languages assets,
+and wire the resulting user services, D-Bus policies and locale drop-in
+into the asteroid desktop profile.
+---
+ devices/fossil-hoki/default.nix               |   2 +-
+ examples/asteroid/asteroid-desktop.nix        |  77 ++++++++-
+ overlay/asteroidos/apps/default.nix           |   4 +-
+ overlay/asteroidos/assets/default.nix         |  84 +++++++++
+ .../asteroidos/asteroid-launcher/default.nix  |   4 +-
+ overlay/asteroidos/default.nix                |   8 +-
+ overlay/asteroidos/libiodata/default.nix      |   7 +
+ .../nemo-qml-plugin-alarms/default.nix        | 131 ++++++++++++++
+ .../nemo-qml-plugin-notifications/default.nix | 117 +++++++++++++
+ overlay/asteroidos/timed-qt6/default.nix      | 163 +++++++++++++++++-
+ 10 files changed, 583 insertions(+), 14 deletions(-)
+ create mode 100644 overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
+ create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index a42c951a..f710b2f4 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -341,7 +341,7 @@ in
+     ''} ./var/lib/environment/compositor/10-platform.conf
+ 
+     cp ${pkgs.writeText "20-device.conf" ''
+-      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"
++      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
+       QPA_HWC_FORCE_GLES=1
+       QPA_HWC2_FORCE_DOZE_UPDATE=1
+       QT_OPENGL_NO_BGRA=1
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 3c44bae3..c7a27ff7 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -93,6 +93,9 @@ in
+         asteroid.nfcd
+         asteroid.keepalive
+         asteroid.nemo-qml-plugin-calendar
++        asteroid.nemo-qml-plugin-alarms
++        asteroid.nemo-qml-plugin-notifications
++        asteroid.timed-qt6
+         # QML module the launcher imports; the cross qt5compat lacks it.
+         qt5compatQml
+         # Asset suite
+@@ -100,6 +103,8 @@ in
+         asteroid.assets.sounds
+         asteroid.assets.icons
+         asteroid.assets.fonts
++        asteroid.assets.keymaps
++        asteroid.assets.supported-languages
+         asteroid.virtualkeyboard
+         # Complete application suite
+         asteroid.apps.stopwatch
+@@ -177,6 +182,19 @@ in
+       }"
+       # Upstream nfcd state storage directory.
+       "d /var/lib/nfcd 0700 root root -"
++      # Upstream timed_git.bb creates /var/lib/timed for shared events/settings.
++      "d /var/lib/timed 0775 root root -"
++      "d /var/lib/timed/shared_events 0775 root root -"
++      "d /var/lib/timed/shared_settings 0775 root root -"
++      # Upstream supported-languages_git.bb seeds the ceres locale drop-in that
++      # user@.service.d/locale.conf reads (installed via environment.etc below).
++      "d /home/.system/var/lib/environment/1000 0755 ceres users -"
++      "C+ /home/.system/var/lib/environment/1000/locale.conf 0644 ceres users - ${
++        pkgs.writeText "asteroid-locale.conf" ''
++          # This is the default locale
++          LANG=en_GB.utf8
++        ''
++      }"
+       # Upstream asteroid-launcher_git.bb seeds the privileged notification DB.
+       # mkcal (used by nemo-qml-plugin-calendar) creates its database under
+       # ~/.local/share/system/Calendar, so that tree must belong to ceres.
+@@ -197,6 +215,7 @@ in
+       "/share/fonts"
+       "/share/lipstick"
+       "/share/ngfd"
++      "/share/qt6"
+       "/share/translations"
+       "/share/rime-data"
+       "/share/supported-languages"
+@@ -491,9 +510,13 @@ in
+       pkgs.asteroid.sensorfw
+       pkgs.asteroid.ngfd
+       pkgs.asteroid.nfcd
++      pkgs.asteroid.timed-qt6
+       connmanDbusPolicy
+     ];
+ 
++    # Upstream timed_git.bb installs timed.rc into /etc.
++    environment.etc."timed.rc".source = "${pkgs.asteroid.timed-qt6}/etc/timed.rc";
++
+     # users.users.ceres.linger generates NixOS's linger-users.service, which
+     # calls loginctl enable-linger after logind starts. Let the normal systemd
+     # linger mechanism own the marker; do not pre-seed it or override the unit.
+@@ -530,12 +553,58 @@ in
+         "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
+         "${pkgs.asteroid.keepalive}/lib/qt-6/qml"
+         "${pkgs.asteroid.nemo-qml-plugin-calendar}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-alarms}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-notifications}/lib/qt-6/qml"
++        "${pkgs.asteroid.amber-mpris}/lib/qt-6/qml"
++        "${pkgs.qt6.qtsensors}/lib/qt-6/qml"
++        "${pkgs.qt6.qtmultimedia}/lib/qt-6/qml"
++        "${pkgs.qt6.qtpositioning}/lib/qt-6/qml"
++      ];
++      QT_PLUGIN_PATH = lib.concatStringsSep ":" [
++        "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtsensors}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtmultimedia}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtpositioning}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtsvg}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtwayland}/lib/qt-6/plugins"
+       ];
+-      QT_PLUGIN_PATH = "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins";
+       # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
+       QT_ENABLE_HIGHDPI_SCALING = "0";
+     };
+ 
++    # Upstream asteroid-alarmclock installs share/systemd/user/alarmpresenter.service
++    # plus the com.nokia.voland D-Bus activation file; expose the same user
++    # service so Nemo.Alarms can present firing alarms.
++    systemd.user.services.alarmpresenter = {
++      description = "AsteroidOS alarm presenter";
++      wantedBy = [ "default.target" ];
++      requires = [ "dbus.socket" ];
++      after = [ "dbus.socket" ];
++      serviceConfig = {
++        Type = "dbus";
++        BusName = "com.nokia.voland";
++        ExecStart = "${pkgs.asteroid.apps.alarmclock}/bin/asteroid-alarmpresenter";
++        Environment = "QT_WAYLAND_DISABLE_WINDOWDECORATION=1";
++      };
++    };
++
++    # Upstream timed.service (installed in /usr/lib/systemd/user and wanted by
++    # default.target): Nemomobile time daemon serving com.nokia.time on the
++    # system bus. Alarms are scheduled through it by Nemo.Alarms.
++    systemd.user.services.timed = {
++      description = "Time Daemon";
++      wantedBy = [ "default.target" ];
++      requires = [ "dbus.socket" ];
++      after = [ "dbus.socket" ];
++      serviceConfig = {
++        Type = "notify";
++        ExecStart = "${pkgs.asteroid.timed-qt6}/bin/timed --systemd";
++        Restart = "always";
++        RestartSec = "1";
++      };
++    };
++
+     # Upstream meta-asteroid: ngfd, the non graphical feedback daemon.
+     # Haptics/sounds are requested through D-Bus by the launcher and apps.
+     systemd.user.services.ngfd = {
+@@ -658,8 +727,14 @@ in
+     # Grant the same capabilities to the user manager as ambient capabilities
+     # instead: they are inherited by the launcher and do not set AT_SECURE.
+     # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
++    # Upstream supported-languages_git.bb ships a user@.service.d drop-in so
++    # the user manager reads the locale the settings app writes for ceres.
++    # Apply the same EnvironmentFile on the only user manager we run.
+     systemd.services."user@1000" = {
+       overrideStrategy = "asDropin";
++      serviceConfig.EnvironmentFile = [
++        "-/home/.system/var/lib/environment/1000/locale.conf"
++      ];
+       serviceConfig.AmbientCapabilities = [
+         "CAP_WAKE_ALARM"
+         "CAP_BLOCK_SUSPEND"
+diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
+index 02e19169..fcef9ac1 100644
+--- a/overlay/asteroidos/apps/default.nix
++++ b/overlay/asteroidos/apps/default.nix
+@@ -38,8 +38,8 @@
+   settings = mkAsteroidApp {
+     name = "settings";
+     desc = "Smartwatch preferences and configuration application";
+-    rev = "6e257e62524001d3438d3b161cbc0693afbee189";
+-    sha256 = "sha256-o/UYJmJ7xVFII2Y4B+9PPyVhJlWPsLJ3aPVNW79Cg+s=";
++    rev = "56c917fd82aa5cb1f679f424f4c226fcffd89a12";
++    sha256 = "1cbn5cg9q49ik7xwhsi4l6wph9mjxl8w5j4016rdwxq6w8y5ixx3";
+     extraBuildInputs = [
+       mce-dev
+       ngf-qt6
+diff --git a/overlay/asteroidos/assets/default.nix b/overlay/asteroidos/assets/default.nix
+index 5188043b..703662c4 100644
+--- a/overlay/asteroidos/assets/default.nix
++++ b/overlay/asteroidos/assets/default.nix
+@@ -3,6 +3,8 @@
+   stdenv,
+   fetchFromGitHub,
+   cmake,
++  buildPackages,
++  metaAsteroidSrc,
+ }:
+ 
+ rec {
+@@ -109,4 +111,86 @@ rec {
+       platforms = platforms.all;
+     };
+   };
++
++  supported-languages = stdenv.mkDerivation {
++    pname = "supported-languages";
++    version = "2.1";
++
++    src = fetchFromGitHub {
++      owner = "AsteroidOS";
++      repo = "supported-languages";
++      rev = "182c3e31a93b157eea3d51f2152d712d16c71f1a";
++      sha256 = "17kv5jfd8l0hk0x838m983kjpqv3pp52snnzqb8vmihc1968lgaw";
++    };
++
++    installPhase = ''
++      runHook preInstall
++      mkdir -p $out/share/supported-languages
++      cp *.conf $out/share/supported-languages/
++      runHook postInstall
++    '';
++
++    meta = with lib; {
++      description = "Supported locale configuration files for AsteroidOS";
++      homepage = "https://asteroidos.org/";
++      license = licenses.gpl3Plus;
++      platforms = platforms.all;
++    };
++  };
++
++  keymaps =
++    let
++      qtbase = buildPackages.qt6.qtbase;
++      kmap2qmap = buildPackages.stdenv.mkDerivation {
++        pname = "kmap2qmap";
++        inherit (buildPackages.qt6.qttools) version src;
++        patches = [
++          "${metaAsteroidSrc}/recipes-qt/qt6/qttools/0001-kmap2qmap-Map-MenuKB-key.patch"
++          "${metaAsteroidSrc}/recipes-qt/qt6/qttools/0002-kmap2qmap-Map-Sleep-key.patch"
++        ];
++        buildPhase = ''
++          runHook preBuild
++          $CXX -std=c++17 -fPIC -O2 \
++            src/kmap2qmap/main.cpp \
++            -I${qtbase}/include \
++            -I${qtbase}/include/QtCore \
++            -I${qtbase}/include/QtCore/${qtbase.version} \
++            -I${qtbase}/include/QtCore/${qtbase.version}/QtCore \
++            -I${qtbase}/include/QtGui \
++            -I${qtbase}/include/QtGui/${qtbase.version} \
++            -I${qtbase}/include/QtGui/${qtbase.version}/QtGui \
++            -I${qtbase}/include/QtInputSupport \
++            -I${qtbase}/include/QtInputSupport/${qtbase.version} \
++            -I${qtbase}/include/QtInputSupport/${qtbase.version}/QtInputSupport \
++            -L${qtbase}/lib \
++            -Wl,-rpath,${qtbase}/lib \
++            -lQt6InputSupport -lQt6Gui -lQt6Core \
++            -o kmap2qmap
++          runHook postBuild
++        '';
++        installPhase = ''
++          runHook preInstall
++          install -Dm755 kmap2qmap $out/bin/kmap2qmap
++          runHook postInstall
++        '';
++      };
++    in
++    stdenv.mkDerivation {
++      pname = "asteroid-keymaps";
++      version = "2.1";
++      dontUnpack = true;
++      nativeBuildInputs = [ kmap2qmap ];
++      installPhase = ''
++        runHook preInstall
++        mkdir -p $out/share/qt6/keymaps
++        kmap2qmap ${metaAsteroidSrc}/recipes-asteroid/asteroid-launcher/asteroid-launcher-configs/keys.kmap $out/share/qt6/keymaps/keys.qmap
++        runHook postInstall
++      '';
++      meta = with lib; {
++        description = "Hardware button keymap for AsteroidOS smartwatches";
++        homepage = "https://asteroidos.org/";
++        license = licenses.gpl3Plus;
++        platforms = platforms.all;
++      };
++    };
+ }
+diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
+index 659bf6e4..d03ede7a 100644
+--- a/overlay/asteroidos/asteroid-launcher/default.nix
++++ b/overlay/asteroidos/asteroid-launcher/default.nix
+@@ -31,8 +31,8 @@ stdenv.mkDerivation (finalAttrs: {
+   src = fetchFromGitHub {
+     owner = "AsteroidOS";
+     repo = "asteroid-launcher";
+-    rev = "4bd3d281fe3a2ea9631c640e1f00871fa19bbd4c";
+-    sha256 = "194hn7pkq100339gnavvjmyib15m557bykkyqr77jrgz0wl07bpz";
++    rev = "8fd1546de7d79da53194f62f650ed72acd306348";
++    sha256 = "0hf6mgf1n0bw6hhng8avakp64c9gywiiqpww2w2qd3caaf99nwm1";
+   };
+ 
+   strictDeps = true;
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index 8e75b57b..a50d02cd 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -109,8 +109,12 @@ rec {
+     inherit mce-dev libiphb;
+   };
+   timed-qt6 = callPackage ./timed-qt6 {
+-    inherit libiodata;
++    inherit libiodata metaAsteroidSrc;
+   };
++  nemo-qml-plugin-alarms = callPackage ./nemo-qml-plugin-alarms {
++    inherit timed-qt6;
++  };
++  nemo-qml-plugin-notifications = callPackage ./nemo-qml-plugin-notifications { };
+ 
+   # Calendar subsystem: accounts-qt, kcalendarcore, mkcal, and nemo-qml-plugin-calendar
+   # Upstream repository: https://gitlab.com/accounts-sso/accounts-qt
+@@ -158,7 +162,7 @@ rec {
+       inherit browser telegram kiwix;
+     };
+ 
+-  assets = (callPackage ./assets { }) // {
++  assets = (callPackage ./assets { inherit metaAsteroidSrc; }) // {
+     inherit virtualkeyboard;
+   };
+ 
+diff --git a/overlay/asteroidos/libiodata/default.nix b/overlay/asteroidos/libiodata/default.nix
+index 36607b9c..25646355 100644
+--- a/overlay/asteroidos/libiodata/default.nix
++++ b/overlay/asteroidos/libiodata/default.nix
+@@ -10,6 +10,7 @@
+   bison,
+   flex,
+   qt6,
++  libxcrypt,
+ }:
+ 
+ stdenv.mkDerivation (finalAttrs: {
+@@ -35,6 +36,7 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   buildInputs = [
+     qt6.qtbase
++    libxcrypt
+   ];
+ 
+   postPatch = ''
+@@ -71,6 +73,11 @@ target_link_libraries(iodata-qt6 PUBLIC Qt6::Core)
+ set_target_properties(iodata-qt6 PROPERTIES VERSION 0.20.0 SOVERSION 0)
+ 
+ install(TARGETS iodata-qt6 DESTINATION lib)
++
++add_executable(iodata-qt6-type-to-c++ type-to-cxx/type-to-cxx.cpp)
++target_link_libraries(iodata-qt6-type-to-c++ PRIVATE iodata-qt6 crypt)
++install(TARGETS iodata-qt6-type-to-c++ DESTINATION bin)
++
+ install(FILES
+   src/iodata.h
+   src/validator.h
+diff --git a/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
+new file mode 100644
+index 00000000..2d20303c
+--- /dev/null
++++ b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
+@@ -0,0 +1,131 @@
++# Nemomobile alarms QML plugin (Nemo.Alarms)
++# Upstream repository: https://github.com/sailfishos/nemo-qml-plugin-alarms
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-qml-plugins/nemo-qml-plugin-alarms_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++  timed-qt6,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "nemo-qml-plugin-alarms";
++  version = "nightly";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-qml-plugin-alarms";
++    rev = "4377d1e31a56c763ba3e2d61137f97529281c1bd";
++    sha256 = "07phqhlfkiq8fb10l7y1czfqnij2kda55jg5vx8ig92khzxj49gz";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    timed-qt6
++  ];
++
++  # Upstream is a qmake project; mirror the src/src.pro target (Qt QML plugin
++  # using the timed-qt6 and timed-voland-qt6 client libraries).
++  postPatch = ''
++    # timed-qt6 intentionally does not install src/lib/hidden/exception (a
++    # file named "exception" in the public include dir shadows the C++
++    # standard header). alarms only includes it, never uses it.
++    substituteInPlace src/alarmobject.cpp \
++      --replace "#include <timed-qt6/exception>" "#include <timed-qt6/exception.h>"
++
++    cat > CMakeLists.txt << 'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(nemoalarms LANGUAGES CXX)
++
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_CXX_STANDARD_REQUIRED ON)
++    set(CMAKE_AUTOMOC ON)
++
++    find_package(Qt6 REQUIRED COMPONENTS Core Qml DBus)
++    find_package(PkgConfig REQUIRED)
++    pkg_check_modules(TIMED REQUIRED timed-qt6)
++    pkg_check_modules(TIMED_VOLAND REQUIRED timed-voland-qt6)
++
++    set(SRC_DIR "''${CMAKE_CURRENT_SOURCE_DIR}/src")
++
++    add_library(nemoalarms MODULE
++      ''${SRC_DIR}/plugin.cpp
++      ''${SRC_DIR}/alarmsbackendmodel.cpp
++      ''${SRC_DIR}/alarmsbackendmodel_p.cpp
++      ''${SRC_DIR}/enabledalarmsproxymodel.cpp
++      ''${SRC_DIR}/alarmobject.cpp
++      ''${SRC_DIR}/alarmhandlerinterface.cpp
++      ''${SRC_DIR}/alarmdialogobject.cpp
++      ''${SRC_DIR}/alarmsettings.cpp
++      ''${SRC_DIR}/interface.cpp
++      ''${SRC_DIR}/alarmsbackendmodel.h
++      ''${SRC_DIR}/alarmsbackendmodel_p.h
++      ''${SRC_DIR}/enabledalarmsproxymodel.h
++      ''${SRC_DIR}/alarmobject.h
++      ''${SRC_DIR}/alarmhandlerinterface.h
++      ''${SRC_DIR}/alarmdialogobject.h
++      ''${SRC_DIR}/alarmsettings.h
++      ''${SRC_DIR}/interface.h
++      ''${SRC_DIR}/time_interface.cpp
++    )
++
++    target_include_directories(nemoalarms PRIVATE
++      ''${SRC_DIR}
++      ''${CMAKE_CURRENT_BINARY_DIR}
++      ''${TIMED_INCLUDE_DIRS}
++      ''${TIMED_VOLAND_INCLUDE_DIRS}
++    )
++
++    target_link_libraries(nemoalarms PRIVATE
++      Qt6::Core
++      Qt6::Qml
++      Qt6::DBus
++      ''${TIMED_LIBRARIES}
++      ''${TIMED_VOLAND_LIBRARIES}
++    )
++
++    set_target_properties(nemoalarms PROPERTIES
++      PREFIX ""
++      OUTPUT_NAME nemoalarms
++      LIBRARY_OUTPUT_DIRECTORY "''${CMAKE_CURRENT_BINARY_DIR}"
++    )
++
++    install(TARGETS nemoalarms DESTINATION lib/qt-6/qml/Nemo/Alarms)
++    install(FILES ''${SRC_DIR}/qmldir ''${SRC_DIR}/plugins.qmltypes
++      DESTINATION lib/qt-6/qml/Nemo/Alarms)
++    EOF
++  '';
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  preConfigure = ''
++    # qmake's DBUS_INTERFACES generates time_interface.h/.cpp from the
++    # introspection XML (header_flags/source_flags: -N -c TimeDaemon).
++    (cd src && ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp \
++      -p time_interface -N -c TimeDaemon com.nokia.time.xml)
++  '';
++
++  meta = with lib; {
++    description = "Nemomobile alarms QML plugin for AsteroidOS";
++    homepage = "https://github.com/sailfishos/nemo-qml-plugin-alarms";
++    license = licenses.bsd3;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
+new file mode 100644
+index 00000000..ea808abd
+--- /dev/null
++++ b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
+@@ -0,0 +1,117 @@
++# Nemomobile notifications library and QML plugin (Nemo.Notifications)
++# Upstream repository: https://github.com/sailfishos/nemo-qml-plugin-notifications
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-qml-plugins/nemo-qml-plugin-notifications_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "nemo-qml-plugin-notifications";
++  version = "nightly";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-qml-plugin-notifications";
++    rev = "d4d0a0ce8257b90293b8df469830f0e288faeeae";
++    sha256 = "0d12viyjigmz823d9ghkr7i1iifyl5vrkn2c98lw32kr4micb9nf";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++  ];
++
++  # Upstream is a qmake project: src/src.pro builds libnemonotifications-qt6
++  # and src/plugin/plugin.pro builds the Nemo.Notifications QML plugin.
++  postPatch = ''
++    cat > CMakeLists.txt << 'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(nemonotifications LANGUAGES CXX)
++
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_CXX_STANDARD_REQUIRED ON)
++    set(CMAKE_AUTOMOC ON)
++
++    find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml DBus)
++
++    set(SRC_DIR "''${CMAKE_CURRENT_SOURCE_DIR}/src")
++
++    add_library(nemonotifications-qt6 SHARED
++      ''${SRC_DIR}/notification.cpp
++      ''${SRC_DIR}/notificationmanagerproxy.cpp
++      ''${SRC_DIR}/notification.h
++      ''${SRC_DIR}/notification_p.h
++      ''${SRC_DIR}/notificationmanagerproxy.h
++      ''${SRC_DIR}/notificationexport.h
++    )
++    target_compile_definitions(nemonotifications-qt6 PRIVATE
++      BUILD_NEMO_QML_PLUGIN_NOTIFICATIONS_LIB)
++    target_include_directories(nemonotifications-qt6 PUBLIC
++      ''${SRC_DIR}
++      ''${CMAKE_CURRENT_BINARY_DIR})
++    target_link_libraries(nemonotifications-qt6 PUBLIC Qt6::Core Qt6::Gui Qt6::DBus)
++    set_target_properties(nemonotifications-qt6 PROPERTIES
++      OUTPUT_NAME nemonotifications-qt6)
++
++    add_library(nemonotifications MODULE ''${SRC_DIR}/plugin/plugin.cpp)
++    target_include_directories(nemonotifications PRIVATE
++      ''${SRC_DIR}
++      ''${CMAKE_CURRENT_BINARY_DIR})
++    target_link_libraries(nemonotifications PRIVATE
++      nemonotifications-qt6
++      Qt6::Core
++      Qt6::Qml
++      Qt6::DBus)
++    set_target_properties(nemonotifications PROPERTIES
++      PREFIX ""
++      OUTPUT_NAME nemonotifications)
++
++    install(TARGETS nemonotifications-qt6 DESTINATION lib)
++    install(TARGETS nemonotifications DESTINATION lib/qt-6/qml/Nemo/Notifications)
++    install(FILES
++      ''${SRC_DIR}/plugin/qmldir
++      ''${SRC_DIR}/plugin/plugins.qmltypes
++      DESTINATION lib/qt-6/qml/Nemo/Notifications)
++    install(FILES
++      ''${SRC_DIR}/notification.h
++      ''${SRC_DIR}/notification_p.h
++      ''${SRC_DIR}/notificationexport.h
++      DESTINATION include/nemonotifications-qt6)
++    EOF
++  '';
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  preConfigure = ''
++    # Upstream src.pro generates the proxy through qdbusxml2cpp with
++    # QT_HOST_BINS; do the same explicitly for cross builds.
++    (cd src && ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp \
++      -p notificationmanagerproxy -c NotificationManagerProxy -i notification_p.h \
++      org.freedesktop.Notifications.xml)
++  '';
++
++  meta = with lib; {
++    description = "Nemomobile notifications library and QML plugin for AsteroidOS";
++    homepage = "https://github.com/sailfishos/nemo-qml-plugin-notifications";
++    license = licenses.bsd3;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
+index acffe994..9f31293c 100644
+--- a/overlay/asteroidos/timed-qt6/default.nix
++++ b/overlay/asteroidos/timed-qt6/default.nix
+@@ -1,4 +1,4 @@
+-# Timed Qt6 client library interface
++# Timed Qt6 daemon, Voland client library, and Timed client library
+ # Upstream repository: https://github.com/sailfishos/timed
+ # Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/timed
+ {
+@@ -8,9 +8,16 @@
+   cmake,
+   pkg-config,
+   qt6,
++  systemd,
+   libiodata,
++  buildPackages,
++  metaAsteroidSrc,
+ }:
+ 
++let
++  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
++  nativeIodata = if isCross then buildPackages.callPackage ../libiodata { } else libiodata;
++in
+ stdenv.mkDerivation (finalAttrs: {
+   pname = "timed-qt6";
+   version = "3.6.0";
+@@ -24,26 +31,39 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   strictDeps = true;
+ 
++  patches = [
++    "${metaAsteroidSrc}/recipes-nemomobile/timed/timed/0002-Drop-sailfish-access-control-dependency.patch"
++  ];
++
+   nativeBuildInputs = [
+     cmake
+     pkg-config
+     qt6.wrapQtAppsHook
++    nativeIodata
+   ];
+ 
+   buildInputs = [
+     qt6.qtbase
++    systemd
+     libiodata
+   ];
+ 
++  # timed-qt6.pc Requires iodata-qt6, so consumers need its pkg-config file.
++  propagatedBuildInputs = [ libiodata ];
++
+   preConfigure = ''
+-    mkdir -p include/timed-qt6
++    mkdir -p include/timed-qt6 include/timed-voland-qt6
+     cp src/lib/*.h include/timed-qt6/
+     cp src/lib/event src/lib/interface src/lib/wallclock src/lib/qmacro include/timed-qt6/
++    cp src/voland/reminder src/voland/interface src/voland/ta_interface src/voland/reminder.h src/voland/interface.h include/timed-voland-qt6/
+     # NOTE: src/lib/hidden/exception is a qmake-only shim that makes the
+     # in-tree "#include <exception>" resolve to timed-qt6/exception.h. Do not
+     # install it: the public include dir is passed as -I to all consumers, and
+     # a file named "exception" there shadows the C++ standard <exception>
+     # header (breaking std::exception_ptr / <future> in every dependent).
++    for t in queue config settings customization tzdata; do
++      iodata-qt6-type-to-c++ src/server/$t.type -o src/server/iodata_$t.cpp -d src/server/$t.type.h
++    done
+   '';
+ 
+   postPatch = ''
+@@ -56,8 +76,10 @@ set(CMAKE_AUTOMOC ON)
+ find_package(Qt6 REQUIRED COMPONENTS Core DBus)
+ find_package(PkgConfig REQUIRED)
+ pkg_check_modules(IODATA REQUIRED iodata-qt6)
++pkg_check_modules(SYSTEMD REQUIRED libsystemd)
+ 
+ set(LIB_SRC
++  src/lib/interface.h
+   src/lib/interface.cpp
+   src/lib/event-io.cpp
+   src/lib/event-pimple.cpp
+@@ -79,12 +101,121 @@ target_include_directories(timed-qt6 PUBLIC
+ target_link_libraries(timed-qt6 PUBLIC Qt6::Core Qt6::DBus ''${IODATA_LIBRARIES} rt)
+ set_target_properties(timed-qt6 PROPERTIES VERSION 3.6.0 SOVERSION 3)
+ 
+-install(TARGETS timed-qt6 DESTINATION lib)
++set(VOLAND_SRC
++  src/voland/interface.h
++  src/voland/reminder.h
++  src/voland/interface.cpp
++  src/voland/reminder-pimple.cpp
++)
++
++add_library(timed-voland-qt6 SHARED ''${VOLAND_SRC})
++target_include_directories(timed-voland-qt6 PUBLIC
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/include>
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/src/voland>
++  $<INSTALL_INTERFACE:include/timed-voland-qt6>
++)
++target_link_libraries(timed-voland-qt6 PUBLIC Qt6::Core Qt6::DBus timed-qt6)
++set_target_properties(timed-voland-qt6 PROPERTIES VERSION 0.3.6 SOVERSION 0)
++
++set(SERVER_SRC
++  src/server/tzdata.h
++  src/server/cellular.h
++  src/server/settings.h
++  src/server/csd.h
++  src/server/adaptor.h
++  src/server/timed.h
++  src/server/state.h
++  src/server/cluster.h
++  src/server/machine.h
++  src/server/singleshot.h
++  src/server/pinguin.h
++  src/server/unix-signal.h
++  src/server/networktime.h
++  src/server/networktimewatcher.h
++  src/server/networkoperator.h
++  src/server/networkregistrationwatcher.h
++  src/server/networktimeinfo.h
++  src/server/ofonomodemmanager.h
++  src/server/modemwatcher.h
++  src/server/ofonoconstants.h
++  src/server/ntpcontroller.h
++  src/server/credentials.h
++  src/server/tz.h
++  src/server/notification.h
++  src/server/tzdata.cpp
++  src/server/cellular.cpp
++  src/server/csd.cpp
++  src/server/cluster.cpp
++  src/server/machine.cpp
++  src/server/state.cpp
++  src/server/main.cpp
++  src/server/timed.cpp
++  src/server/timeutil.cpp
++  src/server/event.cpp
++  src/server/misc.cpp
++  src/server/settings.cpp
++  src/server/pinguin.cpp
++  src/server/unix-signal.cpp
++  src/server/networktime.cpp
++  src/server/networktimewatcher.cpp
++  src/server/networkoperator.cpp
++  src/server/networkregistrationwatcher.cpp
++  src/server/networktimeinfo.cpp
++  src/server/ofonomodemmanager.cpp
++  src/server/modemwatcher.cpp
++  src/server/ofonoconstants.cpp
++  src/server/ntpcontroller.cpp
++  src/server/credentials.cpp
++  src/server/olson.cpp
++  src/server/tz.cpp
++  src/server/notification.cpp
++  src/server/iodata_queue.cpp
++  src/server/iodata_config.cpp
++  src/server/iodata_settings.cpp
++  src/server/iodata_customization.cpp
++  src/server/iodata_tzdata.cpp
++)
++
++add_executable(timed ''${SERVER_SRC})
++target_include_directories(timed PRIVATE
++  ''${CMAKE_CURRENT_SOURCE_DIR}
++  ''${CMAKE_CURRENT_SOURCE_DIR}/include
++  ''${CMAKE_CURRENT_SOURCE_DIR}/src/server
++  ''${CMAKE_CURRENT_SOURCE_DIR}/src/lib
++  ''${CMAKE_CURRENT_SOURCE_DIR}/src/voland
++  ''${IODATA_INCLUDE_DIRS}
++  ''${SYSTEMD_INCLUDE_DIRS}
++)
++target_link_libraries(timed PRIVATE
++  timed-qt6
++  timed-voland-qt6
++  Qt6::Core
++  Qt6::DBus
++  ''${IODATA_LIBRARIES}
++  ''${SYSTEMD_LIBRARIES}
++)
++
++add_executable(timedclient-qt6 tools/timedclient/timedclient.cpp)
++target_include_directories(timedclient-qt6 PRIVATE
++  ''${CMAKE_CURRENT_SOURCE_DIR}/include
++  ''${CMAKE_CURRENT_SOURCE_DIR}/src/lib
++)
++target_link_libraries(timedclient-qt6 PRIVATE timed-qt6 Qt6::Core Qt6::DBus)
++
++install(TARGETS timed-qt6 timed-voland-qt6 DESTINATION lib)
++install(TARGETS timed timedclient-qt6 DESTINATION bin)
+ file(GLOB HEADERS "include/timed-qt6/*")
+ install(FILES ''${HEADERS} DESTINATION include/timed-qt6)
++file(GLOB VOLAND_HEADERS "include/timed-voland-qt6/*")
++install(FILES ''${VOLAND_HEADERS} DESTINATION include/timed-voland-qt6)
+ 
+ configure_file(timed-qt6.pc.in timed-qt6.pc @ONLY)
+-install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/timed-qt6.pc DESTINATION lib/pkgconfig)
++configure_file(timed-voland-qt6.pc.in timed-voland-qt6.pc @ONLY)
++install(FILES
++  ''${CMAKE_CURRENT_BINARY_DIR}/timed-qt6.pc
++  ''${CMAKE_CURRENT_BINARY_DIR}/timed-voland-qt6.pc
++  DESTINATION lib/pkgconfig
++)
+ EOF
+ 
+     cat << "EOF" > timed-qt6.pc.in
+@@ -98,12 +229,32 @@ Description: Timed Qt6 client library
+ Version: 3.6.0
+ Requires: Qt6Core Qt6DBus iodata-qt6
+ Libs: -L''${libdir} -ltimed-qt6
+-Cflags: -I''${includedir}
++Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
+ EOF
++
++    cat << "EOF" > timed-voland-qt6.pc.in
++prefix=@CMAKE_INSTALL_PREFIX@
++exec_prefix=''${prefix}
++libdir=''${prefix}/lib
++includedir=''${prefix}/include/timed-voland-qt6
++
++Name: timed-voland-qt6
++Description: Timed Voland Qt6 communication library
++Version: 3.6.0
++Requires: Qt6Core Qt6DBus timed-qt6
++Libs: -L''${libdir} -ltimed-voland-qt6
++Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
++EOF
++  '';
++
++  postInstall = ''
++    install -Dm644 ${finalAttrs.src}/src/server/timed.rc $out/etc/timed.rc
++    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/timed/timed/timed.conf $out/share/dbus-1/system.d/timed.conf
++    install -Dm644 ${finalAttrs.src}/src/server/timed.service $out/lib/systemd/user/timed.service
+   '';
+ 
+   meta = with lib; {
+-    description = "Time daemon Qt6 client library";
++    description = "Nemomobile time daemon and Qt6 client libraries";
+     homepage = "https://github.com/sailfishos/timed";
+     license = licenses.lgpl21Plus;
+     platforms = platforms.linux;

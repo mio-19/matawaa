@@ -65,6 +65,9 @@ twenty48 = mkAsteroidApp {
 | **`asteroid-btsyncd`** | `AsteroidOS/asteroid-btsyncd` | BLE sync daemon communicating with AsteroidOS Sync companion app |
 | **`amber-mpris`** | `sailfishos/amber-mpris` | D-Bus MPRIS remote media control bindings |
 | **`mlite`** | `sailfishos/mlite` | Lightweight dconf / GSettings integration for Qt |
+| **`timed`** | `sailfishos/timed` | Alarm/clock daemon with the `voland` client library, backing Nemo.Alarms |
+| **`nemo-qml-plugin-alarms`** | `sailfishos/nemo-qml-plugin-alarms` | `Nemo.Alarms` QML bindings used by the clock and alarm presenters |
+| **`nemo-qml-plugin-notifications`** | `sailfishos/nemo-qml-plugin-notifications` | `Nemo.Notifications` QML bindings for toast notifications |
 | **`virtualkeyboard`**| Custom overlay | Touch keyboard input method engine with RIME Chinese layout support and watch style |
 | **`msm-fb-refresher`** | `AsteroidOS/msm-fb-refresher` | Refresh synchronization daemon for Qualcomm MSM display panels |
 
