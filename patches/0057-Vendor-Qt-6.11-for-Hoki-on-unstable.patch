@@ -1,16 +1,13 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
-Date: Sat, 31 Oct 2026 19:19:27 +1100
-Subject: [PATCH] Use unstable packages with vendored Qt 6.11
+Date: Sat, 31 Oct 2026 19:26:49 +1100
+Subject: [PATCH] Vendor Qt 6.11 for Hoki on unstable
 
 ---
- devices/families/asteroidos.nix               |   6 +-
  examples/asteroid/asteroid-desktop.nix        |   6 +-
- .../scripted-installer/automated-installer.rb |   2 +-
- modules/watch-power.nix                       |   6 +-
- npins/sources.json                            |   8 +-
+ .../scripted-installer/automated-installer.rb |   5 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   2 +-
- overlay/cross-compile.nix                     |  37 +-
+ overlay/cross-compile.nix                     |  16 +-
  overlay/vendor/qt-6.11/README.md              |  14 +
  overlay/vendor/qt-6.11/default.nix            | 160 +++++++
  overlay/vendor/qt-6.11/fetch.sh               |   1 +
@@ -81,7 +78,7 @@ Subject: [PATCH] Use unstable packages with vendored Qt 6.11
  overlay/vendor/qt-6.11/qt-env.nix             |  34 ++
  overlay/vendor/qt-6.11/qtModule.nix           |  95 +++++
  overlay/vendor/qt-6.11/srcs.nix               | 342 +++++++++++++++
- 77 files changed, 2919 insertions(+), 42 deletions(-)
+ 74 files changed, 2911 insertions(+), 12 deletions(-)
  create mode 100644 overlay/vendor/qt-6.11/README.md
  create mode 100644 overlay/vendor/qt-6.11/default.nix
  create mode 100644 overlay/vendor/qt-6.11/fetch.sh
@@ -153,23 +150,6 @@ Subject: [PATCH] Use unstable packages with vendored Qt 6.11
  create mode 100644 overlay/vendor/qt-6.11/qtModule.nix
  create mode 100644 overlay/vendor/qt-6.11/srcs.nix
 
-diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index b37a17d8..125847b0 100644
---- a/devices/families/asteroidos.nix
-+++ b/devices/families/asteroidos.nix
-@@ -182,9 +182,9 @@ in
- 
-   # Persist the journal and coredumps only for stage1 debug/ssh bring-up;
-   # production watches keep the volatile journal to avoid eMMC/UFS writes.
--  services.journald = mkIf journalCfg.enable {
--    storage = lib.mkForce "persistent";
--    extraConfig = "SystemMaxUse=64M";
-+  services.journald.settings.Journal = mkIf journalCfg.enable {
-+    Storage = lib.mkForce "persistent";
-+    SystemMaxUse = "64M";
-   };
- 
-   # systemd-coredump writes external files for the launcher/compositor
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 index cb1b0dcb..fd191102 100644
 --- a/examples/asteroid/asteroid-desktop.nix
@@ -195,55 +175,22 @@ index cb1b0dcb..fd191102 100644
          "${pkgs.asteroid.mce-qt6}/lib/qt-6/qml"
          "${pkgs.asteroid.mlite}/lib/qt-6/qml"
 diff --git a/examples/installer/pkgs/scripted-installer/automated-installer.rb b/examples/installer/pkgs/scripted-installer/automated-installer.rb
-index 431bead7..10908c9a 100644
+index b189c9bb..10908c9a 100644
 --- a/examples/installer/pkgs/scripted-installer/automated-installer.rb
 +++ b/examples/installer/pkgs/scripted-installer/automated-installer.rb
-@@ -105,7 +105,7 @@ end
+@@ -103,10 +103,9 @@ end
+ 
+ # Override work that would be done by <nixpkgs/nixos/modules/services/misc/nix-daemon.nix>
  # See also `nix.nixPath` option, which uses `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos`
- # Keep installed systems on the same nixpkgs branch as the image builds.
+-# We only support `nixos-unstable`.
+-# We don't publish "known good" channel releases yet for Mobile NixOS.
++# Keep installed systems on the same nixpkgs branch as the image builds.
  channels = [
--  ["https://github.com/NixOS/nixpkgs/archive/refs/heads/nixos-26.05.tar.gz", "nixos"],
+-  ["https://nixos.org/channels/nixos-unstable", "nixos"],
 +  ["https://github.com/NixOS/nixpkgs/archive/refs/heads/nixpkgs-unstable.tar.gz", "nixos"],
    ["https://github.com/mobile-nixos/mobile-nixos/archive/refs/heads/development.tar.gz", "mobile-nixos"],
  ].map{|pair| pair.join(" ") }.join("\n")
  File.write(File.join(MOUNT_POINT, "/root/.nix-channels"), channels)
-diff --git a/modules/watch-power.nix b/modules/watch-power.nix
-index 21807cee..5b936f61 100644
---- a/modules/watch-power.nix
-+++ b/modules/watch-power.nix
-@@ -39,9 +39,9 @@ in
- 
-     # Systemd journal volatile storage reduces write cycles on watch eMMC/UFS storage
-     # and saves flash controller power draw.
--    services.journald = {
--      storage = "volatile";
--      extraConfig = "RuntimeMaxUse=16M";
-+    services.journald.settings.Journal = {
-+      Storage = "volatile";
-+      RuntimeMaxUse = "16M";
-     };
- 
-     # Sysctl kernel tuning for battery life and wrist devices
-diff --git a/npins/sources.json b/npins/sources.json
-index dba66e0c..4fd0337c 100644
---- a/npins/sources.json
-+++ b/npins/sources.json
-@@ -7,11 +7,11 @@
-         "owner": "NixOS",
-         "repo": "nixpkgs"
-       },
--      "branch": "nixos-26.05",
--      "revision": "6f06d204d8f2d8761d9da78778745974a3216381",
--      "url": "https://github.com/NixOS/nixpkgs/archive/6f06d204d8f2d8761d9da78778745974a3216381.tar.gz",
-+      "branch": "nixpkgs-unstable",
-+      "revision": "885ba4d038f10c3d17d7a92e8c3cc185b99c9158",
-+      "url": "https://github.com/NixOS/nixpkgs/archive/885ba4d038f10c3d17d7a92e8c3cc185b99c9158.tar.gz",
-       "submodules": false,
--      "hash": "sha256-loLMnbbS4KhmG2ln9EY6f0YMNCA273Yx02oWYQ9IMeE="
-+      "hash": "sha256-e/yiZ31gXRROBDcnOtT3YwDQ73NVG9Cepccbt86LIn8="
-     }
-   },
-   "version": 8
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 index b4cd0f72..c8d6dc03 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
@@ -258,7 +205,7 @@ index b4cd0f72..c8d6dc03 100644
  <RCC>
      <qresource prefix="/qt-project.org/imports/Qt5Compat/GraphicalEffects">
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index 2d7b2966..dbc09ffd 100644
+index a5c80f3d..dbc09ffd 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -1,8 +1,8 @@
@@ -287,27 +234,15 @@ index 2d7b2966..dbc09ffd 100644
  else
    let
      # Pinned revision of AsteroidOS meta-asteroid used as the source for
-@@ -97,19 +102,9 @@ else
+@@ -96,6 +101,7 @@ else
+             withLibBPF = false;
            }
          );
- 
--    # Mbed TLS 3.6.6's ARM AES/GCM code triggers GCC 15's array-bounds
--    # diagnostic in its bytewise XOR helper. The package enables -Werror,
--    # so keep that compiler warning non-fatal for this cross-built package.
--    mbedtls = super.mbedtls.overrideAttrs (old: {
--      env = (old.env or { }) // {
--        NIX_CFLAGS_COMPILE = ((old.env or { }).NIX_CFLAGS_COMPILE or "") + " -Wno-error=array-bounds";
--      };
--    });
--
++
    in
    {
      inherit systemd257;
--    inherit mbedtls;
-     # Keep the patched systemd 262 for old kernels available for debugging
-     # or fallback even when the legacy profile selects systemd 257.
-     systemd262oldkernel = systemd262OldKernel;
-@@ -133,7 +128,7 @@ else
+@@ -122,7 +128,7 @@ else
  
      # Upstream nixpkgs Qt6 modules skip QtQuick integration during cross-compilation
      # because cross Qt6QuickTools, Qt6QmlTools, and Qt6ShaderToolsTools cmake flags are missing.
@@ -316,25 +251,6 @@ index 2d7b2966..dbc09ffd 100644
        qfinal: qsuper: {
          # Upstream AsteroidOS builds Qt without desktop GL on hybris machines:
          # meta-asteroid/recipes-qt/qt6/qtbase_git.bbappend does
-@@ -364,18 +359,6 @@ else
-     # Smartwatches do not use InfiniBand, so disable RDMA.
-     libpcap = super.libpcap.override { withRdma = false; };
- 
--    # x265 4.2 in nixpkgs contains an obsolete patch for 32-bit ARM that was
--    # already incorporated upstream, causing patch rejects during cross builds.
--    x265 = (super.x265.override {
--      # The command-line encoder fails to link its ARM NEON test symbols.
--      # FFmpeg uses the shared library and does not need this executable.
--      cliSupport = false;
--    }).overrideAttrs (old: {
--      patches = super.lib.filter (p: !(super.lib.hasInfix "raw" (builtins.baseNameOf (toString p)))) (
--        old.patches or [ ]
--      );
--    });
--
-     # Skia gnFlags cpu mapping expects "arm" instead of "armv7l".
-     # Reference: https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/sk/skia/package.nix
-     skia = super.skia.override {
 diff --git a/overlay/vendor/qt-6.11/README.md b/overlay/vendor/qt-6.11/README.md
 new file mode 100644
 index 00000000..f9b7b01f

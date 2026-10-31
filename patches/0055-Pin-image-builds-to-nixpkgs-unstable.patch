@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
-Date: Sat, 31 Oct 2026 00:06:08 +1100
-Subject: [PATCH] Pin image builds to staging-26.05 for Qt 6.11.3
+Date: Sat, 31 Oct 2026 19:26:09 +1100
+Subject: [PATCH] Pin image builds to nixpkgs-unstable
 
 ---
  npins/sources.json | 16 +++++++++++-----
@@ -9,7 +9,7 @@ Subject: [PATCH] Pin image builds to staging-26.05 for Qt 6.11.3
  2 files changed, 15 insertions(+), 16 deletions(-)
 
 diff --git a/npins/sources.json b/npins/sources.json
-index b8ea3558..5de2861a 100644
+index b8ea3558..4fd0337c 100644
 --- a/npins/sources.json
 +++ b/npins/sources.json
 @@ -1,11 +1,17 @@
@@ -27,11 +27,11 @@ index b8ea3558..5de2861a 100644
 +        "owner": "NixOS",
 +        "repo": "nixpkgs"
 +      },
-+      "branch": "staging-26.05",
-+      "revision": "141fd3604320e9250ae88d93ca306ae4db0e5aa9",
-+      "url": "https://github.com/NixOS/nixpkgs/archive/141fd3604320e9250ae88d93ca306ae4db0e5aa9.tar.gz",
++      "branch": "nixpkgs-unstable",
++      "revision": "885ba4d038f10c3d17d7a92e8c3cc185b99c9158",
++      "url": "https://github.com/NixOS/nixpkgs/archive/885ba4d038f10c3d17d7a92e8c3cc185b99c9158.tar.gz",
 +      "submodules": false,
-+      "hash": "sha256-o73IL5zqycdwz4gTesIwNHMT4UEjwrFxLmBOQ9IFONE="
++      "hash": "sha256-e/yiZ31gXRROBDcnOtT3YwDQ73NVG9Cepccbt86LIn8="
      }
    },
    "version": 8

@@ -7,18 +7,18 @@ Add overlay/cross-compile.nix, which fixes package builds for 32-bit
 ARMv7 wearable targets, and overlay/default.nix to compose the base
 Mobile-NixOS overlay with the cross-compilation hooks.
 ---
- overlay/cross-compile.nix | 311 ++++++++++++++++++++++++++++++++++++++
+ overlay/cross-compile.nix | 303 ++++++++++++++++++++++++++++++++++++++
  overlay/default.nix       |   8 +
- 2 files changed, 319 insertions(+)
+ 2 files changed, 311 insertions(+)
  create mode 100644 overlay/cross-compile.nix
  create mode 100644 overlay/default.nix
 
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
 new file mode 100644
-index 00000000..522bf6a7
+index 00000000..8398b22f
 --- /dev/null
 +++ b/overlay/cross-compile.nix
-@@ -0,0 +1,311 @@
+@@ -0,0 +1,303 @@
 +# Overlays and package workarounds that only make sense during cross-compilation.
 +#
 +# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
@@ -286,14 +286,6 @@ index 00000000..522bf6a7
 +    # on 32-bit ARM due to CMake Python host/target architecture checks.
 +    # Smartwatches do not use InfiniBand, so disable RDMA.
 +    libpcap = super.libpcap.override { withRdma = false; };
-+
-+    # x265 4.2 in nixpkgs contains an obsolete patch for 32-bit ARM that was
-+    # already incorporated upstream, causing patch rejects during cross builds.
-+    x265 = super.x265.overrideAttrs (old: {
-+      patches = super.lib.filter (p: !(super.lib.hasInfix "raw" (builtins.baseNameOf (toString p)))) (
-+        old.patches or [ ]
-+      );
-+    });
 +
 +    # Skia gnFlags cpu mapping expects "arm" instead of "armv7l".
 +    # Reference: https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/sk/skia/package.nix
