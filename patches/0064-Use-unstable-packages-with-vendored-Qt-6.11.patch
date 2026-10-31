@@ -1,0 +1,3651 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 31 Oct 2026 19:19:27 +1100
+Subject: [PATCH] Use unstable packages with vendored Qt 6.11
+
+---
+ devices/families/asteroidos.nix               |   6 +-
+ examples/asteroid/asteroid-desktop.nix        |   6 +-
+ .../scripted-installer/automated-installer.rb |   2 +-
+ modules/watch-power.nix                       |   6 +-
+ npins/sources.json                            |   8 +-
+ .../qt6-qpa-hwcomposer-plugin/default.nix     |   2 +-
+ overlay/cross-compile.nix                     |  37 +-
+ overlay/vendor/qt-6.11/README.md              |  14 +
+ overlay/vendor/qt-6.11/default.nix            | 160 +++++++
+ overlay/vendor/qt-6.11/fetch.sh               |   1 +
+ .../vendor/qt-6.11/hooks/fix-qmake-libtool.sh |  25 ++
+ .../qt-6.11/hooks/fix-qt-builtin-paths.sh     |  63 +++
+ .../qt-6.11/hooks/fix-qt-module-paths.sh      |  27 ++
+ overlay/vendor/qt-6.11/hooks/qmake-hook.sh    |  43 ++
+ .../vendor/qt-6.11/hooks/qtbase-setup-hook.sh | 102 +++++
+ .../vendor/qt-6.11/hooks/wrap-qt-apps-hook.sh | 110 +++++
+ overlay/vendor/qt-6.11/modules/qt3d.nix       |  31 ++
+ overlay/vendor/qt-6.11/modules/qt5compat.nix  |  21 +
+ .../allow-translations-outside-prefix.patch   |  11 +
+ .../vendor/qt-6.11/modules/qtbase/default.nix | 392 ++++++++++++++++++
+ .../derive-plugin-load-path-from-PATH.patch   |  18 +
+ .../qtbase/find-qmlimportscanner.patch        |  13 +
+ .../qt-6.11/modules/qtbase/no-sbom.patch      |  13 +
+ .../qtbase/qmake-always-use-libname.patch     |  28 ++
+ .../modules/qtbase/qmake-fix-includedir.patch |  12 +
+ .../qtbase/qmlimportscanner-import-path.patch |  16 +
+ .../qtbase/skip-missing-qml-directory.patch   |  17 +
+ .../modules/qtbase/use-cmake-from-path.patch  |  34 ++
+ .../modules/qtbase/use-cmake-path.patch       |  60 +++
+ overlay/vendor/qt-6.11/modules/qtcharts.nix   |  13 +
+ .../vendor/qt-6.11/modules/qtconnectivity.nix |  23 +
+ .../vendor/qt-6.11/modules/qtdatavis3d.nix    |  13 +
+ .../qt-6.11/modules/qtdeclarative/default.nix |  62 +++
+ .../dont-cache-nix-store-paths.patch          |  17 +
+ .../use-versioned-import-path.patch           |  14 +
+ overlay/vendor/qt-6.11/modules/qtdoc.nix      |  22 +
+ overlay/vendor/qt-6.11/modules/qtgraphs.nix   |  17 +
+ overlay/vendor/qt-6.11/modules/qtgrpc.nix     |  20 +
+ .../vendor/qt-6.11/modules/qthttpserver.nix   |  13 +
+ .../vendor/qt-6.11/modules/qtimageformats.nix |  19 +
+ .../qt-6.11/modules/qtlanguageserver.nix      |  12 +
+ overlay/vendor/qt-6.11/modules/qtlocation.nix |  15 +
+ overlay/vendor/qt-6.11/modules/qtlottie.nix   |  13 +
+ overlay/vendor/qt-6.11/modules/qtmqtt.nix     |  19 +
+ .../qt-6.11/modules/qtmultimedia/default.nix  |  77 ++++
+ .../windows-no-uppercase-libs.patch           |  11 +
+ .../windows-resolve-function-name.patch       |  28 ++
+ .../vendor/qt-6.11/modules/qtnetworkauth.nix  |   6 +
+ .../vendor/qt-6.11/modules/qtpositioning.nix  |  19 +
+ overlay/vendor/qt-6.11/modules/qtquick3d.nix  |  15 +
+ .../qt-6.11/modules/qtquick3dphysics.nix      |  16 +
+ .../qt-6.11/modules/qtquickeffectmaker.nix    |  14 +
+ .../qt-6.11/modules/qtquicktimeline.nix       |  13 +
+ .../qt-6.11/modules/qtremoteobjects.nix       |  13 +
+ overlay/vendor/qt-6.11/modules/qtscxml.nix    |  13 +
+ overlay/vendor/qt-6.11/modules/qtsensors.nix  |  15 +
+ .../vendor/qt-6.11/modules/qtserialbus.nix    |  14 +
+ .../vendor/qt-6.11/modules/qtserialport.nix   |  14 +
+ .../vendor/qt-6.11/modules/qtshadertools.nix  |  16 +
+ overlay/vendor/qt-6.11/modules/qtspeech.nix   |  25 ++
+ overlay/vendor/qt-6.11/modules/qtsvg.nix      |  27 ++
+ .../qt-6.11/modules/qttools/default.nix       |  53 +++
+ .../vendor/qt-6.11/modules/qttranslations.nix |  12 +
+ .../qt-6.11/modules/qtvirtualkeyboard.nix     |  19 +
+ overlay/vendor/qt-6.11/modules/qtwayland.nix  |  30 ++
+ .../vendor/qt-6.11/modules/qtwebchannel.nix   |  17 +
+ .../qt-6.11/modules/qtwebengine/default.nix   | 294 +++++++++++++
+ .../qtwebengine/gn-object-sorted.patch        |  32 ++
+ .../modules/qtwebengine/link-pulseaudio.patch |  12 +
+ .../modules/qtwebengine/locales-path.patch    |  13 +
+ .../modules/qtwebengine/split-prefix.patch    |  60 +++
+ .../modules/qtwebengine/xkb-includes.patch    |  12 +
+ .../vendor/qt-6.11/modules/qtwebsockets.nix   |  15 +
+ overlay/vendor/qt-6.11/modules/qtwebview.nix  |  15 +
+ overlay/vendor/qt-6.11/qt-env.nix             |  34 ++
+ overlay/vendor/qt-6.11/qtModule.nix           |  95 +++++
+ overlay/vendor/qt-6.11/srcs.nix               | 342 +++++++++++++++
+ 77 files changed, 2919 insertions(+), 42 deletions(-)
+ create mode 100644 overlay/vendor/qt-6.11/README.md
+ create mode 100644 overlay/vendor/qt-6.11/default.nix
+ create mode 100644 overlay/vendor/qt-6.11/fetch.sh
+ create mode 100644 overlay/vendor/qt-6.11/hooks/fix-qmake-libtool.sh
+ create mode 100644 overlay/vendor/qt-6.11/hooks/fix-qt-builtin-paths.sh
+ create mode 100644 overlay/vendor/qt-6.11/hooks/fix-qt-module-paths.sh
+ create mode 100644 overlay/vendor/qt-6.11/hooks/qmake-hook.sh
+ create mode 100644 overlay/vendor/qt-6.11/hooks/qtbase-setup-hook.sh
+ create mode 100644 overlay/vendor/qt-6.11/hooks/wrap-qt-apps-hook.sh
+ create mode 100644 overlay/vendor/qt-6.11/modules/qt3d.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qt5compat.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/allow-translations-outside-prefix.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/default.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/derive-plugin-load-path-from-PATH.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/find-qmlimportscanner.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/no-sbom.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/qmake-always-use-libname.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/qmake-fix-includedir.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/qmlimportscanner-import-path.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/skip-missing-qml-directory.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/use-cmake-from-path.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtbase/use-cmake-path.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtcharts.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtconnectivity.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtdatavis3d.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtdeclarative/default.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtdeclarative/dont-cache-nix-store-paths.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtdeclarative/use-versioned-import-path.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtdoc.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtgraphs.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtgrpc.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qthttpserver.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtimageformats.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtlanguageserver.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtlocation.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtlottie.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtmqtt.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtmultimedia/default.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtmultimedia/windows-no-uppercase-libs.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtmultimedia/windows-resolve-function-name.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtnetworkauth.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtpositioning.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtquick3d.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtquick3dphysics.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtquickeffectmaker.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtquicktimeline.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtremoteobjects.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtscxml.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtsensors.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtserialbus.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtserialport.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtshadertools.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtspeech.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtsvg.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qttools/default.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qttranslations.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtvirtualkeyboard.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwayland.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwebchannel.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwebengine/default.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwebengine/gn-object-sorted.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwebengine/link-pulseaudio.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwebengine/locales-path.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwebengine/split-prefix.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwebengine/xkb-includes.patch
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwebsockets.nix
+ create mode 100644 overlay/vendor/qt-6.11/modules/qtwebview.nix
+ create mode 100644 overlay/vendor/qt-6.11/qt-env.nix
+ create mode 100644 overlay/vendor/qt-6.11/qtModule.nix
+ create mode 100644 overlay/vendor/qt-6.11/srcs.nix
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index b37a17d8..125847b0 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -182,9 +182,9 @@ in
+ 
+   # Persist the journal and coredumps only for stage1 debug/ssh bring-up;
+   # production watches keep the volatile journal to avoid eMMC/UFS writes.
+-  services.journald = mkIf journalCfg.enable {
+-    storage = lib.mkForce "persistent";
+-    extraConfig = "SystemMaxUse=64M";
++  services.journald.settings.Journal = mkIf journalCfg.enable {
++    Storage = lib.mkForce "persistent";
++    SystemMaxUse = "64M";
+   };
+ 
+   # systemd-coredump writes external files for the launcher/compositor
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index cb1b0dcb..fd191102 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -96,8 +96,8 @@ in
+         asteroid.nemo-qml-plugin-alarms
+         asteroid.nemo-qml-plugin-notifications
+         asteroid.timed-qt6
+-        # QML module the launcher imports; the cross qt5compat lacks it.
+-        qt5compatQml
++        # Qt5Compat QML module used by the launcher.
++        qt6.qt5compat
+         # Asset suite
+         asteroid.assets.wallpapers
+         asteroid.assets.sounds
+@@ -543,7 +543,7 @@ in
+       QML2_IMPORT_PATH = lib.concatStringsSep ":" [
+         "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml"
+         "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml"
+-        "${pkgs.qt5compatQml}/lib/qt-6/qml"
++        "${pkgs.qt6.qt5compat}/lib/qt-6/qml"
+         "${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml"
+         "${pkgs.asteroid.mce-qt6}/lib/qt-6/qml"
+         "${pkgs.asteroid.mlite}/lib/qt-6/qml"
+diff --git a/examples/installer/pkgs/scripted-installer/automated-installer.rb b/examples/installer/pkgs/scripted-installer/automated-installer.rb
+index 431bead7..10908c9a 100644
+--- a/examples/installer/pkgs/scripted-installer/automated-installer.rb
++++ b/examples/installer/pkgs/scripted-installer/automated-installer.rb
+@@ -105,7 +105,7 @@ end
+ # See also `nix.nixPath` option, which uses `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos`
+ # Keep installed systems on the same nixpkgs branch as the image builds.
+ channels = [
+-  ["https://github.com/NixOS/nixpkgs/archive/refs/heads/nixos-26.05.tar.gz", "nixos"],
++  ["https://github.com/NixOS/nixpkgs/archive/refs/heads/nixpkgs-unstable.tar.gz", "nixos"],
+   ["https://github.com/mobile-nixos/mobile-nixos/archive/refs/heads/development.tar.gz", "mobile-nixos"],
+ ].map{|pair| pair.join(" ") }.join("\n")
+ File.write(File.join(MOUNT_POINT, "/root/.nix-channels"), channels)
+diff --git a/modules/watch-power.nix b/modules/watch-power.nix
+index 21807cee..5b936f61 100644
+--- a/modules/watch-power.nix
++++ b/modules/watch-power.nix
+@@ -39,9 +39,9 @@ in
+ 
+     # Systemd journal volatile storage reduces write cycles on watch eMMC/UFS storage
+     # and saves flash controller power draw.
+-    services.journald = {
+-      storage = "volatile";
+-      extraConfig = "RuntimeMaxUse=16M";
++    services.journald.settings.Journal = {
++      Storage = "volatile";
++      RuntimeMaxUse = "16M";
+     };
+ 
+     # Sysctl kernel tuning for battery life and wrist devices
+diff --git a/npins/sources.json b/npins/sources.json
+index dba66e0c..4fd0337c 100644
+--- a/npins/sources.json
++++ b/npins/sources.json
+@@ -7,11 +7,11 @@
+         "owner": "NixOS",
+         "repo": "nixpkgs"
+       },
+-      "branch": "nixos-26.05",
+-      "revision": "6f06d204d8f2d8761d9da78778745974a3216381",
+-      "url": "https://github.com/NixOS/nixpkgs/archive/6f06d204d8f2d8761d9da78778745974a3216381.tar.gz",
++      "branch": "nixpkgs-unstable",
++      "revision": "885ba4d038f10c3d17d7a92e8c3cc185b99c9158",
++      "url": "https://github.com/NixOS/nixpkgs/archive/885ba4d038f10c3d17d7a92e8c3cc185b99c9158.tar.gz",
+       "submodules": false,
+-      "hash": "sha256-loLMnbbS4KhmG2ln9EY6f0YMNCA273Yx02oWYQ9IMeE="
++      "hash": "sha256-e/yiZ31gXRROBDcnOtT3YwDQ73NVG9Cepccbt86LIn8="
+     }
+   },
+   "version": 8
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+index b4cd0f72..c8d6dc03 100644
+--- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+@@ -119,7 +119,7 @@ stdenv.mkDerivation (finalAttrs: {
+     # Embed precompiled Qt 6 GraphicalEffects shaders (.qsb) into the QPA plugin
+     # so they are registered in memory (qrc:/qt-project.org/imports/Qt5Compat/GraphicalEffects/shaders_ng/*)
+     # when asteroid-launcher loads the hwcomposer QPA platform plugin.
+-    tar -xf ${qt6.qt5compat.src} --strip-components=4 "qt5compat-everywhere-src-6.12.0/src/imports/graphicaleffects5/shaders_ng"
++    tar -xf ${qt6.qt5compat.src} --strip-components=4 "qt5compat-everywhere-src-${qt6.qt5compat.version}/src/imports/graphicaleffects5/shaders_ng"
+     cat > shaders.qrc << 'QRC'
+ <RCC>
+     <qresource prefix="/qt-project.org/imports/Qt5Compat/GraphicalEffects">
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index 2d7b2966..dbc09ffd 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -1,8 +1,8 @@
+ # Overlays and package workarounds that only make sense during cross-compilation.
+ #
+-# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
+-# When cross-compiling, it provides upstream fixes for Qt 6, 32-bit ARM toolchains,
+-# NetSurf host build tools, Skia, systemd, and libkiwix.
++# When building natively, this overlay selects vendored Qt 6.11 for matching
++# Qt host tools. When cross-compiling, it also provides upstream fixes for Qt 6,
++# 32-bit ARM toolchains, NetSurf host build tools, Skia, systemd, and libkiwix.
+ final: super:
+ 
+ let
+@@ -11,7 +11,12 @@ let
+     superStdenv != null && superStdenv.buildPlatform.system != superStdenv.hostPlatform.system;
+ in
+ if !isCross then
+-  { }
++  {
++    # Use the same vendored Qt package definitions for host tools as for the
++    # target Qt libraries during cross compilation. Their dependencies and
++    # toolchains still come from the current Nixpkgs package set.
++    qt6 = final.callPackage ./vendor/qt-6.11 { };
++  }
+ else
+   let
+     # Pinned revision of AsteroidOS meta-asteroid used as the source for
+@@ -97,19 +102,9 @@ else
+           }
+         );
+ 
+-    # Mbed TLS 3.6.6's ARM AES/GCM code triggers GCC 15's array-bounds
+-    # diagnostic in its bytewise XOR helper. The package enables -Werror,
+-    # so keep that compiler warning non-fatal for this cross-built package.
+-    mbedtls = super.mbedtls.overrideAttrs (old: {
+-      env = (old.env or { }) // {
+-        NIX_CFLAGS_COMPILE = ((old.env or { }).NIX_CFLAGS_COMPILE or "") + " -Wno-error=array-bounds";
+-      };
+-    });
+-
+   in
+   {
+     inherit systemd257;
+-    inherit mbedtls;
+     # Keep the patched systemd 262 for old kernels available for debugging
+     # or fallback even when the legacy profile selects systemd 257.
+     systemd262oldkernel = systemd262OldKernel;
+@@ -133,7 +128,7 @@ else
+ 
+     # Upstream nixpkgs Qt6 modules skip QtQuick integration during cross-compilation
+     # because cross Qt6QuickTools, Qt6QmlTools, and Qt6ShaderToolsTools cmake flags are missing.
+-    qt6 = super.qt6.overrideScope (
++    qt6 = (final.callPackage ./vendor/qt-6.11 { }).overrideScope (
+       qfinal: qsuper: {
+         # Upstream AsteroidOS builds Qt without desktop GL on hybris machines:
+         # meta-asteroid/recipes-qt/qt6/qtbase_git.bbappend does
+@@ -364,18 +359,6 @@ else
+     # Smartwatches do not use InfiniBand, so disable RDMA.
+     libpcap = super.libpcap.override { withRdma = false; };
+ 
+-    # x265 4.2 in nixpkgs contains an obsolete patch for 32-bit ARM that was
+-    # already incorporated upstream, causing patch rejects during cross builds.
+-    x265 = (super.x265.override {
+-      # The command-line encoder fails to link its ARM NEON test symbols.
+-      # FFmpeg uses the shared library and does not need this executable.
+-      cliSupport = false;
+-    }).overrideAttrs (old: {
+-      patches = super.lib.filter (p: !(super.lib.hasInfix "raw" (builtins.baseNameOf (toString p)))) (
+-        old.patches or [ ]
+-      );
+-    });
+-
+     # Skia gnFlags cpu mapping expects "arm" instead of "armv7l".
+     # Reference: https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/sk/skia/package.nix
+     skia = super.skia.override {
+diff --git a/overlay/vendor/qt-6.11/README.md b/overlay/vendor/qt-6.11/README.md
+new file mode 100644
+index 00000000..f9b7b01f
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/README.md
+@@ -0,0 +1,14 @@
++Vendored Qt 6.11 package definitions
++====================================
++
++Source: NixOS/nixpkgs `staging-26.05`, revision
++`3da11a55bdd37955b63cc4182ff789eeaa152329` (Qt 6.11.3).
++
++The package expressions in this directory are called from the active unstable
++package set. Dependencies, compilers, and other non-Qt packages therefore come
++from unstable. The cross-compilation changes from
++`overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch` are applied to the Qt
++files here so target modules use matching Qt 6.11 host tools.
++
++Nixpkgs is licensed under the MIT license; see the Nixpkgs source for the full
++license text.
+diff --git a/overlay/vendor/qt-6.11/default.nix b/overlay/vendor/qt-6.11/default.nix
+new file mode 100644
+index 00000000..e8a7c285
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/default.nix
+@@ -0,0 +1,160 @@
++{
++  newScope,
++  lib,
++  stdenv,
++  generateSplicesForMkScope,
++  makeScopeWithSplicing',
++  fetchurl,
++  fetchpatch2,
++  makeSetupHook,
++  makeWrapper,
++  runCommand,
++  gst_all_1,
++  libglvnd,
++  darwin,
++  apple-sdk_15,
++  darwinMinVersionHook,
++  buildPackages,
++  python3,
++  config,
++}:
++
++let
++  srcs = import ./srcs.nix {
++    inherit fetchurl;
++    mirror = "mirror://qt";
++  };
++
++  addPackages =
++    self:
++    let
++      callPackage = self.newScope {
++        inherit (self) qtModule;
++        inherit srcs python3 stdenv;
++      };
++
++      # Per <https://doc.qt.io/qt-6/macos.html#supported-versions>.
++      # This should reflect the highest “Build Environment” and the
++      # lowest “Target Platform”.
++      darwinVersionInputs = [
++        apple-sdk_15
++        (darwinMinVersionHook "12.0")
++      ];
++
++      onlyPluginsAndQml =
++        drv:
++        let
++          drv' = drv.__spliced.targetTarget or drv;
++          inherit (self.qtbase) qtPluginPrefix qtQmlPrefix;
++        in
++        (runCommand "${drv'.name}-only-plugins-qml" { } ''
++          mkdir -p $(dirname "$out/${qtPluginPrefix}")
++          test -d "${drv'}/${qtPluginPrefix}" && ln -s "${drv'}/${qtPluginPrefix}" "$out/${qtPluginPrefix}" || true
++          test -d "${drv'}/${qtQmlPrefix}" && ln -s "${drv'}/${qtQmlPrefix}" "$out/${qtQmlPrefix}" || true
++        '');
++    in
++    {
++
++      inherit callPackage srcs darwinVersionInputs;
++
++      qtModule = callPackage ./qtModule.nix {
++        inherit darwinVersionInputs;
++      };
++
++      qtbase = callPackage ./modules/qtbase {
++        withGtk3 = !stdenv.hostPlatform.isMinGW;
++        inherit darwinVersionInputs;
++        inherit (srcs.qtbase) src version;
++      };
++      env = callPackage ./qt-env.nix { };
++      qt3d = callPackage ./modules/qt3d.nix { };
++      qt5compat = callPackage ./modules/qt5compat.nix { };
++      qtcharts = callPackage ./modules/qtcharts.nix { };
++      qtconnectivity = callPackage ./modules/qtconnectivity.nix { };
++      qtdatavis3d = callPackage ./modules/qtdatavis3d.nix { };
++      qtdeclarative = callPackage ./modules/qtdeclarative { };
++      qtdoc = callPackage ./modules/qtdoc.nix { };
++      qtgraphs = callPackage ./modules/qtgraphs.nix { };
++      qtgrpc = callPackage ./modules/qtgrpc.nix { };
++      qthttpserver = callPackage ./modules/qthttpserver.nix { };
++      qtimageformats = callPackage ./modules/qtimageformats.nix { };
++      qtlanguageserver = callPackage ./modules/qtlanguageserver.nix { };
++      qtlocation = callPackage ./modules/qtlocation.nix { };
++      qtlottie = callPackage ./modules/qtlottie.nix { };
++      qtmultimedia = callPackage ./modules/qtmultimedia {
++        inherit (gst_all_1)
++          gstreamer
++          gst-plugins-bad
++          gst-plugins-base
++          gst-plugins-good
++          gst-libav
++          ;
++      };
++      qtmqtt = callPackage ./modules/qtmqtt.nix { };
++      qtnetworkauth = callPackage ./modules/qtnetworkauth.nix { };
++      qtpositioning = callPackage ./modules/qtpositioning.nix { };
++      qtsensors = callPackage ./modules/qtsensors.nix { };
++      qtserialbus = callPackage ./modules/qtserialbus.nix { };
++      qtserialport = callPackage ./modules/qtserialport.nix { };
++      qtshadertools = callPackage ./modules/qtshadertools.nix { };
++      qtspeech = callPackage ./modules/qtspeech.nix { };
++      qtquick3d = callPackage ./modules/qtquick3d.nix { };
++      qtquick3dphysics = callPackage ./modules/qtquick3dphysics.nix { };
++      qtquickeffectmaker = callPackage ./modules/qtquickeffectmaker.nix { };
++      qtquicktimeline = callPackage ./modules/qtquicktimeline.nix { };
++      qtremoteobjects = callPackage ./modules/qtremoteobjects.nix { };
++      qtsvg = callPackage ./modules/qtsvg.nix { };
++      qtscxml = callPackage ./modules/qtscxml.nix { };
++      qttools = callPackage ./modules/qttools { };
++      qttranslations = callPackage ./modules/qttranslations.nix {
++        qttools = self.qttools.override {
++          qtbase = self.qtbase.override { qttranslations = null; };
++          qtdeclarative = null;
++        };
++      };
++      qtvirtualkeyboard = callPackage ./modules/qtvirtualkeyboard.nix { };
++      qtwayland = callPackage ./modules/qtwayland.nix { };
++      qtwebchannel = callPackage ./modules/qtwebchannel.nix { };
++      qtwebengine = callPackage ./modules/qtwebengine {
++        inherit (darwin) bootstrap_cmds;
++      };
++      qtwebsockets = callPackage ./modules/qtwebsockets.nix { };
++      qtwebview = callPackage ./modules/qtwebview.nix { };
++
++      wrapQtAppsHook = callPackage (
++        {
++          makeBinaryWrapper,
++          qtwayland,
++          qtbase,
++        }:
++        makeSetupHook {
++          name = "wrap-qt6-apps-hook";
++          propagatedBuildInputs = [ makeBinaryWrapper ];
++          depsTargetTargetPropagated = [
++            (onlyPluginsAndQml qtbase)
++          ];
++        } ./hooks/wrap-qt-apps-hook.sh
++      ) { };
++
++      qmake = callPackage (
++        { qtbase }:
++        makeSetupHook {
++          name = "qmake6-hook";
++          propagatedBuildInputs = [ qtbase.dev ];
++          substitutions = {
++            fix_qmake_libtool = ./hooks/fix-qmake-libtool.sh;
++          };
++        } ./hooks/qmake-hook.sh
++      ) { };
++    }
++    // lib.optionalAttrs config.allowAliases {
++      full = throw "qt6.full has been removed. Please use individual packages instead."; # Added 2025-10-21
++      wrapQtAppsNoGuiHook = lib.warn "wrapQtAppsNoGuiHook is deprecated, use wrapQtAppsHook instead" self.wrapQtAppsHook;
++    };
++
++  baseScope = makeScopeWithSplicing' {
++    otherSplices = generateSplicesForMkScope "qt6";
++    f = addPackages;
++  };
++in
++baseScope
+diff --git a/overlay/vendor/qt-6.11/fetch.sh b/overlay/vendor/qt-6.11/fetch.sh
+new file mode 100644
+index 00000000..d2c0f3a1
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/fetch.sh
+@@ -0,0 +1 @@
++WGET_ARGS=( https://download.qt.io/official_releases/qt/6.11/6.11.3/submodules/ -A '*.tar.xz' )
+diff --git a/overlay/vendor/qt-6.11/hooks/fix-qmake-libtool.sh b/overlay/vendor/qt-6.11/hooks/fix-qmake-libtool.sh
+new file mode 100644
+index 00000000..44bf10a0
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/hooks/fix-qmake-libtool.sh
+@@ -0,0 +1,25 @@
++# Fix libtool libraries generated by qmake.
++# qmake started inserting filenames of shared objects instead of the appropriate
++# linker flags. fixQmakeLibtool searches for broken libtool libraries and
++# replaces the filenames with the linker flags that should have been there.
++fixQmakeLibtool() {
++    if [ -d "$1" ]; then
++        find "$1" -name '*.la' | while read la; do
++            set +e
++            framework_libs=$(grep '^dependency_libs' "$la" | grep -Eo -- '-framework +\w+' | tr '\n' ' ')
++            set -e
++            sed -i "$la" \
++                -e '/^dependency_libs/ s,\(/[^ ]\+\)/lib\([^/ ]\+\)\.so,-L\1 -l\2,g' \
++                -e '/^dependency_libs/ s,-framework \+\w\+,,g'
++            if [ ! -z "$framework_libs" ]; then
++                if grep '^inherited_linker_flags=' $la >/dev/null; then
++                    sed -i "$la" -e "s/^\(inherited_linker_flags='[^']*\)/\1 $framework_libs/"
++                else
++                    echo "inherited_linker_flags='$framework_libs'" >>"$la"
++                fi
++            fi
++        done
++    fi
++}
++
++fixupOutputHooks+=('fixQmakeLibtool $prefix')
+diff --git a/overlay/vendor/qt-6.11/hooks/fix-qt-builtin-paths.sh b/overlay/vendor/qt-6.11/hooks/fix-qt-builtin-paths.sh
+new file mode 100644
+index 00000000..d6f8ab32
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/hooks/fix-qt-builtin-paths.sh
+@@ -0,0 +1,63 @@
++# fixQtBuiltinPaths
++#
++# Usage: fixQtBuiltinPaths _dir_ _pattern_
++#
++# Fix Qt builtin paths in files matching _pattern_ under _dir_.
++#
++fixQtBuiltinPaths() {
++    local dir="$1"
++    local pattern="$2"
++    local lib="${!outputLib}"
++
++    if [ -d "$dir" ]; then
++        find "$dir" -name "$pattern" | while read pr_; do
++            if grep -q '\$\$\[QT_' "${pr_:?}"; then
++                echo "fixQtBuiltinPaths: Fixing Qt builtin paths in \`${pr_:?}'..."
++                sed -i "${pr_:?}" \
++                    -e "s|\\\$\\\$\\[QT_HOST_BINS[^]]*\\]|$lib/bin|g" \
++                    -e "s|\\\$\\\$\\[QT_HOST_LIBEXECS[^]]*\\]|$lib/libexec|g" \
++                    -e "s|\\\$\\\$\\[QT_HOST_DATA[^]]*\\]/mkspecs|$lib/mkspecs|g" \
++                    -e "s|\\\$\\\$\\[QT_HOST_PREFIX[^]]*\\]|$lib|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_ARCHDATA[^]]*\\]|$lib|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_BINS[^]]*\\]|$lib/bin|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_CONFIGURATION[^]]*\\]|$lib|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_DATA[^]]*\\]|$lib|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_DOCS[^]]*\\]|$lib/share/doc|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_EXAMPLES[^]]*\\]|$lib/examples|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_HEADERS[^]]*\\]|$lib/include|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_LIBS[^]]*\\]|$lib/lib|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_LIBEXECS[^]]*\\]|$lib/libexec|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_PLUGINS[^]]*\\]|$lib/$qtPluginPrefix|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_PREFIX[^]]*\\]|$lib|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_TESTS[^]]*\\]|$lib/tests|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_TRANSLATIONS[^]]*\\]|$lib/translations|g" \
++                    -e "s|\\\$\\\$\\[QT_INSTALL_QML[^]]*\\]|$lib/$qtQmlPrefix|g"
++            fi
++        done
++    elif [ -e "$dir" ]; then
++        if grep -q '\$\$\[QT_' "${dir:?}"; then
++            echo "fixQtBuiltinPaths: Fixing Qt builtin paths in \`${dir:?}'..."
++            sed -i "${dir:?}" \
++                -e "s|\\\$\\\$\\[QT_HOST_BINS[^]]*\\]|$lib/bin|g" \
++                -e "s|\\\$\\\$\\[QT_HOST_LIBEXECS[^]]*\\]|$lib/libexec|g" \
++                -e "s|\\\$\\\$\\[QT_HOST_DATA[^]]*\\]/mkspecs|$lib/mkspecs|g" \
++                -e "s|\\\$\\\$\\[QT_HOST_PREFIX[^]]*\\]|$lib|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_ARCHDATA[^]]*\\]|$lib|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_BINS[^]]*\\]|$lib/bin|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_CONFIGURATION[^]]*\\]|$lib|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_DATA[^]]*\\]|$lib|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_DOCS[^]]*\\]|$lib/share/doc|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_EXAMPLES[^]]*\\]|$lib/examples|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_HEADERS[^]]*\\]|$lib/include|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_LIBS[^]]*\\]|$lib/lib|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_LIBEXECS[^]]*\\]|$lib/libexec|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_PLUGINS[^]]*\\]|$lib/$qtPluginPrefix|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_PREFIX[^]]*\\]|$lib|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_TESTS[^]]*\\]|$lib/tests|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_TRANSLATIONS[^]]*\\]|$lib/translations|g" \
++                -e "s|\\\$\\\$\\[QT_INSTALL_QML[^]]*\\]|$lib/$qtQmlPrefix|g"
++        fi
++    else
++        echo "fixQtBuiltinPaths: Warning: \`$dir' does not exist"
++    fi
++}
+diff --git a/overlay/vendor/qt-6.11/hooks/fix-qt-module-paths.sh b/overlay/vendor/qt-6.11/hooks/fix-qt-module-paths.sh
+new file mode 100644
+index 00000000..4884f45b
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/hooks/fix-qt-module-paths.sh
+@@ -0,0 +1,27 @@
++# fixQtModulePaths
++#
++# Usage: fixQtModulePaths _dir_
++#
++# Find Qt module definitions in directory _dir_ and patch the module paths.
++#
++fixQtModulePaths() {
++    local dir="$1"
++    local lib="${!outputLib}"
++
++    if [ -d "$dir" ]; then
++        find "$dir" -name 'qt_*.pri' | while read pr; do
++            if grep -q '\$\$QT_MODULE_' "${pr:?}"; then
++                echo "fixQtModulePaths: Fixing module paths in \`${pr:?}'..."
++                sed -i "${pr:?}" \
++                    -e "s|\\\$\\\$QT_MODULE_LIB_BASE|$lib/lib|g" \
++                    -e "s|\\\$\\\$QT_MODULE_HOST_LIB_BASE|$lib/lib|g" \
++                    -e "s|\\\$\\\$QT_MODULE_INCLUDE_BASE|$lib/include|g" \
++                    -e "s|\\\$\\\$QT_MODULE_BIN_BASE|$lib/bin|g"
++            fi
++        done
++    elif [ -e "$dir" ]; then
++        echo "fixQtModulePaths: Warning: \`$dir' is not a directory"
++    else
++        echo "fixQtModulePaths: Warning: \`$dir' does not exist"
++    fi
++}
+diff --git a/overlay/vendor/qt-6.11/hooks/qmake-hook.sh b/overlay/vendor/qt-6.11/hooks/qmake-hook.sh
+new file mode 100644
+index 00000000..1f696be3
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/hooks/qmake-hook.sh
+@@ -0,0 +1,43 @@
++. @fix_qmake_libtool@
++
++qmakePrePhase() {
++    # These flags must be added _before_ the flags specified in the derivation.
++    # TODO: these flags also need a patch which isn't applied
++    # can we either remove these flags or update the qt5 patch?
++    # "NIX_OUTPUT_DOC=${!outputDev}/${qtDocPrefix:?}" \
++    prependToVar qmakeFlags \
++      "PREFIX=$out" \
++      "NIX_OUTPUT_OUT=$out" \
++      "NIX_OUTPUT_DEV=${!outputDev}" \
++      "NIX_OUTPUT_BIN=${!outputBin}" \
++      "NIX_OUTPUT_QML=${!outputBin}/${qtQmlPrefix:?}" \
++      "NIX_OUTPUT_PLUGIN=${!outputBin}/${qtPluginPrefix:?}"
++}
++appendToVar prePhases qmakePrePhase
++
++qmakeConfigurePhase() {
++    runHook preConfigure
++
++    local flagsArray=()
++    concatTo flagsArray qmakeFlags
++
++    echo "QMAKEPATH=$QMAKEPATH"
++    echo qmake "${flagsArray[@]}"
++    qmake "${flagsArray[@]}"
++
++    if ! [[ -v enableParallelBuilding ]]; then
++        enableParallelBuilding=1
++        echo "qmake: enabled parallel building"
++    fi
++
++    if ! [[ -v enableParallelInstalling ]]; then
++        enableParallelInstalling=1
++        echo "qmake: enabled parallel installing"
++    fi
++
++    runHook postConfigure
++}
++
++if [ -z "${dontUseQmakeConfigure-}" -a -z "${configurePhase-}" ]; then
++    configurePhase=qmakeConfigurePhase
++fi
+diff --git a/overlay/vendor/qt-6.11/hooks/qtbase-setup-hook.sh b/overlay/vendor/qt-6.11/hooks/qtbase-setup-hook.sh
+new file mode 100644
+index 00000000..0001231d
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/hooks/qtbase-setup-hook.sh
+@@ -0,0 +1,102 @@
++if [[ -n "${__nix_qtbase-}" ]]; then
++    # Throw an error if a different version of Qt was already set up.
++    if [[ "$__nix_qtbase" != "@qtbaseOut@" ]]; then
++        echo >&2 "Error: detected mismatched Qt dependencies:"
++        echo >&2 "    @qtbaseOut@"
++        echo >&2 "    $__nix_qtbase"
++        exit 1
++    fi
++else # Only set up Qt once.
++    __nix_qtbase="@qtbaseOut@"
++
++    qtPluginPrefix=@qtPluginPrefix@
++    qtQmlPrefix=@qtQmlPrefix@
++
++    . @fix_qt_builtin_paths@
++    . @fix_qt_module_paths@
++
++    # Build tools are often confused if QMAKE is unset.
++    if [[ -n "@qtHostPath@" && "@qtHostPath@" != "@"* ]]; then
++        export QT_HOST_PATH="@qtHostPath@"
++        export QMAKE="@qtHostPath@/bin/qmake"
++        appendToVar cmakeFlags "-DQT_HOST_PATH=@qtHostPath@"
++        appendToVar cmakeFlags "-DQt6HostInfo_DIR=@qtHostPath@/lib/cmake/Qt6HostInfo"
++    else
++        export QMAKE=@qtbaseOut@/bin/qmake
++    fi
++
++    export QMAKEPATH=
++
++    export QMAKEMODULES=
++
++    declare -Ag qmakePathSeen=()
++    qmakePathHook() {
++        # Skip this path if we have seen it before.
++        # MUST use 'if' because 'qmakePathSeen[$]' may be unset.
++        if [ -n "${qmakePathSeen[$1]-}" ]; then return; fi
++        qmakePathSeen[$1]=1
++        if [ -d "$1/mkspecs" ]; then
++            QMAKEMODULES="${QMAKEMODULES}${QMAKEMODULES:+:}/mkspecs"
++            QMAKEPATH="${QMAKEPATH}${QMAKEPATH:+:}$1"
++        fi
++    }
++    envBuildHostHooks+=(qmakePathHook)
++
++    declare -g qttoolsPathSeen=
++    qtToolsHook() {
++        if [ -f "$1/libexec/qhelpgenerator" ]; then
++            if [[ -n "${qtToolsPathSeen:-}" && "${qttoolsPathSeen:-}" != "$1" ]]; then
++                echo >&2 "Error: detected mismatched Qt dependencies:"
++                echo >&2 "    $1"
++                echo >&2 "    $qttoolsPathSeen"
++                exit 1
++            fi
++
++            qttoolsPathSeen=$1
++            appendToVar cmakeFlags "-DQT_OPTIONAL_TOOLS_PATH=$1"
++        fi
++    }
++    addEnvHooks "$hostOffset" qtToolsHook
++
++    postPatchMkspecs() {
++        # Prevent this hook from running multiple times
++        dontPatchMkspecs=1
++
++        local lib="${!outputLib}"
++        local dev="${!outputDev}"
++
++        moveToOutput "mkspecs/modules" "$dev"
++
++        if [ -d "$dev/mkspecs/modules" ]; then
++            fixQtModulePaths "$dev/mkspecs/modules"
++        fi
++
++        if [ -d "$lib/mkspecs" ]; then
++            fixQtBuiltinPaths "$lib/mkspecs" '*.pr?'
++        fi
++
++        if [ -d "$lib/lib" ]; then
++            fixQtBuiltinPaths "$lib/lib" '*.pr?'
++        fi
++    }
++    if [ -z "${dontPatchMkspecs-}" ]; then
++        appendToVar postPhases postPatchMkspecs
++    fi
++
++    qtPreHook() {
++        # Check that wrapQtAppsHook is used, or it is explicitly disabled.
++        if [[ -z "$__nix_wrapQtAppsHook" && -z "$dontWrapQtApps" ]]; then
++            echo >&2 "Error: this derivation depends on qtbase, but no wrapping behavior was specified."
++            echo >&2 "  - If this is an application, add wrapQtAppsHook to nativeBuildInputs"
++            echo >&2 "  - If this is a library or you need custom wrapping logic, set dontWrapQtApps = true"
++            exit 1
++        fi
++    }
++    appendToVar prePhases qtPreHook
++
++    addQtModulePrefix() {
++        addToSearchPath QT_ADDITIONAL_PACKAGES_PREFIX_PATH $1
++    }
++    addEnvHooks "$hostOffset" addQtModulePrefix
++
++fi
+diff --git a/overlay/vendor/qt-6.11/hooks/wrap-qt-apps-hook.sh b/overlay/vendor/qt-6.11/hooks/wrap-qt-apps-hook.sh
+new file mode 100644
+index 00000000..18056b9d
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/hooks/wrap-qt-apps-hook.sh
+@@ -0,0 +1,110 @@
++if [[ -z "${__nix_wrapQtAppsHook-}" ]]; then
++    __nix_wrapQtAppsHook=1
++    # wrap only once per output
++    declare -a qtWrapperDoneForOuputs
++
++    # Inherit arguments given in mkDerivation
++    qtWrapperArgs=(${qtWrapperArgs-})
++
++    qtHostPathSeen=()
++
++    qtUnseenHostPath() {
++        for pkg in "${qtHostPathSeen[@]}"; do
++            if [ "${pkg:?}" == "$1" ]; then
++                return 1
++            fi
++        done
++
++        qtHostPathSeen+=("$1")
++        return 0
++    }
++
++    qtHostPathHook() {
++        qtUnseenHostPath "$1" || return 0
++
++        if ! [ -v qtPluginPrefix ]; then
++            echo "wrapQtAppsHook qtHostPathHook: qtPluginPrefix is unset. hint: add qt6.qtbase to buildInputs"
++        fi
++
++        local pluginDir="$1/${qtPluginPrefix:?}"
++        if [ -d "$pluginDir" ]; then
++            qtWrapperArgs+=(--prefix QT_PLUGIN_PATH : "$pluginDir")
++        fi
++
++        local qmlDir="$1/${qtQmlPrefix:?}"
++        if [ -d "$qmlDir" ]; then
++            qtWrapperArgs+=(--prefix NIXPKGS_QT6_QML_IMPORT_PATH : "$qmlDir")
++        fi
++    }
++    addEnvHooks "$targetOffset" qtHostPathHook
++
++    makeQtWrapper() {
++        local original="$1"
++        local wrapper="$2"
++        shift 2
++        makeWrapper "$original" "$wrapper" "${qtWrapperArgs[@]}" "$@"
++    }
++
++    wrapQtApp() {
++        local program="$1"
++        shift 1
++        wrapProgram "$program" "${qtWrapperArgs[@]}" "$@"
++    }
++
++    qtOwnPathsHook() {
++        local xdgDataDir="${!outputBin}/share"
++        if [ -d "$xdgDataDir" ]; then
++            qtWrapperArgs+=(--prefix XDG_DATA_DIRS : "$xdgDataDir")
++        fi
++
++        local xdgConfigDir="${!outputBin}/etc/xdg"
++        if [ -d "$xdgConfigDir" ]; then
++            qtWrapperArgs+=(--prefix XDG_CONFIG_DIRS : "$xdgConfigDir")
++        fi
++
++        qtHostPathHook "${!outputBin}"
++    }
++
++    appendToVar preFixupPhases qtOwnPathsHook
++
++    # Note: $qtWrapperArgs still gets defined even if ${dontWrapQtApps-} is set.
++    wrapQtAppsHook() {
++        # skip this hook when requested
++        [ -z "${dontWrapQtApps-}" ] || return 0
++
++        # guard against running multiple times (e.g. due to propagation)
++        local doneOutput
++        for doneOutput in "${qtWrapperDoneForOuputs[@]}"; do
++          if [ "$doneOutput" = "$prefix" ]; then
++            nixWarnLog "Warning: attempted to wrapQtAppsHook $prefix a second time"
++            return 0
++          fi
++        done
++        qtWrapperDoneForOuputs+=("$prefix")
++
++        local targetDirs=("$prefix/bin" "$prefix/sbin" "$prefix/libexec" "$prefix/Applications" "$prefix/"*.app)
++        echo "wrapping Qt applications in ${targetDirs[*]}"
++
++        for targetDir in "${targetDirs[@]}"; do
++            [ -d "$targetDir" ] || continue
++
++            find "$targetDir" ! -type d -executable -print0 | while IFS= read -r -d '' file; do
++                # Skip the file if it is not a binary (ELF or Mach-O)
++                isELF "$file" || isMachO "$file" || continue
++
++                if [ -h "$file" ]; then
++                    target="$(readlink -e "$file")"
++                    echo "wrapping $file -> $target"
++                    rm "$file"
++                    makeQtWrapper "$target" "$file"
++                elif [ -f "$file" ]; then
++                    echo "wrapping $file"
++                    wrapQtApp "$file"
++                fi
++            done
++        done
++    }
++
++    fixupOutputHooks+=(wrapQtAppsHook)
++
++fi
+diff --git a/overlay/vendor/qt-6.11/modules/qt3d.nix b/overlay/vendor/qt-6.11/modules/qt3d.nix
+new file mode 100644
+index 00000000..8963b75a
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qt3d.nix
+@@ -0,0 +1,31 @@
++{
++  lib,
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  qtmultimedia,
++  assimp,
++}:
++
++qtModule {
++  pname = "qt3d";
++
++  # make absolutely sure the vendored assimp is not used
++  # patch cmake to accept assimp 6.x versions
++  postPatch = ''
++    rm -rf src/3rdparty/assimp/src
++    substituteInPlace src/core/configure.cmake --replace-fail "WrapQt3DAssimp 5" "WrapQt3DAssimp 6"
++  '';
++
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++    qtmultimedia
++    assimp
++  ];
++
++  cmakeFlags = [
++    (lib.cmakeBool "FEATURE_qt3d_system_assimp" true) # use nix assimp
++    (lib.cmakeBool "TEST_assimp" true) # required for internal cmake asserts
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qt5compat.nix b/overlay/vendor/qt-6.11/modules/qt5compat.nix
+new file mode 100644
+index 00000000..333f66e1
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qt5compat.nix
+@@ -0,0 +1,21 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  libiconv,
++  icu,
++  openssl,
++}:
++
++qtModule {
++  pname = "qt5compat";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++  buildInputs = [
++    libiconv
++    icu
++    openssl
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/allow-translations-outside-prefix.patch b/overlay/vendor/qt-6.11/modules/qtbase/allow-translations-outside-prefix.patch
+new file mode 100644
+index 00000000..35e78451
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/allow-translations-outside-prefix.patch
+@@ -0,0 +1,11 @@
++--- a/cmake/QtBuildPathsHelpers.cmake
+++++ b/cmake/QtBuildPathsHelpers.cmake
++@@ -140,7 +140,7 @@ function(qt_configure_process_path name default docstring)
++         set(new_value ".")
++     elseif(rel_path MATCHES "^\.\./")
++         # INSTALL_SYSCONFDIR is allowed to be outside the prefix.
++-        if(NOT name STREQUAL "INSTALL_SYSCONFDIR")
+++        if(NOT (name STREQUAL "INSTALL_SYSCONFDIR" OR name STREQUAL "INSTALL_TRANSLATIONSDIR"))
++             message(FATAL_ERROR
++                 "Path component '${name}' is outside computed install prefix: ${rel_path} ")
++         endif()
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/default.nix b/overlay/vendor/qt-6.11/modules/qtbase/default.nix
+new file mode 100644
+index 00000000..3930aec2
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/default.nix
+@@ -0,0 +1,392 @@
++{
++  stdenv,
++  lib,
++  src,
++  version,
++  bison,
++  flex,
++  gperf,
++  lndir,
++  perl,
++  pkg-config,
++  copyPathToStore,
++  makeSetupHook,
++  which,
++  cmake,
++  ninja,
++  libproxy,
++  libxcb-cursor,
++  libxtst,
++  libxdmcp,
++  zstd,
++  double-conversion,
++  util-linux,
++  systemd,
++  systemdSupport ? stdenv.hostPlatform.isLinux,
++  libb2,
++  md4c,
++  mtdev,
++  lksctp-tools,
++  libselinux,
++  libsepol,
++  vulkan-headers,
++  vulkan-loader,
++  libthai,
++  libdrm,
++  libgbm,
++  libdatrie,
++  lttng-ust,
++  libepoxy,
++  dbus,
++  fontconfig,
++  freetype,
++  glib,
++  harfbuzz,
++  icu,
++  libx11,
++  libxcomposite,
++  libxext,
++  libxi,
++  libxrender,
++  libjpeg,
++  libpng,
++  libxcb,
++  libxkbcommon,
++  libxml2,
++  libxslt,
++  openssl,
++  pcre2,
++  sqlite,
++  udev,
++  libxcb-util,
++  libxcb-image,
++  libxcb-keysyms,
++  libxcb-render-util,
++  libxcb-wm,
++  zlib,
++  at-spi2-core,
++  unixodbc,
++  unixodbcDrivers,
++  libGL,
++  # darwin
++  moltenvk,
++  moveBuildTree,
++  darwinVersionInputs,
++  xcbuild,
++  # mingw
++  pkgsBuildBuild,
++  # optional dependencies
++  cups,
++  libmysqlclient,
++  libpq,
++  withGtk3 ? false,
++  gtk3,
++  withLibinput ? false,
++  libinput,
++  withWayland ? lib.meta.availableOn stdenv.hostPlatform wayland,
++  wayland,
++  wayland-scanner,
++  # options
++  qttranslations ? null,
++  fetchpatch,
++}:
++
++let
++  isCrossBuild = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
++  fix_qt_builtin_paths = copyPathToStore ../../hooks/fix-qt-builtin-paths.sh;
++  fix_qt_module_paths = copyPathToStore ../../hooks/fix-qt-module-paths.sh;
++  qtPluginPrefix = "lib/qt-6/plugins";
++  qtQmlPrefix = "lib/qt-6/qml";
++in
++stdenv.mkDerivation {
++  pname = "qtbase";
++
++  inherit src version;
++
++  propagatedBuildInputs = [
++    libxml2
++    libxslt
++    openssl
++    sqlite
++    zlib
++    libGL
++    vulkan-headers
++    vulkan-loader
++    # Text rendering
++    harfbuzz
++    icu
++    # Image formats
++    libjpeg
++    libpng
++    pcre2
++    zstd
++    libb2
++    md4c
++    double-conversion
++  ]
++  ++ lib.optionals (!stdenv.hostPlatform.isMinGW) [
++    libproxy
++    dbus
++    glib
++    # unixodbc drivers
++    unixodbc
++    unixodbcDrivers.psql
++    unixodbcDrivers.sqlite
++    unixodbcDrivers.mariadb
++  ]
++  ++ lib.optionals systemdSupport [
++    systemd
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isLinux [
++    util-linux
++    mtdev
++    lksctp-tools
++    libselinux
++    libsepol
++    lttng-ust
++    libthai
++    libdrm
++    libgbm
++    libdatrie
++    udev
++    # Text rendering
++    fontconfig
++    freetype
++    # X11 libs
++    libx11
++    libxcomposite
++    libxext
++    libxi
++    libxrender
++    libxcb
++    libxkbcommon
++    libxcb-util
++    libxcb-image
++    libxcb-keysyms
++    libxcb-render-util
++    libxcb-wm
++    libxdmcp
++    libxtst
++    libxcb-cursor
++    libepoxy
++  ]
++  ++ lib.optional (cups != null && lib.meta.availableOn stdenv.hostPlatform cups) cups
++  ++ lib.optionals withWayland [
++    wayland
++    wayland-scanner
++  ];
++
++  buildInputs =
++    lib.optionals (lib.meta.availableOn stdenv.hostPlatform at-spi2-core) [
++      at-spi2-core
++    ]
++    ++ lib.optionals stdenv.hostPlatform.isDarwin (darwinVersionInputs ++ [ moltenvk ])
++    ++ lib.optional withGtk3 gtk3
++    ++ lib.optional withLibinput libinput
++    ++ lib.optional (libmysqlclient != null && !stdenv.hostPlatform.isMinGW) libmysqlclient
++    ++ lib.optional (libpq != null && lib.meta.availableOn stdenv.hostPlatform libpq) libpq;
++
++  nativeBuildInputs = [
++    bison
++    flex
++    gperf
++    lndir
++    perl
++    pkg-config
++    which
++    cmake
++    ninja
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isDarwin [ moveBuildTree ];
++
++  propagatedNativeBuildInputs = [
++    lndir
++  ]
++  # I’m not sure if this is necessary, but the macOS mkspecs stuff
++  # tries to call `xcrun xcodebuild`, so better safe than sorry.
++  ++ lib.optionals stdenv.hostPlatform.isDarwin [ xcbuild ]
++  # wayland-scanner needs to be propagated as both build
++  # (for the wayland-scanner binary) and host (for the
++  # actual wayland.xml protocol definition)
++  ++ lib.optionals withWayland [
++    wayland
++    wayland-scanner
++  ];
++
++  strictDeps = true;
++
++  enableParallelBuilding = true;
++
++  patches = [
++    # look for Qt plugins in directories on PATH
++    ./derive-plugin-load-path-from-PATH.patch
++
++    # allow translations to be found outside of install prefix, as is the case in our split builds
++    ./allow-translations-outside-prefix.patch
++
++    # make internal find_package calls between Qt components work with split builds
++    ./use-cmake-path.patch
++
++    # always link to libraries by name in qmake-generated build scripts
++    ./qmake-always-use-libname.patch
++    # always explicitly list includedir in qmake-generated pkg-config files
++    ./qmake-fix-includedir.patch
++
++    # don't generate SBOM files by default, they don't work with our split installs anyway
++    ./no-sbom.patch
++
++    # use cmake from PATH in qt-cmake wrapper, to avoid qtbase runtime-depending on cmake
++    ./use-cmake-from-path.patch
++
++    # macdeployqt fixes
++    # get qmlimportscanner location from environment variable
++    ./find-qmlimportscanner.patch
++    # pass QML2_IMPORT_PATH from environment to qmlimportscanner
++    ./qmlimportscanner-import-path.patch
++    # don't pass qtbase's QML directory to qmlimportscanner if it's empty
++    ./skip-missing-qml-directory.patch
++
++    # another crash fix
++    (fetchpatch {
++      url = "https://github.com/qt/qtbase/commit/515cbbacfba9f4259c9c3b0714a31222c2b4c879.diff";
++      hash = "sha256-93tzp4O7dZxRZv7ilN/gbQSVmaeOGmxpYgM7aomN0n8=";
++    })
++  ];
++
++  postPatch = lib.optionalString stdenv.hostPlatform.isDarwin ''
++    # TODO: Verify that this catches all the occurrences?
++    for file in \
++      cmake/QtPublicAppleHelpers.cmake \
++      mkspecs/features/mac/asset_catalogs.prf \
++      mkspecs/features/mac/default_pre.prf \
++      mkspecs/features/mac/sdk.mk \
++      mkspecs/features/mac/sdk.prf \
++      mkspecs/features/permissions.prf \
++      src/corelib/Qt6CoreMacros.cmake
++    do
++      substituteInPlace "$file" \
++        --replace-quiet /usr/bin/xcrun '${lib.getExe' xcbuild "xcrun"}' \
++        --replace-quiet /usr/bin/xcode-select '${lib.getExe' xcbuild "xcode-select"}' \
++        --replace-quiet /usr/libexec/PlistBuddy '${lib.getExe' xcbuild "PlistBuddy"}'
++    done
++
++    substituteInPlace mkspecs/common/macx.conf \
++      --replace-fail 'CONFIG += ' 'CONFIG += no_default_rpath '
++  '';
++
++  preHook = ''
++    . ${fix_qt_builtin_paths}
++    . ${fix_qt_module_paths}
++  '';
++
++  cmakeFlags = [
++    # makes Qt print the configure summary
++    "--log-level=STATUS"
++
++    "-DQT_EMBED_TOOLCHAIN_COMPILER=OFF"
++    "-DINSTALL_PLUGINSDIR=${qtPluginPrefix}"
++    "-DINSTALL_QMLDIR=${qtQmlPrefix}"
++    "-DQT_FEATURE_libproxy=ON"
++    "-DQT_FEATURE_system_sqlite=ON"
++    "-DQT_FEATURE_openssl_linked=ON"
++    "-DQT_FEATURE_vulkan=ON"
++    # don't leak OS version into the final output
++    # https://bugreports.qt.io/browse/QTBUG-136060
++    "-DCMAKE_SYSTEM_VERSION="
++  ]
++  ++ lib.optionals (!stdenv.hostPlatform.isDarwin) [
++    "-DQT_FEATURE_sctp=ON"
++    "-DQT_FEATURE_journald=${if systemdSupport then "ON" else "OFF"}"
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isDarwin [
++    "-DQT_FEATURE_rpath=OFF"
++    "-DQT_NO_XCODE_MIN_VERSION_CHECK=ON"
++    # This is only used for the min version check, which we disabled above.
++    # When this variable is not set, cmake tries to execute xcodebuild
++    # to query the version.
++    "-DQT_INTERNAL_XCODE_VERSION=0.1"
++  ]
++  ++ lib.optionals isCrossBuild [
++    "-DQT_HOST_PATH=${pkgsBuildBuild.qt6.qtbase}"
++    "-DQt6HostInfo_DIR=${pkgsBuildBuild.qt6.qtbase}/lib/cmake/Qt6HostInfo"
++  ]
++  ++ lib.optional (
++    qttranslations != null && !isCrossBuild
++  ) "-DINSTALL_TRANSLATIONSDIR=${qttranslations}/translations";
++
++  env.NIX_CFLAGS_COMPILE = "-DNIXPKGS_QT_PLUGIN_PREFIX=\"${qtPluginPrefix}\"";
++
++  outputs = [
++    "out"
++    "dev"
++  ];
++  separateDebugInfo = true;
++
++  moveToDev = false;
++
++  postFixup = ''
++    moveToOutput      "mkspecs/modules" "$dev"
++    fixQtModulePaths  "$dev/mkspecs/modules"
++    fixQtBuiltinPaths "$out" '*.pr?'
++
++    # @out@ would be automagically replaced inside makeSetupHook by the output of that derivation,
++    # but we need it to be the output of this derivation.
++    # Use a different placeholder and explicitly substitute this
++    # to keep compatibility with __structuredAttrs and avoid substituteAll.
++    substituteInPlace "''${!outputDev}/nix-support/setup-hook" \
++      --replace-fail "@qtbaseOut@" $out
++  ''
++  + lib.optionalString isCrossBuild ''
++    for f in qmake qmake6 qtpaths qtpaths6 target_qt.conf; do
++      rm -f "$out/bin/$f"
++    done
++    if [ -f "$out/lib/cmake/Qt6/Qt6Dependencies.cmake" ]; then
++      sed -i 's|set(__qt_platform_initial_qt_host_path ".*")|set(__qt_platform_initial_qt_host_path "")|' "$out/lib/cmake/Qt6/Qt6Dependencies.cmake"
++      sed -i 's|set(__qt_platform_initial_qt_host_path_cmake_dir ".*")|set(__qt_platform_initial_qt_host_path_cmake_dir "")|' "$out/lib/cmake/Qt6/Qt6Dependencies.cmake"
++    fi
++  ''
++  + lib.optionalString stdenv.hostPlatform.isLinux ''
++    # FIXME: not sure why this isn't added automatically?
++    patchelf --add-rpath "${libmysqlclient}/lib/mariadb" $out/${qtPluginPrefix}/sqldrivers/libqsqlmysql.so
++    patchelf --add-rpath "${vulkan-loader}/lib" --add-needed "libvulkan.so" $out/lib/libQt6Gui.so
++  '';
++
++  dontWrapQtApps = true;
++
++  setupHook =
++    let
++      hook = makeSetupHook {
++        name = "qtbase6-setup-hook";
++        substitutions = {
++          inherit
++            fix_qt_builtin_paths
++            fix_qt_module_paths
++            qtPluginPrefix
++            qtQmlPrefix
++            ;
++          qtHostPath = lib.optionalString isCrossBuild "${pkgsBuildBuild.qt6.qtbase}";
++        };
++      } ../../hooks/qtbase-setup-hook.sh;
++    in
++    "${hook}/nix-support/setup-hook";
++
++  passthru = {
++    inherit qtPluginPrefix qtQmlPrefix;
++  };
++
++  meta = {
++    homepage = "https://www.qt.io/";
++    description = "Cross-platform application framework for C++";
++    license = with lib.licenses; [
++      fdl13Plus
++      gpl2Plus
++      lgpl21Plus
++      lgpl3Plus
++    ];
++    maintainers = with lib.maintainers; [
++      nickcao
++      LunNova
++    ];
++    platforms = lib.platforms.unix ++ lib.platforms.windows;
++  };
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/derive-plugin-load-path-from-PATH.patch b/overlay/vendor/qt-6.11/modules/qtbase/derive-plugin-load-path-from-PATH.patch
+new file mode 100644
+index 00000000..447d0125
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/derive-plugin-load-path-from-PATH.patch
+@@ -0,0 +1,18 @@
++--- a/src/corelib/kernel/qcoreapplication.cpp
+++++ b/src/corelib/kernel/qcoreapplication.cpp
++@@ -3038,6 +3038,15 @@ QStringList QCoreApplication::libraryPathsLocked()
++                 app_libpaths->append(installPathPlugins);
++         }
++ 
+++        // Add library paths derived from PATH
+++        const QStringList paths = QFile::decodeName(qgetenv("PATH")).split(QStringLiteral(":"));
+++        const QString plugindir = QStringLiteral("../" NIXPKGS_QT_PLUGIN_PREFIX);
+++        for (const QString &path: paths) {
+++            if (!path.isEmpty()) {
+++                app_libpaths->append(QDir::cleanPath(path + QDir::separator() + plugindir));
+++            }
+++        }
+++
++         // If QCoreApplication is not yet instantiated,
++         // make sure we add the application path when we construct the QCoreApplication
++         if (self) self->d_func()->appendApplicationPathToLibraryPaths();
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/find-qmlimportscanner.patch b/overlay/vendor/qt-6.11/modules/qtbase/find-qmlimportscanner.patch
+new file mode 100644
+index 00000000..bde2c940
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/find-qmlimportscanner.patch
+@@ -0,0 +1,13 @@
++--- a/src/tools/macdeployqt/shared/shared.cpp
+++++ b/src/tools/macdeployqt/shared/shared.cpp
++@@ -1280,6 +1280,10 @@ bool deployQmlImports(const QString &appBundlePath, DeploymentInfo deploymentInf
++     if (!QFile::exists(qmlImportScannerPath))
++         qmlImportScannerPath = QCoreApplication::applicationDirPath() + "/qmlimportscanner";
++ 
+++    // Fallback: Pass qml import scanner via environment variable
+++    if (!QFile::exists(qmlImportScannerPath))
+++        qmlImportScannerPath = ::qgetenv("NIX_QMLIMPORTSCANNER");
+++
++     // Verify that we found a qmlimportscanner binary
++     if (!QFile::exists(qmlImportScannerPath)) {
++         LogError() << "qmlimportscanner not found at" << qmlImportScannerPath;
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/no-sbom.patch b/overlay/vendor/qt-6.11/modules/qtbase/no-sbom.patch
+new file mode 100644
+index 00000000..bed920da
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/no-sbom.patch
+@@ -0,0 +1,13 @@
++diff --git a/cmake/QtPublicSbomHelpers.cmake b/cmake/QtPublicSbomHelpers.cmake
++index 45342c2efb6..74bf58e6246 100644
++--- a/cmake/QtPublicSbomHelpers.cmake
+++++ b/cmake/QtPublicSbomHelpers.cmake
++@@ -538,7 +538,7 @@ function(_qt_internal_setup_sbom)
++     # Main SBOM toggle. Used to be the toggle for SPDX v2.3 only, but now would also enable Cyclone
++     # DX as well.
++     set(sbom_help_string "Generate SBOM.")
++-    option(QT_GENERATE_SBOM "${sbom_help_string}" "${default_value}")
+++    option(QT_GENERATE_SBOM "${sbom_help_string}" OFF)
++ 
++ 
++     # Toggle for SPDX V2.3 generation.
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/qmake-always-use-libname.patch b/overlay/vendor/qt-6.11/modules/qtbase/qmake-always-use-libname.patch
+new file mode 100644
+index 00000000..d1d91c39
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/qmake-always-use-libname.patch
+@@ -0,0 +1,28 @@
++--- a/cmake/QtFinishPrlFile.cmake
+++++ b/cmake/QtFinishPrlFile.cmake
++@@ -69,9 +69,10 @@ foreach(line ${lines})
++                         endif()
++                         list(APPEND adjusted_libs "-framework" "${CMAKE_MATCH_1}")
++                     else()
++-                        # Not a framework, transform the Qt module into relocatable relative path.
++-                        qt_strip_library_version_suffix(relative_lib "${relative_lib}")
++-                        list(APPEND adjusted_libs "$$[QT_INSTALL_LIBS]/${relative_lib}")
+++                        # Not a framework, extract the library name and prepend an -l to make
+++                        # it relocatable.
+++                        qt_transform_absolute_library_paths_to_link_flags(lib_with_link_flag "${lib}")
+++                        list(APPEND adjusted_libs "${lib_with_link_flag}")
++                     endif()
++                 endif()
++             else()
++--- a/cmake/QtGenerateLibHelpers.cmake
+++++ b/cmake/QtGenerateLibHelpers.cmake
++@@ -82,9 +82,6 @@ function(qt_transform_absolute_library_paths_to_link_flags out_var library_path_
++                 # If library_path isn't in default link directories, we should add it to link flags.
++                 # But we shouldn't add it duplicately.
++                 list(FIND IMPLICIT_LINK_DIRECTORIES_LOWER "${dir_lower}" index)
++-                if(index EQUAL -1 AND NOT "-L\"${dir}\"" IN_LIST out_list)
++-                    list(APPEND out_list "-L\"${dir}\"")
++-                endif()
++             endif()
++             list(APPEND out_list "${lib_name_with_link_flag}")
++         else()
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/qmake-fix-includedir.patch b/overlay/vendor/qt-6.11/modules/qtbase/qmake-fix-includedir.patch
+new file mode 100644
+index 00000000..3cb9a9ce
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/qmake-fix-includedir.patch
+@@ -0,0 +1,12 @@
++--- a/qmake/generators/makefile.cpp
+++++ b/qmake/generators/makefile.cpp
++@@ -3412,8 +3412,7 @@ MakefileGenerator::writePkgConfigFile()
++       << varGlue("QMAKE_PKGCONFIG_CFLAGS", "", " ", " ")
++         //      << varGlue("DEFINES","-D"," -D"," ")
++          ;
++-    if (!project->values("QMAKE_DEFAULT_INCDIRS").contains(includeDir))
++-        t << "-I${includedir}";
+++    t << "-I${includedir}";
++     if (target_mode == TARG_MAC_MODE && project->isActiveConfig("lib_bundle")
++         && libDir != QLatin1String("/Library/Frameworks")) {
++             t << " -F${libdir}";
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/qmlimportscanner-import-path.patch b/overlay/vendor/qt-6.11/modules/qtbase/qmlimportscanner-import-path.patch
+new file mode 100644
+index 00000000..e99dd5a9
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/qmlimportscanner-import-path.patch
+@@ -0,0 +1,16 @@
++--- a/src/tools/macdeployqt/shared/shared.cpp
+++++ b/src/tools/macdeployqt/shared/shared.cpp
++@@ -1300,6 +1300,13 @@ bool deployQmlImports(const QString &appBundlePath, DeploymentInfo deploymentInf
++     argumentList.append( "-importPath");
++     argumentList.append(qmlImportsPath);
++ 
+++    // In a modularized installation of qt as we have in Nix, instead, we will
+++    // read the paths from the environment, as they are spread in multiple
+++    // locations and normally set in the environment like this
+++    auto envQmlImportPaths = ::qgetenv("QML2_IMPORT_PATH").split(':');
+++    for (const QString &importPath : envQmlImportPaths)
+++        argumentList << "-importPath" << importPath;
+++
++     // run qmlimportscanner
++     QProcess qmlImportScanner;
++     qmlImportScanner.start(qmlImportScannerPath, argumentList);
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/skip-missing-qml-directory.patch b/overlay/vendor/qt-6.11/modules/qtbase/skip-missing-qml-directory.patch
+new file mode 100644
+index 00000000..bb6257ca
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/skip-missing-qml-directory.patch
+@@ -0,0 +1,17 @@
++--- a/src/tools/macdeployqt/shared/shared.cpp
+++++ b/src/tools/macdeployqt/shared/shared.cpp
++@@ -1300,9 +1300,12 @@ bool deployQmlImports(const QString &appBundlePath, DeploymentInfo deploymentInf
++     }
++     for (const QString &importPath : qmlImportPaths)
++         argumentList << "-importPath" << importPath;
+++
++     QString qmlImportsPath = QLibraryInfo::path(QLibraryInfo::QmlImportsPath);
++-    argumentList.append( "-importPath");
++-    argumentList.append(qmlImportsPath);
+++    if (QFile::exists(qmlImportsPath)) {
+++        argumentList.append( "-importPath");
+++        argumentList.append(qmlImportsPath);
+++    }
++ 
++     // In a modularized installation of qt as we have in Nix, instead, we will
++     // read the paths from the environment, as they are spread in multiple
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-from-path.patch b/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-from-path.patch
+new file mode 100644
+index 00000000..f439bf5d
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-from-path.patch
+@@ -0,0 +1,34 @@
++--- a/bin/qt-cmake-create.in
+++++ b/bin/qt-cmake-create.in
++@@ -7,12 +7,7 @@ HELP_MESSAGE="Usage
++ script_dir_path=`dirname $0`
++ script_dir_path=`(cd "$script_dir_path"; /bin/pwd)`
++ 
++-# Try to use original cmake, otherwise to make it relocatable, use any cmake found in PATH.
++-original_cmake_path="@CMAKE_COMMAND@"
++-cmake_path=$original_cmake_path
++-if ! test -f "$cmake_path"; then
++-    cmake_path="cmake"
++-fi
+++cmake_path="cmake"
++ 
++ if [ "$#" -gt 1 ]; then
++     echo "Invalid number of arguments"
++diff --git a/bin/qt-cmake.in b/bin/qt-cmake.in
++index f719257f602..571ffe788fa 100755
++--- a/bin/qt-cmake.in
+++++ b/bin/qt-cmake.in
++@@ -4,12 +4,7 @@
++ script_dir_path=`dirname $0`
++ script_dir_path=`(cd "$script_dir_path"; /bin/pwd)`
++ 
++-# Try to use original cmake, otherwise to make it relocatable, use any cmake found in PATH.
++-original_cmake_path="@CMAKE_COMMAND@"
++-cmake_path=$original_cmake_path
++-if ! test -f "$cmake_path"; then
++-    cmake_path="cmake"
++-fi
+++cmake_path="cmake"
++ 
++ toolchain_path="$script_dir_path/@__GlobalConfig_relative_path_from_bin_dir_to_cmake_config_dir@/qt.toolchain.cmake"
++ 
+diff --git a/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-path.patch b/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-path.patch
+new file mode 100644
+index 00000000..4f5b48f1
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-path.patch
+@@ -0,0 +1,60 @@
++diff --git a/cmake/QtConfig.cmake.in b/cmake/QtConfig.cmake.in
++index 93f47570706..b00d398d671 100644
++--- a/cmake/QtConfig.cmake.in
+++++ b/cmake/QtConfig.cmake.in
++@@ -190,7 +190,6 @@ foreach(module ${__qt_umbrella_find_components})
++                 ${_qt_additional_packages_prefix_paths}
++                 ${__qt_find_package_host_qt_path}
++                 ${_qt_additional_host_packages_prefix_paths}
++-            ${__qt_use_no_default_path_for_qt_packages}
++         )
++     endif()
++ 
++diff --git a/cmake/QtFindWrapHelper.cmake b/cmake/QtFindWrapHelper.cmake
++index c43824b8234..7ef65eb0f36 100644
++--- a/cmake/QtFindWrapHelper.cmake
+++++ b/cmake/QtFindWrapHelper.cmake
++@@ -79,7 +79,6 @@ macro(qt_find_package_system_or_bundled _unique_prefix)
++                     "${CMAKE_CURRENT_LIST_DIR}/.."
++                     ${_qt_cmake_dir}
++                     ${_qt_additional_packages_prefix_paths}
++-                ${${_unique_prefix}_qt_use_no_default_path_for_qt_packages}
++             )
++         else()
++             # For the non-bundled case we will look for FindWrapSystemFoo.cmake module files,
++diff --git a/cmake/QtModuleConfig.cmake.in b/cmake/QtModuleConfig.cmake.in
++index e3af0299c57..2bbc06ddec3 100644
++--- a/cmake/QtModuleConfig.cmake.in
+++++ b/cmake/QtModuleConfig.cmake.in
++@@ -59,7 +59,6 @@ if (@INSTALL_CMAKE_NAMESPACE@@target@_FOUND
++             "${CMAKE_CURRENT_LIST_DIR}/.."
++             "${_qt_cmake_dir}"
++             ${_qt_additional_packages_prefix_paths}
++-        ${__qt_use_no_default_path_for_qt_packages}
++     )
++ 
++     if(NOT @INSTALL_CMAKE_NAMESPACE@@target_private@_FOUND)
++diff --git a/cmake/QtModuleDependencies.cmake.in b/cmake/QtModuleDependencies.cmake.in
++index 78ada0a7425..74659943a83 100644
++--- a/cmake/QtModuleDependencies.cmake.in
+++++ b/cmake/QtModuleDependencies.cmake.in
++@@ -23,7 +23,6 @@ if(NOT @INSTALL_CMAKE_NAMESPACE@_FOUND)
++             "${CMAKE_CURRENT_LIST_DIR}/.."
++             "${_qt_cmake_dir}"
++             ${_qt_additional_packages_prefix_paths}
++-        ${__qt_use_no_default_path_for_qt_packages}
++     )
++ endif()
++ 
++diff --git a/cmake/QtPublicDependencyHelpers.cmake b/cmake/QtPublicDependencyHelpers.cmake
++index b4a0342ad87..a7de8750485 100644
++--- a/cmake/QtPublicDependencyHelpers.cmake
+++++ b/cmake/QtPublicDependencyHelpers.cmake
++@@ -144,7 +144,6 @@ macro(_qt_internal_find_qt_dependencies target target_dep_list find_dependency_p
++                     ${QT_BUILD_CMAKE_PREFIX_PATH}
++                     ${${find_dependency_path_list}}
++                     ${_qt_additional_packages_prefix_paths}
++-                ${__qt_use_no_default_path_for_qt_packages}
++             )
++             if(NOT ${__qt_${target}_pkg}_FOUND)
++                 list(APPEND __qt_${target}_missing_deps "${__qt_${target}_pkg}")
+diff --git a/overlay/vendor/qt-6.11/modules/qtcharts.nix b/overlay/vendor/qt-6.11/modules/qtcharts.nix
+new file mode 100644
+index 00000000..8701933d
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtcharts.nix
+@@ -0,0 +1,13 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++}:
++
++qtModule {
++  pname = "qtcharts";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtconnectivity.nix b/overlay/vendor/qt-6.11/modules/qtconnectivity.nix
+new file mode 100644
+index 00000000..d0f22841
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtconnectivity.nix
+@@ -0,0 +1,23 @@
++{
++  qtModule,
++  lib,
++  stdenv,
++  qtbase,
++  qtdeclarative,
++  bluez,
++  pcsclite,
++  pkg-config,
++}:
++
++qtModule {
++  pname = "qtconnectivity";
++  nativeBuildInputs = [ pkg-config ];
++  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
++    pcsclite
++    bluez
++  ];
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtdatavis3d.nix b/overlay/vendor/qt-6.11/modules/qtdatavis3d.nix
+new file mode 100644
+index 00000000..4e3eca80
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtdatavis3d.nix
+@@ -0,0 +1,13 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++}:
++
++qtModule {
++  pname = "qtdatavis3d";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtdeclarative/default.nix b/overlay/vendor/qt-6.11/modules/qtdeclarative/default.nix
+new file mode 100644
+index 00000000..786229c5
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtdeclarative/default.nix
+@@ -0,0 +1,62 @@
++{
++  qtModule,
++  qtbase,
++  qtlanguageserver,
++  qtshadertools,
++  qtsvg,
++  openssl,
++  darwin,
++  stdenv,
++  lib,
++  pkgsBuildBuild,
++  replaceVars,
++  fetchpatch,
++}:
++
++qtModule {
++  pname = "qtdeclarative";
++
++  propagatedBuildInputs = [
++    qtbase
++    qtlanguageserver
++    qtshadertools
++    qtsvg
++    openssl
++  ];
++  strictDeps = true;
++
++  nativeBuildInputs = lib.optionals stdenv.hostPlatform.isDarwin [
++    darwin.sigtool
++  ];
++
++  patches = [
++    # don't cache bytecode of bare qml files in the store, as that never gets cleaned up
++    (replaceVars ./dont-cache-nix-store-paths.patch {
++      nixStore = builtins.storeDir;
++    })
++    # add version specific QML import path
++    ./use-versioned-import-path.patch
++
++    # revert codesigning change on Darwin that doesn't work with our signing tools
++    (fetchpatch {
++      url = "https://github.com/qt/qtdeclarative/commit/a7084abd9778b955d80e7419e82f6f7b92f7978d.diff";
++      hash = "sha256-ESy35OlmsvI4yFQ/rFT8oelOUBCwCmlcbQJvwcTrCig=";
++      revert = true;
++    })
++  ];
++
++  cmakeFlags = [
++    "-DQt6ShaderToolsTools_DIR=${pkgsBuildBuild.qt6.qtshadertools}/lib/cmake/Qt6ShaderTools"
++    # for some reason doesn't get found automatically on Darwin
++    "-DPython_EXECUTABLE=${lib.getExe pkgsBuildBuild.python3}"
++  ]
++  # Conditional is required to prevent infinite recursion during a cross build
++  ++ lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
++    "-DQt6QmlTools_DIR=${pkgsBuildBuild.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  meta.maintainers = with lib.maintainers; [
++    nickcao
++    outfoxxed
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtdeclarative/dont-cache-nix-store-paths.patch b/overlay/vendor/qt-6.11/modules/qtdeclarative/dont-cache-nix-store-paths.patch
+new file mode 100644
+index 00000000..ef5d108d
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtdeclarative/dont-cache-nix-store-paths.patch
+@@ -0,0 +1,17 @@
++--- a/src/qml/common/qv4compileddata.cpp
+++++ b/src/qml/common/qv4compileddata.cpp
++@@ -178,6 +178,14 @@ bool CompilationUnit::saveToDisk(const QUrl &unitUrl, QString *errorString)
++         return false;
++     }
++ 
+++    if (unitUrl.path().startsWith(QStringLiteral("@nixStore@"))) {
+++        // We don't store bytecode for bare QML files in the nix store as the
+++        // paths will change every time the application updates, filling caches
+++        // endlessly with junk.
+++        *errorString = QStringLiteral("Refusing to save bytecode for bare @nixStore@ path.");
+++        return false;
+++    }
+++
++     return SaveableUnitPointer(unitData()).saveToDisk<char>(
++             [&unitUrl, errorString](const char *data, quint32 size) {
++                 const QString cachePath = localCacheFilePath(unitUrl);
+diff --git a/overlay/vendor/qt-6.11/modules/qtdeclarative/use-versioned-import-path.patch b/overlay/vendor/qt-6.11/modules/qtdeclarative/use-versioned-import-path.patch
+new file mode 100644
+index 00000000..6de31fae
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtdeclarative/use-versioned-import-path.patch
+@@ -0,0 +1,14 @@
++diff --git a/src/qml/qml/qqmltypeloader.cpp b/src/qml/qml/qqmltypeloader.cpp
++index 5d09bf21c6..eacc8ccaea 100644
++--- a/src/qml/qml/qqmltypeloader.cpp
+++++ b/src/qml/qml/qqmltypeloader.cpp
++@@ -1235,7 +1235,8 @@ QQmlTypeLoader::QQmlTypeLoader(QQmlEngine *engine)
++     // env import paths
++     addEnvImportPath("QML_IMPORT_PATH");
++     addEnvImportPath("QML2_IMPORT_PATH");
++-
+++    addEnvImportPath("NIXPKGS_QT6_QML_IMPORT_PATH");
+++ 
++     addImportPath(QStringLiteral("qrc:/qt/qml"));
++     addImportPath(QStringLiteral("qrc:/qt-project.org/imports"));
++ 
+diff --git a/overlay/vendor/qt-6.11/modules/qtdoc.nix b/overlay/vendor/qt-6.11/modules/qtdoc.nix
+new file mode 100644
+index 00000000..5e35b4b5
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtdoc.nix
+@@ -0,0 +1,22 @@
++{
++  qtModule,
++  qtdeclarative,
++  qtbase,
++  qttools,
++}:
++
++qtModule {
++  pname = "qtdoc";
++  # avoid fix-qt-builtin-paths hook substitute QT_INSTALL_DOCS to qtdoc's path
++  postPatch = ''
++    for file in $(grep -rl '$QT_INSTALL_DOCS'); do
++      substituteInPlace $file \
++          --replace '$QT_INSTALL_DOCS' "${qtbase}/share/doc"
++    done
++  '';
++  nativeBuildInputs = [ (qttools.override { withClang = true; }) ];
++  propagatedBuildInputs = [ qtdeclarative ];
++
++  ninjaFlags = [ "docs" ];
++  installTargets = [ "install_docs" ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtgraphs.nix b/overlay/vendor/qt-6.11/modules/qtgraphs.nix
+new file mode 100644
+index 00000000..5de167cc
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtgraphs.nix
+@@ -0,0 +1,17 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  qtquick3d,
++  qtquicktimeline,
++}:
++
++qtModule {
++  pname = "qtgraphs";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++    qtquick3d
++    qtquicktimeline
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtgrpc.nix b/overlay/vendor/qt-6.11/modules/qtgrpc.nix
+new file mode 100644
+index 00000000..28092b27
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtgrpc.nix
+@@ -0,0 +1,20 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  protobuf,
++  grpc,
++}:
++
++qtModule {
++  pname = "qtgrpc";
++
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++  buildInputs = [
++    protobuf
++    grpc
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qthttpserver.nix b/overlay/vendor/qt-6.11/modules/qthttpserver.nix
+new file mode 100644
+index 00000000..8a1f85d1
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qthttpserver.nix
+@@ -0,0 +1,13 @@
++{
++  qtModule,
++  qtbase,
++  qtwebsockets,
++}:
++
++qtModule {
++  pname = "qthttpserver";
++  propagatedBuildInputs = [
++    qtbase
++    qtwebsockets
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtimageformats.nix b/overlay/vendor/qt-6.11/modules/qtimageformats.nix
+new file mode 100644
+index 00000000..e5977e22
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtimageformats.nix
+@@ -0,0 +1,19 @@
++{
++  qtModule,
++  qtbase,
++  libwebp,
++  jasper,
++  libmng,
++  libtiff,
++}:
++
++qtModule {
++  pname = "qtimageformats";
++  propagatedBuildInputs = [ qtbase ];
++  buildInputs = [
++    libwebp
++    jasper
++    libmng
++    libtiff
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtlanguageserver.nix b/overlay/vendor/qt-6.11/modules/qtlanguageserver.nix
+new file mode 100644
+index 00000000..74596e53
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtlanguageserver.nix
+@@ -0,0 +1,12 @@
++{
++  qtModule,
++  qtbase,
++}:
++
++qtModule {
++  pname = "qtlanguageserver";
++  propagatedBuildInputs = [ qtbase ];
++
++  # Doesn't have version set
++  dontCheckQtModuleVersion = true;
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtlocation.nix b/overlay/vendor/qt-6.11/modules/qtlocation.nix
+new file mode 100644
+index 00000000..120b05b0
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtlocation.nix
+@@ -0,0 +1,15 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  qtpositioning,
++}:
++
++qtModule {
++  pname = "qtlocation";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++    qtpositioning
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtlottie.nix b/overlay/vendor/qt-6.11/modules/qtlottie.nix
+new file mode 100644
+index 00000000..c1cefda1
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtlottie.nix
+@@ -0,0 +1,13 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++}:
++
++qtModule {
++  pname = "qtlottie";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtmqtt.nix b/overlay/vendor/qt-6.11/modules/qtmqtt.nix
+new file mode 100644
+index 00000000..b5e6c6bc
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtmqtt.nix
+@@ -0,0 +1,19 @@
++{
++  qtModule,
++  fetchFromGitHub,
++  qtbase,
++}:
++
++qtModule rec {
++  pname = "qtmqtt";
++  version = "6.11.2";
++
++  src = fetchFromGitHub {
++    owner = "qt";
++    repo = "qtmqtt";
++    tag = "v${version}";
++    hash = "sha256-Xg4vfVfYgruRXB6LSWFJWSMtsClJMtML+KhaQExWUGs=";
++  };
++
++  propagatedBuildInputs = [ qtbase ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtmultimedia/default.nix b/overlay/vendor/qt-6.11/modules/qtmultimedia/default.nix
+new file mode 100644
+index 00000000..50829d0b
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtmultimedia/default.nix
+@@ -0,0 +1,77 @@
++{
++  qtModule,
++  lib,
++  stdenv,
++  qtbase,
++  qtdeclarative,
++  qtquick3d,
++  qtshadertools,
++  qtsvg,
++  pkg-config,
++  alsa-lib,
++  gstreamer,
++  gst-plugins-bad,
++  gst-plugins-base,
++  gst-plugins-good,
++  gst-libav,
++  ffmpeg,
++  libva,
++  libpulseaudio,
++  pipewire,
++  wayland,
++  libxrandr,
++  elfutils,
++  libunwind,
++  orc,
++  pkgsBuildBuild,
++}:
++
++qtModule {
++  pname = "qtmultimedia";
++  nativeBuildInputs = [ pkg-config ];
++  buildInputs = [
++    ffmpeg
++  ]
++  ++ lib.optionals (!stdenv.hostPlatform.isMinGW) [
++    libunwind
++    orc
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isLinux [
++    libpulseaudio
++    pipewire
++    alsa-lib
++    wayland
++    libxrandr
++    libva
++  ]
++  ++ lib.optionals (lib.meta.availableOn stdenv.hostPlatform elfutils) [ elfutils ];
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++    qtsvg
++    qtshadertools
++  ]
++  ++ lib.optionals (!stdenv.hostPlatform.isMinGW) [ qtquick3d ]
++  ++ lib.optionals stdenv.hostPlatform.isLinux [
++    gstreamer
++    gst-plugins-bad
++    gst-plugins-base
++    gst-plugins-good
++    gst-libav
++  ];
++
++  patches = lib.optionals stdenv.hostPlatform.isMinGW [
++    ./windows-no-uppercase-libs.patch
++    ./windows-resolve-function-name.patch
++  ];
++
++  cmakeFlags = [
++    "-DENABLE_DYNAMIC_RESOLVE_VAAPI_SYMBOLS=0"
++    "-DQt6ShaderToolsTools_DIR=${pkgsBuildBuild.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
++  ];
++
++  env = {
++    NIX_CFLAGS_COMPILE = lib.optionalString stdenv.hostPlatform.isDarwin "-include AudioToolbox/AudioToolbox.h";
++    NIX_LDFLAGS = lib.optionalString stdenv.hostPlatform.isDarwin "-framework AudioToolbox";
++  };
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-no-uppercase-libs.patch b/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-no-uppercase-libs.patch
+new file mode 100644
+index 00000000..06cead73
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-no-uppercase-libs.patch
+@@ -0,0 +1,11 @@
++--- a/src/plugins/multimedia/ffmpeg/qffmpegscreencapture_dxgi.cpp
+++++ b/src/plugins/multimedia/ffmpeg/qffmpegscreencapture_dxgi.cpp
++@@ -14,7 +14,7 @@
++ #include <qwaitcondition.h>
++ #include <qmutex.h>
++ 
++-#include "D3d11.h"
+++#include "d3d11.h"
++ #include "dxgi1_2.h"
++ 
++ #include <system_error>
+diff --git a/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-resolve-function-name.patch b/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-resolve-function-name.patch
+new file mode 100644
+index 00000000..56482b30
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-resolve-function-name.patch
+@@ -0,0 +1,28 @@
++--- a/src/plugins/multimedia/ffmpeg/qwincapturablewindows.cpp
+++++ b/src/plugins/multimedia/ffmpeg/qwincapturablewindows.cpp
++@@ -42,11 +42,7 @@ static QString windowTitle(HWND hwnd) {
++     return QString::fromStdWString(buffer);
++ }
++ 
++-QList<QCapturableWindow> QWinCapturableWindows::windows() const
++-{
++-    QList<QCapturableWindow> result;
++-
++-    auto windowHandler = [](HWND hwnd, LPARAM lParam) {
+++static int __stdcall windowHandler(HWND hwnd, LPARAM lParam) {
++         if (!canCaptureWindow(hwnd))
++             return TRUE; // Ignore window and continue enumerating
++ 
++@@ -58,7 +54,11 @@ QList<QCapturableWindow> QWinCapturableWindows::windows() const
++         windows.push_back(windowData.release()->create());
++ 
++         return TRUE;
++-    };
+++}
+++
+++QList<QCapturableWindow> QWinCapturableWindows::windows() const
+++{
+++    QList<QCapturableWindow> result;
++ 
++     ::EnumWindows(windowHandler, reinterpret_cast<LPARAM>(&result));
++ 
+diff --git a/overlay/vendor/qt-6.11/modules/qtnetworkauth.nix b/overlay/vendor/qt-6.11/modules/qtnetworkauth.nix
+new file mode 100644
+index 00000000..bec5f354
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtnetworkauth.nix
+@@ -0,0 +1,6 @@
++{ qtModule, qtbase }:
++
++qtModule {
++  pname = "qtnetworkauth";
++  propagatedBuildInputs = [ qtbase ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtpositioning.nix b/overlay/vendor/qt-6.11/modules/qtpositioning.nix
+new file mode 100644
+index 00000000..f0f8a3f5
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtpositioning.nix
+@@ -0,0 +1,19 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  qtserialport,
++  pkg-config,
++  openssl,
++}:
++
++qtModule {
++  pname = "qtpositioning";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++    qtserialport
++  ];
++  nativeBuildInputs = [ pkg-config ];
++  buildInputs = [ openssl ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtquick3d.nix b/overlay/vendor/qt-6.11/modules/qtquick3d.nix
+new file mode 100644
+index 00000000..40b95dfb
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtquick3d.nix
+@@ -0,0 +1,15 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  openssl,
++}:
++
++qtModule {
++  pname = "qtquick3d";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++  buildInputs = [ openssl ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtquick3dphysics.nix b/overlay/vendor/qt-6.11/modules/qtquick3dphysics.nix
+new file mode 100644
+index 00000000..b49c286f
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtquick3dphysics.nix
+@@ -0,0 +1,16 @@
++{
++  qtModule,
++  lib,
++  stdenv,
++  qtbase,
++  qtquick3d,
++}:
++
++qtModule {
++  pname = "qtquick3dphysics";
++  propagatedBuildInputs = [
++    qtbase
++    qtquick3d
++  ];
++  meta.mainProgram = "cooker";
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtquickeffectmaker.nix b/overlay/vendor/qt-6.11/modules/qtquickeffectmaker.nix
+new file mode 100644
+index 00000000..f71c891e
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtquickeffectmaker.nix
+@@ -0,0 +1,14 @@
++{
++  qtModule,
++  qtbase,
++  qtquick3d,
++}:
++
++qtModule {
++  pname = "qtquickeffectmaker";
++  propagatedBuildInputs = [
++    qtbase
++    qtquick3d
++  ];
++  meta.mainProgram = "qqem";
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtquicktimeline.nix b/overlay/vendor/qt-6.11/modules/qtquicktimeline.nix
+new file mode 100644
+index 00000000..59c774b9
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtquicktimeline.nix
+@@ -0,0 +1,13 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++}:
++
++qtModule {
++  pname = "qtquicktimeline";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtremoteobjects.nix b/overlay/vendor/qt-6.11/modules/qtremoteobjects.nix
+new file mode 100644
+index 00000000..42ad13e3
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtremoteobjects.nix
+@@ -0,0 +1,13 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++}:
++
++qtModule {
++  pname = "qtremoteobjects";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtscxml.nix b/overlay/vendor/qt-6.11/modules/qtscxml.nix
+new file mode 100644
+index 00000000..a0a821a3
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtscxml.nix
+@@ -0,0 +1,13 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++}:
++
++qtModule {
++  pname = "qtscxml";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtsensors.nix b/overlay/vendor/qt-6.11/modules/qtsensors.nix
+new file mode 100644
+index 00000000..888136e3
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtsensors.nix
+@@ -0,0 +1,15 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  qtsvg,
++}:
++
++qtModule {
++  pname = "qtsensors";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++    qtsvg
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtserialbus.nix b/overlay/vendor/qt-6.11/modules/qtserialbus.nix
+new file mode 100644
+index 00000000..5276b2e5
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtserialbus.nix
+@@ -0,0 +1,14 @@
++{
++  qtModule,
++  qtbase,
++  qtserialport,
++}:
++
++qtModule {
++  pname = "qtserialbus";
++  propagatedBuildInputs = [
++    qtbase
++    qtserialport
++  ];
++  meta.mainProgram = "canbusutil";
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtserialport.nix b/overlay/vendor/qt-6.11/modules/qtserialport.nix
+new file mode 100644
+index 00000000..74b647c6
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtserialport.nix
+@@ -0,0 +1,14 @@
++{
++  qtModule,
++  stdenv,
++  lib,
++  qtbase,
++  udev,
++  pkg-config,
++}:
++
++qtModule {
++  pname = "qtserialport";
++  nativeBuildInputs = [ pkg-config ];
++  propagatedBuildInputs = [ qtbase ] ++ lib.optionals stdenv.hostPlatform.isLinux [ udev ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtshadertools.nix b/overlay/vendor/qt-6.11/modules/qtshadertools.nix
+new file mode 100644
+index 00000000..0d8c8111
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtshadertools.nix
+@@ -0,0 +1,16 @@
++{
++  qtModule,
++  qtbase,
++  stdenv,
++  lib,
++  pkgsBuildBuild,
++}:
++
++qtModule {
++  pname = "qtshadertools";
++  propagatedBuildInputs = [ qtbase ];
++  cmakeFlags = lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
++    "-DQt6ShaderToolsTools_DIR=${pkgsBuildBuild.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
++  ];
++  meta.mainProgram = "qsb";
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtspeech.nix b/overlay/vendor/qt-6.11/modules/qtspeech.nix
+new file mode 100644
+index 00000000..4867bcaf
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtspeech.nix
+@@ -0,0 +1,25 @@
++{
++  qtModule,
++  lib,
++  stdenv,
++  qtbase,
++  qtmultimedia,
++  pkg-config,
++  flite,
++  alsa-lib,
++  speechd-minimal,
++}:
++
++qtModule {
++  pname = "qtspeech";
++  nativeBuildInputs = [ pkg-config ];
++  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
++    flite
++    alsa-lib
++    speechd-minimal
++  ];
++  propagatedBuildInputs = [
++    qtbase
++    qtmultimedia
++  ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtsvg.nix b/overlay/vendor/qt-6.11/modules/qtsvg.nix
+new file mode 100644
+index 00000000..5937c0c7
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtsvg.nix
+@@ -0,0 +1,27 @@
++{
++  qtModule,
++  qtbase,
++  libwebp,
++  jasper,
++  libmng,
++  zlib,
++  pkg-config,
++  lib,
++  stdenv,
++}:
++
++qtModule {
++  pname = "qtsvg";
++  propagatedBuildInputs = [ qtbase ];
++  buildInputs = [
++    libwebp
++  ]
++  ++ lib.optionals (stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
++    jasper
++  ]
++  ++ [
++    libmng
++    zlib
++  ];
++  nativeBuildInputs = [ pkg-config ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qttools/default.nix b/overlay/vendor/qt-6.11/modules/qttools/default.nix
+new file mode 100644
+index 00000000..c81cb2ac
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qttools/default.nix
+@@ -0,0 +1,53 @@
++{
++  pkgsBuildBuild,
++  qtModule,
++  stdenv,
++  lib,
++  qtbase,
++  qtdeclarative,
++  cups,
++  llvmPackages,
++  # clang-based c++ parser for qdoc and lupdate
++  withClang ? false,
++}:
++
++qtModule {
++  pname = "qttools";
++
++  postPatch = ''
++    substituteInPlace \
++      src/qdoc/catch/CMakeLists.txt \
++      src/qdoc/catch_generators/CMakeLists.txt \
++      src/qdoc/catch_conversions/CMakeLists.txt \
++      --replace ''\'''${CMAKE_INSTALL_INCLUDEDIR}' "$out/include"
++  '';
++
++  env.NIX_CFLAGS_COMPILE = toString [
++    "-DNIX_OUTPUT_OUT=\"${placeholder "out"}\""
++  ];
++
++  buildInputs = lib.optionals withClang [
++    llvmPackages.libclang
++    llvmPackages.llvm
++  ];
++
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isDarwin [ cups ];
++
++  cmakeFlags =
++    lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
++      "-DQt6LinguistTools_DIR=${pkgsBuildBuild.qt6.qttools}/lib/cmake/Qt6LinguistTools"
++      "-DQt6ToolsTools_DIR=${pkgsBuildBuild.qt6.qttools}/lib/cmake/Qt6ToolsTools"
++    ]
++    ++ lib.optionals withClang [
++      "-DFEATURE_clang=ON"
++    ];
++
++  postInstall = ''
++    mkdir -p "$dev"
++    ln -s "$out/bin" "$dev/bin"
++  '';
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qttranslations.nix b/overlay/vendor/qt-6.11/modules/qttranslations.nix
+new file mode 100644
+index 00000000..b6073620
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qttranslations.nix
+@@ -0,0 +1,12 @@
++{
++  qtModule,
++  qttools,
++}:
++
++qtModule {
++  pname = "qttranslations";
++  nativeBuildInputs = [ qttools ];
++  separateDebugInfo = false;
++  outputs = [ "out" ];
++  allowedReferences = [ "out" ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtvirtualkeyboard.nix b/overlay/vendor/qt-6.11/modules/qtvirtualkeyboard.nix
+new file mode 100644
+index 00000000..4c9f449f
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtvirtualkeyboard.nix
+@@ -0,0 +1,19 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  qtsvg,
++  hunspell,
++  pkg-config,
++}:
++
++qtModule {
++  pname = "qtvirtualkeyboard";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++    qtsvg
++    hunspell
++  ];
++  nativeBuildInputs = [ pkg-config ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtwayland.nix b/overlay/vendor/qt-6.11/modules/qtwayland.nix
+new file mode 100644
+index 00000000..54fc9cac
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwayland.nix
+@@ -0,0 +1,30 @@
++{
++  pkgsBuildBuild,
++  stdenv,
++  lib,
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  pkg-config,
++  libdrm,
++}:
++
++qtModule {
++  pname = "qtwayland";
++
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++  buildInputs = [ libdrm ];
++  nativeBuildInputs = [ pkg-config ];
++
++  cmakeFlags = lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
++    "-DQt6WaylandScannerTools_DIR=${pkgsBuildBuild.qt6.qtbase}/lib/cmake/Qt6WaylandScannerTools"
++  ];
++
++  meta = {
++    platforms = lib.platforms.unix;
++    badPlatforms = lib.platforms.darwin;
++  };
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtwebchannel.nix b/overlay/vendor/qt-6.11/modules/qtwebchannel.nix
+new file mode 100644
+index 00000000..b60e8023
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwebchannel.nix
+@@ -0,0 +1,17 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  qtwebsockets,
++  openssl,
++}:
++
++qtModule {
++  pname = "qtwebchannel";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++    qtwebsockets
++  ];
++  buildInputs = [ openssl ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/default.nix b/overlay/vendor/qt-6.11/modules/qtwebengine/default.nix
+new file mode 100644
+index 00000000..f44f4617
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwebengine/default.nix
+@@ -0,0 +1,294 @@
++{
++  qtModule,
++  qtdeclarative,
++  qtwebchannel,
++  qtpositioning,
++  qtwebsockets,
++  buildPackages,
++  bison,
++  coreutils,
++  fetchpatch2,
++  flex,
++  gperf,
++  ninja,
++  pkg-config,
++  python3,
++  which,
++  nodejs,
++  libxext,
++  libxdamage,
++  libxcomposite,
++  xrandr,
++  libxkbfile,
++  libpciaccess,
++  libxcursor,
++  libxscrnsaver,
++  libxrandr,
++  libxtst,
++  libxshmfence,
++  libxi,
++  cups,
++  fontconfig,
++  freetype,
++  harfbuzz,
++  icu,
++  dbus,
++  expat,
++  libdrm,
++  zlib,
++  minizip,
++  libjpeg,
++  libpng,
++  libtiff,
++  libwebp,
++  libopus,
++  jsoncpp,
++  protobuf,
++  srtp,
++  snappy,
++  nss,
++  libevent,
++  openssl,
++  alsa-lib,
++  pulseaudio,
++  libcap,
++  pciutils,
++  systemd,
++  pipewire,
++  gn,
++  ffmpeg,
++  lib,
++  stdenv,
++  glib,
++  libxml2,
++  libxslt,
++  lcms2,
++  libkrb5,
++  libgbm,
++  libva,
++  enableProprietaryCodecs ? true,
++  # darwin
++  bootstrap_cmds,
++  cctools,
++  xcbuild,
++}:
++
++qtModule {
++  pname = "qtwebengine";
++  nativeBuildInputs = [
++    bison
++    coreutils
++    flex
++    gperf
++    ninja
++    pkg-config
++    (python3.withPackages (ps: with ps; [ html5lib ]))
++    which
++    gn
++    nodejs
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isDarwin [
++    bootstrap_cmds
++    cctools
++    xcbuild
++  ];
++  doCheck = true;
++  outputs = [
++    "out"
++    "dev"
++  ];
++
++  dontUseGnConfigure = true;
++
++  # ninja builds some components with -Wno-format,
++  # which cannot be set at the same time as -Wformat-security
++  hardeningDisable = [ "format" ];
++
++  patches = [
++    # Don't assume /usr/share/X11, and also respect the XKB_CONFIG_ROOT
++    # environment variable, since NixOS relies on it working.
++    # See https://github.com/NixOS/nixpkgs/issues/226484 for more context.
++    ./xkb-includes.patch
++
++    ./link-pulseaudio.patch
++
++    # Override locales install path so they go to QtWebEngine's $out
++    ./locales-path.patch
++
++    # Reproducibility QTBUG-136068
++    ./gn-object-sorted.patch
++
++    ./split-prefix.patch
++  ];
++
++  postPatch = ''
++    # Patch Chromium build tools
++    (
++      cd src/3rdparty/chromium;
++
++      # Manually fix unsupported shebangs
++      substituteInPlace third_party/harfbuzz-ng/src/src/update-unicode-tables.make \
++        --replace "/usr/bin/env -S make -f" "/usr/bin/make -f" || true
++      substituteInPlace third_party/webgpu-cts/src/tools/run_deno \
++        --replace "/usr/bin/env -S deno" "/usr/bin/deno" || true
++      patchShebangs .
++    )
++
++    substituteInPlace cmake/Functions.cmake \
++      --replace "/bin/bash" "${buildPackages.bash}/bin/bash"
++
++    substituteInPlace configure.cmake src/gn/CMakeLists.txt \
++      --replace "AppleClang" "Clang"
++
++    # Disable metal shader compilation, Xcode only
++    substituteInPlace src/3rdparty/chromium/third_party/angle/src/libANGLE/renderer/metal/metal_backend.gni \
++      --replace-fail 'angle_has_build && !is_ios && target_os == host_os' "false"
++  ''
++  + lib.optionalString stdenv.hostPlatform.isLinux ''
++    sed -i -e '/lib_loader.*Load/s!"\(libudev\.so\)!"${lib.getLib systemd}/lib/\1!' \
++      src/3rdparty/chromium/device/udev_linux/udev?_loader.cc
++
++    sed -i -e '/libpci_loader.*Load/s!"\(libpci\.so\)!"${pciutils}/lib/\1!' \
++      src/3rdparty/chromium/gpu/config/gpu_info_collector_linux.cc
++  ''
++  + lib.optionalString stdenv.hostPlatform.isDarwin ''
++    substituteInPlace cmake/QtToolchainHelpers.cmake \
++      --replace-fail "/usr/bin/xcrun" "${xcbuild}/bin/xcrun"
++  '';
++
++  cmakeFlags = [
++    "-DQT_FEATURE_qtpdf_build=ON"
++    "-DQT_FEATURE_qtpdf_widgets_build=ON"
++    "-DQT_FEATURE_qtpdf_quick_build=ON"
++    "-DQT_FEATURE_pdf_v8=ON"
++    "-DQT_FEATURE_pdf_xfa=ON"
++    "-DQT_FEATURE_pdf_xfa_bmp=ON"
++    "-DQT_FEATURE_pdf_xfa_gif=ON"
++    "-DQT_FEATURE_pdf_xfa_png=ON"
++    "-DQT_FEATURE_pdf_xfa_tiff=ON"
++    "-DQT_FEATURE_webengine_system_libevent=ON"
++    "-DQT_FEATURE_webengine_system_ffmpeg=ON"
++    # android only. https://bugreports.qt.io/browse/QTBUG-100293
++    # "-DQT_FEATURE_webengine_native_spellchecker=ON"
++    "-DQT_FEATURE_webengine_sanitizer=ON"
++    "-DQT_FEATURE_webengine_kerberos=ON"
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isLinux [
++    "-DQT_FEATURE_webengine_system_libxml=ON"
++    "-DQT_FEATURE_webengine_webrtc_pipewire=ON"
++
++    # Appears not to work on some platforms
++    # https://github.com/Homebrew/homebrew-core/issues/104008
++    "-DQT_FEATURE_webengine_system_icu=ON"
++  ]
++  ++ lib.optionals enableProprietaryCodecs [
++    "-DQT_FEATURE_webengine_proprietary_codecs=ON"
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isDarwin [
++    "-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0" # Per Qt 6’s deployment target (why doesn’t the hook work?)
++  ];
++
++  propagatedBuildInputs = [
++    qtdeclarative
++    qtwebchannel
++    qtwebsockets
++    qtpositioning
++
++    # Image formats
++    libjpeg
++    libpng
++    libtiff
++    libwebp
++
++    # Video formats
++    srtp
++
++    # Audio formats
++    libopus
++
++    # Text rendering
++    harfbuzz
++
++    openssl
++    glib
++    libxslt
++    lcms2
++
++    libevent
++    ffmpeg
++  ]
++  ++ lib.optionals stdenv.hostPlatform.isLinux [
++    dbus
++    expat
++    zlib
++    minizip
++    snappy
++    nss
++    protobuf
++    jsoncpp
++
++    icu
++    libxml2
++
++    # Audio formats
++    alsa-lib
++    pulseaudio
++
++    # Text rendering
++    fontconfig
++    freetype
++
++    libcap
++    pciutils
++
++    # X11 libs
++    xrandr
++    libxscrnsaver
++    libxcursor
++    libxrandr
++    libpciaccess
++    libxtst
++    libxcomposite
++    libxdamage
++    libdrm
++    libxkbfile
++    libxshmfence
++    libxi
++    libxext
++
++    # Pipewire
++    pipewire
++
++    libkrb5
++    libgbm
++    libva
++  ];
++
++  buildInputs = [
++    cups
++  ];
++
++  requiredSystemFeatures = [ "big-parallel" ];
++
++  preConfigure = ''
++    export NINJAFLAGS="-j$NIX_BUILD_CORES"
++  '';
++
++  # Debug info is too big to link with LTO.
++  separateDebugInfo = false;
++
++  meta = {
++    description = "Web engine based on the Chromium web browser";
++    platforms = [
++      "x86_64-darwin"
++      "aarch64-darwin"
++      "aarch64-linux"
++      "armv7a-linux"
++      "armv7l-linux"
++      "x86_64-linux"
++    ];
++    # This build takes a long time; particularly on slow architectures
++    # 1 hour on 32x3.6GHz -> maybe 12 hours on 4x2.4GHz
++    timeout = 24 * 3600;
++  };
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/gn-object-sorted.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/gn-object-sorted.patch
+new file mode 100644
+index 00000000..4e6b0672
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwebengine/gn-object-sorted.patch
+@@ -0,0 +1,32 @@
++diff --git a/gn/src/gn/rsp_target_writer.cc b/gn/src/gn/rsp_target_writer.cc
++index 6c1c687e99d..097b84b317e 100644
++--- a/src/3rdparty/gn/src/gn/rsp_target_writer.cc
+++++ b/src/3rdparty/gn/src/gn/rsp_target_writer.cc
++@@ -117,8 +117,7 @@ void RspTargetWriter::Run() {
++       PathOutput path_output(settings->build_settings()->build_dir(),
++                              settings->build_settings()->root_path_utf8(),
++                              ESCAPE_NONE);
++-      std::vector<SourceFile> object_files;
++-      object_files.reserve(target_->sources().size());
+++      std::set<SourceFile> object_files;
++ 
++       for (const auto& source : target_->sources()) {
++         const char* tool_type = nullptr;
++@@ -128,7 +127,7 @@ void RspTargetWriter::Run() {
++             other_files.push_back(source);
++           continue;  // No output for this source.
++         }
++-        object_files.push_back(
+++        object_files.insert(
++             tool_outputs[0].AsSourceFile(settings->build_settings()));
++       }
++       if (target_->config_values().has_precompiled_headers()) {
++@@ -137,7 +136,7 @@ void RspTargetWriter::Run() {
++         if (tool_cxx && tool_cxx->precompiled_header_type() == CTool::PCH_MSVC) {
++           GetPCHOutputFiles(target_, CTool::kCToolCxx, &tool_outputs);
++           if (!tool_outputs.empty())
++-            object_files.push_back(
+++            object_files.insert(
++                 tool_outputs[0].AsSourceFile(settings->build_settings()));
++         }
++       }
+diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/link-pulseaudio.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/link-pulseaudio.patch
+new file mode 100644
+index 00000000..05ad2a6d
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwebengine/link-pulseaudio.patch
+@@ -0,0 +1,12 @@
++diff --git a/src/core/CMakeLists.txt b/src/core/CMakeLists.txt
++index cc992b4d2..0a01ff03a 100644
++--- a/src/core/CMakeLists.txt
+++++ b/src/core/CMakeLists.txt
++@@ -368,6 +368,7 @@ foreach(arch ${archs})
++             devtools_skip_typecheck=false
++             content_enable_legacy_ipc=true
++             headless_use_policy=false
+++            link_pulseaudio=true
++         )
++         extend_gn_list(gnArgArg
++             ARGS use_v8_context_snapshot v8_use_external_startup_data
+diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/locales-path.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/locales-path.patch
+new file mode 100644
+index 00000000..832adad1
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwebengine/locales-path.patch
+@@ -0,0 +1,13 @@
++diff --git a/src/core/api/CMakeLists.txt b/src/core/api/CMakeLists.txt
++index dbe881ecf..9ba6ceffe 100644
++--- a/src/core/api/CMakeLists.txt
+++++ b/src/core/api/CMakeLists.txt
++@@ -214,7 +214,7 @@ if(QT_FEATURE_framework)
++     )
++ 
++ else()
++-    set(locale_install_path "${INSTALL_TRANSLATIONSDIR}/qtwebengine_locales")
+++    set(locale_install_path "${INSTALL_DATADIR}/qtwebengine_locales")
++     install(FILES ${localeFiles}
++         DESTINATION ${locale_install_path}
++         CONFIGURATIONS ${config}
+diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/split-prefix.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/split-prefix.patch
+new file mode 100644
+index 00000000..deb78798
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwebengine/split-prefix.patch
+@@ -0,0 +1,60 @@
++--- a/src/core/CMakeLists.txt
+++++ b/src/core/CMakeLists.txt
++@@ -83,6 +83,7 @@ foreach(arch ${archs})
++                 QT_USE_QSTRINGBUILDER
++                 QTWEBENGINECORE_VERSION_STR=${QT_REPO_MODULE_VERSION}
++                 QTWEBENGINEPROCESS_NAME=${qtWebEngineProcessName}
+++                QTWEBENGINE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
++                 BUILDING_CHROMIUM
++                 "${forwardDeclarationMacro}"
++             CXX_COMPILE_OPTIONS
++diff --git a/src/core/api/qtwebenginecoreglobal.h b/src/core/api/qtwebenginecoreglobal.h
++index 334d53d8e..9df9276bb 100644
++--- a/src/core/api/qtwebenginecoreglobal.h
+++++ b/src/core/api/qtwebenginecoreglobal.h
++@@ -19,6 +19,7 @@ Q_WEBENGINECORE_EXPORT Q_DECL_CONST_FUNCTION const char *qWebEngineVersion() noe
++ Q_WEBENGINECORE_EXPORT Q_DECL_CONST_FUNCTION const char *qWebEngineProcessName() noexcept;
++ Q_WEBENGINECORE_EXPORT Q_DECL_CONST_FUNCTION const char *qWebEngineChromiumVersion() noexcept;
++ Q_WEBENGINECORE_EXPORT Q_DECL_CONST_FUNCTION const char *qWebEngineChromiumSecurityPatchVersion() noexcept;
+++Q_WEBENGINECORE_EXPORT Q_DECL_CONST_FUNCTION const char *qWebEngineInstallPrefix() noexcept;
++ 
++ Q_WEBENGINECORE_EXPORT QString qWebEngineGetDomainAndRegistry(const QUrl &url);
++ 
++--- a/src/core/web_engine_context.cpp
+++++ b/src/core/web_engine_context.cpp
++@@ -1035,4 +1035,8 @@ const char *qWebEngineChromiumSecurityPatchVersion() noexcept
++     return STRINGIFY_EXPANDED(CHROMIUM_SECURITY_PATCH_VERSION);
++ }
++ 
+++const char *qWebEngineInstallPrefix() noexcept
+++{
+++    return STRINGIFY_EXPANDED(QTWEBENGINE_INSTALL_PREFIX);
+++}
++ QT_END_NAMESPACE
++--- a/src/core/web_engine_library_info.cpp
+++++ b/src/core/web_engine_library_info.cpp
++@@ -172,6 +172,7 @@ QString subProcessPath()
++                 candidatePaths << p % QLatin1Char('/') % processBinary;
++             for (auto &p : QLibraryInfo::paths(QLibraryInfo::BinariesPath))
++                 candidatePaths << p % QLatin1Char('/') % processBinary;
+++            candidatePaths << QString(qWebEngineInstallPrefix()) % "/libexec/"_L1 % processBinary;
++ #endif
++             candidatePaths << QCoreApplication::applicationDirPath()
++                               % QLatin1Char('/') % processBinary;
++@@ -235,6 +236,7 @@ QString localesPath()
++ #endif
++             for (auto &p : QLibraryInfo::paths(QLibraryInfo::TranslationsPath))
++                 candidatePaths << p % QDir::separator() % "qtwebengine_locales"_L1;
+++            candidatePaths << QString(qWebEngineInstallPrefix()) % QDir::separator() % "qtwebengine_locales"_L1;
++             candidatePaths << fallbackDir();
++         }
++ 
++@@ -358,7 +360,7 @@ QString resourcesPath()
++                 candidatePaths << p % QDir::separator() % "resources"_L1;
++                 candidatePaths << p;
++             }
++-
+++            candidatePaths << QString(qWebEngineInstallPrefix()) % QDir::separator() % "resources"_L1;
++             candidatePaths << QCoreApplication::applicationDirPath();
++             candidatePaths << fallbackDir();
++         }
+diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/xkb-includes.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/xkb-includes.patch
+new file mode 100644
+index 00000000..5056550c
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwebengine/xkb-includes.patch
+@@ -0,0 +1,12 @@
++--- a/src/3rdparty/chromium/ui/events/ozone/layout/xkb/xkb_keyboard_layout_engine.cc	2023-04-19 21:58:29.127258300 +0900
+++++ b/src/3rdparty/chromium/ui/events/ozone/layout/xkb/xkb_keyboard_layout_engine.cc	2023-04-19 22:01:35.860196284 +0900
++@@ -637,8 +637,7 @@
++                           .variant = layout_variant.c_str(),
++                           .options = ""};
++   std::unique_ptr<xkb_context, XkbContextDeleter> context;
++-  context.reset(xkb_context_new(XKB_CONTEXT_NO_DEFAULT_INCLUDES));
++-  xkb_context_include_path_append(context.get(), "/usr/share/X11/xkb");
+++  context.reset(xkb_context_new(XKB_CONTEXT_NO_FLAGS));
++   std::unique_ptr<xkb_keymap, XkbKeymapDeleter> keymap;
++   keymap.reset(xkb_keymap_new_from_names(context.get(), &names,
++                                          XKB_KEYMAP_COMPILE_NO_FLAGS));
+diff --git a/overlay/vendor/qt-6.11/modules/qtwebsockets.nix b/overlay/vendor/qt-6.11/modules/qtwebsockets.nix
+new file mode 100644
+index 00000000..11264a48
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwebsockets.nix
+@@ -0,0 +1,15 @@
++{
++  qtModule,
++  qtbase,
++  qtdeclarative,
++  openssl,
++}:
++
++qtModule {
++  pname = "qtwebsockets";
++  propagatedBuildInputs = [
++    qtbase
++    qtdeclarative
++  ];
++  buildInputs = [ openssl ];
++}
+diff --git a/overlay/vendor/qt-6.11/modules/qtwebview.nix b/overlay/vendor/qt-6.11/modules/qtwebview.nix
+new file mode 100644
+index 00000000..87ea9b82
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/modules/qtwebview.nix
+@@ -0,0 +1,15 @@
++{
++  lib,
++  stdenv,
++  qtModule,
++  qtdeclarative,
++  qtwebengine,
++}:
++
++qtModule {
++  pname = "qtwebview";
++  propagatedBuildInputs = [
++    qtdeclarative
++  ]
++  ++ lib.optionals (!stdenv.hostPlatform.isDarwin) [ qtwebengine ];
++}
+diff --git a/overlay/vendor/qt-6.11/qt-env.nix b/overlay/vendor/qt-6.11/qt-env.nix
+new file mode 100644
+index 00000000..113e57e3
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/qt-env.nix
+@@ -0,0 +1,34 @@
++{ buildEnv, qtbase }:
++name: paths:
++
++buildEnv {
++  inherit name;
++  paths = [ qtbase ] ++ paths;
++
++  pathsToLink = [
++    "/metatypes"
++    "/bin"
++    "/mkspecs"
++    "/include"
++    "/lib"
++    "/share"
++    "/libexec"
++  ];
++  extraOutputsToInstall = [
++    "out"
++    "dev"
++  ];
++
++  postBuild = ''
++    for f in qmake qmake6; do
++      rm "$out/bin/$f"
++      cp "${qtbase}/bin/$f" "$out/bin"
++    done
++    cat >"$out/bin/qt.conf" <<EOF
++    [Paths]
++    Prefix = $out
++    Plugins = ${qtbase.qtPluginPrefix}
++    Qml2Imports = ${qtbase.qtQmlPrefix}
++    EOF
++  '';
++}
+diff --git a/overlay/vendor/qt-6.11/qtModule.nix b/overlay/vendor/qt-6.11/qtModule.nix
+new file mode 100644
+index 00000000..5e34cd45
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/qtModule.nix
+@@ -0,0 +1,95 @@
++{
++  lib,
++  stdenv,
++  darwinVersionInputs,
++  cmake,
++  ninja,
++  perl,
++  moveBuildTree,
++  srcs,
++  patches ? [ ],
++  pkgsBuildBuild,
++}:
++
++args:
++
++let
++  inherit (args) pname;
++  version = args.version or srcs.${pname}.version;
++  src = args.src or srcs.${pname}.src;
++in
++stdenv.mkDerivation (
++  args
++  // {
++    inherit pname version src;
++    patches = args.patches or patches.${pname} or [ ];
++
++    buildInputs =
++      args.buildInputs or [ ] ++ lib.optionals stdenv.hostPlatform.isDarwin darwinVersionInputs;
++    nativeBuildInputs =
++      (args.nativeBuildInputs or [ ])
++      ++ [
++        cmake
++        ninja
++        perl
++      ]
++      ++ lib.optionals stdenv.hostPlatform.isDarwin [ moveBuildTree ];
++    propagatedBuildInputs =
++      (lib.warnIf (args ? qtInputs) "qt6.qtModule's qtInputs argument is deprecated" args.qtInputs or [ ])
++      ++ (args.propagatedBuildInputs or [ ]);
++
++    cmakeFlags = [
++      # be more verbose
++      "--log-level=STATUS"
++      # don't leak OS version into the final output
++      # https://bugreports.qt.io/browse/QTBUG-136060
++      "-DCMAKE_SYSTEM_VERSION="
++    ]
++    ++ lib.optionals stdenv.hostPlatform.isDarwin [
++      "-DQT_NO_XCODE_MIN_VERSION_CHECK=ON"
++      # This is only used for the min version check, which we disabled above.
++      # When this variable is not set, cmake tries to execute xcodebuild
++      # to query the version.
++      "-DQT_INTERNAL_XCODE_VERSION=0.1"
++    ]
++    ++ lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
++      "-DQT_HOST_PATH=${pkgsBuildBuild.qt6.qtbase}"
++      "-DQt6HostInfo_DIR=${pkgsBuildBuild.qt6.qtbase}/lib/cmake/Qt6HostInfo"
++    ]
++    ++ args.cmakeFlags or [ ];
++
++    moveToDev = false;
++
++    outputs =
++      args.outputs or [
++        "out"
++        "dev"
++      ];
++    separateDebugInfo = args.separateDebugInfo or true;
++
++    dontWrapQtApps = args.dontWrapQtApps or true;
++  }
++)
++// {
++  meta =
++
++    let
++      pos = builtins.unsafeGetAttrPos "pname" args;
++    in
++    {
++      homepage = "https://www.qt.io/";
++      description = "Cross-platform application framework for C++";
++      license = with lib.licenses; [
++        fdl13Plus
++        gpl2Plus
++        lgpl21Plus
++        lgpl3Plus
++      ];
++      maintainers = with lib.maintainers; [
++        nickcao
++      ];
++      platforms = lib.platforms.unix;
++      position = "${pos.file}:${toString pos.line}";
++    }
++    // (args.meta or { });
++}
+diff --git a/overlay/vendor/qt-6.11/srcs.nix b/overlay/vendor/qt-6.11/srcs.nix
+new file mode 100644
+index 00000000..d35caf48
+--- /dev/null
++++ b/overlay/vendor/qt-6.11/srcs.nix
+@@ -0,0 +1,342 @@
++# DO NOT EDIT! This file is generated automatically.
++# Command: ./maintainers/scripts/fetch-kde-qt.sh pkgs/development/libraries/qt-6
++{ fetchurl, mirror }:
++
++{
++  qt3d = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qt3d-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0l7vsadhslwx8r6g6lpfn1ypw3ixfqgvsg5i6k6hd75jw2abqqwg";
++      name = "qt3d-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qt5compat = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qt5compat-everywhere-src-6.11.3.tar.xz";
++      sha256 = "05k58gz7kfizyysys5jbgsr2y0x6m84kf33mnran7r3x85kq169f";
++      name = "qt5compat-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtactiveqt = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtactiveqt-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0bkaggqmkp8sqlibh6bmb00j9c51np78k9hynlz0z1qxjyid206v";
++      name = "qtactiveqt-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtbase = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtbase-everywhere-src-6.11.3.tar.xz";
++      sha256 = "13wg5z37nm6ana0kgi83d4f191m3v9a47r3a8ifmm54lnl80gpj6";
++      name = "qtbase-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtcanvaspainter = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtcanvaspainter-everywhere-src-6.11.3.tar.xz";
++      sha256 = "12j73ss1qyci96gmnqc43ibdpr3bnqr32b34vn1bk50cwqig5w70";
++      name = "qtcanvaspainter-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtcharts = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtcharts-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0037dp8d1371bd3chbrdkfzsab25x4y9z9fipkdv1s1ndy7d2l8x";
++      name = "qtcharts-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtconnectivity = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtconnectivity-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1w7yzq75ys8a28lnckaad2xdm98z4bzja8b1nnz7cds11ys9ca6x";
++      name = "qtconnectivity-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtdatavis3d = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtdatavis3d-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0pj99b2a1zsyic7z2z3rmpdz31c4i3v17s152mr54yvhzw1j8w9y";
++      name = "qtdatavis3d-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtdeclarative = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtdeclarative-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1dcwfpsh015zidqb2ndbammwsi7yippswi393q5vpqral0lb6vbd";
++      name = "qtdeclarative-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtdoc = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtdoc-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0bjyxfhw5cj1sxw72c7j3pbihfaxdwxajqbmh8jkamj8nia35fz9";
++      name = "qtdoc-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtgraphs = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtgraphs-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0smvhkbv32hm4bzajc7i38z9gbh6sjjnwyhjq2ij404kcifb8x2f";
++      name = "qtgraphs-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtgrpc = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtgrpc-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1xl5hissy6srh95g4jh0nc7w2i6pr6fgyymdrqlx6w8m6434g60p";
++      name = "qtgrpc-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qthttpserver = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qthttpserver-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0zix6a41gxhpsyq1xg920fgvy43n7hxlmwzgsnm8zry1m853vqgf";
++      name = "qthttpserver-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtimageformats = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtimageformats-everywhere-src-6.11.3.tar.xz";
++      sha256 = "04v27qr2shf1wvn386vrq9mq3fxbq751qk9r41hkgidvgaf94n97";
++      name = "qtimageformats-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtlanguageserver = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtlanguageserver-everywhere-src-6.11.3.tar.xz";
++      sha256 = "03ynm353x244pysri7ndr60d03lvs2ymgg9bcnvpw583ah5k3x34";
++      name = "qtlanguageserver-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtlocation = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtlocation-everywhere-src-6.11.3.tar.xz";
++      sha256 = "03jjfnrz2aks282ccd9964dx5qq17xr8lipch0h09m20nmmzl4sl";
++      name = "qtlocation-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtlottie = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtlottie-everywhere-src-6.11.3.tar.xz";
++      sha256 = "172vanjlj29s12idmzqs8yil9mzc4k4fv848a765mvp0fz4mk7jz";
++      name = "qtlottie-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtmultimedia = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtmultimedia-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1rl8f90zq32nqkq5vhdf1zna327rvx52lxki71n6hdyippljs5rx";
++      name = "qtmultimedia-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtnetworkauth = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtnetworkauth-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1hvdzd4hdrzi7570wajlr7bmkcm95c2xm4ns8vka8sc22n12y7m4";
++      name = "qtnetworkauth-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtopenapi = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtopenapi-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0hd0dbp2b1959xggqngckpw106xaajr858rzpwrp3kvmkrj6zz63";
++      name = "qtopenapi-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtpositioning = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtpositioning-everywhere-src-6.11.3.tar.xz";
++      sha256 = "18gcfdf6xrxj9shwdv1l3kk1k4zcc221g5lfdr3n2wib86y9b1m3";
++      name = "qtpositioning-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtquick3d = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtquick3d-everywhere-src-6.11.3.tar.xz";
++      sha256 = "15ncmh7fgv50qsdk5hqzbk0ffx2qiv6ckdz9r3925vnkxa8j8pf0";
++      name = "qtquick3d-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtquick3dphysics = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtquick3dphysics-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0gcjd471lv9knjx457zh5jx2cw64xfn7drx6zq8vxpbad60n2lzd";
++      name = "qtquick3dphysics-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtquickeffectmaker = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtquickeffectmaker-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0pxvpg87l0g3k8y4zzyz3a56293kxz342d5vd5viz0gk95mgwp3l";
++      name = "qtquickeffectmaker-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtquicktimeline = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtquicktimeline-everywhere-src-6.11.3.tar.xz";
++      sha256 = "14n687llw4jfc30p56nvbnizwx7qisn4rzsdziw66gyili9j9rg0";
++      name = "qtquicktimeline-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtremoteobjects = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtremoteobjects-everywhere-src-6.11.3.tar.xz";
++      sha256 = "10s2zmdhrfigwdimq33kwnnc2whizhlr0fc2c6wn3bhlc6mfh1vy";
++      name = "qtremoteobjects-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtscxml = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtscxml-everywhere-src-6.11.3.tar.xz";
++      sha256 = "07q8sbgd0mz3afqz4aklgvf4hhy7fn3vxzwrbilhk5jdsa17g7fq";
++      name = "qtscxml-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtsensors = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtsensors-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1d5fyxqkhpiz0g6afmisy5yg3h8yr79sr03ha83sdpd378s647c4";
++      name = "qtsensors-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtserialbus = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtserialbus-everywhere-src-6.11.3.tar.xz";
++      sha256 = "17jnhjr909ld4yasz31sryzk0q2jwb7azaarghnpyymi443sjjlk";
++      name = "qtserialbus-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtserialport = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtserialport-everywhere-src-6.11.3.tar.xz";
++      sha256 = "08hpc0k68jb1c10x0k4sq8n5r27vm6djqzqgk0dwww70mh7gp6xh";
++      name = "qtserialport-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtshadertools = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtshadertools-everywhere-src-6.11.3.tar.xz";
++      sha256 = "06w0im9kvsiljzxpxyjw3b9af0x4n0ihdlpl0nxyq7n7br17jq6q";
++      name = "qtshadertools-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtspeech = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtspeech-everywhere-src-6.11.3.tar.xz";
++      sha256 = "132p46d10rj4pindpk1qx9i92p8ndjzyv896b742s37j45vv7bfg";
++      name = "qtspeech-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtsvg = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtsvg-everywhere-src-6.11.3.tar.xz";
++      sha256 = "08vil24l3ka6k74x69dcs0csxw6z7wk15p9fm8z1rnd2nnj6zpwv";
++      name = "qtsvg-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qttasktree = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qttasktree-everywhere-src-6.11.3.tar.xz";
++      sha256 = "01fvxjvhj0bzhgb9x7zgpjz6z709xpdvshic43m642zasf1fpqhh";
++      name = "qttasktree-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qttools = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qttools-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1v31dkyncfkhgscd1w8gapi0x4r511f6mrjccka3dyjkwsgafk2j";
++      name = "qttools-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qttranslations = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qttranslations-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1wlhwa2785hjgzkb80sds0whkhviswy4m9fpx9g6flqyp5kk17j9";
++      name = "qttranslations-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtvirtualkeyboard = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtvirtualkeyboard-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0y3lpfn33sipbx0drvh933vdb142qzpq29w6bhidii2ww33a83kw";
++      name = "qtvirtualkeyboard-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtwayland = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtwayland-everywhere-src-6.11.3.tar.xz";
++      sha256 = "15vcdwv8avqs0s6kard2lzcz55mfakf1ibyz88n20xbxdvmqaqbz";
++      name = "qtwayland-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtwebchannel = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtwebchannel-everywhere-src-6.11.3.tar.xz";
++      sha256 = "06phzbzylw00s9jqrh3p0k2wn5gyb6a5xyyl9zfs182cj3121w8x";
++      name = "qtwebchannel-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtwebengine = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtwebengine-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1jj3kwpsw74j6q1475c2ri7cds7yrc92qzsmcwg5g43djys02isg";
++      name = "qtwebengine-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtwebsockets = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtwebsockets-everywhere-src-6.11.3.tar.xz";
++      sha256 = "0fwq2q83y0sm96ldziyhlg908kf6q80h420gzr2a6rzc6z69mcqr";
++      name = "qtwebsockets-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++  qtwebview = {
++    version = "6.11.3";
++    src = fetchurl {
++      url = "${mirror}/official_releases/qt/6.11/6.11.3/submodules/qtwebview-everywhere-src-6.11.3.tar.xz";
++      sha256 = "1dw9fbv8vqf0vzqsx9n6qhxg54lg1a19njrvkkilwnagmw908dpa";
++      name = "qtwebview-everywhere-src-6.11.3.tar.xz";
++    };
++  };
++}

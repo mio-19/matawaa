@@ -2,9 +2,9 @@
   description = "Matawaa - Smartwatch support patchset on top of Mobile NixOS";
 
   inputs = {
-    # Keep the Qt stack on 6.11.2 while investigating the Hoki display.
+    # Use the same unstable package set for image builds and Hoki Qt.
     # The image-build pin in Mobile NixOS must match this input.
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     mobile-nixos = {
       url = "github:NixOS/mobile-nixos/development";
       flake = false;

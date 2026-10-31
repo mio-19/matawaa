@@ -10,9 +10,14 @@ This project is a patchset on top of [Mobile-NixOS](https://mobile.nixos.org/). 
 
 The patch series might be regarded as the real commit history, whereas the git commit history here can be relaxing and/or having meaningless commit messages.
 
-Image builds use the `nixos-26.05` nixpkgs revision in `flake.lock` and
+Image builds use the pinned `nixpkgs-unstable` revision in `flake.lock` and
 `work/mobile-nixos/npins/sources.json` (exported in the patch series). Keep
-both pins in sync when updating. The current pin provides Qt 6.11.2, which has official binary cache coverage.
+both pins in sync when updating. The system package set uses Qt 6.12.0 from
+unstable. Hoki's Qt package definitions are vendored from `staging-26.05` at
+revision `3da11a55bdd37955b63cc4182ff789eeaa152329` (Qt 6.11.3) under
+`work/mobile-nixos/overlay/vendor/qt-6.11`. They use unstable for dependencies
+and toolchains. ARM Qt artifacts are not covered by the binary cache and must
+be built locally.
 The Hoki and Beluga vendor kernels separately retain their old nixpkgs pin
 for GCC 8, which is unavailable in the main package set.
 

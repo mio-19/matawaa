@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 31 Oct 2026 19:19:27 +1100
+Subject: [PATCH] Define Hoki mainline memory region
+
+---
+ devices/fossil-hoki-mainline/sda429-hoki.dts | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/devices/fossil-hoki-mainline/sda429-hoki.dts b/devices/fossil-hoki-mainline/sda429-hoki.dts
+index 41b00986..53caf832 100644
+--- a/devices/fossil-hoki-mainline/sda429-hoki.dts
++++ b/devices/fossil-hoki-mainline/sda429-hoki.dts
+@@ -10819,9 +10819,10 @@
+ 		i2c8 = "/soc/i2c@7af8000";
+ 	};
+ 
+-	memory {
++	memory@80000000 {
+ 		device_type = "memory";
+-		reg = <0x00 0x00 0x00 0x00>;
++		/* The vendor bootloader normally patches this node before Linux. */
++		reg = <0x00 0x80000000 0x00 0x40000000>;
+ 	};
+ 
+ 	firmware {
