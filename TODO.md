@@ -77,6 +77,17 @@ This document catalogs and tracks remaining hardware, runtime, packaging, and ar
 
 ---
 
-### 2.2 WebKitGTK / WPE WebKit Sandbox Hardening
+### 2.2 Mainline Linux Kernel Bringup for Snapdragon Wear 3100 (`oppo-beluga-mainline`)
+* **Target Overview:**
+  * Standalone pure-mainline target using modern Linux 6.18, Freedreno DRM/KMS, simple-framebuffer (402x476 squircle), ramoops pstore console logging, btrfs zstd rootfs, and USB CDC-NCM gadget networking.
+* **Remaining Hardware Verification & Bringup Work:**
+  * Flash experimental `oppo-beluga-mainline` fastboot images and capture earlycon serial/pstore logs.
+  * Verify simple-framebuffer handoff from continuous splash region (`0x83000000`).
+  * Port Visionox 402x476 command-mode DSI panel driver to upstream DRM panel subsystem.
+  * Native input binding for Cypress TrueTouch Gen5 (cyttsp5) I2C touchscreen controller.
+
+---
+
+### 2.3 WebKitGTK / WPE WebKit Sandbox Hardening
 * **Remaining Work:**
   * Investigate if a tailored seccomp filter configuration or unprivileged namespace backport can enable sandboxed WebProcess execution on Linux 4.14 kernels without requiring `WEBKIT_FORCE_SANDBOX=0`.

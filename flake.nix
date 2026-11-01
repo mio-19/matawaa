@@ -52,6 +52,7 @@
         "motorola-minnow"
         "motorola-smelt"
         "oppo-beluga"
+        "oppo-beluga-mainline"
         "polar-pike"
         "samsung-rinato"
         "samsung-sprat"
@@ -165,6 +166,7 @@
         "fossil-hoki" = self.lib.mkWatchConfiguration { device = "fossil-hoki"; };
         "fossil-hoki-mainline" = self.lib.mkWatchConfiguration { device = "fossil-hoki-mainline"; };
         "oppo-beluga" = self.lib.mkWatchConfiguration { device = "oppo-beluga"; };
+        "oppo-beluga-mainline" = self.lib.mkWatchConfiguration { device = "oppo-beluga-mainline"; };
       };
 
       deploy = {
@@ -205,6 +207,19 @@
               path =
                 deploy-rs.lib.x86_64-linux.activate.custom
                   self.nixosConfigurations."oppo-beluga".config.system.build.toplevel
+                  ''
+                    $PROFILE/bin/switch-to-configuration boot
+                  '';
+            };
+          };
+          "oppo-beluga-mainline" = {
+            hostname = "172.16.42.1";
+            profiles.system = {
+              user = "root";
+              sshUser = "ceres";
+              path =
+                deploy-rs.lib.x86_64-linux.activate.custom
+                  self.nixosConfigurations."oppo-beluga-mainline".config.system.build.toplevel
                   ''
                     $PROFILE/bin/switch-to-configuration boot
                   '';

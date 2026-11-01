@@ -31,6 +31,9 @@ jobs:
           - os: ubuntu-24.04
             device: oppo-beluga
             build_mode: cross
+          - os: ubuntu-24.04
+            device: oppo-beluga-mainline
+            build_mode: cross
 
           # aarch64 runners: cross-compile from aarch64 to armv7l
           - os: ubuntu-24.04-arm
@@ -42,6 +45,9 @@ jobs:
           - os: ubuntu-24.04-arm
             device: oppo-beluga
             build_mode: cross
+          - os: ubuntu-24.04-arm
+            device: oppo-beluga-mainline
+            build_mode: cross
 
           # aarch64 runners: arm 32-bit native compile (armv7l-linux)
           - os: ubuntu-24.04-arm
@@ -52,6 +58,9 @@ jobs:
             build_mode: native
           - os: ubuntu-24.04-arm
             device: oppo-beluga
+            build_mode: native
+          - os: ubuntu-24.04-arm
+            device: oppo-beluga-mainline
             build_mode: native
     steps:
       - name: Check out Matawaa
