@@ -101,6 +101,7 @@ This document catalogs and tracks all hardware, runtime, packaging, and architec
   * Freedreno Mesa DRM/KMS graphics stack configured with Qt EGLFS KMS integration (`QT_QPA_PLATFORM=eglfs`, `QT_QPA_EGLFS_INTEGRATION=eglfs_kms`).
   * CDC-NCM USB gadget networking with stage-2 SSH (`172.16.42.1`) enabled for remote debugging.
   * Flake outputs (`allDevices`, `nixosConfigurations`, `deploy.nodes`) fully registered and evaluated.
+  * CI workflow (`.github/workflows/build-smartwatch-images.yml`) updated with `fossil-hoki-mainline` in the build matrix for automated CI builds and Cachix caching.
 * **Remaining Hardware Verification & Bringup Work:**
   * Upstream DSI panel driver (Command Mode) for the 416x416 AMOLED display (to transition from simplefb to native dynamic DRM modesetting).
   * Native DRM touch input binding for Raydium RM69330 I2C controller.

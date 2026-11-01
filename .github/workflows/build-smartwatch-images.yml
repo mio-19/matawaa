@@ -21,6 +21,7 @@ jobs:
           - ubuntu-24.04-arm
         device:
           - fossil-hoki
+          - fossil-hoki-mainline
           - oppo-beluga
     steps:
       - name: Check out Matawaa
