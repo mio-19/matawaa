@@ -1631,7 +1631,7 @@ index 00000000..d12414ad
 +}
 diff --git a/overlay/asteroidos/ngfd/default.nix b/overlay/asteroidos/ngfd/default.nix
 new file mode 100644
-index 00000000..18a9e1d1
+index 00000000..3bd40e33
 --- /dev/null
 +++ b/overlay/asteroidos/ngfd/default.nix
 @@ -0,0 +1,105 @@
@@ -1675,7 +1675,7 @@ index 00000000..18a9e1d1
 +  src = fetchgit {
 +    url = "https://github.com/sailfishos/ngfd.git";
 +    rev = "3372625b3a221fdbdcc3dbb225e93df34ac307c0";
-+    hash = "sha256-gHN+rGjzMAUazu6mWpzrGNatN44R+b4+FX2JHQxhqMM=";
++    hash = "sha256-uOQ84oS5/B8U+Lv4FOAdsk6X8Dyp4IgenjyOKWgBg+Y=";
 +    fetchSubmodules = true;
 +  };
 +

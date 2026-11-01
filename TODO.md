@@ -126,3 +126,5 @@ This document catalogs and tracks all hardware, runtime, packaging, and architec
 | Oppo Beluga Android init asset hashes | Pinned and verified SHA-256 hashes for beluga init assets | `2ce6721` |
 | Touchscreen hardcoded by-path parameter | Removed incorrect `QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS` to enable auto-discovery | Patch `0052` / `fossil-hoki` |
 | Over-the-air deployment support | Added `nixosConfigurations`, `deploy-rs`, and `scripts/deployWatch.sh` OTA deployment tool | `flake.nix` / `deployWatch.sh` |
+| `ngfd` submodule archive hash mismatch | Updated submodule tree hash to `sha256-uOQ84oS5/B8U+Lv4FOAdsk6X8Dyp4IgenjyOKWgBg+Y=` | Patch `0049` (`overlay/asteroidos/ngfd`) |
+| `sensorfw` heart rate patch hash mismatch | Updated filtered patch hash to `sha256-lVbEzeRuFVSWuhdjRZ3kU1IaAQpgQlGs55RM78R7Arw=` | Patch `0054` (`overlay/asteroidos/sensorfw`) |
