@@ -110,21 +110,4 @@ This document catalogs and tracks all hardware, runtime, packaging, and architec
 * **Remaining Work:**
   * Investigate if a tailored seccomp filter configuration or unprivileged namespace backport can enable sandboxed WebProcess execution on Linux 4.14.
 
----
 
-## 3. Recently Resolved Issues (Reference Log)
-
-| Issue | Resolution | Commit / Location |
-|---|---|---|
-| User PATH conflict (`systemd.services."user@1000"`) | Replaced conflicting PATH definition with `systemd.user.settings.Manager.DefaultEnvironment` | `577f913` |
-| `SetTimezone` Interactive Authorization Required | Added Polkit rule granting `ceres` permission for `org.freedesktop.timedate1.set-timezone` | `577f913` |
-| Slow watch boot & black screen latency | Early backlight unblank, early hybris/android-init startup, instant lipstick presentation | `bbd52c3` |
-| `dsme` & `qt6` patch hash mismatches | Replaced `fetchpatch` with `fetchurl` to prevent `filterdiff` checksum mutation | `456dc10` |
-| GitHub Actions CI multi-architecture runners | Added `ubuntu-24.04-arm` alongside `ubuntu-24.04` across all watch builds | `456dc10` |
-| DConf D-Bus service missing (`ca.desrt.dconf`) | Installed `dconf` package in desktop profile and exposed in `services.dbus.packages` | `3cf71ae` |
-| Missing `invoker` in app wrappers | Added `/run/current-system/sw/bin` to `systemd.user.settings.Manager.DefaultEnvironment` | `1966dcd` / `577f913` |
-| Oppo Beluga Android init asset hashes | Pinned and verified SHA-256 hashes for beluga init assets | `2ce6721` |
-| Touchscreen hardcoded by-path parameter | Removed incorrect `QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS` to enable auto-discovery | Patch `0052` / `fossil-hoki` |
-| Over-the-air deployment support | Added `nixosConfigurations`, `deploy-rs`, and `scripts/deployWatch.sh` OTA deployment tool | `flake.nix` / `deployWatch.sh` |
-| `ngfd` submodule archive hash mismatch | Updated submodule tree hash to `sha256-uOQ84oS5/B8U+Lv4FOAdsk6X8Dyp4IgenjyOKWgBg+Y=` | Patch `0049` (`overlay/asteroidos/ngfd`) |
-| `sensorfw` heart rate patch hash mismatch | Updated filtered patch hash to `sha256-lVbEzeRuFVSWuhdjRZ3kU1IaAQpgQlGs55RM78R7Arw=` | Patch `0054` (`overlay/asteroidos/sensorfw`) |

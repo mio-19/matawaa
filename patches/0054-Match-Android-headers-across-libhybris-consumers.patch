@@ -11,9 +11,9 @@ Use the Android headers selected by libhybris for the HWC plugin, SensorFW, and 
  overlay/asteroidos/default.nix                |  3 +-
  .../mce-plugin-libhybris/default.nix          |  9 ++----
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 12 +++----
- overlay/asteroidos/sensorfw/default.nix       |  7 ++---
+ overlay/asteroidos/sensorfw/default.nix       | 17 +++++-----
  overlay/libhybris/default.nix                 |  1 +
- 8 files changed, 48 insertions(+), 18 deletions(-)
+ 8 files changed, 53 insertions(+), 23 deletions(-)
  create mode 100644 devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
 
 diff --git a/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch b/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
@@ -178,10 +178,17 @@ index c8d6dc03..e69967d8 100644
        ${libhybris}/include/hybris/eglplatformcommon
        ${libhybris}/include/hybris/platformcommon
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
-index 6cab054d..9ff9faf7 100644
+index 6cab054d..be6a3c9b 100644
 --- a/overlay/asteroidos/sensorfw/default.nix
 +++ b/overlay/asteroidos/sensorfw/default.nix
-@@ -11,7 +11,6 @@
+@@ -5,13 +5,12 @@
+   lib,
+   stdenv,
+   fetchFromGitHub,
+-  fetchpatch,
++  fetchurl,
+   cmake,
+   pkg-config,
    qt6,
    systemd,
    libhybris,
@@ -189,15 +196,34 @@ index 6cab054d..9ff9faf7 100644
    udev,
  }:
  
-@@ -38,7 +37,7 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -20,8 +19,8 @@ let
+ 
+   upstreamPatch =
+     name: hash:
+-    fetchpatch {
+-      inherit name hash;
++    fetchurl {
++      inherit hash;
+       url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/sensorfw/files/${name}";
+     };
+ in
+@@ -37,13 +36,13 @@ stdenv.mkDerivation (finalAttrs: {
+   };
  
    patches = [
-     (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-7eFjofMXAkQSvZf6RwkINBwLYSe+u3kJ8lCnOkoFhBE=")
--    (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-qRXs9vrszoG1bVnjkIVtRaXEvaLtNKs7Z1PsR759VQo=")
-+    (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-lVbEzeRuFVSWuhdjRZ3kU1IaAQpgQlGs55RM78R7Arw=")
+-    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-7eFjofMXAkQSvZf6RwkINBwLYSe+u3kJ8lCnOkoFhBE=")
++    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-FNjH+q3kjQDeJP5yaAZ24z8FpU0gZ8GJAFuElzM3bsM=")
+     (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-qRXs9vrszoG1bVnjkIVtRaXEvaLtNKs7Z1PsR759VQo=")
      (upstreamPatch "0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch" "sha256-WyVwM0KEtADQhAeZTGy6we9BSyITchcClT+phNTdhuc=")
      (upstreamPatch "0004-Fix-compilation-when-autohybris-is-used.patch" "sha256-RJ711Knze6feQOPfa/UD6r9jG870H//hOnbFPzhoS5s=")
      (upstreamPatch "0005-Fix-compilation-when-hybris-is-used.patch" "sha256-evbbTXcBF/a6Y998373+p2vv7PnYWX71Ei9GFH+BaA8=")
+-    (upstreamPatch "0006-hybrisadaptor-Queue-erroneous-events-too.patch" "sha256-6kLVFeEXnpldLWw976ckEMYaM1jBXYAepvBKLKP62/c=")
+-    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-qH3mMqgPPNq9oqGOmP1xdc/EQ7f95ia8HFcmuBD2oMs=")
++    (upstreamPatch "0006-hybrisadaptor-Queue-erroneous-events-too.patch" "sha256-k10UaeZO9dEa+VApzyr2itLv6ZEqwnMhA+RXGkiWYlk=")
++    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-7TRSkpcprdQczLhhsL9lqjTr4oRYMt3Z6JgbDcxCMjE=")
+   ];
+ 
+   strictDeps = true;
 @@ -58,7 +57,7 @@ stdenv.mkDerivation (finalAttrs: {
      qt6.qtbase
      systemd
