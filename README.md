@@ -27,26 +27,25 @@ Build the AsteroidOS image from the patched checkout:
 nix-build work/mobile-nixos/examples/asteroid --argstr device fossil-hoki -A outputs.default
 ```
 
-## Status
-
-For hoki (Fossil Gen 6):
-
-+ [x] mobile-nixos stage1
-+ [x] asteroid os splash
-+ [ ] asteroid os launcher
-
 ## Devices, Linux Kernel
 
-+ fossil-hoki running kernel 4.14.x EOL, but openela : <https://github.com/openela/kernel-lts/tree/linux-4.14.y>
 + Planned: pixel watch 2, supported kernel
-
-For devices running EOL kernel, it is equivalent to every processes having root permissions.
 
 
 ## TODO
 
 + move hoki hardcoded partitions to better places
 + instead of linking /usr/share for asteroid os launcher, patch them to use nix store path.
+
+## Device: hoki (Fossil Gen 6)
+
+running an old version of 4.14.x 
+
+For devices running EOL kernel, it is equivalent to every processes having root permissions.
+
+TODO
++ at least update to openela's version : <https://github.com/openela/kernel-lts/tree/linux-4.14.y>
+
 
 ## LLM Policy
 
