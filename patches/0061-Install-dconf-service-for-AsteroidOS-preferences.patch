@@ -8,7 +8,7 @@ Subject: [PATCH] Install dconf service for AsteroidOS preferences
  1 file changed, 3 insertions(+)
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 4387681b..5718aa97 100644
+index a44898fb..b9b1960e 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
 @@ -83,6 +83,8 @@ in
