@@ -263,3 +263,90 @@ The watch environment includes Kiwix (`asteroid.apps.kiwix`) paired with the Ast
    ```
 3. Open **Kiwix** from the AsteroidOS app drawer or tap **Kiwix (Offline)** on the browser home portal. Articles and full-text search are instantly accessible directly on the wrist.
 
+
+
+## HWC native-buffer header mismatch (2026-11-01)
+
+The allocation-debug image returned valid 416x416 RGBA buffers (stride 448,
+usage `0x10001800`, two handle FDs), but the QPA presentation trace read an
+implausible width, stride 416, format `0x1c0`, usage 1, and no handle. Kernel
+logs reported repeated `ion_import_fd` and atomic-commit failures.
+
+The plugin was compiled against generic Android 6 headers while Hoki's libhybris
+used the Android 9 headers from the device hybris archive. An ARM GCC 16 compile
+of the exact installed `HWComposerNativeWindowBuffer` header reproduced these
+access differences:
+
+| Access from C++ buffer object | Android 6 | Android 9 |
+| --- | --- | --- |
+| Native-buffer base offset | 4 | 8 |
+| Width offset | 36 | 40 |
+| Stride offset | 44 | 48 |
+| Handle offset | 64 | 68 |
+| Usage offset / size | 52 / 32 bits | 72 / 64 bits |
+
+Disassembly of the actual old and rebuilt QPA plugins confirms this affects
+the real submission, not only logging: immediately before
+`hwc2_compat_display_set_client_target`, the old binary adds 4 to the buffer
+object pointer and the corrected binary adds 8.
+
+The eight-byte difference between the allocated C++ object and its native-buffer
+base is normal with the Android 9 layout. The problem was different compilation
+layouts, not a missing explicit pointer adjustment. Upstream's HWC2 plugin
+already passes the derived buffer to an `ANativeWindowBuffer *` parameter,
+allowing C++ to perform the base conversion. The compatibility layer then reads
+that native buffer's handle and dimensions to construct a `GraphicBuffer`.
+
+The plugin now uses `libhybris.androidHeaders` and
+`libhybris.androidHeadersInclude`, matching AsteroidOS's per-machine Android
+header dependency. The supplemental HWC2 hardware declarations remain in use.
+No hardcoded pointer adjustment or upstream presentation algorithm change is
+required. Allocation diagnostics remain enabled for the next device check.
+The header mismatch is reproduced locally; successful scanout still requires
+verification on the watch.
+
+Upstream references at the revisions used by this project:
+
+- [AsteroidOS QPA recipe](https://github.com/AsteroidOS/meta-asteroid/blob/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin_git.bb)
+- [HWC2 presentation](https://github.com/mer-hybris/qt5-qpa-hwcomposer-plugin/blob/998956aebe21ac7ba6e7315d1c12e6e11c93d742/hwcomposer/hwcomposer_backend_v20.cpp)
+- [Native-buffer submission](https://github.com/libhybris/libhybris/blob/9f61f26c44d9a3bf62efb67d4c32a7a0c89c21ca/compat/hwc2/hwc2_compatibility_layer.cpp)
+
+After the next image is flashed and its failed or successful stage-2 run has
+been followed by a reboot into stage 1, inspect the persistent log with these
+short lines:
+
+```sh
+P=/nix/var/nix/profiles/system/sw/bin
+chroot /mnt "$P/grep" -nE 'hybris-hwc: allocate|hwc:' /home/ceres/launcher.log
+```
+
+Allocation and presentation should agree on dimensions, stride, format, usage,
+and handle FDs. The printed object address need not equal the native base.
+
+
+### Related consumer audit
+
+A project-wide search of Android header selection and libhybris consumers found
+the same independent header selection in SensorFW and MCE's libhybris plugin.
+Both now use the headers selected by libhybris. In MCE, the previous optional
+`android-headers ? libhybris.passthru.androidHeaders` argument did not protect
+against this: `callPackage` supplied its generic `android-headers` automatically.
+The previous derivations confirmed generic Android 6 include paths in both
+packages; the corrected derivations confirm device Android 9 include paths in
+all three consumers, with no generic Android 6 include path.
+
+| Consumer | Audit result |
+| --- | --- |
+| Qt HWC plugin | Corrected native window / gralloc header selection |
+| SensorFW hybris adaptors | Corrected Android HAL header selection |
+| MCE libhybris plugin | Corrected framebuffer, lights, and sensors header selection |
+| Qt Wayland hybris EGL integration | Uses EGL / hybris C interfaces; no independent Android native-buffer headers found |
+| Launcher and EGL probe | Use EGL entry points; no independent Android HAL struct headers found |
+| adbd | Uses the libhybris properties interface; no native-buffer header correction needed |
+| OPPO Beluga | Evaluated all three consumers: same corrected derivations and device header directory as Hoki |
+
+The supplemental Android 10 `hardware.h`, `hwcomposer.h`, and
+`hwcomposer_defs.h` are byte-identical to the device archive's files.
+`hwcomposer2.h` adds later API declarations; no additional layout correction was
+identified there. Review scope is Android/libhybris header and ABI consistency,
+not a claim that every subsystem is fully functional on hardware.
