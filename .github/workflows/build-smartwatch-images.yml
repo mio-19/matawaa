@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Run daily at 03:00 UTC
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -11,18 +14,45 @@ permissions:
 
 jobs:
   build:
+    name: build (${{ matrix.os }}, ${{ matrix.device }}, ${{ matrix.build_mode }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-24.04
-          - ubuntu-24.04-arm
-        device:
-          - fossil-hoki
-          - fossil-hoki-mainline
-          - oppo-beluga
+        include:
+          # x86_64 runners: cross-compile from x86_64 to armv7l
+          - os: ubuntu-24.04
+            device: fossil-hoki
+            build_mode: cross
+          - os: ubuntu-24.04
+            device: fossil-hoki-mainline
+            build_mode: cross
+          - os: ubuntu-24.04
+            device: oppo-beluga
+            build_mode: cross
+
+          # aarch64 runners: cross-compile from aarch64 to armv7l
+          - os: ubuntu-24.04-arm
+            device: fossil-hoki
+            build_mode: cross
+          - os: ubuntu-24.04-arm
+            device: fossil-hoki-mainline
+            build_mode: cross
+          - os: ubuntu-24.04-arm
+            device: oppo-beluga
+            build_mode: cross
+
+          # aarch64 runners: arm 32-bit native compile (armv7l-linux)
+          - os: ubuntu-24.04-arm
+            device: fossil-hoki
+            build_mode: native
+          - os: ubuntu-24.04-arm
+            device: fossil-hoki-mainline
+            build_mode: native
+          - os: ubuntu-24.04-arm
+            device: oppo-beluga
+            build_mode: native
     steps:
       - name: Check out Matawaa
         uses: actions/checkout@v7
@@ -34,6 +64,7 @@ jobs:
           extra_nix_config: |
             substituters = https://cache.nixos.org https://matawaa.cachix.org
             trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= matawaa.cachix.org-1:Lr7VwT3o+MyJPsehlobwZXv5gI+/hh9zhfUWdPCeej8=
+            extra-platforms = armv7l-linux
 
       - name: Configure Cachix
         uses: cachix/cachix-action@v17
@@ -45,21 +76,62 @@ jobs:
       - name: Apply Mobile NixOS patch series
         run: ./scripts/applyPatches.sh
 
-      - name: Build ${{ matrix.device }} fastboot images (${{ matrix.os }})
+      - name: Check and configure 32-bit ARM execution support
+        id: check_arm32
+        if: matrix.build_mode == 'native'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Probing 32-bit ARM binary execution capability..."
+          echo "f0VMRgEBAQAAAAAAAAAAAAIAKAABAAAAVIAAADQAAAAAAAAABQAABTQAIAABAAAAAAAAAAEAAAAAAAAAAIAAAACAAABgAAAAYAAAAAUAAAAAEAAAAACg4wFwoOMAAADv" | base64 -d > /tmp/arm32-probe
+          chmod +x /tmp/arm32-probe
+
+          can_run=false
+          if /tmp/arm32-probe 2>/dev/null; then
+            echo "32-bit ARM execution supported directly by kernel/hardware."
+            can_run=true
+          else
+            echo "Direct execution returned non-zero. Attempting binfmt/qemu-user registration..."
+            sudo apt-get update -qq || true
+            sudo apt-get install -y -qq binfmt-support qemu-user-static || true
+            if /tmp/arm32-probe 2>/dev/null; then
+              echo "32-bit ARM execution successfully enabled via binfmt/qemu-user-static."
+              can_run=true
+            else
+              echo "::warning::Runner cannot execute 32-bit ARM binaries even with qemu-user-static."
+            fi
+          fi
+
+          rm -f /tmp/arm32-probe
+          echo "can_run=$can_run" >> "$GITHUB_OUTPUT"
+
+      - name: Build ${{ matrix.device }} fastboot images (${{ matrix.os }}, ${{ matrix.build_mode }})
         id: image
+        if: matrix.build_mode != 'native' || steps.check_arm32.outputs.can_run == 'true'
         shell: bash
         env:
           DEVICE: ${{ matrix.device }}
+          BUILD_MODE: ${{ matrix.build_mode }}
         run: |
           set -euo pipefail
+          extra_args=()
+          if [ "$BUILD_MODE" = "native" ]; then
+            echo "Building with native 32-bit ARM compilation (system = armv7l-linux)..."
+            extra_args+=(--argstr system armv7l-linux)
+          else
+            echo "Building with cross compilation..."
+          fi
+
           output="$(nix-build work/mobile-nixos/examples/asteroid \
             --argstr device "$DEVICE" \
+            "${extra_args[@]}" \
             -A outputs.default \
             --no-link)"
           echo "store_path=$output" >> "$GITHUB_OUTPUT"
           echo "Built $output"
 
       - name: Push ${{ matrix.device }} image and full closure to Cachix
+        if: steps.image.outputs.store_path != ''
         env:
           IMAGE_STORE_PATH: ${{ steps.image.outputs.store_path }}
         run: nix-store -qR "$IMAGE_STORE_PATH" | cachix push matawaa

@@ -1,0 +1,78 @@
+name: Update nixpkgs-unstable pin
+
+on:
+  schedule:
+    # Run daily at 04:00 UTC
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-pin:
+    name: Update nixpkgs-unstable pin
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out Matawaa
+        uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            substituters = https://cache.nixos.org https://matawaa.cachix.org
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= matawaa.cachix.org-1:Lr7VwT3o+MyJPsehlobwZXv5gI+/hh9zhfUWdPCeej8=
+
+      - name: Apply Mobile NixOS patch series
+        run: ./scripts/applyPatches.sh
+
+      - name: Update npins in mobile-nixos worktree
+        id: update_npins
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd work/mobile-nixos
+          echo "Updating nixpkgs pin via npins..."
+          nix shell nixpkgs#npins --command npins update nixpkgs
+
+          if git diff --quiet npins/sources.json; then
+            echo "npins/sources.json is already up to date."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "npins/sources.json updated."
+            git add npins/sources.json
+            git commit -m "update nixpkgs to current nixos-unstable (npins)"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update flake inputs and rebuild patch series
+        if: steps.update_npins.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Updating flake nixpkgs input..."
+          nix flake update nixpkgs
+
+          echo "Rebuilding patch series..."
+          ./scripts/rebuildPatches.sh
+
+          echo "Formatting nix files..."
+          nixfmt flake.nix
+
+      - name: Create Pull Request for nixpkgs update
+        if: steps.update_npins.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(deps): update nixpkgs-unstable pin"
+          title: "chore(deps): update nixpkgs-unstable pin"
+          body: |
+            Automated update of `nixpkgs-unstable` channel/branch pins:
+            - Updated `work/mobile-nixos/npins/sources.json` to latest `nixpkgs-unstable`
+            - Updated `flake.lock` (`nixpkgs` input)
+            - Rebuilt patch series via `./scripts/rebuildPatches.sh`
+          branch: "automation/update-nixpkgs-unstable"
+          delete-branch: true
