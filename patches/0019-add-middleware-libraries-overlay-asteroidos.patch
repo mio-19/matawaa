@@ -31,9 +31,8 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/libiodata/default.nix      | 111 ++++
  overlay/asteroidos/libiphb/default.nix        |  54 ++
  overlay/asteroidos/libngf/default.nix         |  53 ++
- .../0001-Fix-dynamic-opening-issues.patch     |  28 +
  ...-sailjaild-D-Bus-query-when-sailjail.patch |  40 ++
- overlay/asteroidos/mapplauncherd/default.nix  |  48 ++
+ overlay/asteroidos/mapplauncherd/default.nix  |  61 ++
  overlay/asteroidos/mce-dev/default.nix        |  41 ++
  .../mce-plugin-libhybris/default.nix          |  72 +++
  overlay/asteroidos/mce-qt6/default.nix        | 100 +++
@@ -59,7 +58,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
  overlay/libhybris/default.nix                 |  68 +-
- 42 files changed, 4600 insertions(+), 36 deletions(-)
+ 41 files changed, 4585 insertions(+), 36 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -73,7 +72,6 @@ libraries, without wrapping the Qt apps.
  create mode 100644 overlay/asteroidos/libiodata/default.nix
  create mode 100644 overlay/asteroidos/libiphb/default.nix
  create mode 100644 overlay/asteroidos/libngf/default.nix
- create mode 100644 overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch
  create mode 100644 overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
  create mode 100644 overlay/asteroidos/mapplauncherd/default.nix
  create mode 100644 overlay/asteroidos/mce-dev/default.nix
@@ -1313,40 +1311,6 @@ index 00000000..a2f16428
 +    platforms = platforms.linux;
 +  };
 +})
-diff --git a/overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch b/overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch
-new file mode 100644
-index 00000000..993d33a1
---- /dev/null
-+++ b/overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch
-@@ -0,0 +1,28 @@
-+From 304762c3373d88274d888efbbfa7ad04d5eb0d07 Mon Sep 17 00:00:00 2001
-+From: MagneFire <IDaNLContact@gmail.com>
-+Date: Fri, 8 Jan 2021 22:15:30 +0100
-+Subject: [PATCH] Make single-instance a shared library.
-+Newer versions of glibc(>= 2.30) don't allow dlopen() on position independent executables. Normal (position dependent) executables weren't supported either.
-+---
-+ src/single-instance/CMakeLists.txt | 4 ++--
-+ 1 file changed, 2 insertions(+), 2 deletions(-)
-+
-+Upstream-Status: Inappropriate
-+
-+diff --git a/src/single-instance/CMakeLists.txt b/src/single-instance/CMakeLists.txt
-+index cc04ba2..1d3d13d 100644
-+--- a/src/single-instance/CMakeLists.txt
-++++ b/src/single-instance/CMakeLists.txt
-+@@ -11,10 +11,10 @@ pkg_check_modules(DBUS dbus-1 REQUIRED)
-+ include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${DBUS_INCLUDE_DIRS} ${COMMON})
-+ 
-+ # Hide all symbols except the ones explicitly exported in the code (like main())
-+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fPIC")
-++set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIE -fvisibility=hidden -fPIC")
-+ 
-+ # Link as position independent executable
-+-set(CMAKE_EXE_LINKER_FLAGS "-pie -rdynamic")
-++set(CMAKE_EXE_LINKER_FLAGS "-rdynamic -shared")
-+ 
-+ # Set C flags because of report.c
-+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden -fPIC")
 diff --git a/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
 new file mode 100644
 index 00000000..0597e987
@@ -1395,14 +1359,15 @@ index 00000000..0597e987
 +
 diff --git a/overlay/asteroidos/mapplauncherd/default.nix b/overlay/asteroidos/mapplauncherd/default.nix
 new file mode 100644
-index 00000000..08c75236
+index 00000000..a8bd2d87
 --- /dev/null
 +++ b/overlay/asteroidos/mapplauncherd/default.nix
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,61 @@
 +{
 +  lib,
 +  stdenv,
 +  fetchFromGitHub,
++  fetchurl,
 +  cmake,
 +  pkg-config,
 +  glib,
@@ -1424,13 +1389,25 @@ index 00000000..08c75236
 +  };
 +
 +  patches = [
-+    ./0001-Fix-dynamic-opening-issues.patch
++    (fetchurl {
++      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-nemomobile/mapplauncherd/mapplauncherd/0001-Fix-dynamic-opening-issues.patch";
++      hash = "sha256-c2sqCkdjFN5G7JXyzMnLHbzCM1SDQue9z6He+YwogGI=";
++    })
 +    ./0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
 +  ];
 +
 +  strictDeps = true;
-+  nativeBuildInputs = [ cmake pkg-config kdePackages.extra-cmake-modules ];
-+  buildInputs = [ glib dbus systemd libcap ];
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    kdePackages.extra-cmake-modules
++  ];
++  buildInputs = [
++    glib
++    dbus
++    systemd
++    libcap
++  ];
 +  cmakeFlags = [ "-DECM_DIR=${kdePackages.extra-cmake-modules}/share/ECM/cmake" ];
 +
 +  # Upstream's documentation target requires unavailable Qt 5 tooling, and
