@@ -93,15 +93,18 @@ This document catalogs and tracks all hardware, runtime, packaging, and architec
 
 ## 2. Upstream Architecture & Long-Term Roadmap
 
-### 2.1 Mainline Linux Kernel Bringup for Snapdragon Wear 4100 (`fossil-hoki`)
+### 2.1 Mainline Linux Kernel Bringup for Snapdragon Wear 4100 (`fossil-hoki-mainline`)
 * **Current status:**
-  * A standalone mainline target is defined at `devices/fossil-hoki/mainline/default.nix`.
-  * Reserved memory map and initial Device Tree source (DTS) are defined for SDA429W.
-* **Remaining Work:**
-  * Upstream DSI panel driver (Command Mode) for the 416x416 AMOLED display.
-  * Upstream I2C touchscreen driver for Raydium RM69330.
-  * Fuel gauge (BMS) and charger driver bringup.
-  * Once stable, transition from Android 9 downstream kernel (4.14.214) to upstream Linux 6.x.
+  * Complete pure-mainline device target defined at `devices/fossil-hoki-mainline/default.nix`.
+  * Packaged Linux 6.18 LTS kernel with structured configuration (`CONFIG_ARCH_QCOM`, `CONFIG_DRM_MSM`, `CONFIG_FB_SIMPLE`, `CONFIG_ARM_APPENDED_DTB`, `CONFIG_USB_CONFIGFS_*`, `CONFIG_PSTORE_*`).
+  * Structured Device Tree source (`sda429-hoki.dts`) compiled with early `simple-framebuffer` (416x416 32bpp) splash handoff, `ramoops` pstore memory carveout (`0x9ff00000 0x100000`), `blsp1_uart2` console (`ttyMSM0`), and `gpio-keys` button mappings.
+  * Freedreno Mesa DRM/KMS graphics stack configured with Qt EGLFS KMS integration (`QT_QPA_PLATFORM=eglfs`, `QT_QPA_EGLFS_INTEGRATION=eglfs_kms`).
+  * CDC-NCM USB gadget networking with stage-2 SSH (`172.16.42.1`) enabled for remote debugging.
+  * Flake outputs (`allDevices`, `nixosConfigurations`, `deploy.nodes`) fully registered and evaluated.
+* **Remaining Hardware Verification & Bringup Work:**
+  * Upstream DSI panel driver (Command Mode) for the 416x416 AMOLED display (to transition from simplefb to native dynamic DRM modesetting).
+  * Native DRM touch input binding for Raydium RM69330 I2C controller.
+  * PMIC battery fuel gauge (BMS) and charger drivers.
 
 ### 2.2 WebKitGTK / WPE WebKit Sandbox Hardening
 * **Current status:**

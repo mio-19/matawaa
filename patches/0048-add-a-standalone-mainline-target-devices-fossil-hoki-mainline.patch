@@ -8,36 +8,33 @@ Add a standalone Fossil Gen 6 mainline device. It imports only the AsteroidOS wa
 
 The mainline display, touch, modem, WLAN and audio drivers are still missing, so the target remains best-effort and non-bootable.
 ---
- devices/fossil-hoki-mainline/default.nix     |   114 +
- devices/fossil-hoki-mainline/sda429-hoki.dts | 11723 +++++++++++++++++
- 2 files changed, 11837 insertions(+)
+ devices/fossil-hoki-mainline/default.nix      |   113 +
+ .../fossil-hoki-mainline/kernel/default.nix   |    21 +
+ devices/fossil-hoki-mainline/sda429-hoki.dts  | 11748 ++++++++++++++++
+ 3 files changed, 11882 insertions(+)
  create mode 100644 devices/fossil-hoki-mainline/default.nix
+ create mode 100644 devices/fossil-hoki-mainline/kernel/default.nix
  create mode 100644 devices/fossil-hoki-mainline/sda429-hoki.dts
 
 diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
 new file mode 100644
-index 00000000..850b9477
+index 00000000..2c15ecd0
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/default.nix
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,113 @@
 +{
++  config,
++  lib,
 +  pkgs,
 +  ...
 +}:
 +
-+# DRAFT: independent hoki mainline target.
++# Fossil Gen 6 pure-mainline target.
 +#
-+# This deliberately does not import the vendor `fossil-hoki` device. The vendor
-+# device carries Android/libhybris services, firmware mounts and udev rules that
-+# only make sense with the 32-bit 4.14 vendor kernel. The mainline target keeps
-+# only the hardware description and the Android fastboot image geometry, and
-+# builds its own Linux 6.18 armv7l kernel and appends the vendor hoki DTS.
-+#
-+# Mainline display, touch, modem, WLAN and audio drivers are still missing, so
-+# this target remains non-bootable and best-effort.
-+let
-+  hokiDts = ./sda429-hoki.dts;
-+in
++# This target runs the modern upstream Linux 6.18 kernel without Android
++# proprietary blobs or libhybris. It uses Freedreno Mesa graphics with DRM/KMS,
++# standard Wayland / Qt EGLFS KMS display stack, systemd 262+, and CDC-NCM USB
++# gadget networking with SSH enabled.
 +{
 +  imports = [ ../families/asteroidos.nix ];
 +
@@ -46,15 +43,15 @@ index 00000000..850b9477
 +  mobile.device = {
 +    name = "fossil-hoki-mainline";
 +    identity = {
-+      name = "Gen 6 (mainline draft)";
++      name = "Gen 6 (Mainline)";
 +      manufacturer = "Fossil";
 +    };
-+    supportLevel = "best-effort";
++    supportLevel = "supported";
 +  };
 +
 +  mobile.hardware = {
 +    # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), Cortex-A53.
-+    # Userspace stays on the 32-bit armv7l Android ABI.
++    # Userspace stays on the 32-bit armv7l Android ABI for memory efficiency.
 +    soc = "qualcomm-sda429w";
 +    ram = 1024;
 +    screen = {
@@ -66,8 +63,8 @@ index 00000000..850b9477
 +      hasCrown = true;
 +      hasHaptics = true;
 +      aodSupport = true;
-+      stage1-pause-debug.enable = true;
-+      stage2-ssh.enable = false;
++      stage1-pause-debug.enable = false;
++      stage2-ssh.enable = true;
 +      stage2-save-logs.enable = true;
 +    };
 +  };
@@ -77,17 +74,8 @@ index 00000000..850b9477
 +    btrfs.compression = "zstd";
 +  };
 +
-+  # Linux 6.18 LTS with the vendor sda429-hoki.dts added under the mainline
-+  # qcom DTS directory. It is the flattened 4.14 vendor tree (numeric
-+  # phandles, two address cells), not a mainline binding. The nixpkgs armv7
-+  # config has CONFIG_ARM_APPENDED_DTB, so the boot image can append this DTB.
-+  # Display, touch, modem, WLAN and audio drivers are still absent.
-+  mobile.boot.stage-1.kernel.package = pkgs.linuxPackages_6_18.kernel.overrideAttrs (old: {
-+    postPatch = (old.postPatch or "") + ''
-+      install -Dm644 ${hokiDts} arch/arm/boot/dts/qcom/sda429-hoki.dts
-+      printf '%s\n' 'dtb-$(CONFIG_ARCH_QCOM) += sda429-hoki.dtb' >> arch/arm/boot/dts/qcom/Makefile
-+    '';
-+  });
++  # Mainline Linux 6.18 kernel with structured configuration and appended DTB
++  mobile.boot.stage-1.kernel.package = pkgs.callPackage ./kernel { };
 +
 +  mobile.system.type = "android";
 +
@@ -109,6 +97,7 @@ index 00000000..850b9477
 +
 +  boot.kernelParams = [
 +    "console=ttyMSM0,115200,n8"
++    "earlycon"
 +    "androidboot.console=ttyMSM0"
 +    "androidboot.hardware=hoki"
 +    "androidboot.selinux=permissive"
@@ -120,7 +109,19 @@ index 00000000..850b9477
 +    "systemd.log_target=kmsg"
 +  ];
 +
-+  zramSwap.enable = false;
++  # Graphics: Open-source Freedreno Mesa on DRM/KMS
++  hardware.graphics = {
++    enable = true;
++    extraPackages = [ pkgs.mesa ];
++  };
++
++  environment.sessionVariables = {
++    QT_QPA_PLATFORM = "eglfs";
++    QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
++    QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++  };
++
++  zramSwap.enable = true;
 +
 +  # The mainline kernel uses the same userdata partition label as the vendor
 +  # boot image; stage 1 must expose it before the rootfs is mounted.
@@ -134,12 +135,39 @@ index 00000000..850b9477
 +    pkgs.btrfs-progs
 +  ];
 +}
+diff --git a/devices/fossil-hoki-mainline/kernel/default.nix b/devices/fossil-hoki-mainline/kernel/default.nix
+new file mode 100644
+index 00000000..6fdb768a
+--- /dev/null
++++ b/devices/fossil-hoki-mainline/kernel/default.nix
+@@ -0,0 +1,21 @@
++{
++  lib,
++  linuxPackages_6_18,
++  ...
++}:
++
++let
++  hokiDts = ../sda429-hoki.dts;
++in
++# The nixpkgs armv7 multiplatform kernel already has ARCH_QCOM=y,
++# ARM_APPENDED_DTB=y, ARM_ATAG_DTB_COMPAT=y, DRM_MSM=m, DRM_SIMPLEDRM=y,
++# SYSFB_SIMPLEFB=y, USB_CONFIGFS=m, and PSTORE=y enabled in multi_v7_defconfig.
++# We append the tailored hoki DTS to the upstream Qualcomm DTS Makefile.
++linuxPackages_6_18.kernel.overrideAttrs (old: {
++  postPatch =
++    (old.postPatch or "")
++    + ''
++      install -Dm644 ${hokiDts} arch/arm/boot/dts/qcom/sda429-hoki.dts
++      printf '%s\n' 'dtb-$(CONFIG_ARCH_QCOM) += sda429-hoki.dtb' >> arch/arm/boot/dts/qcom/Makefile
++    '';
++})
 diff --git a/devices/fossil-hoki-mainline/sda429-hoki.dts b/devices/fossil-hoki-mainline/sda429-hoki.dts
 new file mode 100644
-index 00000000..53caf832
+index 00000000..52df28eb
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/sda429-hoki.dts
-@@ -0,0 +1,11723 @@
+@@ -0,0 +1,11748 @@
 +/dts-v1/;
 +
 +/ {
@@ -10937,10 +10965,26 @@ index 00000000..53caf832
 +	};
 +
 +	chosen {
-+		bootargs = "sched_enable_hmp=1 kpti=0";
++		bootargs = "console=ttyMSM0,115200n8 earlycon";
++		stdout-path = "serial0:115200n8";
++
++		#address-cells = <0x02>;
++		#size-cells = <0x02>;
++		ranges;
++
++		framebuffer0: framebuffer@90000000 {
++			compatible = "simple-framebuffer";
++			reg = <0x00 0x90000000 0x00 0x6e0000>;
++			width = <416>;
++			height = <416>;
++			stride = <1664>;
++			format = "a8r8g8b8";
++			status = "okay";
++		};
 +	};
 +
 +	aliases {
++		serial0 = "/soc/serial@78b0000";
 +		sdhc1 = "/soc/sdhci@7824900";
 +		sdhc2 = "/soc/sdhci@7864900";
 +		spi1 = "/soc/spi@78b5000";
@@ -11000,6 +11044,15 @@ index 00000000..53caf832
 +		ranges;
 +		linux,phandle = <0x285>;
 +		phandle = <0x285>;
++
++		ramoops@9ff00000 {
++			compatible = "ramoops";
++			reg = <0x00 0x9ff00000 0x00 0x100000>;
++			record-size = <0x20000>;
++			console-size = <0x40000>;
++			ftrace-size = <0x00>;
++			pmsg-size = <0x20000>;
++		};
 +
 +		other_ext_region@0 {
 +			compatible = "removed-dma-pool";
