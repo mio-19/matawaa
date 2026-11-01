@@ -1,0 +1,61 @@
+name: Build smartwatch images
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        device:
+          - fossil-hoki
+          - oppo-beluga
+    steps:
+      - name: Check out Matawaa
+        uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            substituters = https://cache.nixos.org https://matawaa.cachix.org
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= matawaa.cachix.org-1:Lr7VwT3o+MyJPsehlobwZXv5gI+/hh9zhfUWdPCeej8=
+
+      - name: Configure Cachix
+        uses: cachix/cachix-action@v17
+        with:
+          name: matawaa
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          useDaemon: true
+
+      - name: Apply Mobile NixOS patch series
+        run: ./scripts/applyPatches.sh
+
+      - name: Build ${{ matrix.device }} fastboot images
+        id: image
+        shell: bash
+        env:
+          DEVICE: ${{ matrix.device }}
+        run: |
+          set -euo pipefail
+          output="$(nix-build work/mobile-nixos/examples/asteroid \
+            --argstr device "$DEVICE" \
+            -A outputs.default \
+            --no-link)"
+          echo "store_path=$output" >> "$GITHUB_OUTPUT"
+          echo "Built $output"
+
+      - name: Push ${{ matrix.device }} image and full closure to Cachix
+        env:
+          IMAGE_STORE_PATH: ${{ steps.image.outputs.store_path }}
+        run: nix-store -qR "$IMAGE_STORE_PATH" | cachix push matawaa
