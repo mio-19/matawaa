@@ -174,7 +174,12 @@
             profiles.system = {
               user = "root";
               sshUser = "ceres";
-              path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations."fossil-hoki";
+              path =
+                deploy-rs.lib.x86_64-linux.activate.custom
+                  self.nixosConfigurations."fossil-hoki".config.system.build.toplevel
+                  ''
+                    $PROFILE/bin/switch-to-configuration boot
+                  '';
             };
           };
           "oppo-beluga" = {
@@ -182,7 +187,12 @@
             profiles.system = {
               user = "root";
               sshUser = "ceres";
-              path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations."oppo-beluga";
+              path =
+                deploy-rs.lib.x86_64-linux.activate.custom
+                  self.nixosConfigurations."oppo-beluga".config.system.build.toplevel
+                  ''
+                    $PROFILE/bin/switch-to-configuration boot
+                  '';
             };
           };
         };

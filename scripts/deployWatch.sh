@@ -18,7 +18,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEVICE="fossil-hoki"
 TARGET_HOST="172.16.42.1"
 SSH_USER="ceres"
-ACTION="switch"
+ACTION="boot"
 METHOD="copy"
 DRY_RUN=false
 PORT="22"
@@ -28,6 +28,9 @@ usage() {
 Usage: $(basename "$0") [OPTIONS]
 
 Deploy or upgrade a running AsteroidOS smartwatch over USB networking or Wi-Fi.
+By default, the new system configuration is activated as 'boot' (staged for next
+startup) to avoid abruptly terminating the running Lipstick compositor, hybris
+display services, or USB gadget networking session mid-switch.
 
 Options:
   -d, --device <name>     Target smartwatch device (default: $DEVICE)
@@ -35,7 +38,7 @@ Options:
   -t, --target <host>     Target IP or hostname of the watch (default: $TARGET_HOST)
   -p, --port <port>       SSH port on the watch (default: $PORT)
   -u, --user <user>       SSH user on the watch (default: $SSH_USER)
-  -a, --action <action>   Activation action: switch | boot | test | dry-activate (default: $ACTION)
+  -a, --action <action>   Activation action: boot | switch | test | dry-activate (default: $ACTION)
   -m, --method <method>   Deployment method: copy | nixos-rebuild | deploy-rs (default: $METHOD)
   -n, --dry-run           Build/evaluate configuration without copying or activating
   -h, --help              Show this help message
@@ -43,15 +46,18 @@ Options:
 Methods:
   copy          (Recommended) Local cross-build + nix-copy-closure + remote activation.
                 Extremely lightweight, does not require Flakes or nix-daemon on the watch.
-  nixos-rebuild Standard nixos-rebuild switch --flake .#<device> --target-host ...
+  nixos-rebuild Standard nixos-rebuild boot/switch --flake .#<device> --target-host ...
   deploy-rs     Declarative deploy-rs multi-profile runner via Flakes.
 
 Examples:
-  # Deploy to watch connected over USB networking (172.16.42.1)
+  # Deploy full AsteroidOS UI desktop to watch (staged for next boot)
   $(basename "$0")
 
   # Deploy to Fossil Gen 6 over Wi-Fi
   $(basename "$0") --device fossil-hoki --target 192.168.1.150
+
+  # Immediately switch running services in-place
+  $(basename "$0") --action switch
 
   # Test configuration without permanently setting the bootloader entry
   $(basename "$0") --action test
@@ -145,13 +151,17 @@ check_connectivity() {
 }
 
 deploy_copy() {
-  echo "[*] Building cross-compiled system toplevel for $DEVICE..."
-  TOPLEVEL="$(nix-build "$REPO_ROOT/work/mobile-nixos/examples/asteroid" \
-    --argstr device "$DEVICE" \
-    -A config.system.build.toplevel \
-    --no-link)"
+  echo "[*] Building cross-compiled AsteroidOS desktop toplevel for $DEVICE..."
+  if [ -d "$REPO_ROOT/work/mobile-nixos/examples/asteroid" ]; then
+    TOPLEVEL="$(nix-build "$REPO_ROOT/work/mobile-nixos/examples/asteroid" \
+      --argstr device "$DEVICE" \
+      -A config.system.build.toplevel \
+      --no-link)"
+  else
+    TOPLEVEL="$(nix build "$REPO_ROOT#nixosConfigurations.$DEVICE.config.system.build.toplevel" --no-link --print-out-paths)"
+  fi
 
-  echo "[+] Built toplevel: $TOPLEVEL"
+  echo "[+] Built full AsteroidOS desktop toplevel: $TOPLEVEL"
 
   if [ "$DRY_RUN" = true ]; then
     echo "[*] Dry run requested. Built closure ready; skipping transmission and activation."
@@ -175,7 +185,11 @@ deploy_copy() {
   ssh -p "$PORT" -o StrictHostKeyChecking=accept-new -t "$SSH_USER@$TARGET_HOST" \
     "$SUDO_CMD nix-env -p /nix/var/nix/profiles/system --set $TOPLEVEL && $SUDO_CMD $TOPLEVEL/bin/switch-to-configuration $ACTION"
 
-  echo "[+] Deployment successfully completed on $DEVICE!"
+  echo "[+] Deployment ($ACTION) successfully completed on $DEVICE!"
+  if [ "$ACTION" = "boot" ]; then
+    echo "[*] New generation staged for next startup. Reboot the watch when ready:"
+    echo "    ssh -p $PORT $SSH_USER@$TARGET_HOST '$SUDO_CMD reboot'"
+  fi
 }
 
 deploy_nixos_rebuild() {
@@ -193,6 +207,11 @@ deploy_nixos_rebuild() {
     --target-host "$SSH_USER@$TARGET_HOST" \
     --use-remote-sudo \
     --build-host localhost
+
+  if [ "$ACTION" = "boot" ]; then
+    echo "[*] New generation staged for next startup. Reboot the watch when ready:"
+    echo "    ssh -p $PORT $SSH_USER@$TARGET_HOST 'sudo reboot'"
+  fi
 }
 
 deploy_deploy_rs() {
@@ -205,7 +224,16 @@ deploy_deploy_rs() {
   check_connectivity
 
   echo "[*] Executing deploy-rs for $DEVICE..."
-  nix run github:serokell/deploy-rs -- "$REPO_ROOT#$DEVICE"
+  DEPLOY_ARGS=()
+  if [ "$ACTION" = "boot" ]; then
+    DEPLOY_ARGS+=(--boot)
+  fi
+  nix run github:serokell/deploy-rs -- "${DEPLOY_ARGS[@]}" "$REPO_ROOT#$DEVICE"
+
+  if [ "$ACTION" = "boot" ]; then
+    echo "[*] New generation staged for next startup. Reboot the watch when ready:"
+    echo "    ssh -p $PORT $SSH_USER@$TARGET_HOST 'sudo reboot'"
+  fi
 }
 
 case "$METHOD" in
