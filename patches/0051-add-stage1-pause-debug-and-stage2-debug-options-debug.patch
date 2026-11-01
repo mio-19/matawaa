@@ -10,11 +10,11 @@ Add the development-only stage debugging modes:
 - devices/families/asteroidos.nix: gate the stage-1 console/SSH/telnet and pause behind stage1-pause-debug; persist the journal and coredumps only when stage2-save-logs is enabled; enable stage-2 OpenSSH and USB networking when stage2-ssh is enabled; assert that stage1-pause-debug and stage2-ssh are mutually exclusive.
 - devices/fossil-hoki/default.nix: opt hoki into stage1-pause-debug and stage2-save-logs for the current bring-up, and keep verbose systemd logging gated by the stage1 debug mode.
 ---
- boot/init/tasks/switch_root.rb  | 19 +++++++
- devices/families/asteroidos.nix | 97 +++++++++++++++++++++++++++++++++
- devices/fossil-hoki/default.nix | 21 +++++--
- modules/initrd-ssh.nix          | 72 +++++++++++++++++++-----
- 4 files changed, 189 insertions(+), 20 deletions(-)
+ boot/init/tasks/switch_root.rb  |  19 +++++
+ devices/families/asteroidos.nix | 134 ++++++++++++++++++++++++++++++++
+ devices/fossil-hoki/default.nix |  21 +++--
+ modules/initrd-ssh.nix          |  72 +++++++++++++----
+ 4 files changed, 226 insertions(+), 20 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
 index b3a6045b..0644044c 100644
@@ -54,10 +54,17 @@ index b3a6045b..0644044c 100644
  
      Tasks::UDev.instance.teardown()
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index f2b892bc..368d1cfa 100644
+index f2b892bc..72acc76f 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
-@@ -10,12 +10,23 @@ let
+@@ -1,5 +1,6 @@
+ {
+   config,
++  options,
+   lib,
+   pkgs,
+   ...
+@@ -10,12 +11,23 @@ let
      mkDefault
      mkIf
      ;
@@ -81,7 +88,7 @@ index f2b892bc..368d1cfa 100644
    mobile.system.type = mkDefault "android";
    mobile.system.system = mkDefault "armv7l-linux";
  
-@@ -141,6 +152,8 @@ in
+@@ -141,6 +153,8 @@ in
      memoryPercent = lib.mkOptionDefault 50;
    };
  
@@ -90,7 +97,7 @@ index f2b892bc..368d1cfa 100644
    # AsteroidOS credits the saved random seed as entropy to avoid slow boots on
    # pre-5.4 watch kernels.
    # Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
-@@ -166,4 +179,88 @@ in
+@@ -166,4 +180,124 @@ in
    boot.kernelParams = [
      "loop.max_part=7"
    ];
@@ -121,7 +128,10 @@ index f2b892bc..368d1cfa 100644
 +    gadgetfs.functions.rndis = "ncm.usb0";
 +  };
 +
-+  mobile.boot.stage-1.networking.enable = mkIf cfg.enable (mkDefault true);
++  # Stage-1 owns gadget creation on these Android kernels. Keep it enabled
++  # whenever debug networking is requested, even when boot continues directly
++  # into stage-2; otherwise usb_f_ncm is not loaded and no USB NIC appears.
++  mobile.boot.stage-1.networking.enable = mkIf debugNetwork (mkDefault true);
 +  mobile.boot.stage-1.ssh.enable = mkIf cfg.enable (mkDefault true);
 +
 +  services.openssh = mkIf debugNetwork {
@@ -129,6 +139,10 @@ index f2b892bc..368d1cfa 100644
 +    settings = {
 +      PermitRootLogin = "yes";
 +      PermitEmptyPasswords = "yes";
++      # Keyboard-interactive PAM authentication succeeds on the vendor kernel
++      # but fails during pam_setcred(); direct password sessions work.
++      PasswordAuthentication = true;
++      KbdInteractiveAuthentication = false;
 +    };
 +  };
 +
@@ -137,6 +151,18 @@ index f2b892bc..368d1cfa 100644
 +  systemd.services.sshd.wantedBy = mkIf (cfg.enable && !stage2SshCfg.enable) (lib.mkForce [ ]);
 +
 +  networking.firewall.enable = mkIf debugNetwork (mkDefault false);
++
++  # ConnMan otherwise claims the gadget as a tethering device and brings it
++  # down after the static debug addresses have been configured.
++  services.connman.networkInterfaceBlacklist = mkIf debugNetwork (
++    lib.mkAfter (
++      options.services.connman.networkInterfaceBlacklist.default
++      ++ [
++        "usb"
++        "rndis"
++      ]
++    )
++  );
 +
 +  networking.interfaces.usb0.ipv4.addresses = mkIf debugNetwork [
 +    {
@@ -153,7 +179,8 @@ index f2b892bc..368d1cfa 100644
 +
 +  systemd.services.usb-gadget-network = mkIf debugNetwork {
 +    description = "USB Gadget Ethernet (NCM) Setup";
-+    wantedBy = [ "network-pre.target" ];
++    wantedBy = [ "multi-user.target" ];
++    wants = [ "network-pre.target" ];
 +    before = [ "network-pre.target" ];
 +    unitConfig.DefaultDependencies = false;
 +    serviceConfig = {
@@ -161,9 +188,9 @@ index f2b892bc..368d1cfa 100644
 +      RemainAfterExit = true;
 +      ExecStart = pkgs.writeShellScript "setup-usb-gadget" ''
 +        set -e
-+        mountpoint -q /sys/kernel/config || { mkdir -p /sys/kernel/config; mount -t configfs none /sys/kernel/config; }
++        ${pkgs.util-linux}/bin/mountpoint -q /sys/kernel/config || { mkdir -p /sys/kernel/config; ${pkgs.util-linux}/bin/mount -t configfs none /sys/kernel/config; }
 +        udc="$(ls /sys/class/udc 2>/dev/null | head -n1)"
-+        [ -n "$udc" ] || exit 0
++        [ -n "$udc" ] || { echo "No USB device controller found" >&2; exit 1; }
 +        g=/sys/kernel/config/usb_gadget/g1
 +        if [ ! -d "$g" ]; then
 +          mkdir -p "$g/strings/0x409" "$g/functions/ncm.usb0" "$g/configs/c.1/strings/0x409"
@@ -174,13 +201,29 @@ index f2b892bc..368d1cfa 100644
 +          echo "CDC NCM" > "$g/configs/c.1/strings/0x409/configuration"
 +          ln -sf "$g/functions/ncm.usb0" "$g/configs/c.1/"
 +        fi
-+        [ -s "$g/UDC" ] || echo "$udc" > "$g/UDC"
++        # Configfs attribute sizes do not report whether a controller is bound.
++        [ -n "$(cat "$g/UDC")" ] || echo "$udc" > "$g/UDC"
++
++        # Binding the NCM function creates usb0, but does not necessarily bring
++        # the netdev up. A down usb0 leaves macOS with an enumerated but
++        # inactive USB Ethernet port.
++        for attempt in $(seq 1 20); do
++          [ -e /sys/class/net/usb0 ] && break
++          sleep 0.25
++        done
++        [ -e /sys/class/net/usb0 ] || { echo "NCM gadget did not create usb0" >&2; exit 1; }
++        ${pkgs.iproute2}/bin/ip link set dev usb0 up
++        # The normal NixOS address unit can run before gadget binding creates
++        # usb0. Configure both debug subnets here after the netdev exists; the
++        # declarative interface config remains as a fallback on later starts.
++        ${pkgs.iproute2}/bin/ip address replace 192.168.2.15/24 dev usb0
++        ${pkgs.iproute2}/bin/ip address replace 172.16.42.1/24 dev usb0
 +      '';
 +    };
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index b7793a6a..a42c951a 100644
+index b7793a6a..f5979e50 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -54,6 +54,10 @@ in
@@ -198,8 +241,8 @@ index b7793a6a..a42c951a 100644
        hasCrown = true;
        hasHaptics = true;
        aodSupport = true;
-+      stage1-pause-debug.enable = true;
-+      stage2-ssh.enable = false;
++      stage1-pause-debug.enable = false;
++      stage2-ssh.enable = true;
 +      stage2-save-logs.enable = true;
      };
    };

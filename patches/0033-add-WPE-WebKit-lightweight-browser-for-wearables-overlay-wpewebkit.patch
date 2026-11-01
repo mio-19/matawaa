@@ -14,17 +14,17 @@ This patch integrates the lightweight WPE WebKit rendering engine and browser:
 - overlay/asteroidos/default.nix: Exposes browser and wpewebkit-qt in asteroid scope.
 - overlay/overlay.nix: Registers wpewebkit package in Nixpkgs overlay.
 ---
- overlay/asteroidos/browser/CMakeLists.txt     |  49 +++
+ overlay/asteroidos/browser/CMakeLists.txt     |  54 +++
  .../browser/asteroid-browser.desktop          |  12 +
- .../asteroidos/browser/asteroid-browser.svg   |  50 +++
- overlay/asteroidos/browser/default.nix        |  44 ++
+ .../asteroidos/browser/asteroid-browser.svg   |  22 +
+ overlay/asteroidos/browser/default.nix        |  52 +++
  overlay/asteroidos/browser/portal.html        | 237 +++++++++++
  overlay/asteroidos/browser/src/main.c         | 384 ++++++++++++++++++
  overlay/asteroidos/default.nix                |  14 +-
  overlay/asteroidos/wpewebkit-qt/default.nix   |  70 ++++
  overlay/overlay.nix                           |   2 +
  overlay/wpewebkit/default.nix                 | 163 ++++++++
- 10 files changed, 1023 insertions(+), 2 deletions(-)
+ 10 files changed, 1008 insertions(+), 2 deletions(-)
  create mode 100644 overlay/asteroidos/browser/CMakeLists.txt
  create mode 100644 overlay/asteroidos/browser/asteroid-browser.desktop
  create mode 100644 overlay/asteroidos/browser/asteroid-browser.svg
@@ -36,10 +36,10 @@ This patch integrates the lightweight WPE WebKit rendering engine and browser:
 
 diff --git a/overlay/asteroidos/browser/CMakeLists.txt b/overlay/asteroidos/browser/CMakeLists.txt
 new file mode 100644
-index 00000000..1ecd71a9
+index 00000000..cb9a9691
 --- /dev/null
 +++ b/overlay/asteroidos/browser/CMakeLists.txt
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,54 @@
 +cmake_minimum_required(VERSION 3.16)
 +project(asteroid-browser VERSION 1.0.0 LANGUAGES C)
 +
@@ -81,6 +81,11 @@ index 00000000..1ecd71a9
 +    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
 +)
 +
++# The launcher resolves app icons through AsteroidOS's flat theme directory.
++install(FILES asteroid-browser.svg
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/asteroid
++)
++
 +install(FILES asteroid-browser.svg
 +    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
 +    RENAME org.asteroidos.browser.svg
@@ -109,66 +114,38 @@ index 00000000..6e0de5d7
 +Keywords=web;browser;internet;
 diff --git a/overlay/asteroidos/browser/asteroid-browser.svg b/overlay/asteroidos/browser/asteroid-browser.svg
 new file mode 100644
-index 00000000..b65fe4b9
+index 00000000..6ce8f579
 --- /dev/null
 +++ b/overlay/asteroidos/browser/asteroid-browser.svg
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,22 @@
 +<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
 +  <defs>
-+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-+      <stop offset="0%" stop-color="#0b1e36"/>
-+      <stop offset="50%" stop-color="#102a4c"/>
-+      <stop offset="100%" stop-color="#091322"/>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#173d68" />
++      <stop offset="1" stop-color="#091526" />
 +    </linearGradient>
-+    <linearGradient id="orbit" x1="0%" y1="0%" x2="100%" y2="100%">
-+      <stop offset="0%" stop-color="#00e5ff"/>
-+      <stop offset="100%" stop-color="#2979ff"/>
++    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
++      <stop offset="0" stop-color="#eaf8ff" />
++      <stop offset="1" stop-color="#b9d9e8" />
 +    </linearGradient>
-+    <linearGradient id="compass-north" x1="0%" y1="0%" x2="100%" y2="100%">
-+      <stop offset="0%" stop-color="#ff1744"/>
-+      <stop offset="100%" stop-color="#d50000"/>
-+    </linearGradient>
-+    <linearGradient id="compass-south" x1="0%" y1="0%" x2="100%" y2="100%">
-+      <stop offset="0%" stop-color="#ffffff"/>
-+      <stop offset="100%" stop-color="#cfd8dc"/>
-+    </linearGradient>
-+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-+      <feGaussianBlur stdDeviation="3" result="blur" />
-+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-+    </filter>
 +  </defs>
 +
-+  <!-- Circular background badge -->
-+  <circle cx="64" cy="64" r="60" fill="url(#bg)" stroke="#1e3a5f" stroke-width="2"/>
-+
-+  <!-- Outer orbital ring -->
-+  <circle cx="64" cy="64" r="50" fill="none" stroke="url(#orbit)" stroke-width="3" stroke-dasharray="14 6" opacity="0.8" filter="url(#glow)"/>
-+
-+  <!-- Latitude / Longitude globe lines -->
-+  <ellipse cx="64" cy="64" rx="42" ry="42" fill="none" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
-+  <ellipse cx="64" cy="64" rx="20" ry="42" fill="none" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
-+  <line x1="22" y1="64" x2="106" y2="64" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
-+  <line x1="64" y1="22" x2="64" y2="106" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
-+
-+  <!-- Stylized Compass / Navigator Pointer (35 degree tilt) -->
-+  <g transform="translate(64,64) rotate(35)">
-+    <!-- North Needle -->
-+    <polygon points="0,-36 9,0 0,-4" fill="url(#compass-north)" filter="url(#glow)"/>
-+    <polygon points="0,-36 -9,0 0,-4" fill="#b71c1c"/>
-+    <!-- South Needle -->
-+    <polygon points="0,36 9,0 0,4" fill="url(#compass-south)"/>
-+    <polygon points="0,36 -9,0 0,4" fill="#90a4ae"/>
-+    <!-- Center Pivot Pin -->
-+    <circle cx="0" cy="0" r="5" fill="#eceff1" stroke="#37474f" stroke-width="1.5"/>
-+    <circle cx="0" cy="0" r="2" fill="#00e5ff"/>
-+  </g>
++  <circle cx="64" cy="64" r="60" fill="url(#bg)" stroke="#2b6088" stroke-width="2" />
++  <rect x="23" y="29" width="82" height="70" rx="11" fill="#07111d" stroke="#55d9ee" stroke-width="4" />
++  <path d="M27 40a7 7 0 0 1 7-7h60a7 7 0 0 1 7 7v10H27z" fill="#16466b" />
++  <circle cx="38" cy="40" r="2.5" fill="#ff6b77" />
++  <circle cx="47" cy="40" r="2.5" fill="#ffd166" />
++  <circle cx="56" cy="40" r="2.5" fill="#62e6a7" />
++  <rect x="34" y="57" width="60" height="34" rx="5" fill="url(#page)" />
++  <path d="M42 66h27M42 73h43M42 80h35" stroke="#3982a8" stroke-width="3" stroke-linecap="round" />
++  <circle cx="83" cy="65" r="5" fill="#00bcd4" />
 +</svg>
 diff --git a/overlay/asteroidos/browser/default.nix b/overlay/asteroidos/browser/default.nix
 new file mode 100644
-index 00000000..4ee89f74
+index 00000000..fe875e78
 --- /dev/null
 +++ b/overlay/asteroidos/browser/default.nix
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,52 @@
 +# AsteroidOS native smartwatch web browser
 +# Real WebKit browser engine (WebKitGTK 6.0) optimized for wearable displays
 +# Upstream architecture: https://asteroidos.org/
@@ -204,6 +181,14 @@ index 00000000..4ee89f74
 +  ];
 +
 +  dontWrapGApps = false;
++
++  # This legacy watch kernel cannot create WebKit's bwrap sandbox namespaces.
++  # Run the GTK client on the Asteroid Wayland socket and use WebKit's explicit
++  # sandbox-disable switch so the browser can start on this device.
++  preFixup = ''
++    gappsWrapperArgs+=(--set GDK_BACKEND wayland)
++    gappsWrapperArgs+=(--set WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS 1)
++  '';
 +
 +  meta = with lib; {
 +    description = "Native WebKit smartwatch browser for AsteroidOS";
@@ -458,7 +443,7 @@ index 00000000..1924bbc8
 +</html>
 diff --git a/overlay/asteroidos/browser/src/main.c b/overlay/asteroidos/browser/src/main.c
 new file mode 100644
-index 00000000..c8cf0974
+index 00000000..785f614f
 --- /dev/null
 +++ b/overlay/asteroidos/browser/src/main.c
 @@ -0,0 +1,384 @@
@@ -652,18 +637,18 @@ index 00000000..c8cf0974
 +        "  background: rgba(14, 20, 32, 0.94);\n"
 +        "  border: 1px solid rgba(0, 229, 255, 0.4);\n"
 +        "  border-radius: 28px;\n"
-+        "  padding: 4px 8px;\n"
-+        "  margin-bottom: 12px;\n"
++        "  padding: 8px 10px;\n"
++        "  margin-bottom: 10px;\n"
 +        "}\n"
 +        ".watch-btn {\n"
 +        "  background: transparent;\n"
 +        "  border: none;\n"
 +        "  border-radius: 50%;\n"
-+        "  min-width: 36px;\n"
-+        "  min-height: 36px;\n"
++        "  min-width: 56px;\n"
++        "  min-height: 56px;\n"
 +        "  padding: 0;\n"
 +        "  color: #F0F4F8;\n"
-+        "  font-size: 15px;\n"
++        "  font-size: 22px;\n"
 +        "  font-weight: bold;\n"
 +        "}\n"
 +        ".watch-btn:hover, .watch-btn:active {\n"
@@ -847,10 +832,10 @@ index 00000000..c8cf0974
 +    return status;
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index e86d7b51..609b1dc1 100644
+index d4468c6d..a589c73a 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -100,10 +100,20 @@ rec {
+@@ -101,10 +101,20 @@ rec {
      inherit qml-asteroid amber-mpris mlite;
    };
  

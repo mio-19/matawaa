@@ -20,7 +20,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/accounts-qt/default.nix    |  85 +++
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++
- overlay/asteroidos/default.nix                |  66 ++
+ overlay/asteroidos/default.nix                |  67 ++
  overlay/asteroidos/dsme/default.nix           | 122 ++++
  overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
  overlay/asteroidos/keepalive/default.nix      | 131 ++++
@@ -31,6 +31,9 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/libiodata/default.nix      | 111 ++++
  overlay/asteroidos/libiphb/default.nix        |  54 ++
  overlay/asteroidos/libngf/default.nix         |  53 ++
+ .../0001-Fix-dynamic-opening-issues.patch     |  28 +
+ ...-sailjaild-D-Bus-query-when-sailjail.patch |  40 ++
+ overlay/asteroidos/mapplauncherd/default.nix  |  48 ++
  overlay/asteroidos/mce-dev/default.nix        |  41 ++
  .../mce-plugin-libhybris/default.nix          |  72 +++
  overlay/asteroidos/mce-qt6/default.nix        | 100 +++
@@ -56,7 +59,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
  overlay/libhybris/default.nix                 |  68 +-
- 39 files changed, 4483 insertions(+), 36 deletions(-)
+ 42 files changed, 4600 insertions(+), 36 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -70,6 +73,9 @@ libraries, without wrapping the Qt apps.
  create mode 100644 overlay/asteroidos/libiodata/default.nix
  create mode 100644 overlay/asteroidos/libiphb/default.nix
  create mode 100644 overlay/asteroidos/libngf/default.nix
+ create mode 100644 overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch
+ create mode 100644 overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
+ create mode 100644 overlay/asteroidos/mapplauncherd/default.nix
  create mode 100644 overlay/asteroidos/mce-dev/default.nix
  create mode 100644 overlay/asteroidos/mce-plugin-libhybris/default.nix
  create mode 100644 overlay/asteroidos/mce-qt6/default.nix
@@ -381,13 +387,15 @@ index 00000000..bcdd9f13
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 2fc834f0..515f584a 100644
+index 2fc834f0..7788a0e5 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,5 +7,71 @@ rec {
+@@ -6,6 +6,73 @@ rec {
+   };
  
    qml-asteroid = callPackage ./qml-asteroid { };
- 
++  mapplauncherd = callPackage ./mapplauncherd { };
++
 +  amber-mpris = callPackage ./amber-mpris { };
 +  mlite = callPackage ./mlite { };
 +  nemo-qml-plugin-configuration = callPackage ./nemo-qml-plugin-configuration {
@@ -453,7 +461,7 @@ index 2fc834f0..515f584a 100644
 +  nemo-qml-plugin-calendar = callPackage ./nemo-qml-plugin-calendar {
 +    inherit accounts-qt kcalendarcore mkcal timed-qt6 libiodata;
 +  };
-+
+ 
    inherit (pkgs) msm-fb-refresher;
  }
 diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
@@ -1305,6 +1313,140 @@ index 00000000..a2f16428
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch b/overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch
+new file mode 100644
+index 00000000..993d33a1
+--- /dev/null
++++ b/overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch
+@@ -0,0 +1,28 @@
++From 304762c3373d88274d888efbbfa7ad04d5eb0d07 Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Fri, 8 Jan 2021 22:15:30 +0100
++Subject: [PATCH] Make single-instance a shared library.
++Newer versions of glibc(>= 2.30) don't allow dlopen() on position independent executables. Normal (position dependent) executables weren't supported either.
++---
++ src/single-instance/CMakeLists.txt | 4 ++--
++ 1 file changed, 2 insertions(+), 2 deletions(-)
++
++Upstream-Status: Inappropriate
++
++diff --git a/src/single-instance/CMakeLists.txt b/src/single-instance/CMakeLists.txt
++index cc04ba2..1d3d13d 100644
++--- a/src/single-instance/CMakeLists.txt
+++++ b/src/single-instance/CMakeLists.txt
++@@ -11,10 +11,10 @@ pkg_check_modules(DBUS dbus-1 REQUIRED)
++ include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${DBUS_INCLUDE_DIRS} ${COMMON})
++ 
++ # Hide all symbols except the ones explicitly exported in the code (like main())
++-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fPIC")
+++set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIE -fvisibility=hidden -fPIC")
++ 
++ # Link as position independent executable
++-set(CMAKE_EXE_LINKER_FLAGS "-pie -rdynamic")
+++set(CMAKE_EXE_LINKER_FLAGS "-rdynamic -shared")
++ 
++ # Set C flags because of report.c
++ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden -fPIC")
+diff --git a/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
+new file mode 100644
+index 00000000..0597e987
+--- /dev/null
++++ b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
+@@ -0,0 +1,40 @@
++From 934565b7817b85a341b88d23df7c90a28c62dd0a Mon Sep 17 00:00:00 2001
++From: Florent Revest <revestflo@gmail.com>
++Date: Wed, 10 Jun 2026 23:20:09 +0000
++Subject: [PATCH] invoker: skip the sailjaild D-Bus query when sailjail is not
++ installed
++
++Every launch performs a synchronous D-Bus round-trip (bus connect +
++method call + ServiceUnknown error reply) to org.sailfishos.sailjaild1
++on systems that do not ship the sandboxing daemon. Sandbox enforcement
++prepends /usr/bin/sailjail to the command anyway, so when that binary
++does not exist the query can never lead anywhere: gate it on
++access(SAILJAIL_PATH, X_OK) and drop the dead bus traffic from the
++launch critical path.
++
++Upstream-Status: Pending
++---
++ src/invoker/invoker.c | 7 +++++++
++ 1 file changed, 7 insertions(+)
++
++diff --git a/src/invoker/invoker.c b/src/invoker/invoker.c
++index 2bc1143..9642a7d 100644
++--- a/src/invoker/invoker.c
+++++ b/src/invoker/invoker.c
++@@ -1136,6 +1136,13 @@ int main(int argc, char *argv[])
++         free(path);
++     }
++ 
+++    // Sandboxing needs the sailjail binary (it gets prepended to the
+++    // command below). On systems that do not ship it, skip the sailjaild
+++    // D-Bus query: it is a synchronous bus round-trip (connect + method
+++    // call + error reply) on the critical path of every single launch.
+++    if (args.sandboxing_id && access(SAILJAIL_PATH, X_OK) == -1)
+++        args.sandboxing_id = NULL;
+++
++     // Application specific boosters are running in sandbox and can
++     // thus launch only sandboxed processes, otherwise
++     // If arguments don't define sailjail and sailjaild says the app must be sandboxed,
++-- 
++2.47.3
++
+diff --git a/overlay/asteroidos/mapplauncherd/default.nix b/overlay/asteroidos/mapplauncherd/default.nix
+new file mode 100644
+index 00000000..08c75236
+--- /dev/null
++++ b/overlay/asteroidos/mapplauncherd/default.nix
+@@ -0,0 +1,48 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  glib,
++  dbus,
++  systemd,
++  libcap,
++  kdePackages,
++}:
++
++stdenv.mkDerivation {
++  pname = "mapplauncherd";
++  version = "2026-10-20";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "mapplauncherd";
++    rev = "7216a9b5801ffe58d1021cc71b9e90ff7d67268f";
++    hash = "sha256-kdzWP+Ffzb8kDagtxnWtHWoRQcWagJbUqe7ZWFUoZnk=";
++  };
++
++  patches = [
++    ./0001-Fix-dynamic-opening-issues.patch
++    ./0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
++  ];
++
++  strictDeps = true;
++  nativeBuildInputs = [ cmake pkg-config kdePackages.extra-cmake-modules ];
++  buildInputs = [ glib dbus systemd libcap ];
++  cmakeFlags = [ "-DECM_DIR=${kdePackages.extra-cmake-modules}/share/ECM/cmake" ];
++
++  # Upstream's documentation target requires unavailable Qt 5 tooling, and
++  # this systemd build exports libsystemd directly.
++  postPatch = ''
++    sed -i '/Target for documentation/,$d' CMakeLists.txt
++    sed -i 's@-L/lib -lsystemd-daemon@-lsystemd@' src/launcherlib/CMakeLists.txt
++  '';
++
++  meta = with lib; {
++    description = "AsteroidOS application launcher and invoker runtime";
++    homepage = "https://github.com/sailfishos/mapplauncherd";
++    license = licenses.lgpl21Only;
++    platforms = platforms.linux;
++  };
++}
 diff --git a/overlay/asteroidos/mce-dev/default.nix b/overlay/asteroidos/mce-dev/default.nix
 new file mode 100644
 index 00000000..29cca049
@@ -1546,7 +1688,7 @@ index 00000000..617c1bc5
 \ No newline at end of file
 diff --git a/overlay/asteroidos/mce/default.nix b/overlay/asteroidos/mce/default.nix
 new file mode 100644
-index 00000000..b1ee31e3
+index 00000000..8ce4a485
 --- /dev/null
 +++ b/overlay/asteroidos/mce/default.nix
 @@ -0,0 +1,107 @@
@@ -1637,8 +1779,8 @@ index 00000000..b1ee31e3
 +
 +    install -m644 mce.conf $out/share/dbus-1/system.d/com.nokia.mce.conf
 +
-+    install -m644 inifiles/mce.ini $out/etc/mce/mce.ini
-+    install -m644 inifiles/mce-radio-states.ini $out/etc/mce/mce-radio-states.ini
++    install -m644 inifiles/mce.ini $out/etc/mce/10mce.ini
++    install -m644 inifiles/mce-radio-states.ini $out/etc/mce/20mce-radio-states.ini
 +    install -m644 inifiles/hybris-led.ini $out/etc/mce/20hybris-led.ini
 +    install -m644 inifiles/hybris-features.ini $out/etc/mce/20hybris-features.ini
 +    install -m644 inifiles/debug-led.ini $out/etc/mce/20debug-led.ini
@@ -4402,7 +4544,7 @@ index 00000000..6ad5cc23
 +install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sensord-qt6.pc DESTINATION lib/pkgconfig)
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
 new file mode 100644
-index 00000000..aef62b0b
+index 00000000..9698e618
 --- /dev/null
 +++ b/overlay/asteroidos/sensorfw/default.nix
 @@ -0,0 +1,82 @@
@@ -4451,7 +4593,7 @@ index 00000000..aef62b0b
 +    (upstreamPatch "0004-Fix-compilation-when-autohybris-is-used.patch" "sha256-RJ711Knze6feQOPfa/UD6r9jG870H//hOnbFPzhoS5s=")
 +    (upstreamPatch "0005-Fix-compilation-when-hybris-is-used.patch" "sha256-evbbTXcBF/a6Y998373+p2vv7PnYWX71Ei9GFH+BaA8=")
 +    (upstreamPatch "0006-hybrisadaptor-Queue-erroneous-events-too.patch" "sha256-k10UaeZO9dEa+VApzyr2itLv6ZEqwnMhA+RXGkiWYlk=")
-+    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-7TRSkpcprdQczLhhsL9lqjTr4oRYMt3Z6JgbDcxCMjE=")
++    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-qH3mMqgPPNq9oqGOmP1xdc/EQ7f95ia8HFcmuBD2oMs=")
 +  ];
 +
 +  strictDeps = true;

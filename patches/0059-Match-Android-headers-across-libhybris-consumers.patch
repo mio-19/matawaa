@@ -74,10 +74,10 @@ index 4dcaa20c..6c9f6620 100644
        });
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index fd191102..cc8034aa 100644
+index 143d9655..a0c1cdf8 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -665,6 +665,7 @@ in
+@@ -667,6 +667,7 @@ in
          # failing import line even before any component error is printed.
          QML_IMPORT_TRACE = "1";
          QPA_HWC_DEBUG = "1";
@@ -86,10 +86,10 @@ index fd191102..cc8034aa 100644
          EGL_LOG_LEVEL = "debug";
          LIBGL_DEBUG = "verbose";
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index a50d02cd..a33893cf 100644
+index 35888440..964a67bf 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -38,7 +38,6 @@ rec {
+@@ -39,7 +39,6 @@ rec {
    qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
      inherit (pkgs)
        libhybris
@@ -97,7 +97,7 @@ index a50d02cd..a33893cf 100644
        glib
        mtdev
        ;
-@@ -94,7 +93,7 @@ rec {
+@@ -95,7 +94,7 @@ rec {
    # Nemomobile SensorFW daemon and client API (qtsensors sensorfw backend).
    # Upstream: https://github.com/sailfishos/sensorfw
    sensorfw = callPackage ./sensorfw {
@@ -178,7 +178,7 @@ index c8d6dc03..e69967d8 100644
        ${libhybris}/include/hybris/eglplatformcommon
        ${libhybris}/include/hybris/platformcommon
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
-index aef62b0b..c9e7b629 100644
+index 9698e618..eb4bc803 100644
 --- a/overlay/asteroidos/sensorfw/default.nix
 +++ b/overlay/asteroidos/sensorfw/default.nix
 @@ -11,7 +11,6 @@

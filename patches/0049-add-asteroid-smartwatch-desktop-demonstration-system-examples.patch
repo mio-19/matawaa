@@ -9,7 +9,7 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 729 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 731 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 ++
  examples/asteroid/default.nix                 |  15 +
  overlay/asteroidos/bluebinder/default.nix     |  81 ++
@@ -23,7 +23,7 @@ Run the launcher the way upstream AsteroidOS does: start it as a user service wi
  overlay/asteroidos/ngfd/default.nix           | 105 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 15 files changed, 1659 insertions(+)
+ 15 files changed, 1661 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -69,10 +69,10 @@ index f9fc1173..f2b892bc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..3c44bae3
+index 00000000..38e08c4f
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,729 @@
+@@ -0,0 +1,731 @@
 +{
 +  config,
 +  lib,
@@ -159,6 +159,8 @@ index 00000000..3c44bae3
 +      with pkgs;
 +      [
 +        asteroid.qml-asteroid
++        # Provides the invoker command used by AsteroidOS Qt app launchers.
++        asteroid.mapplauncherd
 +        asteroid.asteroid-launcher
 +        asteroid.asteroid-btsyncd
 +        asteroid.nemo-qml-plugin-dbus
@@ -960,12 +962,12 @@ index 00000000..e38bf0b5
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 71d04c60..8e75b57b 100644
+index 5e7c1500..e92e5f1b 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -7,6 +7,34 @@ rec {
- 
+@@ -8,6 +8,34 @@ rec {
    qml-asteroid = callPackage ./qml-asteroid { };
+   mapplauncherd = callPackage ./mapplauncherd { };
  
 +  # Upstream meta-asteroid checkout, used for unmodified recipe payloads
 +  # (udev rules, unit files, patches) instead of vendoring them.
@@ -998,7 +1000,7 @@ index 71d04c60..8e75b57b 100644
    qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
      inherit (pkgs)
        libhybris
-@@ -71,6 +99,8 @@ rec {
+@@ -72,6 +100,8 @@ rec {
  
    # Device state machine daemon MCE talks to.
    # Upstream: https://github.com/sailfishos/dsme

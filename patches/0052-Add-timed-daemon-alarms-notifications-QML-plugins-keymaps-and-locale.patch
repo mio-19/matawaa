@@ -10,7 +10,7 @@ plugins, ship the patched kmap2qmap keymap and supported-languages assets,
 and wire the resulting user services, D-Bus policies and locale drop-in
 into the asteroid desktop profile.
 ---
- devices/fossil-hoki/default.nix               |   2 +-
+ devices/fossil-hoki/default.nix               |   3 +-
  examples/asteroid/asteroid-desktop.nix        |  77 ++++++++-
  overlay/asteroidos/apps/default.nix           |   4 +-
  overlay/asteroidos/assets/default.nix         |  84 +++++++++
@@ -20,28 +20,29 @@ into the asteroid desktop profile.
  .../nemo-qml-plugin-alarms/default.nix        | 131 ++++++++++++++
  .../nemo-qml-plugin-notifications/default.nix | 117 +++++++++++++
  overlay/asteroidos/timed-qt6/default.nix      | 163 +++++++++++++++++-
- 10 files changed, 583 insertions(+), 14 deletions(-)
+ 10 files changed, 584 insertions(+), 14 deletions(-)
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index a42c951a..f710b2f4 100644
+index f5979e50..f674e31d 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -341,7 +341,7 @@ in
+@@ -341,7 +341,8 @@ in
      ''} ./var/lib/environment/compositor/10-platform.conf
  
      cp ${pkgs.writeText "20-device.conf" ''
 -      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"
++      QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/by-path/platform-78b8000.i2c-event
 +      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
        QPA_HWC_FORCE_GLES=1
        QPA_HWC2_FORCE_DOZE_UPDATE=1
        QT_OPENGL_NO_BGRA=1
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 3c44bae3..c7a27ff7 100644
+index 38e08c4f..1497e4c2 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -93,6 +93,9 @@ in
+@@ -95,6 +95,9 @@ in
          asteroid.nfcd
          asteroid.keepalive
          asteroid.nemo-qml-plugin-calendar
@@ -51,7 +52,7 @@ index 3c44bae3..c7a27ff7 100644
          # QML module the launcher imports; the cross qt5compat lacks it.
          qt5compatQml
          # Asset suite
-@@ -100,6 +103,8 @@ in
+@@ -102,6 +105,8 @@ in
          asteroid.assets.sounds
          asteroid.assets.icons
          asteroid.assets.fonts
@@ -60,7 +61,7 @@ index 3c44bae3..c7a27ff7 100644
          asteroid.virtualkeyboard
          # Complete application suite
          asteroid.apps.stopwatch
-@@ -177,6 +182,19 @@ in
+@@ -179,6 +184,19 @@ in
        }"
        # Upstream nfcd state storage directory.
        "d /var/lib/nfcd 0700 root root -"
@@ -80,7 +81,7 @@ index 3c44bae3..c7a27ff7 100644
        # Upstream asteroid-launcher_git.bb seeds the privileged notification DB.
        # mkcal (used by nemo-qml-plugin-calendar) creates its database under
        # ~/.local/share/system/Calendar, so that tree must belong to ceres.
-@@ -197,6 +215,7 @@ in
+@@ -199,6 +217,7 @@ in
        "/share/fonts"
        "/share/lipstick"
        "/share/ngfd"
@@ -88,7 +89,7 @@ index 3c44bae3..c7a27ff7 100644
        "/share/translations"
        "/share/rime-data"
        "/share/supported-languages"
-@@ -491,9 +510,13 @@ in
+@@ -493,9 +512,13 @@ in
        pkgs.asteroid.sensorfw
        pkgs.asteroid.ngfd
        pkgs.asteroid.nfcd
@@ -102,7 +103,7 @@ index 3c44bae3..c7a27ff7 100644
      # users.users.ceres.linger generates NixOS's linger-users.service, which
      # calls loginctl enable-linger after logind starts. Let the normal systemd
      # linger mechanism own the marker; do not pre-seed it or override the unit.
-@@ -530,12 +553,58 @@ in
+@@ -532,12 +555,58 @@ in
          "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
          "${pkgs.asteroid.keepalive}/lib/qt-6/qml"
          "${pkgs.asteroid.nemo-qml-plugin-calendar}/lib/qt-6/qml"
@@ -162,7 +163,7 @@ index 3c44bae3..c7a27ff7 100644
      # Upstream meta-asteroid: ngfd, the non graphical feedback daemon.
      # Haptics/sounds are requested through D-Bus by the launcher and apps.
      systemd.user.services.ngfd = {
-@@ -658,8 +727,14 @@ in
+@@ -660,8 +729,14 @@ in
      # Grant the same capabilities to the user manager as ambient capabilities
      # instead: they are inherited by the launcher and do not set AT_SECURE.
      # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
@@ -308,10 +309,10 @@ index 659bf6e4..d03ede7a 100644
  
    strictDeps = true;
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 8e75b57b..a50d02cd 100644
+index e92e5f1b..35888440 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -109,8 +109,12 @@ rec {
+@@ -110,8 +110,12 @@ rec {
      inherit mce-dev libiphb;
    };
    timed-qt6 = callPackage ./timed-qt6 {
@@ -325,7 +326,7 @@ index 8e75b57b..a50d02cd 100644
  
    # Calendar subsystem: accounts-qt, kcalendarcore, mkcal, and nemo-qml-plugin-calendar
    # Upstream repository: https://gitlab.com/accounts-sso/accounts-qt
-@@ -158,7 +162,7 @@ rec {
+@@ -159,7 +163,7 @@ rec {
        inherit browser telegram kiwix;
      };
  

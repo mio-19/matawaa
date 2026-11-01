@@ -12,10 +12,10 @@ Subject: [PATCH] Enable QML and hardware composer diagnostics for black
  create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 3b47d97a..cb1b0dcb 100644
+index fde0658f..8a717c15 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -653,13 +653,18 @@ in
+@@ -655,13 +655,18 @@ in
          # import/instantiation errors and the QML_IMPORT_TRACE output are
          # reported, so keep `default` warnings and debug on; otherwise a black
          # screen leaves nothing but renderloop chatter in launcher.log.

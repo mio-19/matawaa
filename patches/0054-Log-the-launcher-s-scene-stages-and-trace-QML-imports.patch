@@ -16,10 +16,10 @@ module or backend is named in launcher.log.
  create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 6964ccad..3b47d97a 100644
+index 6dbe7ca3..fde0658f 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -649,14 +649,18 @@ in
+@@ -651,14 +651,18 @@ in
        // lib.optionalAttrs debugBuild {
          # Debug builds: turn on every trace the graphics stack can emit.
          # These are runtime switches only; the upstream code path is unchanged.

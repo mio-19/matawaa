@@ -151,10 +151,10 @@ Subject: [PATCH] Vendor Qt 6.11 for Hoki on unstable
  create mode 100644 overlay/vendor/qt-6.11/srcs.nix
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index cb1b0dcb..fd191102 100644
+index 8a717c15..143d9655 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -96,8 +96,8 @@ in
+@@ -98,8 +98,8 @@ in
          asteroid.nemo-qml-plugin-alarms
          asteroid.nemo-qml-plugin-notifications
          asteroid.timed-qt6
@@ -165,7 +165,7 @@ index cb1b0dcb..fd191102 100644
          # Asset suite
          asteroid.assets.wallpapers
          asteroid.assets.sounds
-@@ -543,7 +543,7 @@ in
+@@ -545,7 +545,7 @@ in
        QML2_IMPORT_PATH = lib.concatStringsSep ":" [
          "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml"
          "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml"
