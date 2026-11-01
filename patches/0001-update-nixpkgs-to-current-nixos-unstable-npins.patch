@@ -14,8 +14,8 @@ so it remains reproducible without adding a separate Nixpkgs flake input.
  npins/sources.json                            | 16 +++-
  overlay/mobile-nixos/kernel/builder.nix       |  4 +-
  .../0001-qt6-cross-host-leak.patch            | 95 +++++++++++++++++++
- pkgs.nix                                      | 33 +++----
- 4 files changed, 123 insertions(+), 25 deletions(-)
+ pkgs.nix                                      | 37 ++++----
+ 4 files changed, 127 insertions(+), 25 deletions(-)
  create mode 100644 overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
 
 diff --git a/npins/sources.json b/npins/sources.json
@@ -162,12 +162,15 @@ index 00000000..85a8660f
 +     doInstallCheck = true;
 + 
 diff --git a/pkgs.nix b/pkgs.nix
-index da735500..5c720cc7 100644
+index da735500..49a7d93a 100644
 --- a/pkgs.nix
 +++ b/pkgs.nix
-@@ -7,22 +7,19 @@
+@@ -6,23 +6,24 @@
+ #
  # The pinning is now managed using `npins`.
  #
++{ system ? null }@args:
++
  let
 -  inherit (import ./npins)
 -    nixpkgs
@@ -190,7 +193,7 @@ index da735500..5c720cc7 100644
 +  identifier = pin.revision;
 +  branch = pin.branch;
 +
-+  bootstrapPkgs = import rawNixpkgs { };
++  bootstrapPkgs = import rawNixpkgs (if system != null then { inherit system; } else { });
 +
 +  nixpkgs = bootstrapPkgs.applyPatches {
 +    name = "nixpkgs-patched";
@@ -202,4 +205,6 @@ index da735500..5c720cc7 100644
  in
 -builtins.trace "(Using pinned Nixpkgs; ${channelName} @ ${identifier})"
 -(import nixpkgs)
-+builtins.trace "(Using pinned Nixpkgs; ${branch} @ ${identifier})" (import nixpkgs)
++builtins.trace "(Using pinned Nixpkgs; ${branch} @ ${identifier})" (
++  import nixpkgs (if system != null then { inherit system; } else { })
++)

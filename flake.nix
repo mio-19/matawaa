@@ -8,6 +8,10 @@
       flake = false;
     };
     nix-systems.url = "github:nix-systems/default-linux";
+    deploy-rs = {
+      url = "github:serokell/deploy-rs";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -16,6 +20,7 @@
       nixpkgs,
       mobile-nixos,
       nix-systems,
+      deploy-rs,
     }:
     let
       systems = import nix-systems;
@@ -92,6 +97,25 @@
               (import "${self.lib.mkPatchedMobileNixos pkgs}/lib/configuration.nix" { inherit device; })
             ];
           };
+
+        # Helper to construct a full AsteroidOS smartwatch NixOS system configuration
+        mkWatchConfiguration =
+          {
+            device,
+            system ? "x86_64-linux",
+          }:
+          let
+            pkgs = nixpkgs.legacyPackages.${system};
+            patchedMobileNixos = mkPatchedMobileNixos pkgs;
+            eval = import "${patchedMobileNixos}/examples/asteroid" {
+              inherit device;
+              pkgs = import "${patchedMobileNixos}/pkgs.nix" { inherit system; };
+              additionalConfiguration = {
+                nixpkgs.buildPlatform = system;
+              };
+            };
+          in
+          eval.eval;
       };
 
       packages = forAllSystems (
@@ -134,6 +158,34 @@
         cross =
           final: super:
           (import "${self.lib.mkPatchedMobileNixos super}/overlay/cross-compile.nix" final super);
+      };
+
+      nixosConfigurations = {
+        "fossil-hoki" = self.lib.mkWatchConfiguration { device = "fossil-hoki"; };
+        "oppo-beluga" = self.lib.mkWatchConfiguration { device = "oppo-beluga"; };
+      };
+
+      deploy = {
+        magicRollback = false;
+        autoRollback = false;
+        nodes = {
+          "fossil-hoki" = {
+            hostname = "172.16.42.1";
+            profiles.system = {
+              user = "root";
+              sshUser = "ceres";
+              path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations."fossil-hoki";
+            };
+          };
+          "oppo-beluga" = {
+            hostname = "172.16.42.1";
+            profiles.system = {
+              user = "root";
+              sshUser = "ceres";
+              path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations."oppo-beluga";
+            };
+          };
+        };
       };
     };
 }

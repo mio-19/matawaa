@@ -346,7 +346,7 @@ index c2cef490..fbb7a582 100644
  }
 diff --git a/devices/oppo-beluga/kernel/default.nix b/devices/oppo-beluga/kernel/default.nix
 new file mode 100644
-index 00000000..3c120c93
+index 00000000..d01de3b0
 --- /dev/null
 +++ b/devices/oppo-beluga/kernel/default.nix
 @@ -0,0 +1,95 @@
@@ -369,7 +369,7 @@ index 00000000..3c120c93
 +    url = "https://github.com/NixOS/nixpkgs.git";
 +    rev = "b134951a4c9f3c995fd7be05f3243f8ecd65d798";
 +    shallow = true;
-+  }) { };
++  }) { system = stdenv.buildPlatform.system; };
 +
 +  cc8 = pkgsGcc8.pkgsCross.armv7l-hf-multiplatform.buildPackages.gcc8;
 +

@@ -10,7 +10,7 @@ plugins, ship the patched kmap2qmap keymap and supported-languages assets,
 and wire the resulting user services, D-Bus policies and locale drop-in
 into the asteroid desktop profile.
 ---
- devices/fossil-hoki/default.nix               |   3 +-
+ devices/fossil-hoki/default.nix               |   2 +-
  examples/asteroid/asteroid-desktop.nix        | 124 ++++++++++-
  overlay/asteroidos/apps/default.nix           |   4 +-
  overlay/asteroidos/assets/default.nix         |  84 ++++++++
@@ -23,22 +23,21 @@ into the asteroid desktop profile.
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   1 +
  .../hwc-present-diagnostics.patch             | 204 ++++++++++++++++++
  overlay/asteroidos/timed-qt6/default.nix      | 163 +++++++++++++-
- 13 files changed, 890 insertions(+), 22 deletions(-)
+ 13 files changed, 889 insertions(+), 22 deletions(-)
  create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
  create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index f5979e50..f674e31d 100644
+index f5979e50..d804b27f 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -341,7 +341,8 @@ in
+@@ -341,7 +341,7 @@ in
      ''} ./var/lib/environment/compositor/10-platform.conf
  
      cp ${pkgs.writeText "20-device.conf" ''
 -      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"
-+      QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/by-path/platform-78b8000.i2c-event
 +      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
        QPA_HWC_FORCE_GLES=1
        QPA_HWC2_FORCE_DOZE_UPDATE=1

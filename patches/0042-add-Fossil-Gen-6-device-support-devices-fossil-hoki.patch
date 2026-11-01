@@ -1032,7 +1032,7 @@ index 00000000..4dcaa20c
 +}
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
-index 00000000..8da40776
+index 00000000..7963bedd
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/default.nix
 @@ -0,0 +1,252 @@
@@ -1069,7 +1069,7 @@ index 00000000..8da40776
 +    url = "https://github.com/NixOS/nixpkgs.git";
 +    rev = "b134951a4c9f3c995fd7be05f3243f8ecd65d798";
 +    shallow = true;
-+  }) { };
++  }) { system = stdenv.buildPlatform.system; };
 +
 +  cc8 = pkgsGcc8.pkgsCross.armv7l-hf-multiplatform.buildPackages.gcc8;
 +
