@@ -11,27 +11,37 @@ This keeps the target userland and cross-compilation toolchains on the
 current nixos-unstable snapshot. The pin is expressed as a channel tarball
 so it remains reproducible without adding a separate Nixpkgs flake input.
 ---
- npins/sources.json                            |  6 +-
+ npins/sources.json                            | 16 +++-
  overlay/mobile-nixos/kernel/builder.nix       |  4 +-
  .../0001-qt6-cross-host-leak.patch            | 95 +++++++++++++++++++
- pkgs.nix                                      | 30 +++---
- 4 files changed, 117 insertions(+), 18 deletions(-)
+ pkgs.nix                                      | 33 +++----
+ 4 files changed, 123 insertions(+), 25 deletions(-)
  create mode 100644 overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
 
 diff --git a/npins/sources.json b/npins/sources.json
-index 8a487595..b8ea3558 100644
+index 8a487595..4fd0337c 100644
 --- a/npins/sources.json
 +++ b/npins/sources.json
-@@ -3,9 +3,9 @@
+@@ -1,11 +1,17 @@
+ {
+   "pins": {
      "nixpkgs": {
-       "type": "Channel",
-       "name": "nixos-unstable",
+-      "type": "Channel",
+-      "name": "nixos-unstable",
 -      "artifact": "nixexprs.tar.xz",
 -      "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1031299.0bb7ec54c848/nixexprs.tar.xz",
 -      "hash": "sha256-nFgG4gPQueCgP8LidXsdI2lYPrSwTcmDl6afcVn7F/U="
-+      "artifact": "nixexprs.tar.zst",
-+      "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1103272.31ecbaca1bde/nixexprs.tar.zst",
-+      "hash": "sha256-yXRSdZdZZqccEL+j11lc1gFG1f7V5j8N7oPBTHwf7n4="
++      "type": "Git",
++      "repository": {
++        "type": "GitHub",
++        "owner": "NixOS",
++        "repo": "nixpkgs"
++      },
++      "branch": "nixpkgs-unstable",
++      "revision": "885ba4d038f10c3d17d7a92e8c3cc185b99c9158",
++      "url": "https://github.com/NixOS/nixpkgs/archive/885ba4d038f10c3d17d7a92e8c3cc185b99c9158.tar.gz",
++      "submodules": false,
++      "hash": "sha256-e/yiZ31gXRROBDcnOtT3YwDQ73NVG9Cepccbt86LIn8="
      }
    },
    "version": 8
@@ -152,21 +162,20 @@ index 00000000..85a8660f
 +     doInstallCheck = true;
 + 
 diff --git a/pkgs.nix b/pkgs.nix
-index da735500..4c458690 100644
+index da735500..5c720cc7 100644
 --- a/pkgs.nix
 +++ b/pkgs.nix
-@@ -7,22 +7,26 @@
+@@ -7,22 +7,19 @@
  # The pinning is now managed using `npins`.
  #
  let
 -  inherit (import ./npins)
 -    nixpkgs
 -  ;
-+  rawNixpkgs = (import ./npins).nixpkgs;
-   channelInfo =
-     builtins.match
-       # https://releases.nixos.org/nixos/unstable/nixos-25.05beta723344.d3c42f187194/nixexprs.tar.xz
-       "https?://(.*)/([^/]+)/([^/]+)/([^/]+)/.*"
+-  channelInfo =
+-    builtins.match
+-      # https://releases.nixos.org/nixos/unstable/nixos-25.05beta723344.d3c42f187194/nixexprs.tar.xz
+-      "https?://(.*)/([^/]+)/([^/]+)/([^/]+)/.*"
 -      nixpkgs.url
 -  ;
 -  channelName =
@@ -175,12 +184,11 @@ index da735500..4c458690 100644
 -      (builtins.elemAt channelInfo 2)
 -    ]
 -  ;
-+      rawNixpkgs.url;
-+  channelName = builtins.concatStringsSep "-" [
-+    (builtins.elemAt channelInfo 1)
-+    (builtins.elemAt channelInfo 2)
-+  ];
-   identifier = builtins.elemAt channelInfo 3;
+-  identifier = builtins.elemAt channelInfo 3;
++  rawNixpkgs = (import ./npins).nixpkgs;
++  pin = (builtins.fromJSON (builtins.readFile ./npins/sources.json)).pins.nixpkgs;
++  identifier = pin.revision;
++  branch = pin.branch;
 +
 +  bootstrapPkgs = import rawNixpkgs { };
 +
@@ -194,4 +202,4 @@ index da735500..4c458690 100644
  in
 -builtins.trace "(Using pinned Nixpkgs; ${channelName} @ ${identifier})"
 -(import nixpkgs)
-+builtins.trace "(Using pinned Nixpkgs; ${channelName} @ ${identifier})" (import nixpkgs)
++builtins.trace "(Using pinned Nixpkgs; ${branch} @ ${identifier})" (import nixpkgs)

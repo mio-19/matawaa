@@ -19,12 +19,12 @@ This patch integrates the lightweight WPE WebKit rendering engine and browser:
  .../asteroidos/browser/asteroid-browser.svg   |  22 +
  overlay/asteroidos/browser/default.nix        |  52 +++
  overlay/asteroidos/browser/portal.html        | 237 +++++++++++
- overlay/asteroidos/browser/src/main.c         | 384 ++++++++++++++++++
+ overlay/asteroidos/browser/src/main.c         | 388 ++++++++++++++++++
  overlay/asteroidos/default.nix                |  14 +-
  overlay/asteroidos/wpewebkit-qt/default.nix   |  70 ++++
  overlay/overlay.nix                           |   2 +
  overlay/wpewebkit/default.nix                 | 163 ++++++++
- 10 files changed, 1008 insertions(+), 2 deletions(-)
+ 10 files changed, 1012 insertions(+), 2 deletions(-)
  create mode 100644 overlay/asteroidos/browser/CMakeLists.txt
  create mode 100644 overlay/asteroidos/browser/asteroid-browser.desktop
  create mode 100644 overlay/asteroidos/browser/asteroid-browser.svg
@@ -443,10 +443,10 @@ index 00000000..1924bbc8
 +</html>
 diff --git a/overlay/asteroidos/browser/src/main.c b/overlay/asteroidos/browser/src/main.c
 new file mode 100644
-index 00000000..785f614f
+index 00000000..abd05227
 --- /dev/null
 +++ b/overlay/asteroidos/browser/src/main.c
-@@ -0,0 +1,384 @@
+@@ -0,0 +1,388 @@
 +#include <gtk/gtk.h>
 +#include <webkit/webkit.h>
 +#include <math.h>
@@ -814,6 +814,10 @@ index 00000000..785f614f
 +
 +int main(int argc, char *argv[])
 +{
++    /* Smartwatch vendor kernels (3.18 - 4.14) do not support unprivileged user namespaces
++     * or mounting /proc inside bubblewrap; disable WebProcess sandbox on wearables */
++    g_setenv("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1", FALSE);
++
 +    memset(&g_app_data, 0, sizeof(WatchBrowserApp));
 +
 +    if (argc > 1 && argv[1][0] != '-') {

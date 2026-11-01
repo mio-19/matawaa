@@ -9,8 +9,8 @@ Add a standalone Fossil Gen 6 mainline device. It imports only the AsteroidOS wa
 The mainline display, touch, modem, WLAN and audio drivers are still missing, so the target remains best-effort and non-bootable.
 ---
  devices/fossil-hoki-mainline/default.nix     |   114 +
- devices/fossil-hoki-mainline/sda429-hoki.dts | 11722 +++++++++++++++++
- 2 files changed, 11836 insertions(+)
+ devices/fossil-hoki-mainline/sda429-hoki.dts | 11723 +++++++++++++++++
+ 2 files changed, 11837 insertions(+)
  create mode 100644 devices/fossil-hoki-mainline/default.nix
  create mode 100644 devices/fossil-hoki-mainline/sda429-hoki.dts
 
@@ -136,10 +136,10 @@ index 00000000..850b9477
 +}
 diff --git a/devices/fossil-hoki-mainline/sda429-hoki.dts b/devices/fossil-hoki-mainline/sda429-hoki.dts
 new file mode 100644
-index 00000000..41b00986
+index 00000000..53caf832
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/sda429-hoki.dts
-@@ -0,0 +1,11722 @@
+@@ -0,0 +1,11723 @@
 +/dts-v1/;
 +
 +/ {
@@ -10961,9 +10961,10 @@ index 00000000..41b00986
 +		i2c8 = "/soc/i2c@7af8000";
 +	};
 +
-+	memory {
++	memory@80000000 {
 +		device_type = "memory";
-+		reg = <0x00 0x00 0x00 0x00>;
++		/* The vendor bootloader normally patches this node before Linux. */
++		reg = <0x00 0x80000000 0x00 0x40000000>;
 +	};
 +
 +	firmware {

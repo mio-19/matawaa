@@ -74,10 +74,10 @@ index 4dcaa20c..6c9f6620 100644
        });
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 143d9655..a0c1cdf8 100644
+index ecc9e884..cc0a48d6 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -667,6 +667,7 @@ in
+@@ -670,6 +670,7 @@ in
          # failing import line even before any component error is printed.
          QML_IMPORT_TRACE = "1";
          QPA_HWC_DEBUG = "1";

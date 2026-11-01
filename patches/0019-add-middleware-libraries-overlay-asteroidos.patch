@@ -464,7 +464,7 @@ index 2fc834f0..7788a0e5 100644
  }
 diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
 new file mode 100644
-index 00000000..8e4ee589
+index 00000000..23dc6802
 --- /dev/null
 +++ b/overlay/asteroidos/dsme/default.nix
 @@ -0,0 +1,122 @@
@@ -495,7 +495,7 @@ index 00000000..8e4ee589
 +
 +  asteroidPatch =
 +    name: hash:
-+    fetchpatch {
++    fetchurl {
 +      inherit name hash;
 +      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/dsme/dsme/${name}";
 +    };

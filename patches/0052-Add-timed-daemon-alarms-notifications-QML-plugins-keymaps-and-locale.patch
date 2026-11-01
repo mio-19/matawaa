@@ -11,18 +11,23 @@ and wire the resulting user services, D-Bus policies and locale drop-in
 into the asteroid desktop profile.
 ---
  devices/fossil-hoki/default.nix               |   3 +-
- examples/asteroid/asteroid-desktop.nix        |  77 ++++++++-
+ examples/asteroid/asteroid-desktop.nix        | 124 ++++++++++-
  overlay/asteroidos/apps/default.nix           |   4 +-
- overlay/asteroidos/assets/default.nix         |  84 +++++++++
- .../asteroidos/asteroid-launcher/default.nix  |   4 +-
+ overlay/asteroidos/assets/default.nix         |  84 ++++++++
+ .../asteroidos/asteroid-launcher/default.nix  |   8 +-
+ .../qml-boot-diagnostics.patch                |  58 +++++
  overlay/asteroidos/default.nix                |   8 +-
  overlay/asteroidos/libiodata/default.nix      |   7 +
- .../nemo-qml-plugin-alarms/default.nix        | 131 ++++++++++++++
- .../nemo-qml-plugin-notifications/default.nix | 117 +++++++++++++
- overlay/asteroidos/timed-qt6/default.nix      | 163 +++++++++++++++++-
- 10 files changed, 584 insertions(+), 14 deletions(-)
+ .../nemo-qml-plugin-alarms/default.nix        | 131 +++++++++++
+ .../nemo-qml-plugin-notifications/default.nix | 117 ++++++++++
+ .../qt6-qpa-hwcomposer-plugin/default.nix     |   1 +
+ .../hwc-present-diagnostics.patch             | 204 ++++++++++++++++++
+ overlay/asteroidos/timed-qt6/default.nix      | 163 +++++++++++++-
+ 13 files changed, 890 insertions(+), 22 deletions(-)
+ create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
+ create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 index f5979e50..f674e31d 100644
@@ -39,10 +44,19 @@ index f5979e50..f674e31d 100644
        QPA_HWC2_FORCE_DOZE_UPDATE=1
        QT_OPENGL_NO_BGRA=1
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 38e08c4f..1497e4c2 100644
+index 38e08c4f..21b2a357 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -95,6 +95,9 @@ in
+@@ -83,6 +83,8 @@ in
+     environment.systemPackages =
+       with pkgs;
+       [
++        # Provides the D-Bus service used by GSettings and AsteroidOS mlite.
++        dconf
+         asteroid.qml-asteroid
+         # Provides the invoker command used by AsteroidOS Qt app launchers.
+         asteroid.mapplauncherd
+@@ -95,6 +97,9 @@ in
          asteroid.nfcd
          asteroid.keepalive
          asteroid.nemo-qml-plugin-calendar
@@ -52,7 +66,7 @@ index 38e08c4f..1497e4c2 100644
          # QML module the launcher imports; the cross qt5compat lacks it.
          qt5compatQml
          # Asset suite
-@@ -102,6 +105,8 @@ in
+@@ -102,6 +107,8 @@ in
          asteroid.assets.sounds
          asteroid.assets.icons
          asteroid.assets.fonts
@@ -61,7 +75,7 @@ index 38e08c4f..1497e4c2 100644
          asteroid.virtualkeyboard
          # Complete application suite
          asteroid.apps.stopwatch
-@@ -179,6 +184,19 @@ in
+@@ -179,6 +186,19 @@ in
        }"
        # Upstream nfcd state storage directory.
        "d /var/lib/nfcd 0700 root root -"
@@ -81,7 +95,7 @@ index 38e08c4f..1497e4c2 100644
        # Upstream asteroid-launcher_git.bb seeds the privileged notification DB.
        # mkcal (used by nemo-qml-plugin-calendar) creates its database under
        # ~/.local/share/system/Calendar, so that tree must belong to ceres.
-@@ -199,6 +217,7 @@ in
+@@ -199,6 +219,7 @@ in
        "/share/fonts"
        "/share/lipstick"
        "/share/ngfd"
@@ -89,7 +103,31 @@ index 38e08c4f..1497e4c2 100644
        "/share/translations"
        "/share/rime-data"
        "/share/supported-languages"
-@@ -493,9 +512,13 @@ in
+@@ -315,7 +336,7 @@ in
+         ExecStartPre = [
+           "${pkgs.writeShellScript "asteroid-wait-for-lipstick" ''
+             i=0
+-            while [ "$i" -lt 60 ]; do
++            while [ "$i" -lt 600 ]; do
+               if ${pkgs.dbus}/bin/dbus-send --system --print-reply \
+                    --dest=org.freedesktop.DBus /org/freedesktop/DBus \
+                    org.freedesktop.DBus.NameHasOwner \
+@@ -324,7 +345,7 @@ in
+                 exit 0
+               fi
+               i=$((i + 1))
+-              sleep 1
++              sleep 0.1
+             done
+             exit 0
+           ''}"
+@@ -488,14 +509,19 @@ in
+     # environment.etc entries. The MCE package ships com.nokia.mce.conf; the
+     # upstream AsteroidOS connman policy replaces connman's own one.
+     services.dbus.packages = [
++      pkgs.dconf
+       pkgs.asteroid.mce
+       pkgs.asteroid.dsme
        pkgs.asteroid.sensorfw
        pkgs.asteroid.ngfd
        pkgs.asteroid.nfcd
@@ -103,7 +141,7 @@ index 38e08c4f..1497e4c2 100644
      # users.users.ceres.linger generates NixOS's linger-users.service, which
      # calls loginctl enable-linger after logind starts. Let the normal systemd
      # linger mechanism own the marker; do not pre-seed it or override the unit.
-@@ -532,12 +555,58 @@ in
+@@ -532,12 +558,58 @@ in
          "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
          "${pkgs.asteroid.keepalive}/lib/qt-6/qml"
          "${pkgs.asteroid.nemo-qml-plugin-calendar}/lib/qt-6/qml"
@@ -163,7 +201,66 @@ index 38e08c4f..1497e4c2 100644
      # Upstream meta-asteroid: ngfd, the non graphical feedback daemon.
      # Haptics/sounds are requested through D-Bus by the launcher and apps.
      systemd.user.services.ngfd = {
-@@ -660,8 +729,14 @@ in
+@@ -582,10 +654,23 @@ in
+       // lib.optionalAttrs debugBuild {
+         # Debug builds: turn on every trace the graphics stack can emit.
+         # These are runtime switches only; the upstream code path is unchanged.
+-        # Keep the graphics/EGL diagnostics, drop the QML import flood so the
+-        # actual failure stays at the end of launcher.log.
+-        QT_LOGGING_RULES = "*=false;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
++        # `*=false` also silences the default category, which is where QML
++        # import/instantiation errors and the QML_IMPORT_TRACE output are
++        # reported, so keep `default` warnings and debug on; otherwise a black
++        # screen leaves nothing but renderloop chatter in launcher.log.
++        # QML `console.log/info` (and QML runtime warnings) are logged under the
++        # plain `qml` category, so `*=false` silences them as well: the
++        # diagnostics below would never reach launcher.log without enabling that
++        # category explicitly. `qt.qml.*` only covers its subcategories.
++        QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
+         QT_DEBUG_PLUGINS = "1";
++        # Log every QML import attempt (module, version, and the directory each
++        # candidate was looked up in) plus the scene graph the renderer picked.
++        # Both are runtime switches; a missing QML module shows up here as a
++        # failing import line even before any component error is printed.
++        QML_IMPORT_TRACE = "1";
++        QPA_HWC_DEBUG = "1";
++        QSG_INFO = "1";
+         EGL_LOG_LEVEL = "debug";
+         LIBGL_DEBUG = "verbose";
+         MESA_DEBUG = "1";
+@@ -614,8 +699,8 @@ in
+             # android-init.service touches this marker once the property
+             # service and the vendor HALs are up; wait for it with a bound.
+             i=0
+-            while [ ! -e /dev/.coldboot_done ] && [ "$i" -lt 30 ]; do
+-              sleep 1
++            while [ ! -e /dev/.coldboot_done ] && [ "$i" -lt 300 ]; do
++              sleep 0.1
+               i=$((i + 1))
+             done
+           ''}"
+@@ -648,11 +733,19 @@ in
+       unitConfig.ConditionUser = "!root";
+       serviceConfig = {
+         Type = "simple";
+-        ExecStartPre = "-${pkgs.coreutils}/bin/sleep 10";
++        ExecStartPre = "-${pkgs.coreutils}/bin/sleep 1";
+         ExecStart = "${pkgs.bash}/bin/bash -ec 'if [ \"$(/system/bin/getprop sys.boot_completed)\" != 1 ]; then /system/bin/setprop sys.boot_completed 1; fi'";
+       };
+     };
+ 
++    # AsteroidOS desktop entries and service wrappers invoke apps through
++    # `invoker`. Expose the system profile to all systemd user services so
++    # AsteroidOS apps and service wrappers can find `invoker`, core utilities,
++    # and wrappers without conflicting with the system-level user manager service.
++    systemd.user.settings.Manager = {
++      DefaultEnvironment = "PATH=/run/wrappers/bin:/run/current-system/sw/bin";
++    };
++
+     # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
+     # cap_block_suspend for always-on-display ticks. File capabilities make the
+     # kernel set AT_SECURE, and glibc then discards LD_PRELOAD/LD_LIBRARY_PATH —
+@@ -660,8 +753,14 @@ in
      # Grant the same capabilities to the user manager as ambient capabilities
      # instead: they are inherited by the launcher and do not set AT_SECURE.
      # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
@@ -178,6 +275,20 @@ index 38e08c4f..1497e4c2 100644
        serviceConfig.AmbientCapabilities = [
          "CAP_WAKE_ALARM"
          "CAP_BLOCK_SUSPEND"
+@@ -711,6 +810,13 @@ in
+             subject.user == "ceres") {
+           return polkit.Result.YES;
+         }
++        if ((action.id == "org.freedesktop.timedate1.set-timezone" ||
++             action.id == "org.freedesktop.timedate1.set-time" ||
++             action.id == "org.freedesktop.timedate1.set-local-rtc" ||
++             action.id == "org.freedesktop.timedate1.set-ntp") &&
++            subject.user == "ceres") {
++          return polkit.Result.YES;
++        }
+       });
+     '';
+ 
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
 index 02e19169..fcef9ac1 100644
 --- a/overlay/asteroidos/apps/default.nix
@@ -294,7 +405,7 @@ index 5188043b..703662c4 100644
 +    };
  }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 659bf6e4..d03ede7a 100644
+index 659bf6e4..13c77920 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -31,8 +31,8 @@ stdenv.mkDerivation (finalAttrs: {
@@ -308,6 +419,81 @@ index 659bf6e4..d03ede7a 100644
    };
  
    strictDeps = true;
+@@ -54,6 +54,10 @@ stdenv.mkDerivation (finalAttrs: {
+     # Upstream: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
+     # Upstream CMake qt_add_shaders: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
+     ./circlemask-qrc.patch
++    # Log which stage of the compositor scene came up, so an empty scene (black
++    # screen with a live render loop) names the failing Loader instead of
++    # leaving only "update from item" chatter in the log.
++    ./qml-boot-diagnostics.patch
+   ];
+ 
+   nativeBuildInputs = [
+diff --git a/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+new file mode 100644
+index 00000000..858ba581
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+@@ -0,0 +1,58 @@
++# Bring-up diagnostics: report what actually made it into the compositor scene.
++#
++# A black screen with a live render loop (frames swapping while the renderer
++# reports no geometry) means the QML tree came up empty, and lipstick's own
++# loader only reports that through the default logging category. These lines
++# make the three stages observable in launcher.log: the compositor root and its
++# scene size, the home screen Loader, and the watchface Loader.
++--- a/src/qml/compositor/compositor.qml
+++++ b/src/qml/compositor/compositor.qml
++@@ -44,6 +44,10 @@
++     height: Dims.h(100)
++     rotation: Screen.angleBetween(Screen.primaryScreen, Lipstick.compositor.screenOrientation)
++ 
+++    Component.onCompleted: console.info("compositor: scene root", width, "x", height,
+++                                        "round screen:", DeviceSpecs.hasRoundScreen,
+++                                        "orientation:", rotation)
+++
++     // The home screen is a persistent item at the bottom of the z-stack, not
++     // an in-process "window". Its z follows MainScreen's own z (raised while
++     // the splash is up) so it can sit above running apps when needed.
++@@ -57,6 +61,15 @@
++             anchors.fill: parent
++             source: "MainScreen.qml"
++             onLoaded: item.aboutToOpen = Qt.binding(function() { return !comp.homeActive && !appLayer.ready })
+++
+++            // A failing Loader leaves the scene empty and the screen black with
+++            // no further trace, so name the stage that failed.
+++            onStatusChanged: {
+++                if (status === Loader.Ready)
+++                    console.info("compositor: home screen loaded,", width, "x", height)
+++                else if (status === Loader.Error)
+++                    console.warn("compositor: home screen failed to load (see the QML error above)")
+++            }
++         }
++     }
++ 
++--- a/src/qml/MainScreen.qml
+++++ b/src/qml/MainScreen.qml
++@@ -113,6 +113,9 @@
++         lipstickSettings.lockScreen(true)
++         if(firstRun.isFirstRun())
++             firstRunComponent.createObject(desktop)
+++        console.info("launcher: home screen", width, "x", height, "visible:", visible,
+++                     "dims:", Dims.w(100), "x", Dims.h(100),
+++                     "first run:", firstRun.isFirstRun())
++     }
++ 
++     Splash {
++@@ -396,6 +399,9 @@
++                 anchors.fill: parent
++                 source: watchFaceSource.value
++ 
+++                onStatusChanged: console.info("launcher: watchface", source,
+++                                              "status:", status)
+++
++                 // Reinstantiate to re-read the source from disk. Toggling the
++                 // Loader instead of rewriting the dconf-backed watchFaceSource
++                 // avoids a cross-process write that can clobber a concurrent
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index e92e5f1b..35888440 100644
 --- a/overlay/asteroidos/default.nix
@@ -627,6 +813,228 @@ index 00000000..ea808abd
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+index 9b3ef899..b4cd0f72 100644
+--- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+@@ -75,6 +75,7 @@ stdenv.mkDerivation (finalAttrs: {
+     (patch "0005-Explicitly-make-hwcomposer-a-shared-library.patch" "sha256-Z/zjAhKm6XRQ8zVuSYPiD+rDh7KqZuKzTiUAzmsu+ZE=")
+     (patch "0006-v10-Fix-refresh-rate-fallback-unit.patch" "sha256-XOplqx7zKgbjPWIwlJ82O1qFDXXNkj2PDO/TdaP/ync=")
+     (patch "0007-v10-Make-updates-request-driven-and-vsync-paced.patch" "sha256-EQhs66R9Vc2a2yH5zVmo8xtC+oVQHjMlKyNAIGrEsbA=")
++    ./hwc-present-diagnostics.patch
+   ];
+ 
+   strictDeps = true;
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
+new file mode 100644
+index 00000000..fb5f9bd6
+--- /dev/null
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
+@@ -0,0 +1,204 @@
++--- a/hwcomposer/hwcomposer_backend.cpp
+++++ b/hwcomposer/hwcomposer_backend.cpp
++@@ -109,6 +109,7 @@
++         // Create hwcomposer backend directly without opening hardware module
++         // because on some devices loading hwc2 module twice breaks graphics
++         // (The first load is in the composer android service.)
+++        fprintf(stderr, "== hwcomposer: using HWC2 backend ==\n");
++         return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
++     }
++ #endif
++@@ -196,7 +197,8 @@
++ #endif /* HWC_PLUGIN_HAVE_HWCOMPOSER1_API */
++ #ifdef HWC_PLUGIN_HAVE_HWCOMPOSER2_API
++             case HWC_DEVICE_API_VERSION_2_0:
++-                return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
+++                fprintf(stderr, "== hwcomposer: using HWC2 backend ==\n");
+++        return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
++ #endif
++             default:
++                 fprintf(stderr, "Unknown hwcomposer API: 0x%x/0x%x/0x%x\n",
++@@ -209,6 +211,7 @@
++ #ifdef HWC_PLUGIN_HAVE_HWCOMPOSER2_API
++     else {
++         // Create hwc2 backend directly if opening hardware module fails
+++        fprintf(stderr, "== hwcomposer: using HWC2 backend ==\n");
++         return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
++     }
++ #endif
++--- a/hwcomposer/hwcomposer_backend_v20.cpp
+++++ b/hwcomposer/hwcomposer_backend_v20.cpp
++@@ -88,6 +88,54 @@
++                                 new QEvent(QEvent::User));
++ }
++ 
+++// Composition diagnostics (Matawaa debug builds).
+++//
+++// QPA_HWC_FORCE_GLES=1 (upstream meta-hoki 20-device.conf) hands the
+++// compositor's gralloc buffers straight to the display HAL. When the vendor
+++// MDP rejects those buffers the only symptom is a black screen: the scene
+++// graph still reports rendered frames, so nothing in Qt's own logging points
+++// at the display path. QPA_HWC_DEBUG=1 logs the buffer handle and every HWC2
+++// return code, which is what identifies a failing buffer import.
+++static bool hwcDebugEnabled()
+++{
+++    static const bool enabled = qEnvironmentVariableIsSet("QPA_HWC_DEBUG");
+++    return enabled;
+++}
+++
+++static const char *hwcErrorName(hwc2_error_t error)
+++{
+++    switch (error) {
+++    case HWC2_ERROR_NONE: return "NONE";
+++    case HWC2_ERROR_BAD_CONFIG: return "BAD_CONFIG";
+++    case HWC2_ERROR_BAD_DISPLAY: return "BAD_DISPLAY";
+++    case HWC2_ERROR_BAD_LAYER: return "BAD_LAYER";
+++    case HWC2_ERROR_BAD_PARAMETER: return "BAD_PARAMETER";
+++    case HWC2_ERROR_HAS_CHANGES: return "HAS_CHANGES";
+++    case HWC2_ERROR_NO_RESOURCES: return "NO_RESOURCES";
+++    case HWC2_ERROR_NOT_VALIDATED: return "NOT_VALIDATED";
+++    case HWC2_ERROR_UNSUPPORTED: return "UNSUPPORTED";
+++    default: return "UNKNOWN";
+++    }
+++}
+++
+++static void hwcLogBuffer(const char *what, int index,
+++                         HWComposerNativeWindowBuffer *buffer, int acquireFenceFd)
+++{
+++    if (!hwcDebugEnabled())
+++        return;
+++
+++    const native_handle_t *handle = buffer ? buffer->handle : nullptr;
+++    qDebug("hwc: %s #%d buffer=%p %ux%u stride=%d format=0x%x usage=0x%llx "
+++           "handleFds=%d handleFd0=%d acquireFence=%d",
+++           what, index, static_cast<void *>(buffer),
+++           buffer ? buffer->width : 0u, buffer ? buffer->height : 0u,
+++           buffer ? buffer->stride : 0, buffer ? buffer->format : 0,
+++           buffer ? static_cast<unsigned long long>(buffer->usage) : 0ULL,
+++           handle ? handle->numFds : -1,
+++           (handle && handle->numFds > 0) ? handle->data[0] : -1,
+++           acquireFenceFd);
+++}
+++
++ void hwc2_callback_hotplug(HWC2EventListener* listener, int32_t sequenceId,
++                            hwc2_display_t display, bool connected,
++                            bool primaryDisplay)
++@@ -167,6 +215,11 @@
++ 
++     int acquireFenceFd = getFenceBufferFd(buffer);
++ 
+++    static int presentCount = 0;
+++    const int presentIndex = presentCount++;
+++    if (presentIndex < 5 || (presentIndex % 300) == 0)
+++        hwcLogBuffer("present", presentIndex, buffer, acquireFenceFd);
+++
++     if (m_syncBeforeSet && acquireFenceFd >= 0) {
++         sync_wait(acquireFenceFd, -1);
++         close(acquireFenceFd);
++@@ -182,33 +235,48 @@
++     error = hwc2_compat_display_validate(hwcDisplay, &numTypes,
++                                                     &numRequests);
++     if (error != HWC2_ERROR_NONE && error != HWC2_ERROR_HAS_CHANGES) {
++-        qDebug("prepare: validate failed for display %d: %d", displayId, error);
+++        qWarning("hwc: validate failed for display %d: %s (%d), frame dropped",
+++                 displayId, hwcErrorName(error), error);
++         return;
++     }
++ 
++     if (numTypes || numRequests) {
++-        qDebug("prepare: validate required changes for display %d: %d",
++-               displayId, error);
+++        qDebug("hwc: validate requested changes for display %d: %s (%d), "
+++               "types=%u requests=%u, frame dropped",
+++               displayId, hwcErrorName(error), error, numTypes, numRequests);
++         return;
++     }
++ 
++     error = hwc2_compat_display_accept_changes(hwcDisplay);
++     if (error != HWC2_ERROR_NONE) {
++-        qDebug("prepare: acceptChanges failed: %d", error);
+++        qWarning("hwc: accept_changes failed: %s (%d), frame dropped",
+++                 hwcErrorName(error), error);
++         return;
++     }
++ 
++     QPA_HWC_TIMING_SAMPLE(prepareTime);
++ 
++     QSystrace::begin("graphics", "QPA::set_client_target", "");
++-    hwc2_compat_display_set_client_target(hwcDisplay, /* slot */0, buffer,
++-                                          acquireFenceFd,
++-                                          HAL_DATASPACE_UNKNOWN);
+++    const hwc2_error_t setTargetError =
+++        hwc2_compat_display_set_client_target(hwcDisplay, /* slot */0, buffer,
+++                                              acquireFenceFd,
+++                                              HAL_DATASPACE_UNKNOWN);
++     QSystrace::end("graphics", "QPA::set_client_target", "");
+++    if (setTargetError != HWC2_ERROR_NONE) {
+++        qWarning("hwc: set_client_target failed: %s (%d), buffer fd=%d",
+++                 hwcErrorName(setTargetError), setTargetError,
+++                 (buffer && buffer->handle && buffer->handle->numFds > 0)
+++                     ? buffer->handle->data[0] : -1);
+++    }
++ 
++     QSystrace::begin("graphics", "QPA::present", "");
++     int presentFence = -1;
++-    hwc2_compat_display_present(hwcDisplay, &presentFence);
+++    const hwc2_error_t presentError =
+++        hwc2_compat_display_present(hwcDisplay, &presentFence);
+++    if (presentError != HWC2_ERROR_NONE) {
+++        qWarning("hwc: present failed: %s (%d)",
+++                 hwcErrorName(presentError), presentError);
+++    }
++     QSystrace::end("graphics", "QPA::present", "");
++ 
++     QPA_HWC_TIMING_SAMPLE(setTime);
++@@ -221,6 +289,9 @@
++     lastPresentFence = presentFence != -1 ? dup(presentFence) : -1;
++ 
++     setFenceBufferFd(buffer, presentFence);
+++
+++    if (hwcDebugEnabled() && (presentIndex < 5 || (presentIndex % 300) == 0))
+++        qDebug("hwc: present #%d done, fence=%d", presentIndex, presentFence);
++ 
++     if (m_dozeWorkaround && m_backend->isDozing()) {
++         hwc2_compat_display_set_power_mode(hwcDisplay, HWC2_POWER_MODE_DOZE_SUSPEND);
++@@ -263,6 +334,17 @@
++     }
++     HWC_PLUGIN_ASSERT_NOT_NULL(hwc2_primary_display);
++ 
+++    if (hwcDebugEnabled()) {
+++        HWC2DisplayConfig *config =
+++            hwc2_compat_display_get_active_config(hwc2_primary_display);
+++        qDebug("hwc: primary display id=%" PRIu64 " config=%dx%d "
+++               "vsyncPeriod=%" PRId64 " dpi=%.1fx%.1f",
+++               static_cast<uint64_t>(procs->primaryDisplayId),
+++               config ? config->width : 0, config ? config->height : 0,
+++               config ? config->vsyncPeriod : int64_t(0),
+++               config ? config->dpiX : 0.0, config ? config->dpiY : 0.0);
+++    }
+++
++     sleepDisplay(false);
++ }
++ 
++@@ -309,6 +391,10 @@
++                                          HAL_PIXEL_FORMAT_RGBA_8888,
++                                          hwc2_primary_display, layer, this);
++ 
+++    if (hwcDebugEnabled())
+++        qDebug("hwc: window %dx%d format=0x%x layer=%p", width, height,
+++               HAL_PIXEL_FORMAT_RGBA_8888, static_cast<void *>(layer));
+++
++     return (EGLNativeWindowType) static_cast<ANativeWindow *>(hwc_win);
++ }
++ 
++@@ -325,7 +411,9 @@
++     timer.start();
++ #endif
++ 
++-    eglSwapBuffers(display, surface);
+++    const EGLBoolean swapped = eglSwapBuffers(display, surface);
+++    if (hwcDebugEnabled() && swapped != EGL_TRUE)
+++        qWarning("hwc: eglSwapBuffers failed: 0x%x", eglGetError());
++ 
++ #ifdef QPA_HWC_TIMING
++     qDebug("HWComposerBackend::swap(), present=%.3f, sync=%.3f, prepare=%.3f, set=%.3f, total=%.3f",
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
 index acffe994..9f31293c 100644
 --- a/overlay/asteroidos/timed-qt6/default.nix

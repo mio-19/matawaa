@@ -7,7 +7,7 @@ Subject: [PATCH] Vendor Qt 6.11 for Hoki on unstable
  examples/asteroid/asteroid-desktop.nix        |   6 +-
  .../scripted-installer/automated-installer.rb |   5 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   2 +-
- overlay/cross-compile.nix                     |  16 +-
+ overlay/cross-compile.nix                     |  26 +-
  overlay/vendor/qt-6.11/README.md              |  14 +
  overlay/vendor/qt-6.11/default.nix            | 160 +++++++
  overlay/vendor/qt-6.11/fetch.sh               |   1 +
@@ -78,7 +78,7 @@ Subject: [PATCH] Vendor Qt 6.11 for Hoki on unstable
  overlay/vendor/qt-6.11/qt-env.nix             |  34 ++
  overlay/vendor/qt-6.11/qtModule.nix           |  95 +++++
  overlay/vendor/qt-6.11/srcs.nix               | 342 +++++++++++++++
- 74 files changed, 2911 insertions(+), 12 deletions(-)
+ 74 files changed, 2916 insertions(+), 17 deletions(-)
  create mode 100644 overlay/vendor/qt-6.11/README.md
  create mode 100644 overlay/vendor/qt-6.11/default.nix
  create mode 100644 overlay/vendor/qt-6.11/fetch.sh
@@ -151,10 +151,10 @@ Subject: [PATCH] Vendor Qt 6.11 for Hoki on unstable
  create mode 100644 overlay/vendor/qt-6.11/srcs.nix
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 8a717c15..143d9655 100644
+index 21b2a357..ecc9e884 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -98,8 +98,8 @@ in
+@@ -100,8 +100,8 @@ in
          asteroid.nemo-qml-plugin-alarms
          asteroid.nemo-qml-plugin-notifications
          asteroid.timed-qt6
@@ -165,7 +165,7 @@ index 8a717c15..143d9655 100644
          # Asset suite
          asteroid.assets.wallpapers
          asteroid.assets.sounds
-@@ -545,7 +545,7 @@ in
+@@ -548,7 +548,7 @@ in
        QML2_IMPORT_PATH = lib.concatStringsSep ":" [
          "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml"
          "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml"
@@ -205,7 +205,7 @@ index b4cd0f72..c8d6dc03 100644
  <RCC>
      <qresource prefix="/qt-project.org/imports/Qt5Compat/GraphicalEffects">
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index a5c80f3d..dbc09ffd 100644
+index a5c80f3d..47a1b808 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -1,8 +1,8 @@
@@ -251,6 +251,42 @@ index a5c80f3d..dbc09ffd 100644
        qfinal: qsuper: {
          # Upstream AsteroidOS builds Qt without desktop GL on hybris machines:
          # meta-asteroid/recipes-qt/qt6/qtbase_git.bbappend does
+@@ -162,7 +168,7 @@ else
+         # QT_WAYLAND_SERVER_BUFFER_INTEGRATION=libhybris-egl-server.
+         qtwayland = (addCrossQuickTools qsuper.qtwayland).overrideAttrs (old: {
+           patches = (old.patches or [ ]) ++ [
+-            (final.fetchpatch {
++            (final.fetchurl {
+               name = "0001-Fix-libhybris-egl-server-compilation.patch";
+               url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch";
+               hash = "sha256-emo6w37aUY8ujwzvVJZ9zPFXbvSZHKA8/0lByzo06Zs=";
+@@ -215,22 +221,22 @@ else
+               --replace-fail 'DESTINATION /etc/xdg/QtProject' 'DESTINATION etc/xdg/QtProject'
+           '';
+           patches = (old.patches or [ ]) ++ [
+-            (final.fetchpatch {
++            (final.fetchurl {
+               name = "0001-Enable-sensorfw.patch";
+               url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0001-Enable-sensorfw.patch";
+               hash = "sha256-H58A7wp9kX8V2NHhQAufDsQKllUnAgZLjbN8geYLvLo=";
+             })
+-            (final.fetchpatch {
++            (final.fetchurl {
+               name = "0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch";
+               url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch";
+               hash = "sha256-2MvTv0IVD1kYgyny/V535U3MjCkx9xMTwduguNxgmjk=";
+             })
+-            (final.fetchpatch {
++            (final.fetchurl {
+               name = "0003-Add-step-counter-sensor-with-sensorfw-backend.patch";
+               url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0003-Add-step-counter-sensor-with-sensorfw-backend.patch";
+               hash = "sha256-rboCPatCx2FnPnGEPwGXw/X4uaHNm8kCOUYfMCm0/xk=";
+             })
+-            (final.fetchpatch {
++            (final.fetchurl {
+               name = "0004-Add-sensorfw-backend-for-pressure-sensor.patch";
+               url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0004-Add-sensorfw-backend-for-pressure-sensor.patch";
+               hash = "sha256-pMCDkMeLW50i8elrrBtwHb5EYqA3iX2K3iavpn8mHQ8=";
 diff --git a/overlay/vendor/qt-6.11/README.md b/overlay/vendor/qt-6.11/README.md
 new file mode 100644
 index 00000000..f9b7b01f
