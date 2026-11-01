@@ -1,4 +1,4 @@
-From 9715b57ff7eb0666901bc3f324ecb1b489e35d8f Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Sun, 1 Nov 2026 21:44:16 +1100
 Subject: [PATCH] Fix beluga Android init asset hashes
@@ -32,6 +32,3 @@ index c3cfecb9..ffc5fceb 100644
    };
  
    # ld.config.28.txt from AsteroidOS meta-beluga:
--- 
-2.56.0
-
