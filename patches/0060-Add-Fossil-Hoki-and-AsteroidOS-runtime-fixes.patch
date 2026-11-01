@@ -1,0 +1,592 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sun, 1 Nov 2026 21:06:04 +1100
+Subject: [PATCH] Add Fossil Hoki and AsteroidOS runtime fixes
+
+---
+ devices/families/asteroidos.nix               | 47 +++++++++++++--
+ devices/fossil-hoki/default.nix               |  5 +-
+ devices/fossil-hoki/kernel/default.nix        | 22 ++++++-
+ .../kernel/linux-4.14.213-214.patch.patch     | 40 +++++++++++++
+ examples/asteroid/asteroid-desktop.nix        |  2 +
+ .../asteroid-launcher/skip-firstrun.patch     | 30 ++--------
+ overlay/asteroidos/browser/CMakeLists.txt     |  5 ++
+ .../asteroidos/browser/asteroid-browser.svg   | 58 +++++--------------
+ overlay/asteroidos/browser/default.nix        |  8 +++
+ overlay/asteroidos/browser/src/main.c         | 10 ++--
+ overlay/asteroidos/default.nix                |  1 +
+ .../0001-Fix-dynamic-opening-issues.patch     | 28 +++++++++
+ ...-sailjaild-D-Bus-query-when-sailjail.patch | 40 +++++++++++++
+ overlay/asteroidos/mapplauncherd/default.nix  | 48 +++++++++++++++
+ overlay/asteroidos/mce/default.nix            |  4 +-
+ 15 files changed, 264 insertions(+), 84 deletions(-)
+ create mode 100644 devices/fossil-hoki/kernel/linux-4.14.213-214.patch.patch
+ create mode 100644 overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch
+ create mode 100644 overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
+ create mode 100644 overlay/asteroidos/mapplauncherd/default.nix
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 368d1cfa..72acc76f 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -1,5 +1,6 @@
+ {
+   config,
++  options,
+   lib,
+   pkgs,
+   ...
+@@ -206,7 +207,10 @@ in
+     gadgetfs.functions.rndis = "ncm.usb0";
+   };
+ 
+-  mobile.boot.stage-1.networking.enable = mkIf cfg.enable (mkDefault true);
++  # Stage-1 owns gadget creation on these Android kernels. Keep it enabled
++  # whenever debug networking is requested, even when boot continues directly
++  # into stage-2; otherwise usb_f_ncm is not loaded and no USB NIC appears.
++  mobile.boot.stage-1.networking.enable = mkIf debugNetwork (mkDefault true);
+   mobile.boot.stage-1.ssh.enable = mkIf cfg.enable (mkDefault true);
+ 
+   services.openssh = mkIf debugNetwork {
+@@ -214,6 +218,10 @@ in
+     settings = {
+       PermitRootLogin = "yes";
+       PermitEmptyPasswords = "yes";
++      # Keyboard-interactive PAM authentication succeeds on the vendor kernel
++      # but fails during pam_setcred(); direct password sessions work.
++      PasswordAuthentication = true;
++      KbdInteractiveAuthentication = false;
+     };
+   };
+ 
+@@ -223,6 +231,18 @@ in
+ 
+   networking.firewall.enable = mkIf debugNetwork (mkDefault false);
+ 
++  # ConnMan otherwise claims the gadget as a tethering device and brings it
++  # down after the static debug addresses have been configured.
++  services.connman.networkInterfaceBlacklist = mkIf debugNetwork (
++    lib.mkAfter (
++      options.services.connman.networkInterfaceBlacklist.default
++      ++ [
++        "usb"
++        "rndis"
++      ]
++    )
++  );
++
+   networking.interfaces.usb0.ipv4.addresses = mkIf debugNetwork [
+     {
+       address = "192.168.2.15";
+@@ -238,7 +258,8 @@ in
+ 
+   systemd.services.usb-gadget-network = mkIf debugNetwork {
+     description = "USB Gadget Ethernet (NCM) Setup";
+-    wantedBy = [ "network-pre.target" ];
++    wantedBy = [ "multi-user.target" ];
++    wants = [ "network-pre.target" ];
+     before = [ "network-pre.target" ];
+     unitConfig.DefaultDependencies = false;
+     serviceConfig = {
+@@ -246,9 +267,9 @@ in
+       RemainAfterExit = true;
+       ExecStart = pkgs.writeShellScript "setup-usb-gadget" ''
+         set -e
+-        mountpoint -q /sys/kernel/config || { mkdir -p /sys/kernel/config; mount -t configfs none /sys/kernel/config; }
++        ${pkgs.util-linux}/bin/mountpoint -q /sys/kernel/config || { mkdir -p /sys/kernel/config; ${pkgs.util-linux}/bin/mount -t configfs none /sys/kernel/config; }
+         udc="$(ls /sys/class/udc 2>/dev/null | head -n1)"
+-        [ -n "$udc" ] || exit 0
++        [ -n "$udc" ] || { echo "No USB device controller found" >&2; exit 1; }
+         g=/sys/kernel/config/usb_gadget/g1
+         if [ ! -d "$g" ]; then
+           mkdir -p "$g/strings/0x409" "$g/functions/ncm.usb0" "$g/configs/c.1/strings/0x409"
+@@ -259,7 +280,23 @@ in
+           echo "CDC NCM" > "$g/configs/c.1/strings/0x409/configuration"
+           ln -sf "$g/functions/ncm.usb0" "$g/configs/c.1/"
+         fi
+-        [ -s "$g/UDC" ] || echo "$udc" > "$g/UDC"
++        # Configfs attribute sizes do not report whether a controller is bound.
++        [ -n "$(cat "$g/UDC")" ] || echo "$udc" > "$g/UDC"
++
++        # Binding the NCM function creates usb0, but does not necessarily bring
++        # the netdev up. A down usb0 leaves macOS with an enumerated but
++        # inactive USB Ethernet port.
++        for attempt in $(seq 1 20); do
++          [ -e /sys/class/net/usb0 ] && break
++          sleep 0.25
++        done
++        [ -e /sys/class/net/usb0 ] || { echo "NCM gadget did not create usb0" >&2; exit 1; }
++        ${pkgs.iproute2}/bin/ip link set dev usb0 up
++        # The normal NixOS address unit can run before gadget binding creates
++        # usb0. Configure both debug subnets here after the netdev exists; the
++        # declarative interface config remains as a fallback on later starts.
++        ${pkgs.iproute2}/bin/ip address replace 192.168.2.15/24 dev usb0
++        ${pkgs.iproute2}/bin/ip address replace 172.16.42.1/24 dev usb0
+       '';
+     };
+   };
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index f710b2f4..f674e31d 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -82,8 +82,8 @@ in
+       hasCrown = true;
+       hasHaptics = true;
+       aodSupport = true;
+-      stage1-pause-debug.enable = true;
+-      stage2-ssh.enable = false;
++      stage1-pause-debug.enable = false;
++      stage2-ssh.enable = true;
+       stage2-save-logs.enable = true;
+     };
+   };
+@@ -341,6 +341,7 @@ in
+     ''} ./var/lib/environment/compositor/10-platform.conf
+ 
+     cp ${pkgs.writeText "20-device.conf" ''
++      QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/by-path/platform-78b8000.i2c-event
+       LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
+       QPA_HWC_FORCE_GLES=1
+       QPA_HWC2_FORCE_DOZE_UPDATE=1
+diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
+index 50d2ee71..8da40776 100644
+--- a/devices/fossil-hoki/kernel/default.nix
++++ b/devices/fossil-hoki/kernel/default.nix
+@@ -178,6 +178,25 @@ let
+         cp "$TMPDIR/stable/linux-4.14.212-213.patch" "$out"
+       '';
+ 
++  # Incremental 4.14.213 -> 4.14.214 stable patch. The Fossil vendor tree
++  # already carries the dm-verity shutdown fix, so omit that upstream hunk.
++  stablePatch214 =
++    runCommand "linux-4.14.213-214.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.213-214.xz";
++          hash = "sha256-z2VWV17dh99E2YhKa0kktt0VsLVi8rZPZEe2ELlvem8=";
++        };
++        patchFile = ./linux-4.14.213-214.patch.patch;
++      }
++      ''
++        mkdir -p "$TMPDIR/stable"
++        xz -dc "$src" > "$TMPDIR/stable/linux-4.14.213-214.patch"
++        (cd "$TMPDIR/stable" && patch -p1 -i "$patchFile")
++        cp "$TMPDIR/stable/linux-4.14.213-214.patch" "$out"
++      '';
++
+   # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
+   # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
+   configfile =
+@@ -192,7 +211,7 @@ let
+ in
+ 
+ kernel-builder-gcc8 {
+-  version = "4.14.213";
++  version = "4.14.214";
+   inherit configfile;
+ 
+   src = fetchFromGitHub {
+@@ -210,6 +229,7 @@ kernel-builder-gcc8 {
+     stablePatch211
+     stablePatch212
+     stablePatch213
++    stablePatch214
+     (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
+     (upstreamPatch "0002-mmc-Fix-embedded_sdio_data-duplicate-definition.patch" "0h7d3pxz8di2rh257kmc83iwcpf8xmrqhbqq4an2vclfdhyr297j")
+     (upstreamPatch "0003-video-fbdev-msm-Provide-mdss_dsi_switch_page.patch" "1igqg795cvr81w948k4dj8nrbzc2pz5bg6gdp68jfplm2hcs4nch")
+diff --git a/devices/fossil-hoki/kernel/linux-4.14.213-214.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.213-214.patch.patch
+new file mode 100644
+index 00000000..3a081d63
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/linux-4.14.213-214.patch.patch
+@@ -0,0 +1,40 @@
++--- a/linux-4.14.213-214.patch
+++++ b/linux-4.14.213-214.patch
++@@ -160,36 +160,6 @@
++  		iio_get_time_ns(indio_dev));
++  
++  done:
++-diff --git a/drivers/md/dm-verity-target.c b/drivers/md/dm-verity-target.c
++-index e705799976c2c..2dae30713eb3d 100644
++---- a/drivers/md/dm-verity-target.c
++-+++ b/drivers/md/dm-verity-target.c
++-@@ -551,6 +551,15 @@ static int verity_verify_io(struct dm_verity_io *io)
++- 	return 0;
++- }
++- 
++-+/*
++-+ * Skip verity work in response to I/O error when system is shutting down.
++-+ */
++-+static inline bool verity_is_system_shutting_down(void)
++-+{
++-+	return system_state == SYSTEM_HALT || system_state == SYSTEM_POWER_OFF
++-+		|| system_state == SYSTEM_RESTART;
++-+}
++-+
++- /*
++-  * End one "io" structure with a given error.
++-  */
++-@@ -578,7 +587,8 @@ static void verity_end_io(struct bio *bio)
++- {
++- 	struct dm_verity_io *io = bio->bi_private;
++- 
++--	if (bio->bi_status && !verity_fec_is_enabled(io->v)) {
++-+	if (bio->bi_status &&
++-+	    (!verity_fec_is_enabled(io->v) || verity_is_system_shutting_down())) {
++- 		verity_finish_io(io, bio->bi_status);
++- 		return;
++- 	}
++ diff --git a/drivers/md/raid10.c b/drivers/md/raid10.c
++ index d08d77b9674ff..419ecdd914f4c 100644
++ --- a/drivers/md/raid10.c
++ +++ b/drivers/md/raid10.c
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index cc8034aa..a0c1cdf8 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -84,6 +84,8 @@ in
+       with pkgs;
+       [
+         asteroid.qml-asteroid
++        # Provides the invoker command used by AsteroidOS Qt app launchers.
++        asteroid.mapplauncherd
+         asteroid.asteroid-launcher
+         asteroid.asteroid-btsyncd
+         asteroid.nemo-qml-plugin-dbus
+diff --git a/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
+index a3dc5d7b..f78b521b 100644
+--- a/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
++++ b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
+@@ -1,33 +1,11 @@
+---- a/src/qml/firstrun/FirstRunConfig.qml	2026-10-18 13:45:58.913015468 +1100
+-+++ b/src/qml/firstrun/FirstRunConfig.qml	2026-10-18 13:45:58.913015468 +1100
+-@@ -267,6 +267,20 @@
+-     }
+- 
+-     IconButton {
+-+        id: skipButton
+-+        iconName: "ios-close"
+-+        anchors {
+-+            top: parent.top
+-+            horizontalCenter: parent.horizontalCenter
+-+            topMargin: Dims.iconButtonMargin
+-+        }
+-+        onClicked: {
+-+            firstRun.stopFirstRun()
+-+            config.destroy()
+-+        }
+-+    }
+-+
+-+    IconButton {
+-         id: nextButton
+-         iconName: "ios-arrow-dropright"
+-         anchors { 
+---- a/src/qml/firstrun/Tutorial.qml	2026-10-18 13:45:58.913015468 +1100
+-+++ b/src/qml/firstrun/Tutorial.qml	2026-10-18 13:45:58.913015468 +1100
+-@@ -525,6 +525,19 @@
++--- a/src/qml/firstrun/Tutorial.qml
+++++ b/src/qml/firstrun/Tutorial.qml
++@@ -525,6 +525,20 @@
+          }
+  
+          IconButton {
+ +            id: skipButton
+++            visible: tuto.state === "WELCOME"
+ +            iconName: "ios-close"
+ +            anchors {
+ +                top: parent.top
+diff --git a/overlay/asteroidos/browser/CMakeLists.txt b/overlay/asteroidos/browser/CMakeLists.txt
+index 1ecd71a9..cb9a9691 100644
+--- a/overlay/asteroidos/browser/CMakeLists.txt
++++ b/overlay/asteroidos/browser/CMakeLists.txt
+@@ -39,6 +39,11 @@ install(FILES asteroid-browser.svg
+     DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+ )
+ 
++# The launcher resolves app icons through AsteroidOS's flat theme directory.
++install(FILES asteroid-browser.svg
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/asteroid
++)
++
+ install(FILES asteroid-browser.svg
+     DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+     RENAME org.asteroidos.browser.svg
+diff --git a/overlay/asteroidos/browser/asteroid-browser.svg b/overlay/asteroidos/browser/asteroid-browser.svg
+index b65fe4b9..6ce8f579 100644
+--- a/overlay/asteroidos/browser/asteroid-browser.svg
++++ b/overlay/asteroidos/browser/asteroid-browser.svg
+@@ -1,50 +1,22 @@
+ <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+   <defs>
+-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+-      <stop offset="0%" stop-color="#0b1e36"/>
+-      <stop offset="50%" stop-color="#102a4c"/>
+-      <stop offset="100%" stop-color="#091322"/>
++    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#173d68" />
++      <stop offset="1" stop-color="#091526" />
+     </linearGradient>
+-    <linearGradient id="orbit" x1="0%" y1="0%" x2="100%" y2="100%">
+-      <stop offset="0%" stop-color="#00e5ff"/>
+-      <stop offset="100%" stop-color="#2979ff"/>
++    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
++      <stop offset="0" stop-color="#eaf8ff" />
++      <stop offset="1" stop-color="#b9d9e8" />
+     </linearGradient>
+-    <linearGradient id="compass-north" x1="0%" y1="0%" x2="100%" y2="100%">
+-      <stop offset="0%" stop-color="#ff1744"/>
+-      <stop offset="100%" stop-color="#d50000"/>
+-    </linearGradient>
+-    <linearGradient id="compass-south" x1="0%" y1="0%" x2="100%" y2="100%">
+-      <stop offset="0%" stop-color="#ffffff"/>
+-      <stop offset="100%" stop-color="#cfd8dc"/>
+-    </linearGradient>
+-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+-      <feGaussianBlur stdDeviation="3" result="blur" />
+-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+-    </filter>
+   </defs>
+ 
+-  <!-- Circular background badge -->
+-  <circle cx="64" cy="64" r="60" fill="url(#bg)" stroke="#1e3a5f" stroke-width="2"/>
+-
+-  <!-- Outer orbital ring -->
+-  <circle cx="64" cy="64" r="50" fill="none" stroke="url(#orbit)" stroke-width="3" stroke-dasharray="14 6" opacity="0.8" filter="url(#glow)"/>
+-
+-  <!-- Latitude / Longitude globe lines -->
+-  <ellipse cx="64" cy="64" rx="42" ry="42" fill="none" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
+-  <ellipse cx="64" cy="64" rx="20" ry="42" fill="none" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
+-  <line x1="22" y1="64" x2="106" y2="64" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
+-  <line x1="64" y1="22" x2="64" y2="106" stroke="#2a527a" stroke-width="1.5" opacity="0.6"/>
+-
+-  <!-- Stylized Compass / Navigator Pointer (35 degree tilt) -->
+-  <g transform="translate(64,64) rotate(35)">
+-    <!-- North Needle -->
+-    <polygon points="0,-36 9,0 0,-4" fill="url(#compass-north)" filter="url(#glow)"/>
+-    <polygon points="0,-36 -9,0 0,-4" fill="#b71c1c"/>
+-    <!-- South Needle -->
+-    <polygon points="0,36 9,0 0,4" fill="url(#compass-south)"/>
+-    <polygon points="0,36 -9,0 0,4" fill="#90a4ae"/>
+-    <!-- Center Pivot Pin -->
+-    <circle cx="0" cy="0" r="5" fill="#eceff1" stroke="#37474f" stroke-width="1.5"/>
+-    <circle cx="0" cy="0" r="2" fill="#00e5ff"/>
+-  </g>
++  <circle cx="64" cy="64" r="60" fill="url(#bg)" stroke="#2b6088" stroke-width="2" />
++  <rect x="23" y="29" width="82" height="70" rx="11" fill="#07111d" stroke="#55d9ee" stroke-width="4" />
++  <path d="M27 40a7 7 0 0 1 7-7h60a7 7 0 0 1 7 7v10H27z" fill="#16466b" />
++  <circle cx="38" cy="40" r="2.5" fill="#ff6b77" />
++  <circle cx="47" cy="40" r="2.5" fill="#ffd166" />
++  <circle cx="56" cy="40" r="2.5" fill="#62e6a7" />
++  <rect x="34" y="57" width="60" height="34" rx="5" fill="url(#page)" />
++  <path d="M42 66h27M42 73h43M42 80h35" stroke="#3982a8" stroke-width="3" stroke-linecap="round" />
++  <circle cx="83" cy="65" r="5" fill="#00bcd4" />
+ </svg>
+diff --git a/overlay/asteroidos/browser/default.nix b/overlay/asteroidos/browser/default.nix
+index 4ee89f74..fe875e78 100644
+--- a/overlay/asteroidos/browser/default.nix
++++ b/overlay/asteroidos/browser/default.nix
+@@ -34,6 +34,14 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   dontWrapGApps = false;
+ 
++  # This legacy watch kernel cannot create WebKit's bwrap sandbox namespaces.
++  # Run the GTK client on the Asteroid Wayland socket and use WebKit's explicit
++  # sandbox-disable switch so the browser can start on this device.
++  preFixup = ''
++    gappsWrapperArgs+=(--set GDK_BACKEND wayland)
++    gappsWrapperArgs+=(--set WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS 1)
++  '';
++
+   meta = with lib; {
+     description = "Native WebKit smartwatch browser for AsteroidOS";
+     homepage = "https://asteroidos.org";
+diff --git a/overlay/asteroidos/browser/src/main.c b/overlay/asteroidos/browser/src/main.c
+index c8cf0974..785f614f 100644
+--- a/overlay/asteroidos/browser/src/main.c
++++ b/overlay/asteroidos/browser/src/main.c
+@@ -188,18 +188,18 @@ static void activate(GtkApplication *app, gpointer user_data)
+         "  background: rgba(14, 20, 32, 0.94);\n"
+         "  border: 1px solid rgba(0, 229, 255, 0.4);\n"
+         "  border-radius: 28px;\n"
+-        "  padding: 4px 8px;\n"
+-        "  margin-bottom: 12px;\n"
++        "  padding: 8px 10px;\n"
++        "  margin-bottom: 10px;\n"
+         "}\n"
+         ".watch-btn {\n"
+         "  background: transparent;\n"
+         "  border: none;\n"
+         "  border-radius: 50%;\n"
+-        "  min-width: 36px;\n"
+-        "  min-height: 36px;\n"
++        "  min-width: 56px;\n"
++        "  min-height: 56px;\n"
+         "  padding: 0;\n"
+         "  color: #F0F4F8;\n"
+-        "  font-size: 15px;\n"
++        "  font-size: 22px;\n"
+         "  font-weight: bold;\n"
+         "}\n"
+         ".watch-btn:hover, .watch-btn:active {\n"
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index a33893cf..964a67bf 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -6,6 +6,7 @@ rec {
+   };
+ 
+   qml-asteroid = callPackage ./qml-asteroid { };
++  mapplauncherd = callPackage ./mapplauncherd { };
+ 
+   # Upstream meta-asteroid checkout, used for unmodified recipe payloads
+   # (udev rules, unit files, patches) instead of vendoring them.
+diff --git a/overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch b/overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch
+new file mode 100644
+index 00000000..993d33a1
+--- /dev/null
++++ b/overlay/asteroidos/mapplauncherd/0001-Fix-dynamic-opening-issues.patch
+@@ -0,0 +1,28 @@
++From 304762c3373d88274d888efbbfa7ad04d5eb0d07 Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Fri, 8 Jan 2021 22:15:30 +0100
++Subject: [PATCH] Make single-instance a shared library.
++Newer versions of glibc(>= 2.30) don't allow dlopen() on position independent executables. Normal (position dependent) executables weren't supported either.
++---
++ src/single-instance/CMakeLists.txt | 4 ++--
++ 1 file changed, 2 insertions(+), 2 deletions(-)
++
++Upstream-Status: Inappropriate
++
++diff --git a/src/single-instance/CMakeLists.txt b/src/single-instance/CMakeLists.txt
++index cc04ba2..1d3d13d 100644
++--- a/src/single-instance/CMakeLists.txt
+++++ b/src/single-instance/CMakeLists.txt
++@@ -11,10 +11,10 @@ pkg_check_modules(DBUS dbus-1 REQUIRED)
++ include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${DBUS_INCLUDE_DIRS} ${COMMON})
++ 
++ # Hide all symbols except the ones explicitly exported in the code (like main())
++-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fPIC")
+++set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIE -fvisibility=hidden -fPIC")
++ 
++ # Link as position independent executable
++-set(CMAKE_EXE_LINKER_FLAGS "-pie -rdynamic")
+++set(CMAKE_EXE_LINKER_FLAGS "-rdynamic -shared")
++ 
++ # Set C flags because of report.c
++ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden -fPIC")
+diff --git a/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
+new file mode 100644
+index 00000000..0597e987
+--- /dev/null
++++ b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
+@@ -0,0 +1,40 @@
++From 934565b7817b85a341b88d23df7c90a28c62dd0a Mon Sep 17 00:00:00 2001
++From: Florent Revest <revestflo@gmail.com>
++Date: Wed, 10 Jun 2026 23:20:09 +0000
++Subject: [PATCH] invoker: skip the sailjaild D-Bus query when sailjail is not
++ installed
++
++Every launch performs a synchronous D-Bus round-trip (bus connect +
++method call + ServiceUnknown error reply) to org.sailfishos.sailjaild1
++on systems that do not ship the sandboxing daemon. Sandbox enforcement
++prepends /usr/bin/sailjail to the command anyway, so when that binary
++does not exist the query can never lead anywhere: gate it on
++access(SAILJAIL_PATH, X_OK) and drop the dead bus traffic from the
++launch critical path.
++
++Upstream-Status: Pending
++---
++ src/invoker/invoker.c | 7 +++++++
++ 1 file changed, 7 insertions(+)
++
++diff --git a/src/invoker/invoker.c b/src/invoker/invoker.c
++index 2bc1143..9642a7d 100644
++--- a/src/invoker/invoker.c
+++++ b/src/invoker/invoker.c
++@@ -1136,6 +1136,13 @@ int main(int argc, char *argv[])
++         free(path);
++     }
++ 
+++    // Sandboxing needs the sailjail binary (it gets prepended to the
+++    // command below). On systems that do not ship it, skip the sailjaild
+++    // D-Bus query: it is a synchronous bus round-trip (connect + method
+++    // call + error reply) on the critical path of every single launch.
+++    if (args.sandboxing_id && access(SAILJAIL_PATH, X_OK) == -1)
+++        args.sandboxing_id = NULL;
+++
++     // Application specific boosters are running in sandbox and can
++     // thus launch only sandboxed processes, otherwise
++     // If arguments don't define sailjail and sailjaild says the app must be sandboxed,
++-- 
++2.47.3
++
+diff --git a/overlay/asteroidos/mapplauncherd/default.nix b/overlay/asteroidos/mapplauncherd/default.nix
+new file mode 100644
+index 00000000..08c75236
+--- /dev/null
++++ b/overlay/asteroidos/mapplauncherd/default.nix
+@@ -0,0 +1,48 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  glib,
++  dbus,
++  systemd,
++  libcap,
++  kdePackages,
++}:
++
++stdenv.mkDerivation {
++  pname = "mapplauncherd";
++  version = "2026-10-20";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "mapplauncherd";
++    rev = "7216a9b5801ffe58d1021cc71b9e90ff7d67268f";
++    hash = "sha256-kdzWP+Ffzb8kDagtxnWtHWoRQcWagJbUqe7ZWFUoZnk=";
++  };
++
++  patches = [
++    ./0001-Fix-dynamic-opening-issues.patch
++    ./0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
++  ];
++
++  strictDeps = true;
++  nativeBuildInputs = [ cmake pkg-config kdePackages.extra-cmake-modules ];
++  buildInputs = [ glib dbus systemd libcap ];
++  cmakeFlags = [ "-DECM_DIR=${kdePackages.extra-cmake-modules}/share/ECM/cmake" ];
++
++  # Upstream's documentation target requires unavailable Qt 5 tooling, and
++  # this systemd build exports libsystemd directly.
++  postPatch = ''
++    sed -i '/Target for documentation/,$d' CMakeLists.txt
++    sed -i 's@-L/lib -lsystemd-daemon@-lsystemd@' src/launcherlib/CMakeLists.txt
++  '';
++
++  meta = with lib; {
++    description = "AsteroidOS application launcher and invoker runtime";
++    homepage = "https://github.com/sailfishos/mapplauncherd";
++    license = licenses.lgpl21Only;
++    platforms = platforms.linux;
++  };
++}
+diff --git a/overlay/asteroidos/mce/default.nix b/overlay/asteroidos/mce/default.nix
+index b1ee31e3..8ce4a485 100644
+--- a/overlay/asteroidos/mce/default.nix
++++ b/overlay/asteroidos/mce/default.nix
+@@ -85,8 +85,8 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+     install -m644 mce.conf $out/share/dbus-1/system.d/com.nokia.mce.conf
+ 
+-    install -m644 inifiles/mce.ini $out/etc/mce/mce.ini
+-    install -m644 inifiles/mce-radio-states.ini $out/etc/mce/mce-radio-states.ini
++    install -m644 inifiles/mce.ini $out/etc/mce/10mce.ini
++    install -m644 inifiles/mce-radio-states.ini $out/etc/mce/20mce-radio-states.ini
+     install -m644 inifiles/hybris-led.ini $out/etc/mce/20hybris-led.ini
+     install -m644 inifiles/hybris-features.ini $out/etc/mce/20hybris-features.ini
+     install -m644 inifiles/debug-led.ini $out/etc/mce/20debug-led.ini
