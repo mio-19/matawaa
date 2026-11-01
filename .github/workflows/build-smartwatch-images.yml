@@ -65,6 +65,7 @@ jobs:
             substituters = https://cache.nixos.org https://matawaa.cachix.org
             trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= matawaa.cachix.org-1:Lr7VwT3o+MyJPsehlobwZXv5gI+/hh9zhfUWdPCeej8=
             extra-platforms = armv7l-linux
+            system-features = nixos-test benchmark big-parallel kvm uid-range gccarch-armv7-a
 
       - name: Configure Cachix
         uses: cachix/cachix-action@v17
