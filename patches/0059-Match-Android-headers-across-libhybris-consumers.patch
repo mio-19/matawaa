@@ -178,7 +178,7 @@ index c8d6dc03..e69967d8 100644
        ${libhybris}/include/hybris/eglplatformcommon
        ${libhybris}/include/hybris/platformcommon
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
-index 9698e618..eb4bc803 100644
+index a1ca1844..ad85ad06 100644
 --- a/overlay/asteroidos/sensorfw/default.nix
 +++ b/overlay/asteroidos/sensorfw/default.nix
 @@ -11,7 +11,6 @@

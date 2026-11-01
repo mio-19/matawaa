@@ -4521,7 +4521,7 @@ index 00000000..6ad5cc23
 +install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sensord-qt6.pc DESTINATION lib/pkgconfig)
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
 new file mode 100644
-index 00000000..9698e618
+index 00000000..a1ca1844
 --- /dev/null
 +++ b/overlay/asteroidos/sensorfw/default.nix
 @@ -0,0 +1,82 @@
@@ -4564,7 +4564,7 @@ index 00000000..9698e618
 +  };
 +
 +  patches = [
-+    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-FNjH+q3kjQDeJP5yaAZ24z8FpU0gZ8GJAFuElzM3bsM=")
++    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-7eFjofMXAkQSvZf6RwkINBwLYSe+u3kJ8lCnOkoFhBE=")
 +    (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-qRXs9vrszoG1bVnjkIVtRaXEvaLtNKs7Z1PsR759VQo=")
 +    (upstreamPatch "0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch" "sha256-WyVwM0KEtADQhAeZTGy6we9BSyITchcClT+phNTdhuc=")
 +    (upstreamPatch "0004-Fix-compilation-when-autohybris-is-used.patch" "sha256-RJ711Knze6feQOPfa/UD6r9jG870H//hOnbFPzhoS5s=")
