@@ -19,11 +19,11 @@ they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 ++
  devices/fossil-hoki/android-init.nix          | 148 +++++
- devices/fossil-hoki/android-system-data.nix   |  18 +
+ devices/fossil-hoki/android-system-data.nix   |  26 +
  devices/fossil-hoki/audio-modules.nix         | 122 +++++
  devices/fossil-hoki/default.nix               | 506 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
- devices/fossil-hoki/hybris-android.nix        |  22 +
+ devices/fossil-hoki/hybris-android.nix        |  30 ++
  devices/fossil-hoki/hybris.nix                |  45 ++
  devices/fossil-hoki/kernel/default.nix        | 252 +++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++
@@ -40,7 +40,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  65 ++-
- 23 files changed, 2162 insertions(+), 53 deletions(-)
+ 23 files changed, 2178 insertions(+), 53 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -281,18 +281,26 @@ index 00000000..e9ba17d2
 +}
 diff --git a/devices/fossil-hoki/android-system-data.nix b/devices/fossil-hoki/android-system-data.nix
 new file mode 100644
-index 00000000..4373edde
+index 00000000..36d3b739
 --- /dev/null
 +++ b/devices/fossil-hoki/android-system-data.nix
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,26 @@
 +{ pkgs }:
 +
 +# Installs the Fossil Gen 6 Android 9 system and vendor data for libhybris.
 +# Matches upstream AsteroidOS recipe:
 +# AsteroidOS/meta-smartwatch: meta-hoki/recipes-android/android/android-system-data_hoki-p.bb
-+pkgs.runCommand "android-system-data-hoki-p" { } ''
++let
++  inherit (pkgs) buildPackages;
++in
++pkgs.runCommand "android-system-data-hoki-p" {
++  nativeBuildInputs = [
++    buildPackages.gnutar
++    buildPackages.gzip
++  ];
++} ''
 +  mkdir -p $out
-+  ${pkgs.gnutar}/bin/tar -xzf ${
++  tar -xzf ${
 +    pkgs.fetchurl {
 +      url = "https://dl.dropboxusercontent.com/s/1mmpew8kyn52jko/system-hoki-p.tar.gz";
 +      hash = "sha256-FBagGo/RnpyCqgypveM9toU+sI9UEVkrSxeDZJcUF84=";
@@ -953,19 +961,27 @@ index 00000000..594fc6c1
 +NTP_FORCE_INJECT=true
 diff --git a/devices/fossil-hoki/hybris-android.nix b/devices/fossil-hoki/hybris-android.nix
 new file mode 100644
-index 00000000..1e97adce
+index 00000000..49b976fc
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris-android.nix
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,30 @@
 +{ pkgs }:
 +# AsteroidOS ships patched Android system libraries and headers for hybris on
 +# the Fossil Gen 6. They contain the HWC2 compatibility layer that the stock
 +# Fossil system/vendor image lacks, and the hal-droid init/system binaries
 +# used by android-init.service.
 +# Source: meta-asteroid recipes-android/android/android_armv7-pie64.bb
-+pkgs.runCommand "hybris-p-msm8909w" { } ''
++let
++  inherit (pkgs) buildPackages;
++in
++pkgs.runCommand "hybris-p-msm8909w" {
++  nativeBuildInputs = [
++    buildPackages.gnutar
++    buildPackages.gzip
++  ];
++} ''
 +  mkdir -p $out
-+  ${pkgs.gnutar}/bin/tar xf ${
++  tar xf ${
 +    pkgs.fetchurl {
 +      url = "https://dl.dropboxusercontent.com/s/2btck4hlowhronv/hybris-p-msm8909w.tar.gz";
 +      hash = "sha256-19kXAAB3la7c30//pBhVLt8rP9QaAiM2dAGQb09N/tM=";
@@ -975,8 +991,8 @@ index 00000000..1e97adce
 +  # GNSS (#342): the vendor provides gps.default.so under /vendor/lib/hw.
 +  # /system is the read-only hal-droid tree, so create the hw module alias at
 +  # build time rather than relying on a boot-time symlink into the store.
-+  ${pkgs.coreutils}/bin/mkdir -p $out/usr/libexec/hal-droid/system/lib/hw
-+  ${pkgs.coreutils}/bin/ln -sfn /vendor/lib/hw/gps.default.so \
++  mkdir -p $out/usr/libexec/hal-droid/system/lib/hw
++  ln -sfn /vendor/lib/hw/gps.default.so \
 +    $out/usr/libexec/hal-droid/system/lib/hw/gps.default.so
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
