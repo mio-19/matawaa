@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sun, 1 Nov 2026 21:41:27 +1100
+Subject: [PATCH] Install dconf service for AsteroidOS preferences
+
+---
+ examples/asteroid/asteroid-desktop.nix | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 4387681b..5718aa97 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -83,6 +83,8 @@ in
+     environment.systemPackages =
+       with pkgs;
+       [
++        # Provides the D-Bus service used by GSettings and AsteroidOS mlite.
++        dconf
+         asteroid.qml-asteroid
+         # Provides the invoker command used by AsteroidOS Qt app launchers.
+         asteroid.mapplauncherd
+@@ -507,6 +509,7 @@ in
+     # environment.etc entries. The MCE package ships com.nokia.mce.conf; the
+     # upstream AsteroidOS connman policy replaces connman's own one.
+     services.dbus.packages = [
++      pkgs.dconf
+       pkgs.asteroid.mce
+       pkgs.asteroid.dsme
+       pkgs.asteroid.sensorfw
