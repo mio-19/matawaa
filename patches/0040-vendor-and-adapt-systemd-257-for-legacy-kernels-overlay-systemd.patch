@@ -16,7 +16,7 @@ systemd262oldkernel.
 ---
  devices/families/asteroidos.nix               |    4 +
  modules/hardware-watch.nix                    |   13 +
- overlay/cross-compile.nix                     |  125 +-
+ overlay/cross-compile.nix                     |   79 +-
  overlay/overlay.nix                           |   30 +-
  .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
@@ -44,7 +44,7 @@ systemd262oldkernel.
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
  overlay/systemd.nix                           |   68 +
- 30 files changed, 2436 insertions(+), 66 deletions(-)
+ 30 files changed, 2396 insertions(+), 60 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -112,32 +112,11 @@ index 71f4b2d6..e5050bea 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index 3145a5c7..02caaf5e 100644
+index 3145a5c7..5af7a518 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
-@@ -1,8 +1,8 @@
- # Overlays and package workarounds that only make sense during cross-compilation.
- #
--# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
--# When cross-compiling, it provides upstream fixes for Qt 6, 32-bit ARM toolchains,
--# NetSurf host build tools, Skia, systemd, and libkiwix.
-+# When building natively, this overlay selects vendored Qt 6.11 for matching
-+# Qt host tools. When cross-compiling, it also provides upstream fixes for Qt 6,
-+# 32-bit ARM toolchains, NetSurf host build tools, Skia, systemd, and libkiwix.
- final: super:
- 
- let
-@@ -11,14 +11,14 @@ let
-     superStdenv != null && superStdenv.buildPlatform.system != superStdenv.hostPlatform.system;
- in
- if !isCross then
--  { }
-+  {
-+    # Use the same vendored Qt package definitions for host tools as for the
-+    # target Qt libraries during cross compilation. Their dependencies and
-+    # toolchains still come from the current Nixpkgs package set.
-+    qt6 = final.callPackage ./vendor/qt-6.11 { };
-+  }
+@@ -14,11 +14,6 @@ if !isCross then
+   { }
  else
    let
 -    # Pinned revision of AsteroidOS meta-asteroid used as the source for
@@ -148,7 +127,7 @@ index 3145a5c7..02caaf5e 100644
      addCrossQuickTools =
        pkg:
        pkg.overrideAttrs (old: {
-@@ -29,40 +29,8 @@ else
+@@ -29,40 +24,8 @@ else
          ];
        });
  
@@ -189,55 +168,7 @@ index 3145a5c7..02caaf5e 100644
      # ModemManager's generated GDBus sources race with the static archive link
      # when building in parallel; serialize its build.
      modemmanager = super.modemmanager.overrideAttrs (old: {
-@@ -81,8 +49,22 @@ else
- 
-     # Upstream nixpkgs Qt6 modules skip QtQuick integration during cross-compilation
-     # because cross Qt6QuickTools, Qt6QmlTools, and Qt6ShaderToolsTools cmake flags are missing.
--    qt6 = super.qt6.overrideScope (
-+    qt6 = (final.callPackage ./vendor/qt-6.11 { }).overrideScope (
-       qfinal: qsuper: {
-+        # Upstream AsteroidOS builds Qt without desktop GL on hybris machines:
-+        # meta-asteroid/recipes-qt/qt6/qtbase_git.bbappend does
-+        #   PACKAGECONFIG:append = " gles2 "
-+        #   PACKAGECONFIG:remove:hybris-machine = " ... gl ... "
-+        # i.e. `-opengl es2`. With the nixpkgs default (desktop GL only),
-+        # QOpenGLContext::openGLModuleType() returns LibGL, so
-+        # QEGLConfigChooser asks for EGL_OPENGL_BIT; the vendor EGL only
-+        # exposes ES configs (renderable=0x45 in the egl-probe dump), so
-+        # eglChooseConfig() returns no config and eglCreateWindowSurface()
-+        # fails with EGL_BAD_CONFIG. `-opengl es2` makes Qt request
-+        # EGL_OPENGL_ES2_BIT, which the vendor EGL does provide.
-+        qtbase = qsuper.qtbase.overrideAttrs (old: {
-+          cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DINPUT_opengl=es2" ];
-+        });
-         qtdeclarative = qsuper.qtdeclarative.overrideAttrs (old: {
-           cmakeFlags =
-             (map (
-@@ -98,7 +80,22 @@ else
-               "-DQt6QuickTools_DIR=${final.pkgsBuildBuild.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
-             ];
-         });
--        qtwayland = addCrossQuickTools qsuper.qtwayland;
-+        # Upstream AsteroidOS builds qtwayland's libhybris-egl-server buffer
-+        # integration (meta-asteroid recipes-qt/qt6/qtwayland_%.bbappend +
-+        # 0001-Fix-libhybris-egl-server-compilation.patch). Qt 6.12 no longer
-+        # defines the feature, but it still ships the plugin sources and the
-+        # guard is a plain CMake variable, so enable it explicitly and apply
-+        # the same upstream patch. Selected at runtime through
-+        # QT_WAYLAND_SERVER_BUFFER_INTEGRATION=libhybris-egl-server.
-+        qtwayland = (addCrossQuickTools qsuper.qtwayland).overrideAttrs (old: {
-+          patches = (old.patches or [ ]) ++ [
-+            "${final.meta-asteroid-src}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch"
-+          ];
-+          cmakeFlags = (old.cmakeFlags or [ ]) ++ [
-+            "-DQT_FEATURE_wayland_libhybris_egl_server_buffer=ON"
-+          ];
-+          buildInputs = (old.buildInputs or [ ]) ++ [ final.libhybris ];
-+        });
-         qtvirtualkeyboard = addCrossQuickTools qsuper.qtvirtualkeyboard;
-         qtmultimedia = (addCrossQuickTools qsuper.qtmultimedia).overrideAttrs (old: {
-           buildInputs = final.lib.filter (
-@@ -141,26 +138,10 @@ else
+@@ -141,26 +104,10 @@ else
                --replace-fail 'DESTINATION /etc/xdg/QtProject' 'DESTINATION etc/xdg/QtProject'
            '';
            patches = (old.patches or [ ]) ++ [
@@ -268,7 +199,7 @@ index 3145a5c7..02caaf5e 100644
            ];
          });
          qtconnectivity = addCrossQuickTools qsuper.qtconnectivity;
-@@ -274,6 +255,24 @@ else
+@@ -274,6 +221,24 @@ else
      });
    }
    // super.lib.optionalAttrs (superStdenv != null && superStdenv.hostPlatform.isAarch32) {

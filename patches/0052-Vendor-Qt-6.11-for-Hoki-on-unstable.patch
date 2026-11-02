@@ -7,6 +7,7 @@ Subject: [PATCH] Vendor Qt 6.11 for Hoki on unstable
  examples/asteroid/asteroid-desktop.nix        |   6 +-
  .../scripted-installer/automated-installer.rb |   5 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   2 +-
+ overlay/cross-compile.nix                     |  46 +-
  overlay/vendor/qt-6.11/README.md              |  14 +
  overlay/vendor/qt-6.11/default.nix            | 160 +++++++
  overlay/vendor/qt-6.11/fetch.sh               |   1 +
@@ -77,7 +78,7 @@ Subject: [PATCH] Vendor Qt 6.11 for Hoki on unstable
  overlay/vendor/qt-6.11/qt-env.nix             |  34 ++
  overlay/vendor/qt-6.11/qtModule.nix           |  95 +++++
  overlay/vendor/qt-6.11/srcs.nix               | 342 +++++++++++++++
- 73 files changed, 2900 insertions(+), 7 deletions(-)
+ 74 files changed, 2940 insertions(+), 13 deletions(-)
  create mode 100644 overlay/vendor/qt-6.11/README.md
  create mode 100644 overlay/vendor/qt-6.11/default.nix
  create mode 100644 overlay/vendor/qt-6.11/fetch.sh
@@ -203,6 +204,84 @@ index b4cd0f72..c8d6dc03 100644
      cat > shaders.qrc << 'QRC'
  <RCC>
      <qresource prefix="/qt-project.org/imports/Qt5Compat/GraphicalEffects">
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index 5af7a518..02caaf5e 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -1,8 +1,8 @@
+ # Overlays and package workarounds that only make sense during cross-compilation.
+ #
+-# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
+-# When cross-compiling, it provides upstream fixes for Qt 6, 32-bit ARM toolchains,
+-# NetSurf host build tools, Skia, systemd, and libkiwix.
++# When building natively, this overlay selects vendored Qt 6.11 for matching
++# Qt host tools. When cross-compiling, it also provides upstream fixes for Qt 6,
++# 32-bit ARM toolchains, NetSurf host build tools, Skia, systemd, and libkiwix.
+ final: super:
+ 
+ let
+@@ -11,7 +11,12 @@ let
+     superStdenv != null && superStdenv.buildPlatform.system != superStdenv.hostPlatform.system;
+ in
+ if !isCross then
+-  { }
++  {
++    # Use the same vendored Qt package definitions for host tools as for the
++    # target Qt libraries during cross compilation. Their dependencies and
++    # toolchains still come from the current Nixpkgs package set.
++    qt6 = final.callPackage ./vendor/qt-6.11 { };
++  }
+ else
+   let
+     addCrossQuickTools =
+@@ -44,8 +49,22 @@ else
+ 
+     # Upstream nixpkgs Qt6 modules skip QtQuick integration during cross-compilation
+     # because cross Qt6QuickTools, Qt6QmlTools, and Qt6ShaderToolsTools cmake flags are missing.
+-    qt6 = super.qt6.overrideScope (
++    qt6 = (final.callPackage ./vendor/qt-6.11 { }).overrideScope (
+       qfinal: qsuper: {
++        # Upstream AsteroidOS builds Qt without desktop GL on hybris machines:
++        # meta-asteroid/recipes-qt/qt6/qtbase_git.bbappend does
++        #   PACKAGECONFIG:append = " gles2 "
++        #   PACKAGECONFIG:remove:hybris-machine = " ... gl ... "
++        # i.e. `-opengl es2`. With the nixpkgs default (desktop GL only),
++        # QOpenGLContext::openGLModuleType() returns LibGL, so
++        # QEGLConfigChooser asks for EGL_OPENGL_BIT; the vendor EGL only
++        # exposes ES configs (renderable=0x45 in the egl-probe dump), so
++        # eglChooseConfig() returns no config and eglCreateWindowSurface()
++        # fails with EGL_BAD_CONFIG. `-opengl es2` makes Qt request
++        # EGL_OPENGL_ES2_BIT, which the vendor EGL does provide.
++        qtbase = qsuper.qtbase.overrideAttrs (old: {
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DINPUT_opengl=es2" ];
++        });
+         qtdeclarative = qsuper.qtdeclarative.overrideAttrs (old: {
+           cmakeFlags =
+             (map (
+@@ -61,7 +80,22 @@ else
+               "-DQt6QuickTools_DIR=${final.pkgsBuildBuild.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
+             ];
+         });
+-        qtwayland = addCrossQuickTools qsuper.qtwayland;
++        # Upstream AsteroidOS builds qtwayland's libhybris-egl-server buffer
++        # integration (meta-asteroid recipes-qt/qt6/qtwayland_%.bbappend +
++        # 0001-Fix-libhybris-egl-server-compilation.patch). Qt 6.12 no longer
++        # defines the feature, but it still ships the plugin sources and the
++        # guard is a plain CMake variable, so enable it explicitly and apply
++        # the same upstream patch. Selected at runtime through
++        # QT_WAYLAND_SERVER_BUFFER_INTEGRATION=libhybris-egl-server.
++        qtwayland = (addCrossQuickTools qsuper.qtwayland).overrideAttrs (old: {
++          patches = (old.patches or [ ]) ++ [
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch"
++          ];
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [
++            "-DQT_FEATURE_wayland_libhybris_egl_server_buffer=ON"
++          ];
++          buildInputs = (old.buildInputs or [ ]) ++ [ final.libhybris ];
++        });
+         qtvirtualkeyboard = addCrossQuickTools qsuper.qtvirtualkeyboard;
+         qtmultimedia = (addCrossQuickTools qsuper.qtmultimedia).overrideAttrs (old: {
+           buildInputs = final.lib.filter (
 diff --git a/overlay/vendor/qt-6.11/README.md b/overlay/vendor/qt-6.11/README.md
 new file mode 100644
 index 00000000..f9b7b01f
