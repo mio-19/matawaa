@@ -5,19 +5,27 @@ Subject: [PATCH] asteroid: unify systemd 257 on legacy targets, eliminate
  /usr/share, and align gestures with upstream
 
 ---
- devices/families/asteroidos.nix               | 17 ++++-
+ devices/families/asteroidos.nix               | 17 +++-
  devices/fossil-hoki-mainline/default.nix      |  6 +-
  devices/fossil-hoki/default.nix               |  3 +-
  devices/oppo-beluga-mainline/default.nix      |  6 +-
- examples/asteroid/asteroid-desktop.nix        | 65 +++++++++----------
+ examples/asteroid/asteroid-desktop.nix        | 99 +++++++------------
  modules/asteroid-config.nix                   |  7 +-
- modules/hardware-watch.nix                    | 10 +++
- .../asteroidos/asteroid-launcher/default.nix  | 26 ++++++++
+ modules/hardware-watch.nix                    | 10 ++
+ .../asteroidos/asteroid-launcher/default.nix  | 26 +++++
+ overlay/asteroidos/default.nix                | 17 +++-
+ overlay/asteroidos/dsme/default.nix           | 21 +---
  overlay/asteroidos/lib/mk-asteroid-app.nix    |  1 +
+ overlay/asteroidos/mapplauncherd/default.nix  |  7 +-
+ .../qt6-qpa-hwcomposer-plugin/default.nix     | 19 ++--
+ overlay/asteroidos/sensorfw/default.nix       | 26 ++---
  overlay/asteroidos/timed-qt6/default.nix      |  7 ++
  .../asteroidos/virtualkeyboard/default.nix    |  2 +
- overlay/systemd.nix                           | 12 +++-
- 12 files changed, 113 insertions(+), 49 deletions(-)
+ overlay/cross-compile.nix                     | 35 +------
+ overlay/libhybris/default.nix                 | 22 +----
+ overlay/overlay.nix                           |  6 +-
+ overlay/systemd.nix                           | 12 ++-
+ 20 files changed, 165 insertions(+), 184 deletions(-)
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 index 4e495943..f1e3d863 100644
@@ -96,10 +104,10 @@ index e14f5032..6ed487dd 100644
  
    zramSwap.enable = true;
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index bcb3f0ea..4e72786f 100644
+index bcb3f0ea..8b6b586d 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -16,12 +16,7 @@ let
+@@ -16,47 +16,19 @@ let
      || config.mobile.hardware.watch.stage2-save-logs.enable
      || config.mobile.hardware.watch.stage2-ssh.enable;
  
@@ -109,11 +117,50 @@ index bcb3f0ea..4e72786f 100644
 -    systemd = config.systemd.package;
 -    udev = config.systemd.package;
 -  };
+-
+-  # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
+-  # policies at build time instead of vendoring copies in this repository.
+-  # https://github.com/AsteroidOS/meta-asteroid
+-  asteroidOSRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
 +  isLegacy = config.mobile.hardware.watch.kernel == "legacy";
  
-   # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
-   # policies at build time instead of vendoring copies in this repository.
-@@ -136,7 +131,7 @@ in
+   # Upstream asteroid-launcher_git.bb installs a seeded notification database
+   # into the ceres user's privileged data directory.
+   # https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications
+-  launcherNotifications = pkgs.fetchurl {
+-    name = "notifications.db";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db";
+-    hash = "sha256-QK2tngW8h/K/IcYaTXs61RdfKb8NshS4n7AtK41K6aM=";
+-  };
+-  launcherNotificationsWal = pkgs.fetchurl {
+-    name = "notifications.db-wal";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-wal";
+-    hash = "sha256-gRtpUBYYtNI3tKDw3/2If5nFyiTLfKPLNUC1gF83qm4=";
+-  };
+-  launcherNotificationsShm = pkgs.fetchurl {
+-    name = "notifications.db-shm";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-shm";
+-    hash = "sha256-lZXfg4awjBp0HSRIpdqyyFrtRXWv5HUst9u5tha/ZVo=";
+-  };
++  launcherNotifications = "${pkgs.asteroid.meta-asteroid-src}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db";
++  launcherNotificationsWal = "${pkgs.asteroid.meta-asteroid-src}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-wal";
++  launcherNotificationsShm = "${pkgs.asteroid.meta-asteroid-src}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-shm";
+ 
+   # Upstream connman_%.bbappend replaces connman's D-Bus policy with one that
+   # also admits the ceres user; expose it through services.dbus.packages.
+   connmanDbusPolicy = pkgs.runCommand "asteroid-connman-dbus-policy" { } ''
+-    install -Dm644 ${
+-      pkgs.fetchurl {
+-        name = "connman-dbus.conf";
+-        url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-connectivity/connman/connman/connman-dbus.conf";
+-        hash = "sha256-iC4/pjt6UB/fcUqukFX/nEavNuETNmAvVW0T8T0ody0=";
+-      }
+-    } $out/share/dbus-1/system.d/connman.conf
++    install -Dm644 ${pkgs.asteroid.meta-asteroid-src}/recipes-connectivity/connman/connman/connman-dbus.conf $out/share/dbus-1/system.d/connman.conf
+   '';
+ in
+ {
+@@ -136,7 +108,7 @@ in
          asteroid.asteroid-btsyncd
          asteroid.nemo-qml-plugin-dbus
          asteroid.libconnman-qt
@@ -122,7 +169,14 @@ index bcb3f0ea..4e72786f 100644
          asteroid.ngfd
          asteroid.nfcd
          asteroid.keepalive
-@@ -202,12 +197,11 @@ in
+@@ -198,16 +170,18 @@ in
+         asteroid.community-apps.shopper
+         asteroid.community-apps.toolwatch
+         asteroid.community-apps.touchdown
++        asteroid.community-apps.hackwatch
++        asteroid.community-apps.neofetch
++        tree
+       ]);
  
      systemd.tmpfiles.rules = [
        "d /var/lib/kiwix 0775 ceres users -"
@@ -136,7 +190,7 @@ index bcb3f0ea..4e72786f 100644
        # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
        "d /var/lib/connman 0755 root root -"
        "C+ /var/lib/connman/settings 0644 root root - ${
-@@ -236,8 +230,6 @@ in
+@@ -236,8 +210,6 @@ in
        "d /var/lib/timed 0775 ceres users -"
        "d /var/lib/timed/shared_events 0775 ceres users -"
        "d /var/lib/timed/shared_settings 0775 ceres users -"
@@ -145,7 +199,7 @@ index bcb3f0ea..4e72786f 100644
        # Upstream supported-languages_git.bb seeds the ceres locale drop-in that
        # user@.service.d/locale.conf reads (installed via environment.etc below).
        "d /home/.system/var/lib/environment/1000 0755 ceres users -"
-@@ -279,12 +271,6 @@ in
+@@ -279,12 +251,6 @@ in
        pkgs.asteroid.assets.fonts
      ];
  
@@ -158,7 +212,7 @@ index bcb3f0ea..4e72786f 100644
      # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
      # Reference: https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/src/main.conf
      hardware.bluetooth.settings = {
-@@ -346,7 +332,7 @@ in
+@@ -346,7 +312,7 @@ in
          # fails ("Cannot open `/var/run/mce/boot' for writing").
          RuntimeDirectory = "mce";
          RuntimeDirectoryMode = "0755";
@@ -167,7 +221,7 @@ index bcb3f0ea..4e72786f 100644
          TimeoutSec = 2;
          Restart = "always";
          RestartSec = "1s";
-@@ -558,7 +544,7 @@ in
+@@ -558,7 +524,7 @@ in
      # upstream AsteroidOS connman policy replaces connman's own one.
      services.dbus.packages = [
        pkgs.dconf
@@ -176,7 +230,7 @@ index bcb3f0ea..4e72786f 100644
        pkgs.asteroid.dsme
        pkgs.asteroid.sensorfw
        pkgs.asteroid.ngfd
-@@ -594,18 +580,19 @@ in
+@@ -594,18 +560,19 @@ in
        QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
        # Default platform for client apps running under the Wayland compositor
@@ -199,7 +253,7 @@ index bcb3f0ea..4e72786f 100644
      };
  
      # Upstream asteroid-alarmclock installs share/systemd/user/alarmpresenter.service
-@@ -668,21 +655,26 @@ in
+@@ -668,21 +635,26 @@ in
            QT_VIRTUALKEYBOARD_STYLE = "watch";
            QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
            RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
@@ -235,7 +289,7 @@ index bcb3f0ea..4e72786f 100644
          // lib.optionalAttrs debugBuild {
          # Debug builds: turn on every trace the graphics stack can emit.
          # These are runtime switches only; the upstream code path is unchanged.
-@@ -763,7 +755,10 @@ in
+@@ -763,7 +735,10 @@ in
        description = "Tells the Android init system that the boot has been completed";
        wantedBy = [ "default.target" ];
        after = [ "asteroid-launcher.service" ];
@@ -247,7 +301,7 @@ index bcb3f0ea..4e72786f 100644
        serviceConfig = {
          Type = "simple";
          ExecStartPre = "-${pkgs.coreutils}/bin/sleep 1";
-@@ -776,14 +771,16 @@ in
+@@ -776,14 +751,16 @@ in
      # all systemd user services so AsteroidOS apps and service wrappers can find
      # `invoker`, core utilities, QML modules, and libhybris EGL.
      systemd.user.settings.Manager = {
@@ -265,7 +319,7 @@ index bcb3f0ea..4e72786f 100644
          "\"QML2_IMPORT_PATH=${qmlImportPath}\""
          "\"QML_IMPORT_PATH=${qmlImportPath}\""
          "\"NIXPKGS_QT6_QML_IMPORT_PATH=${qmlImportPath}\""
-@@ -793,7 +790,7 @@ in
+@@ -793,7 +770,7 @@ in
          "\"QT_VIRTUALKEYBOARD_LAYOUT_PATH=${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts\""
          "\"RIME_SHARED_DATA_DIR=${pkgs.asteroid.virtualkeyboard}/share/rime-data\""
          "\"QT_ENABLE_HIGHDPI_SCALING=0\""
@@ -314,7 +368,7 @@ index 1dfe1365..4c9a9b22 100644
        type = types.bool;
        default = true;
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 6ef74f4c..5f3abf8e 100644
+index 6ef74f4c..f904b791 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -38,6 +38,26 @@ stdenv.mkDerivation (finalAttrs: {
@@ -352,11 +406,114 @@ index 6ef74f4c..5f3abf8e 100644
 +    # Upstream PR: https://github.com/AsteroidOS/asteroid-launcher/pull/308
 +    (fetchpatch {
 +      url = "https://github.com/AsteroidOS/asteroid-launcher/pull/308.diff";
-+      hash = "sha256-g9e8oc8jBWm5OcRUw8gUHQeIS0+vc2UWteTvMQ9U73g=";
++      hash = "sha256-QzBzGPIk9khM8Q5b7ZHMhxd/TVI6UrDIthZMzn7el1I=";
 +    })
      # Remove OpacityMask dependency from the 400ms initial splash animation
      ./splash-no-opacitymask.patch
      # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index f8ff2194..58ac0b7d 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -6,15 +6,16 @@ rec {
+   };
+ 
+   qml-asteroid = callPackage ./qml-asteroid { };
+-  mapplauncherd = callPackage ./mapplauncherd { };
++  mapplauncherd = callPackage ./mapplauncherd { inherit metaAsteroidSrc; };
+ 
+   # Upstream meta-asteroid checkout, used for unmodified recipe payloads
+   # (udev rules, unit files, patches) instead of vendoring them.
+   metaAsteroidSrc = pkgs.fetchgit {
+     url = "https://github.com/AsteroidOS/meta-asteroid";
+-    rev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-    hash = "sha256-Z9Hu9zOHodSioy6oqQqWMoD/0FUGHH9nnDv72F5GweI=";
++    rev = "f1fce86f8d6488066ac266216b7e68be00d8499d";
++    hash = "sha256-FZlt4YrN+y4dSXz8zbBsK+ulwKIaoSi4eDpTWLPiYvQ=";
+   };
++  meta-asteroid-src = metaAsteroidSrc;
+ 
+   # Device features shipped by upstream meta-hoki (IMAGE_INSTALL) and asteroid-image.
+   udev-droid-system = callPackage ./udev-droid-system { inherit metaAsteroidSrc; };
+@@ -42,6 +43,7 @@ rec {
+       glib
+       mtdev
+       ;
++    inherit metaAsteroidSrc;
+     libudev = pkgs.udev;
+   };
+ 
+@@ -94,6 +96,7 @@ rec {
+   # Nemomobile SensorFW daemon and client API (qtsensors sensorfw backend).
+   # Upstream: https://github.com/sailfishos/sensorfw
+   sensorfw = callPackage ./sensorfw {
++    inherit metaAsteroidSrc;
+     inherit (pkgs) libhybris;
+   };
+ 
+@@ -102,7 +105,13 @@ rec {
+   egl-probe = callPackage ./egl-probe { };
+ 
+   dsme = callPackage ./dsme {
+-    inherit libdsme libngf libiphb mce-dev;
++    inherit
++      metaAsteroidSrc
++      libdsme
++      libngf
++      libiphb
++      mce-dev
++      ;
+   };
+ 
+   keepalive = callPackage ./keepalive {
+diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
+index 23dc6802..49c4f3f1 100644
+--- a/overlay/asteroidos/dsme/default.nix
++++ b/overlay/asteroidos/dsme/default.nix
+@@ -18,24 +18,9 @@
+   libngf,
+   libiphb,
+   libdsme,
++  metaAsteroidSrc,
+ }:
+ 
+-let
+-  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-
+-  asteroidPatch =
+-    name: hash:
+-    fetchurl {
+-      inherit name hash;
+-      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/dsme/dsme/${name}";
+-    };
+-
+-  dsmeService = fetchurl {
+-    name = "dsme.service";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/dsme/dsme/dsme.service";
+-    hash = "sha256-6IO1Q6tCkMRcYtlq5eU06ZlrHpRYGkKfurYMZwa4os4=";
+-  };
+-in
+ stdenv.mkDerivation (finalAttrs: {
+   pname = "dsme";
+   version = "0.84.7";
+@@ -48,7 +33,7 @@ stdenv.mkDerivation (finalAttrs: {
+   };
+ 
+   patches = [
+-    (asteroidPatch "0002-Fix-and-improve-alarm-time-serialization.patch" "sha256-GCpSPP8EtQsly7VC91s5PFJnx+uFqJHQ+GQR9yI6rqI=")
++    "${metaAsteroidSrc}/recipes-nemomobile/dsme/dsme/0002-Fix-and-improve-alarm-time-serialization.patch"
+   ];
+ 
+   strictDeps = true;
+@@ -110,7 +95,7 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   postInstall = ''
+     install -Dm644 reboot-via-dsme.sh $out/etc/profile.d/reboot-via-dsme.sh
+-    install -Dm644 ${dsmeService} $out/lib/systemd/system/dsme.service
++    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/dsme/dsme/dsme.service $out/lib/systemd/system/dsme.service
+   '';
+ 
+   meta = with lib; {
 diff --git a/overlay/asteroidos/lib/mk-asteroid-app.nix b/overlay/asteroidos/lib/mk-asteroid-app.nix
 index 1f0eb3e1..04769ec4 100644
 --- a/overlay/asteroidos/lib/mk-asteroid-app.nix
@@ -369,6 +526,130 @@ index 1f0eb3e1..04769ec4 100644
    ''
    + postPatch;
  
+diff --git a/overlay/asteroidos/mapplauncherd/default.nix b/overlay/asteroidos/mapplauncherd/default.nix
+index 56478b7c..711acf6a 100644
+--- a/overlay/asteroidos/mapplauncherd/default.nix
++++ b/overlay/asteroidos/mapplauncherd/default.nix
+@@ -2,7 +2,6 @@
+   lib,
+   stdenv,
+   fetchFromGitHub,
+-  fetchurl,
+   cmake,
+   pkg-config,
+   glib,
+@@ -10,6 +9,7 @@
+   systemd,
+   libcap,
+   kdePackages,
++  metaAsteroidSrc,
+ }:
+ 
+ stdenv.mkDerivation {
+@@ -24,10 +24,7 @@ stdenv.mkDerivation {
+   };
+ 
+   patches = [
+-    (fetchurl {
+-      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-nemomobile/mapplauncherd/mapplauncherd/0001-Fix-dynamic-opening-issues.patch";
+-      hash = "sha256-c2sqCkdjFN5G7JXyzMnLHbzCM1SDQue9z6He+YwogGI=";
+-    })
++    "${metaAsteroidSrc}/recipes-nemomobile/mapplauncherd/mapplauncherd/0001-Fix-dynamic-opening-issues.patch"
+     ./0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
+     ./0003-invoker-fallback-dlopen-so.patch
+   ];
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+index e69967d8..8aebcdd9 100644
+--- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+@@ -12,17 +12,10 @@
+   libudev,
+   glib,
+   mtdev,
++  metaAsteroidSrc,
+ }:
+ 
+ let
+-  metaAsteroid = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-  patch =
+-    name: hash:
+-    fetchurl {
+-      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroid}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/${name}";
+-      inherit hash;
+-    };
+-
+   # HWC2 was introduced after the Android 6 headers in android-headers 23.
+   # Supplement the device headers with HWC2 declarations. Native window and
+   # gralloc types must still come from the exact headers used by libhybris:
+@@ -70,11 +63,11 @@ stdenv.mkDerivation (finalAttrs: {
+   patchFlags = [ "-p2" ];
+ 
+   patches = [
+-    (patch "0001-Add-ambient-mode-display-support.patch" "sha256-dkORtCZzlhuIv8TxATysSsnK7fHwi+TsOdQzxwdhMoc=")
+-    (patch "0003-Support-Qt-6.10.patch" "sha256-HbMYiIgzilhqQtCmr73RkX8V+aEvV8wJae6tfDB0CvQ=")
+-    (patch "0005-Explicitly-make-hwcomposer-a-shared-library.patch" "sha256-Z/zjAhKm6XRQ8zVuSYPiD+rDh7KqZuKzTiUAzmsu+ZE=")
+-    (patch "0006-v10-Fix-refresh-rate-fallback-unit.patch" "sha256-XOplqx7zKgbjPWIwlJ82O1qFDXXNkj2PDO/TdaP/ync=")
+-    (patch "0007-v10-Make-updates-request-driven-and-vsync-paced.patch" "sha256-EQhs66R9Vc2a2yH5zVmo8xtC+oVQHjMlKyNAIGrEsbA=")
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0001-Add-ambient-mode-display-support.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0003-Support-Qt-6.10.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0005-Explicitly-make-hwcomposer-a-shared-library.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0006-v10-Fix-refresh-rate-fallback-unit.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0007-v10-Make-updates-request-driven-and-vsync-paced.patch"
+     ./hwc-present-diagnostics.patch
+   ];
+ 
+diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
+index be6a3c9b..fa31860e 100644
+--- a/overlay/asteroidos/sensorfw/default.nix
++++ b/overlay/asteroidos/sensorfw/default.nix
+@@ -5,25 +5,15 @@
+   lib,
+   stdenv,
+   fetchFromGitHub,
+-  fetchurl,
+   cmake,
+   pkg-config,
+   qt6,
+   systemd,
+   libhybris,
+   udev,
++  metaAsteroidSrc,
+ }:
+ 
+-let
+-  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-
+-  upstreamPatch =
+-    name: hash:
+-    fetchurl {
+-      inherit hash;
+-      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/sensorfw/files/${name}";
+-    };
+-in
+ stdenv.mkDerivation (finalAttrs: {
+   pname = "sensorfw";
+   version = "0.15.1";
+@@ -36,13 +26,13 @@ stdenv.mkDerivation (finalAttrs: {
+   };
+ 
+   patches = [
+-    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-FNjH+q3kjQDeJP5yaAZ24z8FpU0gZ8GJAFuElzM3bsM=")
+-    (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-qRXs9vrszoG1bVnjkIVtRaXEvaLtNKs7Z1PsR759VQo=")
+-    (upstreamPatch "0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch" "sha256-WyVwM0KEtADQhAeZTGy6we9BSyITchcClT+phNTdhuc=")
+-    (upstreamPatch "0004-Fix-compilation-when-autohybris-is-used.patch" "sha256-RJ711Knze6feQOPfa/UD6r9jG870H//hOnbFPzhoS5s=")
+-    (upstreamPatch "0005-Fix-compilation-when-hybris-is-used.patch" "sha256-evbbTXcBF/a6Y998373+p2vv7PnYWX71Ei9GFH+BaA8=")
+-    (upstreamPatch "0006-hybrisadaptor-Queue-erroneous-events-too.patch" "sha256-k10UaeZO9dEa+VApzyr2itLv6ZEqwnMhA+RXGkiWYlk=")
+-    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-7TRSkpcprdQczLhhsL9lqjTr4oRYMt3Z6JgbDcxCMjE=")
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0001-Do-not-hide-stepcounter-by-default.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0004-Fix-compilation-when-autohybris-is-used.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0005-Fix-compilation-when-hybris-is-used.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0006-hybrisadaptor-Queue-erroneous-events-too.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch"
+   ];
+ 
+   strictDeps = true;
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
 index 9f31293c..e52b5713 100644
 --- a/overlay/asteroidos/timed-qt6/default.nix
@@ -414,6 +695,139 @@ index 5d616bcb..54ce4ee1 100644
      mkdir -p layouts
      cp -r ${./layouts}/* layouts/
    '';
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index de136c27..02caaf5e 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -19,11 +19,6 @@ if !isCross then
+   }
+ else
+   let
+-    # Pinned revision of AsteroidOS meta-asteroid used as the source for
+-    # upstream patches, so nothing has to be vendored in this repository.
+-    # https://github.com/AsteroidOS/meta-asteroid
+-    asteroidOSRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-
+     addCrossQuickTools =
+       pkg:
+       pkg.overrideAttrs (old: {
+@@ -94,11 +89,7 @@ else
+         # QT_WAYLAND_SERVER_BUFFER_INTEGRATION=libhybris-egl-server.
+         qtwayland = (addCrossQuickTools qsuper.qtwayland).overrideAttrs (old: {
+           patches = (old.patches or [ ]) ++ [
+-            (final.fetchurl {
+-              name = "0001-Fix-libhybris-egl-server-compilation.patch";
+-              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch";
+-              hash = "sha256-emo6w37aUY8ujwzvVJZ9zPFXbvSZHKA8/0lByzo06Zs=";
+-            })
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch"
+           ];
+           cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+             "-DQT_FEATURE_wayland_libhybris_egl_server_buffer=ON"
+@@ -147,26 +138,10 @@ else
+               --replace-fail 'DESTINATION /etc/xdg/QtProject' 'DESTINATION etc/xdg/QtProject'
+           '';
+           patches = (old.patches or [ ]) ++ [
+-            (final.fetchurl {
+-              name = "0001-Enable-sensorfw.patch";
+-              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0001-Enable-sensorfw.patch";
+-              hash = "sha256-H58A7wp9kX8V2NHhQAufDsQKllUnAgZLjbN8geYLvLo=";
+-            })
+-            (final.fetchurl {
+-              name = "0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch";
+-              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch";
+-              hash = "sha256-2MvTv0IVD1kYgyny/V535U3MjCkx9xMTwduguNxgmjk=";
+-            })
+-            (final.fetchurl {
+-              name = "0003-Add-step-counter-sensor-with-sensorfw-backend.patch";
+-              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0003-Add-step-counter-sensor-with-sensorfw-backend.patch";
+-              hash = "sha256-rboCPatCx2FnPnGEPwGXw/X4uaHNm8kCOUYfMCm0/xk=";
+-            })
+-            (final.fetchurl {
+-              name = "0004-Add-sensorfw-backend-for-pressure-sensor.patch";
+-              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0004-Add-sensorfw-backend-for-pressure-sensor.patch";
+-              hash = "sha256-pMCDkMeLW50i8elrrBtwHb5EYqA3iX2K3iavpn8mHQ8=";
+-            })
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtsensors/0001-Enable-sensorfw.patch"
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtsensors/0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch"
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtsensors/0003-Add-step-counter-sensor-with-sensorfw-backend.patch"
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtsensors/0004-Add-sensorfw-backend-for-pressure-sensor.patch"
+           ];
+         });
+         qtconnectivity = addCrossQuickTools qsuper.qtconnectivity;
+diff --git a/overlay/libhybris/default.nix b/overlay/libhybris/default.nix
+index 8d39d02e..3c1e8538 100644
+--- a/overlay/libhybris/default.nix
++++ b/overlay/libhybris/default.nix
+@@ -10,6 +10,7 @@
+ , file
+ , wayland
+ , buildPackages
++, meta-asteroid-src ? null
+ , useLegacyProperties ? false
+ }:
+ 
+@@ -17,17 +18,6 @@ let
+   inherit (stdenv) targetPlatform buildPlatform;
+   libPrefix = if targetPlatform == buildPlatform then ""
+     else stdenv.targetPlatform.config;
+-
+-  # Upstream AsteroidOS pins libhybris to this revision and layers two patches
+-  # on top of it. Keep this package identical to upstream instead of carrying
+-  # local fork patches: the newer libhybris contains the EGL display reference
+-  # counting that the hwcomposer QPA plugin relies on.
+-  # https://github.com/AsteroidOS/meta-asteroid/blob/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-core/libhybris/libhybris_git.bbappend
+-  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-  upstreamPatch = name: hash: fetchurl {
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-core/libhybris/libhybris/${name}";
+-    inherit hash;
+-  };
+ in
+ stdenv.mkDerivation {
+   pname = "libhybris";
+@@ -45,14 +35,8 @@ stdenv.mkDerivation {
+   postPatch = ''
+     # These upstream patches are generated from the repository root, while
+     # sourceRoot points at hybris/.
+-    patch -p2 -i ${
+-      upstreamPatch "0001-Remove-references-to-host-path-in-package-config-fil.patch"
+-        "sha256-9JtlPyiqN8CrMikCBOwUDZ8+BShDCDefiiZZ5KPeVg8="
+-    }
+-    patch -p2 -i ${
+-      upstreamPatch "0002-tests-workaround-Wimplicit-function-declaration-in-s.patch"
+-        "sha256-B3ffNEfjJf8Xz7Wv+pK84Dk3jY6FvgAE3otf158+oLo="
+-    }
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0001-Remove-references-to-host-path-in-package-config-fil.patch
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0002-tests-workaround-Wimplicit-function-declaration-in-s.patch
+   '';
+ 
+   postAutoreconf = ''
+diff --git a/overlay/overlay.nix b/overlay/overlay.nix
+index e74c9bd0..c97c69d8 100644
+--- a/overlay/overlay.nix
++++ b/overlay/overlay.nix
+@@ -14,9 +14,12 @@ in
+       inherit callPackage;
+       pkgs = final;
+     };
++    meta-asteroid-src = final.asteroid.meta-asteroid-src;
+     dtbTool = callPackage ./dtbtool { };
+     dtbTool-exynos = callPackage ./dtbtool-exynos { };
+-    libhybris = callPackage ./libhybris { };
++    libhybris = callPackage ./libhybris {
++      inherit (final) meta-asteroid-src;
++    };
+     mkbootimg = callPackage ./mkbootimg { };
+     oans = callPackage ./oans { };
+     msm-fb-refresher = callPackage ./msm-fb-refresher { };
+@@ -90,6 +93,7 @@ in
+     libpcap = if super.stdenv.hostPlatform.isAarch32 then super.libpcap.override { withRdma = false; } else super.libpcap;
+     rdma-core = if super.stdenv.hostPlatform.isAarch32 then super.rdma-core.override { withManPages = false; } else super.rdma-core;
+     tpm2-tss = super.tpm2-tss.overrideAttrs (_: { doCheck = false; });
++    jemalloc = super.jemalloc.overrideAttrs (_: { doCheck = false; });
+ 
+     # Things specific to mobile-nixos.
+     # Not necessarily internals, but they probably won't go into <nixpkgs>.
 diff --git a/overlay/systemd.nix b/overlay/systemd.nix
 index 324ad95f..45012ded 100644
 --- a/overlay/systemd.nix

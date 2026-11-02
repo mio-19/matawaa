@@ -8,17 +8,17 @@ map, qmltester, skedaddle, weatherfetch, beatfork, benchymark,
 docking-bay, heliograph, horizon, meteormatch, pulsar, rag, shopper,
 toolwatch, and touchdown.
 ---
- overlay/asteroidos/community-apps/default.nix | 296 ++++++++++++++++++
+ overlay/asteroidos/community-apps/default.nix | 337 ++++++++++++++++++
  overlay/asteroidos/default.nix                |   5 +
- 2 files changed, 301 insertions(+)
+ 2 files changed, 342 insertions(+)
  create mode 100644 overlay/asteroidos/community-apps/default.nix
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
 new file mode 100644
-index 00000000..eb4f8d35
+index 00000000..4baec981
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/default.nix
-@@ -0,0 +1,296 @@
+@@ -0,0 +1,337 @@
 +{
 +  lib,
 +  stdenv,
@@ -313,6 +313,47 @@ index 00000000..eb4f8d35
 +    extraBuildInputs = [
 +      qt6.qtsensors
 +    ];
++  };
++
++  # Keystroke injection and penetration testing utility: https://github.com/Snoarlax/asteroid-hack
++  hackwatch = mkAsteroidApp {
++    name = "hack";
++    pname = "asteroid-hackwatch";
++    owner = "Snoarlax";
++    repo = "asteroid-hack";
++    desc = "Keystroke injection and penetration testing utility for AsteroidOS";
++    rev = "b2af485c78e26e18e950e3e064584b0765c163e5";
++    sha256 = "1cf0vrc9s3s72p0b3iyrjjmy0zd4rmvpyhlzjhfbi4yn590ylkkk";
++    postBuild = ''
++      $CC $CFLAGS $LDFLAGS ../src/utilities/keyboard_interface.c -o keyboard_interface
++    '';
++    postInstall = ''
++      install -Dm755 keyboard_interface $out/bin/keyboard_interface
++    '';
++  };
++
++  # CLI system information tool: https://github.com/AsteroidOS/meta-asteroid-community/tree/master/recipes-tools/neofetch
++  neofetch = stdenv.mkDerivation {
++    pname = "neofetch";
++    version = "7.1.0";
++    src = fetchFromGitHub {
++      owner = "dylanaraps";
++      repo = "neofetch";
++      rev = "ccd5d9f52609bbdcd5d8fa78c4fdb0f12954125f";
++      hash = "sha256-9MoX6ykqvd2iB0VrZCfhSyhtztMpBTukeKejfAWYW1w=";
++    };
++    dontBuild = true;
++    installPhase = ''
++      runHook preInstall
++      install -Dm755 neofetch $out/bin/neofetch
++      runHook postInstall
++    '';
++    meta = with lib; {
++      description = "CLI system information tool written in BASH";
++      homepage = "https://github.com/dylanaraps/neofetch";
++      license = licenses.mit;
++      platforms = platforms.all;
++    };
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix

@@ -467,7 +467,7 @@ index 00000000..3887693a
 +         target: bpmSpinner
 +         function onCurrentIndexChanged() {
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
-index 96c40e50..03d760b7 100644
+index 751d7d80..540726d5 100644
 --- a/overlay/asteroidos/community-apps/default.nix
 +++ b/overlay/asteroidos/community-apps/default.nix
 @@ -142,6 +142,7 @@ rec {

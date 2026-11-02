@@ -19,7 +19,7 @@ so it remains reproducible without adding a separate Nixpkgs flake input.
  create mode 100644 overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
 
 diff --git a/npins/sources.json b/npins/sources.json
-index 8a487595..ae077a5f 100644
+index 8a487595..574e5b3e 100644
 --- a/npins/sources.json
 +++ b/npins/sources.json
 @@ -1,11 +1,17 @@
@@ -38,10 +38,10 @@ index 8a487595..ae077a5f 100644
 +        "repo": "nixpkgs"
 +      },
 +      "branch": "nixpkgs-unstable",
-+      "revision": "d357a2b54f0b6dc4aeb4e993190a52cf151b6f24",
-+      "url": "https://github.com/NixOS/nixpkgs/archive/d357a2b54f0b6dc4aeb4e993190a52cf151b6f24.tar.gz",
++      "revision": "5c9de89ec55bff981cb8da1a4ee92b10f1438ffc",
++      "url": "https://github.com/NixOS/nixpkgs/archive/5c9de89ec55bff981cb8da1a4ee92b10f1438ffc.tar.gz",
 +      "submodules": false,
-+      "hash": "sha256-Thn0OE71NF80ZfOMGCgJvKtbCcnnz0fToT/qsvb/Gtc="
++      "hash": "sha256-WDValiY9se78X2Wh7aWWaq/c7HN29U555+OKbHEzYrw="
      }
    },
    "version": 8
