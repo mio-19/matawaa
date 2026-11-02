@@ -5,8 +5,9 @@ Subject: [PATCH] npins, overlay: update nixpkgs to 5c9de89, define
  meta-asteroid-src package and eliminate per-patch hashes
 
 ---
- examples/asteroid/asteroid-desktop.nix        | 31 +++-------------
+ examples/asteroid/asteroid-desktop.nix        | 34 ++++--------------
  npins/sources.json                            |  6 ++--
+ overlay/asteroidos/community-apps/default.nix | 17 +++++++++
  overlay/asteroidos/default.nix                | 17 ++++++---
  overlay/asteroidos/dsme/default.nix           | 21 ++---------
  overlay/asteroidos/mapplauncherd/default.nix  |  7 ++--
@@ -15,10 +16,10 @@ Subject: [PATCH] npins, overlay: update nixpkgs to 5c9de89, define
  overlay/cross-compile.nix                     | 35 +++----------------
  overlay/libhybris/default.nix                 | 22 ++----------
  overlay/overlay.nix                           |  5 ++-
- 10 files changed, 51 insertions(+), 138 deletions(-)
+ 11 files changed, 71 insertions(+), 138 deletions(-)
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 4e72786f..fdcb60cb 100644
+index 4e72786f..07eb7a8c 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
 @@ -18,40 +18,17 @@ let
@@ -66,6 +67,16 @@ index 4e72786f..fdcb60cb 100644
    '';
  in
  {
+@@ -193,6 +170,9 @@ in
+         asteroid.community-apps.shopper
+         asteroid.community-apps.toolwatch
+         asteroid.community-apps.touchdown
++        asteroid.community-apps.hackwatch
++        tree
++        fastfetch
+       ]);
+ 
+     systemd.tmpfiles.rules = [
 diff --git a/npins/sources.json b/npins/sources.json
 index ae077a5f..574e5b3e 100644
 --- a/npins/sources.json
@@ -84,6 +95,32 @@ index ae077a5f..574e5b3e 100644
      }
    },
    "version": 8
+diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
+index 03d760b7..53872c50 100644
+--- a/overlay/asteroidos/community-apps/default.nix
++++ b/overlay/asteroidos/community-apps/default.nix
+@@ -303,4 +303,21 @@ rec {
+       qt6.qtsensors
+     ];
+   };
++
++  # Keystroke injection and penetration testing utility: https://github.com/Snoarlax/asteroid-hack
++  hackwatch = mkAsteroidApp {
++    name = "hack";
++    pname = "asteroid-hackwatch";
++    owner = "Snoarlax";
++    repo = "asteroid-hack";
++    desc = "Keystroke injection and penetration testing utility for AsteroidOS";
++    rev = "b2af485c78e26e18e950e3e064584b0765c163e5";
++    sha256 = "1cf0vrc9s3s72p0b3iyrjjmy0zd4rmvpyhlzjhfbi4yn590ylkkk";
++    postBuild = ''
++      $CC $CFLAGS $LDFLAGS ../src/utilities/keyboard_interface.c -o keyboard_interface
++    '';
++    postInstall = ''
++      install -Dm755 keyboard_interface $out/bin/keyboard_interface
++    '';
++  };
+ }
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index f8ff2194..58ac0b7d 100644
 --- a/overlay/asteroidos/default.nix
