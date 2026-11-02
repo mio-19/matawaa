@@ -1,43 +1,26 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Mon, 2 Nov 2026 13:24:21 +1100
-Subject: [PATCH] overlay/asteroidos: enlarge tutorial skip tip and support
- dlopen fallback in invoker
+Subject: [PATCH] overlay/asteroidos: support dlopen fallback and Wayland
+ client environment in invoker
 
+When applauncherd or boosters are unavailable, invoker falls back to
+direct execution. In AsteroidOS, smartwatch applications are compiled
+as dynamic shared objects (.so) with a 'main' entry point. Allow invoker
+to dlopen the library, configure the Wayland client environment, and invoke
+main directly.
 ---
- .../asteroid-launcher/skip-firstrun.patch     |  6 +--
- .../0003-invoker-fallback-dlopen-so.patch     | 47 +++++++++++++++++++
+ .../0003-invoker-fallback-dlopen-so.patch     | 69 +++++++++++++++++++
  overlay/asteroidos/mapplauncherd/default.nix  |  1 +
- 3 files changed, 51 insertions(+), 3 deletions(-)
+ 2 files changed, 70 insertions(+)
  create mode 100644 overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
 
-diff --git a/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
-index 3049a22c..5bb8053e 100644
---- a/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
-+++ b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
-@@ -8,13 +8,13 @@
- +            id: skipTip
- +            visible: tuto.state === "WELCOME"
- +            text: qsTr("Long press to skip")
--+            font.pixelSize: Dims.l(3.5)
--+            color: "#888888"
-++            font.pixelSize: Dims.l(5.0)
-++            color: "#aaaaaa"
- +            horizontalAlignment: Text.AlignHCenter
- +            anchors {
- +                bottom: nextButton.top
- +                horizontalCenter: parent.horizontalCenter
--+                bottomMargin: Dims.h(1)
-++                bottomMargin: Dims.h(1.5)
- +            }
- +        }
- +
 diff --git a/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
 new file mode 100644
-index 00000000..4cef2e95
+index 00000000..4a96ad3c
 --- /dev/null
 +++ b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,69 @@
 +diff --git a/src/invoker/CMakeLists.txt b/src/invoker/CMakeLists.txt
 +index 8ef4ade..df5efb5 100644
 +--- a/src/invoker/CMakeLists.txt
@@ -52,23 +35,45 @@ index 00000000..4cef2e95
 + # Add install rule
 + install(TARGETS invoker DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
 +diff --git a/src/invoker/invoker.c b/src/invoker/invoker.c
-+index 9642a7d..f03553e 100644
++index 9642a7d..e245abc 100644
 +--- a/src/invoker/invoker.c
 ++++ b/src/invoker/invoker.c
-+@@ -38,6 +38,7 @@
++@@ -38,6 +38,8 @@
 + #include <errno.h>
 + #include <sys/wait.h>
 + #include <limits.h>
 ++#include <dlfcn.h>
+++#include <string.h>
 + #include <getopt.h>
 + #include <fcntl.h>
 + #include <time.h>
-+@@ -859,6 +860,21 @@ static void invoke_fallback(const InvokeArgs *args)
++@@ -859,6 +861,42 @@ static void invoke_fallback(const InvokeArgs *args)
 +         }
 +     }
 + 
+++    /* When launched from asteroid-launcher compositor, the environment has
+++     * QT_QPA_PLATFORM=hwcomposer and EGL_PLATFORM=hwcomposer.
+++     * Smartwatch client applications must connect as Wayland clients to the compositor.
+++     */
+++    const char *qpa = getenv("QT_QPA_PLATFORM");
+++    if (!qpa || strcmp(qpa, "hwcomposer") == 0) {
+++        setenv("QT_QPA_PLATFORM", "wayland", 1);
+++    }
+++    const char *egl_plat = getenv("EGL_PLATFORM");
+++    if (!egl_plat || strcmp(egl_plat, "hwcomposer") == 0) {
+++        setenv("EGL_PLATFORM", "wayland", 1);
+++    }
+++    if (!getenv("WAYLAND_DISPLAY")) {
+++        setenv("WAYLAND_DISPLAY", "wayland-0", 0);
+++    }
+++    if (!getenv("XDG_RUNTIME_DIR")) {
+++        setenv("XDG_RUNTIME_DIR", "/run/user/1000", 0);
+++    }
+++
 ++    const char *dot_so = strstr(args->prog_name, ".so");
 ++    if (dot_so && (dot_so[3] == '\0' || dot_so[3] == '.')) {
+++        dlopen("libEGL.so.1", RTLD_NOW | RTLD_GLOBAL);
+++        dlopen("libGLESv2.so.2", RTLD_NOW | RTLD_GLOBAL);
 ++        void *handle = dlopen(args->prog_name, RTLD_NOW | RTLD_GLOBAL);
 ++        if (!handle) {
 ++            error("dlopen(%s) failed: %s\n", args->prog_name, dlerror());

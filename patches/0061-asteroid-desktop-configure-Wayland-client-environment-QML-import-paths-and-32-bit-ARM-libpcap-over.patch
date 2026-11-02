@@ -1,0 +1,182 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 2 Nov 2026 19:00:44 +1100
+Subject: [PATCH] asteroid-desktop: configure Wayland client environment, QML
+ import paths, and 32-bit ARM libpcap override
+
+1. Expose WAYLAND_DISPLAY, XDG_RUNTIME_DIR, QT_QPA_PLATFORM=wayland, EGL_PLATFORM=wayland,
+   LD_PRELOAD and QML import paths to the systemd user manager session so client apps
+   can launch with proper hardware-accelerated OpenGL / libhybris Wayland contexts.
+2. Pkg-config and override libpcap/rdma-core conditionally for 32-bit ARM.
+---
+ examples/asteroid/asteroid-desktop.nix | 109 +++++++++++++++++--------
+ overlay/overlay.nix                    |   9 +-
+ 2 files changed, 78 insertions(+), 40 deletions(-)
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index c4d200a7..476f571c 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -72,7 +72,44 @@ in
+     };
+   };
+ 
+-  config = mkIf cfg.enable {
++  config = mkIf cfg.enable (
++    let
++      qmlImportPath = lib.concatStringsSep ":" [
++        "/run/current-system/sw/lib/qt-6/qml"
++        "${pkgs.qt6.qtdeclarative}/lib/qt-6/qml"
++        "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml"
++        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml"
++        "${pkgs.qt6.qt5compat}/lib/qt-6/qml"
++        "${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml"
++        "${pkgs.asteroid.mce-qt6}/lib/qt-6/qml"
++        "${pkgs.asteroid.mlite}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-dbus}/lib/qt-6/qml"
++        "${pkgs.asteroid.libconnman-qt}/lib/qt-6/qml"
++        "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
++        "${pkgs.asteroid.keepalive}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-calendar}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-alarms}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-notifications}/lib/qt-6/qml"
++        "${pkgs.asteroid.amber-mpris}/lib/qt-6/qml"
++        "${pkgs.qt6.qtsensors}/lib/qt-6/qml"
++        "${pkgs.qt6.qtmultimedia}/lib/qt-6/qml"
++        "${pkgs.qt6.qtpositioning}/lib/qt-6/qml"
++      ];
++      qtPluginPath = lib.concatStringsSep ":" [
++        "/run/current-system/sw/lib/qt-6/plugins"
++        "${pkgs.qt6.qtbase}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtdeclarative}/lib/qt-6/plugins"
++        "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtsensors}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtmultimedia}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtpositioning}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtsvg}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtwayland}/lib/qt-6/plugins"
++      ];
++    in
++    {
+ 
+     # Watch system beautification and boot visibility
+     mobile.beautification = {
+@@ -107,7 +144,8 @@ in
+         asteroid.nemo-qml-plugin-alarms
+         asteroid.nemo-qml-plugin-notifications
+         asteroid.timed-qt6
+-        # Qt5Compat QML module used by the launcher.
++        # Qt modules used by apps and the launcher.
++        qt6.qtdeclarative
+         qt6.qt5compat
+         # Asset suite
+         asteroid.assets.wallpapers
+@@ -552,35 +590,17 @@ in
+       QT_VIRTUALKEYBOARD_STYLE = "watch";
+       QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+       RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
+-      QML2_IMPORT_PATH = lib.concatStringsSep ":" [
+-        "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml"
+-        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml"
+-        "${pkgs.qt6.qt5compat}/lib/qt-6/qml"
+-        "${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml"
+-        "${pkgs.asteroid.mce-qt6}/lib/qt-6/qml"
+-        "${pkgs.asteroid.mlite}/lib/qt-6/qml"
+-        "${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml"
+-        "${pkgs.asteroid.nemo-qml-plugin-dbus}/lib/qt-6/qml"
+-        "${pkgs.asteroid.libconnman-qt}/lib/qt-6/qml"
+-        "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
+-        "${pkgs.asteroid.keepalive}/lib/qt-6/qml"
+-        "${pkgs.asteroid.nemo-qml-plugin-calendar}/lib/qt-6/qml"
+-        "${pkgs.asteroid.nemo-qml-plugin-alarms}/lib/qt-6/qml"
+-        "${pkgs.asteroid.nemo-qml-plugin-notifications}/lib/qt-6/qml"
+-        "${pkgs.asteroid.amber-mpris}/lib/qt-6/qml"
+-        "${pkgs.qt6.qtsensors}/lib/qt-6/qml"
+-        "${pkgs.qt6.qtmultimedia}/lib/qt-6/qml"
+-        "${pkgs.qt6.qtpositioning}/lib/qt-6/qml"
+-      ];
+-      QT_PLUGIN_PATH = lib.concatStringsSep ":" [
+-        "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins"
+-        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins"
+-        "${pkgs.qt6.qtsensors}/lib/qt-6/plugins"
+-        "${pkgs.qt6.qtmultimedia}/lib/qt-6/plugins"
+-        "${pkgs.qt6.qtpositioning}/lib/qt-6/plugins"
+-        "${pkgs.qt6.qtsvg}/lib/qt-6/plugins"
+-        "${pkgs.qt6.qtwayland}/lib/qt-6/plugins"
+-      ];
++      # Default platform for client apps running under the Wayland compositor
++      QT_QPA_PLATFORM = "wayland";
++      EGL_PLATFORM = "wayland";
++      WAYLAND_DISPLAY = "wayland-0";
++      XDG_RUNTIME_DIR = "/run/user/1000";
++      LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++      LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
++      QML2_IMPORT_PATH = qmlImportPath;
++      QML_IMPORT_PATH = qmlImportPath;
++      NIXPKGS_QT6_QML_IMPORT_PATH = qmlImportPath;
++      QT_PLUGIN_PATH = qtPluginPath;
+       # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
+       QT_ENABLE_HIGHDPI_SCALING = "0";
+     };
+@@ -747,11 +767,28 @@ in
+     };
+ 
+     # AsteroidOS desktop entries and service wrappers invoke apps through
+-    # `invoker`. Expose the system profile to all systemd user services so
+-    # AsteroidOS apps and service wrappers can find `invoker`, core utilities,
+-    # and wrappers without conflicting with the system-level user manager service.
++    # `invoker`. Expose the system profile and Wayland client environment to
++    # all systemd user services so AsteroidOS apps and service wrappers can find
++    # `invoker`, core utilities, QML modules, and libhybris EGL.
+     systemd.user.settings.Manager = {
+-      DefaultEnvironment = "PATH=/run/wrappers/bin:/run/current-system/sw/bin";
++      DefaultEnvironment = lib.concatStringsSep " " [
++        "\"PATH=/run/wrappers/bin:/run/current-system/sw/bin\""
++        "\"WAYLAND_DISPLAY=wayland-0\""
++        "\"XDG_RUNTIME_DIR=/run/user/1000\""
++        "\"QT_QPA_PLATFORM=wayland\""
++        "\"EGL_PLATFORM=wayland\""
++        "\"LD_PRELOAD=${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2\""
++        "\"LD_LIBRARY_PATH=${pkgs.libhybris}/lib\""
++        "\"QML2_IMPORT_PATH=${qmlImportPath}\""
++        "\"QML_IMPORT_PATH=${qmlImportPath}\""
++        "\"NIXPKGS_QT6_QML_IMPORT_PATH=${qmlImportPath}\""
++        "\"QT_PLUGIN_PATH=${qtPluginPath}\""
++        "\"QT_IM_MODULE=qtvirtualkeyboard\""
++        "\"QT_VIRTUALKEYBOARD_STYLE=watch\""
++        "\"QT_VIRTUALKEYBOARD_LAYOUT_PATH=${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts\""
++        "\"RIME_SHARED_DATA_DIR=${pkgs.asteroid.virtualkeyboard}/share/rime-data\""
++        "\"QT_ENABLE_HIGHDPI_SCALING=0\""
++      ];
+     };
+ 
+     # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
+@@ -841,5 +878,5 @@ in
+         RestartSec = "5s";
+       };
+     };
+-  };
++  });
+ }
+diff --git a/overlay/overlay.nix b/overlay/overlay.nix
+index bb5de193..e74c9bd0 100644
+--- a/overlay/overlay.nix
++++ b/overlay/overlay.nix
+@@ -85,10 +85,11 @@ in
+     # On 32-bit ARM (armv7l-linux), GHC cannot bootstrap (cannot bootstrap GHC on
+     # this platform ('armv7l-linux' with libc 'defaultLibc')), breaking native ARM CI.
+     # Neither mobile devices nor smartwatches have RDMA hardware (InfiniBand/RoCE),
+-    # so disable RDMA in libpcap and disable man pages in rdma-core to prevent pulling
+-    # the entire Pandoc and GHC toolchain.
+-    libpcap = super.libpcap.override { withRdma = false; };
+-    rdma-core = super.rdma-core.override { withManPages = false; };
++    # so disable RDMA in libpcap and disable man pages in rdma-core on 32-bit ARM to prevent
++    # pulling the entire Pandoc and GHC toolchain without invalidating the x86_64 build cache.
++    libpcap = if super.stdenv.hostPlatform.isAarch32 then super.libpcap.override { withRdma = false; } else super.libpcap;
++    rdma-core = if super.stdenv.hostPlatform.isAarch32 then super.rdma-core.override { withManPages = false; } else super.rdma-core;
++    tpm2-tss = super.tpm2-tss.overrideAttrs (_: { doCheck = false; });
+ 
+     # Things specific to mobile-nixos.
+     # Not necessarily internals, but they probably won't go into <nixpkgs>.

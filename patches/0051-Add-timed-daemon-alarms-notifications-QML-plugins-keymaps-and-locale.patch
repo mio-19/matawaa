@@ -404,10 +404,10 @@ index 5188043b..703662c4 100644
 +    };
  }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 698d8ef5..83b47418 100644
+index 95bab117..6ef74f4c 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -31,8 +31,8 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -32,8 +32,8 @@ stdenv.mkDerivation (finalAttrs: {
    src = fetchFromGitHub {
      owner = "AsteroidOS";
      repo = "asteroid-launcher";
@@ -418,7 +418,7 @@ index 698d8ef5..83b47418 100644
    };
  
    strictDeps = true;
-@@ -54,6 +54,10 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -59,6 +59,10 @@ stdenv.mkDerivation (finalAttrs: {
      # Upstream: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
      # Upstream CMake qt_add_shaders: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
      ./circlemask-qrc.patch

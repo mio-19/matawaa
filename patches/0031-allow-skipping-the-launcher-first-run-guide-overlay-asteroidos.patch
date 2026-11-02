@@ -4,55 +4,34 @@ Date: Tue, 20 Oct 2026 19:13:49 +1100
 Subject: [PATCH] allow skipping the launcher first-run guide
  (overlay/asteroidos)
 
-Apply the skip-firstrun patch to asteroid-launcher so the initial
-tutorial and setup guide can be dismissed with a visible skip button.
-
-This is useful for preconfigured watch images and automated bring-up.
+Fetch upstream PR 310 to allow dismissing the initial tutorial
+and setup guide with a visible "Long press to skip" hint and long-press handler.
 ---
- .../asteroidos/asteroid-launcher/default.nix  |  2 ++
- .../asteroid-launcher/skip-firstrun.patch     | 23 +++++++++++++++++++
- 2 files changed, 25 insertions(+)
- create mode 100644 overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
+ overlay/asteroidos/asteroid-launcher/default.nix | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 235c277e..698d8ef5 100644
+index 235c277e..95bab117 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -42,6 +42,8 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -2,6 +2,7 @@
+   lib,
+   stdenv,
+   fetchFromGitHub,
++  fetchpatch,
+   cmake,
+   pkg-config,
+   qt6,
+@@ -42,6 +43,12 @@ stdenv.mkDerivation (finalAttrs: {
    patches = [
      # QuickPanel quick-toggle button to trigger the find-phone alarm on the companion phone
      ./find-phone.patch
 +    # Tip for first-time tutorial indicating long press skips the guide
-+    ./skip-firstrun.patch
++    # Upstream PR: https://github.com/AsteroidOS/asteroid-launcher/pull/310
++    (fetchpatch {
++      url = "https://github.com/AsteroidOS/asteroid-launcher/pull/310.patch";
++      hash = "sha256-zFU7CbI4YqPSDWirkhUW5wxYwYLi0rft2AxwJ7TGqMg=";
++    })
      # Remove OpacityMask dependency from the 400ms initial splash animation
      ./splash-no-opacitymask.patch
      # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
-diff --git a/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
-new file mode 100644
-index 00000000..3049a22c
---- /dev/null
-+++ b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
-@@ -0,0 +1,23 @@
-+--- a/src/qml/firstrun/Tutorial.qml
-++++ b/src/qml/firstrun/Tutorial.qml
-+@@ -524,6 +524,20 @@
-+             horizontalAlignment: Text.AlignHCenter
-+         }
-+ 
-++        Label {
-++            id: skipTip
-++            visible: tuto.state === "WELCOME"
-++            text: qsTr("Long press to skip")
-++            font.pixelSize: Dims.l(3.5)
-++            color: "#888888"
-++            horizontalAlignment: Text.AlignHCenter
-++            anchors {
-++                bottom: nextButton.top
-++                horizontalCenter: parent.horizontalCenter
-++                bottomMargin: Dims.h(1)
-++            }
-++        }
-++
-+         IconButton {
-+             id: nextButton
-+             iconName: "ios-arrow-dropright"
