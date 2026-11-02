@@ -136,6 +136,7 @@ jobs:
             --argstr device "$DEVICE" \
             "${extra_args[@]}" \
             -A outputs.default \
+            --keep-going \
             --no-link)"
           echo "store_path=$output" >> "$GITHUB_OUTPUT"
           echo "Built $output"
