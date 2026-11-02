@@ -404,7 +404,7 @@ index 5188043b..703662c4 100644
 +    };
  }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 659bf6e4..13c77920 100644
+index 698d8ef5..83b47418 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -31,8 +31,8 @@ stdenv.mkDerivation (finalAttrs: {
