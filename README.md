@@ -26,6 +26,7 @@ nix-build work/mobile-nixos/examples/asteroid --argstr device fossil-hoki -A out
 
 + move hoki hardcoded partitions to better places
 + instead of linking /usr/share for asteroid os launcher, patch them to use nix store path.
++ asteriod os usbnet adb modes
 
 ## Device: hoki (Fossil Gen 6)
 
