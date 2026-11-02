@@ -1,0 +1,82 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 2 Nov 2026 12:21:18 +1100
+Subject: [PATCH] examples/asteroid, devices/families: link mce against
+ config.systemd.package and export battery udev attributes
+
+---
+ devices/families/asteroidos.nix        |  6 ++++++
+ examples/asteroid/asteroid-desktop.nix | 15 +++++++++++----
+ 2 files changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 72acc76f..4e495943 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -171,6 +171,12 @@ in
+     ACTION=="add", KERNEL=="MTK_SMI", MODE="0664", GROUP="video"
+     ACTION=="add", KERNEL=="mali", MODE="0664", GROUP="video"
+     ACTION=="add", KERNEL=="vboxguest", MODE="0664", GROUP="video"
++
++    # Export power_supply capacity and status to udev database for MCE battery-udev plugin
++    SUBSYSTEM=="power_supply", ATTR{type}=="Battery", ATTR{capacity}=="?*", ENV{POWER_SUPPLY_CAPACITY}="$attr{capacity}"
++    SUBSYSTEM=="power_supply", ATTR{type}=="Battery", ATTR{status}=="?*", ENV{POWER_SUPPLY_STATUS}="$attr{status}"
++    SUBSYSTEM=="power_supply", KERNEL=="battery", ATTR{capacity}=="?*", ENV{POWER_SUPPLY_CAPACITY}="$attr{capacity}"
++    SUBSYSTEM=="power_supply", KERNEL=="battery", ATTR{status}=="?*", ENV{POWER_SUPPLY_STATUS}="$attr{status}"
+   '';
+ 
+   # Default to ext4 root filesystem for compatibility across vendor kernels
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index cc0a48d6..c4d200a7 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -16,6 +16,13 @@ let
+     || config.mobile.hardware.watch.stage2-save-logs.enable
+     || config.mobile.hardware.watch.stage2-ssh.enable;
+ 
++  # MCE daemon compiled with the active systemd / udev package (e.g. systemd 257 for legacy kernels)
++  # to ensure libudev device enumeration compatibility on vendor kernels.
++  mcePkg = pkgs.asteroid.mce.override {
++    systemd = config.systemd.package;
++    udev = config.systemd.package;
++  };
++
+   # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
+   # policies at build time instead of vendoring copies in this repository.
+   # https://github.com/AsteroidOS/meta-asteroid
+@@ -92,7 +99,7 @@ in
+         asteroid.asteroid-btsyncd
+         asteroid.nemo-qml-plugin-dbus
+         asteroid.libconnman-qt
+-        asteroid.mce
++        mcePkg
+         asteroid.ngfd
+         asteroid.nfcd
+         asteroid.keepalive
+@@ -162,7 +169,7 @@ in
+       # builtin-gconf.values into /var/lib/mce.
+       "d /run/mce 0755 root root -"
+       "d /var/lib/mce 0755 root root -"
+-      "L+ /var/lib/mce/builtin-gconf.values - - - - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
++      "L+ /var/lib/mce/builtin-gconf.values - - - - ${mcePkg}/share/mce/builtin-gconf.values"
+       # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
+       "d /var/lib/connman 0755 root root -"
+       "C+ /var/lib/connman/settings 0644 root root - ${
+@@ -298,7 +305,7 @@ in
+         # fails ("Cannot open `/var/run/mce/boot' for writing").
+         RuntimeDirectory = "mce";
+         RuntimeDirectoryMode = "0755";
+-        ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
++        ExecStart = "${mcePkg}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
+         TimeoutSec = 2;
+         Restart = "always";
+         RestartSec = "1s";
+@@ -510,7 +517,7 @@ in
+     # upstream AsteroidOS connman policy replaces connman's own one.
+     services.dbus.packages = [
+       pkgs.dconf
+-      pkgs.asteroid.mce
++      mcePkg
+       pkgs.asteroid.dsme
+       pkgs.asteroid.sensorfw
+       pkgs.asteroid.ngfd
