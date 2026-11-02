@@ -27,6 +27,7 @@ nix-build work/mobile-nixos/examples/asteroid --argstr device fossil-hoki -A out
 + move hoki hardcoded partitions to better places
 + instead of linking /usr/share for asteroid os launcher, patch them to use nix store path.
 + asteriod os usbnet adb modes
++ legacy kernel's device's image: just override systemd to systemd257 so every systemd become systemd257 in the system, also after this we can simplify some nix code
 
 ## Device: hoki (Fossil Gen 6)
 
