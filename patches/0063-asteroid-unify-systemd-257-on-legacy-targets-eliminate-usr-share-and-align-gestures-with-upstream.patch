@@ -1,0 +1,300 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 2 Nov 2026 23:28:59 +1100
+Subject: [PATCH] asteroid: unify systemd 257 on legacy targets, eliminate
+ /usr/share, and align gestures with upstream
+
+---
+ devices/families/asteroidos.nix               | 17 ++++++++++---
+ devices/fossil-hoki/default.nix               |  3 +--
+ examples/asteroid/asteroid-desktop.nix        | 24 ++++---------------
+ modules/asteroid-config.nix                   |  7 ++++--
+ modules/hardware-watch.nix                    | 10 ++++++++
+ .../asteroidos/asteroid-launcher/default.nix  | 20 ++++++++++++++++
+ overlay/asteroidos/lib/mk-asteroid-app.nix    |  1 +
+ overlay/asteroidos/timed-qt6/default.nix      |  7 ++++++
+ .../asteroidos/virtualkeyboard/default.nix    |  2 ++
+ overlay/systemd.nix                           | 12 ++++++++--
+ 10 files changed, 74 insertions(+), 29 deletions(-)
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+index 4e495943..f1e3d863 100644
+--- a/devices/families/asteroidos.nix
++++ b/devices/families/asteroidos.nix
+@@ -17,9 +17,20 @@ let
+   debugNetwork = cfg.enable || stage2SshCfg.enable;
+ in
+ {
+-  systemd.package = lib.mkForce (
+-    if config.mobile.hardware.watch.kernel == "legacy" then pkgs.systemd257 else pkgs.systemd
+-  );
++  # Legacy smartwatch kernels (Linux 4.x) lack STATX_MNT_ID, close_range, and modern
++  # cgroup/pidfd APIs required by systemd >= 261. Override systemd and udev system-wide
++  # to systemd 257 for all consumers on legacy watch targets (without polluting buildPackages).
++  nixpkgs.overlays = lib.mkIf (config.mobile.hardware.watch.kernel == "legacy") (lib.mkAfter [
++    (final: super: super.lib.optionalAttrs (super.stdenv.hostPlatform.isAarch32) {
++      systemd = final.systemd257;
++      udev = final.systemd257;
++      lvm2 = super.lvm2.overrideAttrs (old: {
++        outputChecks = builtins.mapAttrs (_: v: (v // { disallowedRequisites = [ ]; })) (
++          old.outputChecks or { }
++        );
++      });
++    })
++  ]);
+ 
+   assertions = [
+     {
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 2c5fb96a..191ff280 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -341,8 +341,7 @@ in
+     ''} ./var/lib/environment/compositor/10-platform.conf
+ 
+     cp ${pkgs.writeText "20-device.conf" ''
+-      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
+-      QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/by-path/platform-78b8000.i2c-event
++      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
+       QPA_HWC_FORCE_GLES=1
+       QPA_HWC2_FORCE_DOZE_UPDATE=1
+       QT_OPENGL_NO_BGRA=1
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index bcb3f0ea..71dd5852 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -16,13 +16,6 @@ let
+     || config.mobile.hardware.watch.stage2-save-logs.enable
+     || config.mobile.hardware.watch.stage2-ssh.enable;
+ 
+-  # MCE daemon compiled with the active systemd / udev package (e.g. systemd 257 for legacy kernels)
+-  # to ensure libudev device enumeration compatibility on vendor kernels.
+-  mcePkg = pkgs.asteroid.mce.override {
+-    systemd = config.systemd.package;
+-    udev = config.systemd.package;
+-  };
+-
+   # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
+   # policies at build time instead of vendoring copies in this repository.
+   # https://github.com/AsteroidOS/meta-asteroid
+@@ -136,7 +129,7 @@ in
+         asteroid.asteroid-btsyncd
+         asteroid.nemo-qml-plugin-dbus
+         asteroid.libconnman-qt
+-        mcePkg
++        asteroid.mce
+         asteroid.ngfd
+         asteroid.nfcd
+         asteroid.keepalive
+@@ -202,12 +195,11 @@ in
+ 
+     systemd.tmpfiles.rules = [
+       "d /var/lib/kiwix 0775 ceres users -"
+-      "L+ /usr/share - - - - /run/current-system/sw/share"
+       # MCE runtime/config directories; upstream mce_git.bb installs
+       # builtin-gconf.values into /var/lib/mce.
+       "d /run/mce 0755 root root -"
+       "d /var/lib/mce 0755 root root -"
+-      "L+ /var/lib/mce/builtin-gconf.values - - - - ${mcePkg}/share/mce/builtin-gconf.values"
++      "L+ /var/lib/mce/builtin-gconf.values - - - - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
+       # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
+       "d /var/lib/connman 0755 root root -"
+       "C+ /var/lib/connman/settings 0644 root root - ${
+@@ -236,8 +228,6 @@ in
+       "d /var/lib/timed 0775 ceres users -"
+       "d /var/lib/timed/shared_events 0775 ceres users -"
+       "d /var/lib/timed/shared_settings 0775 ceres users -"
+-      # Upstream timed looks for time zone files in standard /usr/share/zoneinfo
+-      "L+ /usr/share/zoneinfo - - - - ${pkgs.tzdata}/share/zoneinfo"
+       # Upstream supported-languages_git.bb seeds the ceres locale drop-in that
+       # user@.service.d/locale.conf reads (installed via environment.etc below).
+       "d /home/.system/var/lib/environment/1000 0755 ceres users -"
+@@ -279,12 +269,6 @@ in
+       pkgs.asteroid.assets.fonts
+     ];
+ 
+-    # Create /usr/share early in activation for AsteroidOS apps and shell
+-    system.activationScripts.usrshare = ''
+-      mkdir -p /usr
+-      ln -sfn /run/current-system/sw/share /usr/share
+-    '';
+-
+     # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
+     # Reference: https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/src/main.conf
+     hardware.bluetooth.settings = {
+@@ -346,7 +330,7 @@ in
+         # fails ("Cannot open `/var/run/mce/boot' for writing").
+         RuntimeDirectory = "mce";
+         RuntimeDirectoryMode = "0755";
+-        ExecStart = "${mcePkg}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
++        ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
+         TimeoutSec = 2;
+         Restart = "always";
+         RestartSec = "1s";
+@@ -558,7 +542,7 @@ in
+     # upstream AsteroidOS connman policy replaces connman's own one.
+     services.dbus.packages = [
+       pkgs.dconf
+-      mcePkg
++      pkgs.asteroid.mce
+       pkgs.asteroid.dsme
+       pkgs.asteroid.sensorfw
+       pkgs.asteroid.ngfd
+diff --git a/modules/asteroid-config.nix b/modules/asteroid-config.nix
+index e7f2f5a3..dc08f497 100644
+--- a/modules/asteroid-config.nix
++++ b/modules/asteroid-config.nix
+@@ -20,8 +20,11 @@ let
+   machineConf = pkgs.writeText "machine.conf" ''
+     [Display]
+     FLAT_TIRE=${toString screenCfg.chinHeight}
+-    BORDER_GESTURE_WIDTH=15
+-    ROUND=${if screenCfg.shape == "round" || screenCfg.shape == "chin" then "true" else "false"}
++    ${
++      lib.optionalString (
++        watchCfg.borderGestureWidth != null
++      ) "BORDER_GESTURE_WIDTH=${toString watchCfg.borderGestureWidth}\n"
++    }ROUND=${if screenCfg.shape == "round" || screenCfg.shape == "chin" then "true" else "false"}
+     NEEDS_BURN_IN_PROTECTION=${if watchCfg.burnInProtection then "true" else "false"}
+ 
+     [Capabilities]
+diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
+index 1dfe1365..4c9a9b22 100644
+--- a/modules/hardware-watch.nix
++++ b/modules/hardware-watch.nix
+@@ -102,6 +102,16 @@ in
+       '';
+     };
+ 
++    borderGestureWidth = mkOption {
++      type = types.nullOr (types.either types.str types.float);
++      default = null;
++      description = ''
++        Fraction of display width/height dedicated to border gestures (0.0 - 1.0).
++        Mirrors upstream MACHINE_DISPLAY_BORDER_GESTURE_WIDTH in /etc/asteroid/machine.conf.
++        When null, qml-asteroid defaults to 0.1 (10% of screen edge).
++      '';
++    };
++
+     aodSupport = mkOption {
+       type = types.bool;
+       default = true;
+diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
+index 6ef74f4c..015adf68 100644
+--- a/overlay/asteroidos/asteroid-launcher/default.nix
++++ b/overlay/asteroidos/asteroid-launcher/default.nix
+@@ -38,6 +38,26 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   strictDeps = true;
+ 
++  postPatch = ''
++    substituteInPlace src/qml/MainScreen.qml \
++      --replace-fail "/usr/share/asteroid-launcher" "$out/share/asteroid-launcher"
++
++    substituteInPlace lipstick/src/localemanager.cpp \
++      --replace-fail '"/usr/share/translations"' "\"$out/share/translations\""
++
++    substituteInPlace lipstick/src/components/launchermodel.cpp \
++      --replace-fail '"/usr/share/lipstick/lipstick.conf"' "\"$out/share/lipstick/lipstick.conf\"" \
++      --replace-fail '#define LAUNCHER_APPS_PATH "/usr/share/applications/"' '#define LAUNCHER_APPS_PATH "/run/current-system/sw/share/applications/"' \
++      --replace-fail '#define LAUNCHER_ICONS_PATH "/usr/share/icons/hicolor/86x86/apps/"' '#define LAUNCHER_ICONS_PATH "/run/current-system/sw/share/icons/hicolor/86x86/apps/"'
++
++    substituteInPlace lipstick/src/notifications/notificationmanager.cpp \
++      --replace-fail '"/usr/share/lipstick/notificationcategories"' "\"$out/share/lipstick/notificationcategories\"" \
++      --replace-fail 'DESKTOP_ENTRY_PATH= "/usr/share/applications/"' 'DESKTOP_ENTRY_PATH= "/run/current-system/sw/share/applications/"'
++
++    substituteInPlace src/notificationsnoozer.cpp \
++      --replace-fail "/usr/bin/notificationtool" "/run/current-system/sw/bin/notificationtool"
++  '';
++
+   # AsteroidOS wayland compositor & shell
+   # Upstream repository: https://github.com/AsteroidOS/asteroid-launcher
+   patches = [
+diff --git a/overlay/asteroidos/lib/mk-asteroid-app.nix b/overlay/asteroidos/lib/mk-asteroid-app.nix
+index 1f0eb3e1..04769ec4 100644
+--- a/overlay/asteroidos/lib/mk-asteroid-app.nix
++++ b/overlay/asteroidos/lib/mk-asteroid-app.nix
+@@ -52,6 +52,7 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   postPatch = ''
+     find . -name CMakeLists.txt -exec sed -i 's|/usr/share|share|g' {} +
++    find . -name "*.qml" -exec sed -i 's|/usr/share/asteroid-launcher|/run/current-system/sw/share/asteroid-launcher|g' {} +
+   ''
+   + postPatch;
+ 
+diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
+index 9f31293c..e52b5713 100644
+--- a/overlay/asteroidos/timed-qt6/default.nix
++++ b/overlay/asteroidos/timed-qt6/default.nix
+@@ -12,6 +12,7 @@
+   libiodata,
+   buildPackages,
+   metaAsteroidSrc,
++  tzdata,
+ }:
+ 
+ let
+@@ -46,6 +47,7 @@ stdenv.mkDerivation (finalAttrs: {
+     qt6.qtbase
+     systemd
+     libiodata
++    tzdata
+   ];
+ 
+   # timed-qt6.pc Requires iodata-qt6, so consumers need its pkg-config file.
+@@ -245,6 +247,11 @@ Requires: Qt6Core Qt6DBus timed-qt6
+ Libs: -L''${libdir} -ltimed-voland-qt6
+ Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
+ EOF
++
++    substituteInPlace src/server/settings.cpp \
++      --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
++    substituteInPlace src/lib/aliases.cpp \
++      --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
+   '';
+ 
+   postInstall = ''
+diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
+index 5d616bcb..54ce4ee1 100644
+--- a/overlay/asteroidos/virtualkeyboard/default.nix
++++ b/overlay/asteroidos/virtualkeyboard/default.nix
+@@ -28,6 +28,8 @@ stdenv.mkDerivation (finalAttrs: {
+   postPatch = ''
+     cp ${./rimeinputmethod.cpp} rimeinputmethod.cpp
+     cp ${./rimeinputmethod.h} rimeinputmethod.h
++    substituteInPlace rimeinputmethod.cpp \
++      --replace-fail '"/usr/share/rime-data"' '"${rime-data}/share/rime-data"'
+     mkdir -p layouts
+     cp -r ${./layouts}/* layouts/
+   '';
+diff --git a/overlay/systemd.nix b/overlay/systemd.nix
+index 324ad95f..45012ded 100644
+--- a/overlay/systemd.nix
++++ b/overlay/systemd.nix
+@@ -36,9 +36,13 @@ let
+ 
+   systemd257 =
+     (super.lib.callPackageWith
+-      (builtins.intersectAttrs (super.lib.functionArgs (import ./systemd-257)) final)
++      (builtins.intersectAttrs (super.lib.functionArgs (import ./systemd-257)) super)
+       ./systemd-257
+-      { stdenv = systemdStdenv; }
++      {
++        stdenv = systemdStdenv;
++        libcap = super.libcap.override { usePam = false; };
++        util-linux = super.util-linuxMinimal;
++      }
+     ).override
+       (
+         {
+@@ -47,6 +51,10 @@ let
+           withHomed = false;
+           withRepart = false;
+           withFido2 = false;
++          withIptables = false;
++          withRemote = false;
++          withTpm2Tss = false;
++          withImportd = false;
+         }
+         // super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
+           withLibBPF = false;
