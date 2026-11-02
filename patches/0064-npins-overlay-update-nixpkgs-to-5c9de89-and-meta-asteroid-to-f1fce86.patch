@@ -1,0 +1,72 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 3 Nov 2026 07:11:44 +1100
+Subject: [PATCH] npins, overlay: update nixpkgs to 5c9de89 and meta-asteroid
+ to f1fce86
+
+---
+ examples/asteroid/asteroid-desktop.nix | 2 +-
+ npins/sources.json                     | 6 +++---
+ overlay/asteroidos/default.nix         | 4 ++--
+ overlay/cross-compile.nix              | 2 +-
+ 4 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 71dd5852..cd1bc3a2 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -19,7 +19,7 @@ let
+   # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
+   # policies at build time instead of vendoring copies in this repository.
+   # https://github.com/AsteroidOS/meta-asteroid
+-  asteroidOSRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
++  asteroidOSRev = "f1fce86f8d6488066ac266216b7e68be00d8499d";
+ 
+   # Upstream asteroid-launcher_git.bb installs a seeded notification database
+   # into the ceres user's privileged data directory.
+diff --git a/npins/sources.json b/npins/sources.json
+index ae077a5f..574e5b3e 100644
+--- a/npins/sources.json
++++ b/npins/sources.json
+@@ -8,10 +8,10 @@
+         "repo": "nixpkgs"
+       },
+       "branch": "nixpkgs-unstable",
+-      "revision": "d357a2b54f0b6dc4aeb4e993190a52cf151b6f24",
+-      "url": "https://github.com/NixOS/nixpkgs/archive/d357a2b54f0b6dc4aeb4e993190a52cf151b6f24.tar.gz",
++      "revision": "5c9de89ec55bff981cb8da1a4ee92b10f1438ffc",
++      "url": "https://github.com/NixOS/nixpkgs/archive/5c9de89ec55bff981cb8da1a4ee92b10f1438ffc.tar.gz",
+       "submodules": false,
+-      "hash": "sha256-Thn0OE71NF80ZfOMGCgJvKtbCcnnz0fToT/qsvb/Gtc="
++      "hash": "sha256-WDValiY9se78X2Wh7aWWaq/c7HN29U555+OKbHEzYrw="
+     }
+   },
+   "version": 8
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index f8ff2194..45f897db 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -12,8 +12,8 @@ rec {
+   # (udev rules, unit files, patches) instead of vendoring them.
+   metaAsteroidSrc = pkgs.fetchgit {
+     url = "https://github.com/AsteroidOS/meta-asteroid";
+-    rev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-    hash = "sha256-Z9Hu9zOHodSioy6oqQqWMoD/0FUGHH9nnDv72F5GweI=";
++    rev = "f1fce86f8d6488066ac266216b7e68be00d8499d";
++    hash = "sha256-FZlt4YrN+y4dSXz8zbBsK+ulwKIaoSi4eDpTWLPiYvQ=";
+   };
+ 
+   # Device features shipped by upstream meta-hoki (IMAGE_INSTALL) and asteroid-image.
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index de136c27..b51fc3e1 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -22,7 +22,7 @@ else
+     # Pinned revision of AsteroidOS meta-asteroid used as the source for
+     # upstream patches, so nothing has to be vendored in this repository.
+     # https://github.com/AsteroidOS/meta-asteroid
+-    asteroidOSRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
++    asteroidOSRev = "f1fce86f8d6488066ac266216b7e68be00d8499d";
+ 
+     addCrossQuickTools =
+       pkg:
