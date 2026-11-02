@@ -67,6 +67,22 @@ This document catalogs and tracks remaining hardware, runtime, packaging, and ar
 
 ---
 
+### 1.6 MSM MDSS Display Frame Commit Warnings (`ctx=0 stopped already`)
+* **Observed on:** Fossil Gen 6 (`fossil-hoki`)
+* **Symptom:** Kernel `dmesg` logs show repeated messages such as:
+  ```
+  mdss_mdp_display_commit: ctl 0 error displaying frame
+  mdss_mdp_display_commit: ctx=0 stopped already
+  ```
+* **Technical Context:**
+  * In the Qualcomm Android 4.14 downstream kernel MDSS (Mobile Display SubSystem) driver, command-mode DSI display commit callbacks signal when a frame display kick occurs while a previous commit or transfer is pending, or when frames are pushed faster than the panel refresh rate (~60Hz / 16.6ms).
+  * This is benign in practice and commonly observed during high frame rate UI animations (e.g. Qt Quick scenegraph renderloop bursts) where subsequent frames trigger before the hardware TE-signal / VSYNC interval completes.
+* **Remaining Verification & Resolution Steps:**
+  * Confirm whether tuning VSYNC pacing or buffer wait queues in `qt6-qpa-hwcomposer-plugin` reduces log verbosity.
+  * Adjust MDSS logging level or rate-limit kernel printk if dmesg buffer flooding occurs.
+
+---
+
 ## 2. Upstream Architecture & Long-Term Roadmap
 
 ### 2.1 Mainline Linux Kernel Bringup for Snapdragon Wear 4100 (`fossil-hoki-mainline`)
