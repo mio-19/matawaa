@@ -1,0 +1,99 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 2 Nov 2026 13:24:21 +1100
+Subject: [PATCH] overlay/asteroidos: enlarge tutorial skip tip and support
+ dlopen fallback in invoker
+
+---
+ .../asteroid-launcher/skip-firstrun.patch     |  6 +--
+ .../0003-invoker-fallback-dlopen-so.patch     | 47 +++++++++++++++++++
+ overlay/asteroidos/mapplauncherd/default.nix  |  1 +
+ 3 files changed, 51 insertions(+), 3 deletions(-)
+ create mode 100644 overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
+
+diff --git a/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
+index 3049a22c..5bb8053e 100644
+--- a/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
++++ b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
+@@ -8,13 +8,13 @@
+ +            id: skipTip
+ +            visible: tuto.state === "WELCOME"
+ +            text: qsTr("Long press to skip")
+-+            font.pixelSize: Dims.l(3.5)
+-+            color: "#888888"
+++            font.pixelSize: Dims.l(5.0)
+++            color: "#aaaaaa"
+ +            horizontalAlignment: Text.AlignHCenter
+ +            anchors {
+ +                bottom: nextButton.top
+ +                horizontalCenter: parent.horizontalCenter
+-+                bottomMargin: Dims.h(1)
+++                bottomMargin: Dims.h(1.5)
+ +            }
+ +        }
+ +
+diff --git a/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
+new file mode 100644
+index 00000000..4cef2e95
+--- /dev/null
++++ b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
+@@ -0,0 +1,47 @@
++diff --git a/src/invoker/CMakeLists.txt b/src/invoker/CMakeLists.txt
++index 8ef4ade..df5efb5 100644
++--- a/src/invoker/CMakeLists.txt
+++++ b/src/invoker/CMakeLists.txt
++@@ -17,7 +17,7 @@ add_definitions(-DPROG_NAME_INVOKER="invoker")
++ # Set target
++ add_executable(invoker ${SRC})
++ 
++-target_link_libraries(invoker ${DBUS_LDFLAGS} ${GLIB_LDFLAGS})
+++target_link_libraries(invoker ${DBUS_LDFLAGS} ${GLIB_LDFLAGS} ${CMAKE_DL_LIBS})
++ 
++ # Add install rule
++ install(TARGETS invoker DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
++diff --git a/src/invoker/invoker.c b/src/invoker/invoker.c
++index 9642a7d..f03553e 100644
++--- a/src/invoker/invoker.c
+++++ b/src/invoker/invoker.c
++@@ -38,6 +38,7 @@
++ #include <errno.h>
++ #include <sys/wait.h>
++ #include <limits.h>
+++#include <dlfcn.h>
++ #include <getopt.h>
++ #include <fcntl.h>
++ #include <time.h>
++@@ -859,6 +860,21 @@ static void invoke_fallback(const InvokeArgs *args)
++         }
++     }
++ 
+++    const char *dot_so = strstr(args->prog_name, ".so");
+++    if (dot_so && (dot_so[3] == '\0' || dot_so[3] == '.')) {
+++        void *handle = dlopen(args->prog_name, RTLD_NOW | RTLD_GLOBAL);
+++        if (!handle) {
+++            error("dlopen(%s) failed: %s\n", args->prog_name, dlerror());
+++            exit(EXIT_FAILURE);
+++        }
+++        int (*app_main)(int, char **) = (int (*)(int, char **))dlsym(handle, "main");
+++        if (!app_main) {
+++            error("dlsym(main) in %s failed: %s\n", args->prog_name, dlerror());
+++            exit(EXIT_FAILURE);
+++        }
+++        exit(app_main(args->prog_argc, args->prog_argv));
+++    }
+++
++     // Exec the process image
++     execve(args->prog_name, args->prog_argv, environ);
++     perror("execve");   /* execve() only returns on error */
+diff --git a/overlay/asteroidos/mapplauncherd/default.nix b/overlay/asteroidos/mapplauncherd/default.nix
+index a8bd2d87..56478b7c 100644
+--- a/overlay/asteroidos/mapplauncherd/default.nix
++++ b/overlay/asteroidos/mapplauncherd/default.nix
+@@ -29,6 +29,7 @@ stdenv.mkDerivation {
+       hash = "sha256-c2sqCkdjFN5G7JXyzMnLHbzCM1SDQue9z6He+YwogGI=";
+     })
+     ./0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
++    ./0003-invoker-fallback-dlopen-so.patch
+   ];
+ 
+   strictDeps = true;

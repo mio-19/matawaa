@@ -15,44 +15,44 @@ This is useful for preconfigured watch images and automated bring-up.
  create mode 100644 overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
 
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 235c277e..659bf6e4 100644
+index 235c277e..698d8ef5 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -42,6 +42,8 @@ stdenv.mkDerivation (finalAttrs: {
    patches = [
      # QuickPanel quick-toggle button to trigger the find-phone alarm on the companion phone
      ./find-phone.patch
-+    # Visible skip button for first-time tutorial and initial setup guide
++    # Tip for first-time tutorial indicating long press skips the guide
 +    ./skip-firstrun.patch
      # Remove OpacityMask dependency from the 400ms initial splash animation
      ./splash-no-opacitymask.patch
      # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
 diff --git a/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
 new file mode 100644
-index 00000000..f78b521b
+index 00000000..3049a22c
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/skip-firstrun.patch
 @@ -0,0 +1,23 @@
 +--- a/src/qml/firstrun/Tutorial.qml
 ++++ b/src/qml/firstrun/Tutorial.qml
-+@@ -525,6 +525,20 @@
++@@ -524,6 +524,20 @@
++             horizontalAlignment: Text.AlignHCenter
 +         }
 + 
-+         IconButton {
-++            id: skipButton
+++        Label {
+++            id: skipTip
 ++            visible: tuto.state === "WELCOME"
-++            iconName: "ios-close"
+++            text: qsTr("Long press to skip")
+++            font.pixelSize: Dims.l(3.5)
+++            color: "#888888"
+++            horizontalAlignment: Text.AlignHCenter
 ++            anchors {
-++                top: parent.top
+++                bottom: nextButton.top
 ++                horizontalCenter: parent.horizontalCenter
-++                topMargin: Dims.iconButtonMargin
-++            }
-++            onClicked: {
-++                tuto.state = "DONE";
+++                bottomMargin: Dims.h(1)
 ++            }
 ++        }
 ++
-++        IconButton {
++         IconButton {
 +             id: nextButton
 +             iconName: "ios-arrow-dropright"
-+             anchors { 
