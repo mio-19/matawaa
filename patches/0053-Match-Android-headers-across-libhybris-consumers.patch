@@ -10,10 +10,10 @@ Use the Android headers selected by libhybris for the HWC plugin, SensorFW, and 
  examples/asteroid/asteroid-desktop.nix        |  1 +
  overlay/asteroidos/default.nix                |  3 +-
  .../mce-plugin-libhybris/default.nix          |  9 ++----
- .../qt6-qpa-hwcomposer-plugin/default.nix     | 12 +++----
- overlay/asteroidos/sensorfw/default.nix       | 17 +++++-----
- overlay/libhybris/default.nix                 |  1 +
- 8 files changed, 53 insertions(+), 23 deletions(-)
+ .../qt6-qpa-hwcomposer-plugin/default.nix     | 31 +++++++------------
+ overlay/asteroidos/sensorfw/default.nix       | 31 ++++++-------------
+ overlay/libhybris/default.nix                 | 23 +++-----------
+ 8 files changed, 64 insertions(+), 67 deletions(-)
  create mode 100644 devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
 
 diff --git a/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch b/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
@@ -134,10 +134,10 @@ index b8e68a89..6066dc34 100644
    ];
  
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-index c8d6dc03..e69967d8 100644
+index c8d6dc03..8aebcdd9 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-@@ -9,7 +9,6 @@
+@@ -9,24 +9,17 @@
    qt6,
    buildPackages,
    libhybris,
@@ -145,9 +145,18 @@ index c8d6dc03..e69967d8 100644
    libudev,
    glib,
    mtdev,
-@@ -25,8 +24,9 @@ let
-     };
++  metaAsteroidSrc,
+ }:
  
+ let
+-  metaAsteroid = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-  patch =
+-    name: hash:
+-    fetchurl {
+-      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroid}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/${name}";
+-      inherit hash;
+-    };
+-
    # HWC2 was introduced after the Android 6 headers in android-headers 23.
 -  # Keep the old headers for HWC1/libhybris and use the Android 10 HWC2
 -  # headers for this plugin.
@@ -157,7 +166,24 @@ index c8d6dc03..e69967d8 100644
    hwc2Headers = runCommand "android-hwc2-headers" { } ''
      mkdir -p $out/include/hardware
      cp ${
-@@ -91,7 +91,7 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -70,11 +63,11 @@ stdenv.mkDerivation (finalAttrs: {
+   patchFlags = [ "-p2" ];
+ 
+   patches = [
+-    (patch "0001-Add-ambient-mode-display-support.patch" "sha256-dkORtCZzlhuIv8TxATysSsnK7fHwi+TsOdQzxwdhMoc=")
+-    (patch "0003-Support-Qt-6.10.patch" "sha256-HbMYiIgzilhqQtCmr73RkX8V+aEvV8wJae6tfDB0CvQ=")
+-    (patch "0005-Explicitly-make-hwcomposer-a-shared-library.patch" "sha256-Z/zjAhKm6XRQ8zVuSYPiD+rDh7KqZuKzTiUAzmsu+ZE=")
+-    (patch "0006-v10-Fix-refresh-rate-fallback-unit.patch" "sha256-XOplqx7zKgbjPWIwlJ82O1qFDXXNkj2PDO/TdaP/ync=")
+-    (patch "0007-v10-Make-updates-request-driven-and-vsync-paced.patch" "sha256-EQhs66R9Vc2a2yH5zVmo8xtC+oVQHjMlKyNAIGrEsbA=")
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0001-Add-ambient-mode-display-support.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0003-Support-Qt-6.10.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0005-Explicitly-make-hwcomposer-a-shared-library.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0006-v10-Fix-refresh-rate-fallback-unit.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0007-v10-Make-updates-request-driven-and-vsync-paced.patch"
+     ./hwc-present-diagnostics.patch
+   ];
+ 
+@@ -91,7 +84,7 @@ stdenv.mkDerivation (finalAttrs: {
      qt6.qtdeclarative
      qt6.qtwayland
      libhybris
@@ -166,7 +192,7 @@ index c8d6dc03..e69967d8 100644
      hwc2Headers
      libudev
      glib
-@@ -190,8 +190,8 @@ QRC
+@@ -190,8 +183,8 @@ QRC
      target_include_directories(hwcomposer PRIVATE
        .
        ${hwc2Headers}/include
@@ -178,15 +204,14 @@ index c8d6dc03..e69967d8 100644
        ${libhybris}/include/hybris/eglplatformcommon
        ${libhybris}/include/hybris/platformcommon
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
-index 6cab054d..be6a3c9b 100644
+index 6cab054d..fa31860e 100644
 --- a/overlay/asteroidos/sensorfw/default.nix
 +++ b/overlay/asteroidos/sensorfw/default.nix
-@@ -5,13 +5,12 @@
+@@ -5,26 +5,15 @@
    lib,
    stdenv,
    fetchFromGitHub,
 -  fetchpatch,
-+  fetchurl,
    cmake,
    pkg-config,
    qt6,
@@ -194,37 +219,44 @@ index 6cab054d..be6a3c9b 100644
    libhybris,
 -  android-headers,
    udev,
++  metaAsteroidSrc,
  }:
  
-@@ -20,8 +19,8 @@ let
- 
-   upstreamPatch =
-     name: hash:
+-let
+-  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-
+-  upstreamPatch =
+-    name: hash:
 -    fetchpatch {
 -      inherit name hash;
-+    fetchurl {
-+      inherit hash;
-       url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/sensorfw/files/${name}";
-     };
- in
-@@ -37,13 +36,13 @@ stdenv.mkDerivation (finalAttrs: {
+-      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/sensorfw/files/${name}";
+-    };
+-in
+ stdenv.mkDerivation (finalAttrs: {
+   pname = "sensorfw";
+   version = "0.15.1";
+@@ -37,13 +26,13 @@ stdenv.mkDerivation (finalAttrs: {
    };
  
    patches = [
 -    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-7eFjofMXAkQSvZf6RwkINBwLYSe+u3kJ8lCnOkoFhBE=")
-+    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-FNjH+q3kjQDeJP5yaAZ24z8FpU0gZ8GJAFuElzM3bsM=")
-     (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-qRXs9vrszoG1bVnjkIVtRaXEvaLtNKs7Z1PsR759VQo=")
-     (upstreamPatch "0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch" "sha256-WyVwM0KEtADQhAeZTGy6we9BSyITchcClT+phNTdhuc=")
-     (upstreamPatch "0004-Fix-compilation-when-autohybris-is-used.patch" "sha256-RJ711Knze6feQOPfa/UD6r9jG870H//hOnbFPzhoS5s=")
-     (upstreamPatch "0005-Fix-compilation-when-hybris-is-used.patch" "sha256-evbbTXcBF/a6Y998373+p2vv7PnYWX71Ei9GFH+BaA8=")
+-    (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-qRXs9vrszoG1bVnjkIVtRaXEvaLtNKs7Z1PsR759VQo=")
+-    (upstreamPatch "0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch" "sha256-WyVwM0KEtADQhAeZTGy6we9BSyITchcClT+phNTdhuc=")
+-    (upstreamPatch "0004-Fix-compilation-when-autohybris-is-used.patch" "sha256-RJ711Knze6feQOPfa/UD6r9jG870H//hOnbFPzhoS5s=")
+-    (upstreamPatch "0005-Fix-compilation-when-hybris-is-used.patch" "sha256-evbbTXcBF/a6Y998373+p2vv7PnYWX71Ei9GFH+BaA8=")
 -    (upstreamPatch "0006-hybrisadaptor-Queue-erroneous-events-too.patch" "sha256-6kLVFeEXnpldLWw976ckEMYaM1jBXYAepvBKLKP62/c=")
 -    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-qH3mMqgPPNq9oqGOmP1xdc/EQ7f95ia8HFcmuBD2oMs=")
-+    (upstreamPatch "0006-hybrisadaptor-Queue-erroneous-events-too.patch" "sha256-k10UaeZO9dEa+VApzyr2itLv6ZEqwnMhA+RXGkiWYlk=")
-+    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-7TRSkpcprdQczLhhsL9lqjTr4oRYMt3Z6JgbDcxCMjE=")
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0001-Do-not-hide-stepcounter-by-default.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0004-Fix-compilation-when-autohybris-is-used.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0005-Fix-compilation-when-hybris-is-used.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0006-hybrisadaptor-Queue-erroneous-events-too.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch"
    ];
  
    strictDeps = true;
-@@ -58,7 +57,7 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -58,7 +47,7 @@ stdenv.mkDerivation (finalAttrs: {
      qt6.qtbase
      systemd
      libhybris
@@ -233,7 +265,7 @@ index 6cab054d..be6a3c9b 100644
      udev
    ];
  
-@@ -70,7 +69,7 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -70,7 +59,7 @@ stdenv.mkDerivation (finalAttrs: {
    cmakeFlags = [
      "-DENABLE_HYBRIS=ON"
      "-DHYBRIS_LIB=${libhybris}"
@@ -243,10 +275,53 @@ index 6cab054d..be6a3c9b 100644
  
    meta = with lib; {
 diff --git a/overlay/libhybris/default.nix b/overlay/libhybris/default.nix
-index 807ec78e..8d39d02e 100644
+index 807ec78e..3c1e8538 100644
 --- a/overlay/libhybris/default.nix
 +++ b/overlay/libhybris/default.nix
-@@ -106,5 +106,6 @@ stdenv.mkDerivation {
+@@ -10,6 +10,7 @@
+ , file
+ , wayland
+ , buildPackages
++, meta-asteroid-src ? null
+ , useLegacyProperties ? false
+ }:
+ 
+@@ -17,17 +18,6 @@ let
+   inherit (stdenv) targetPlatform buildPlatform;
+   libPrefix = if targetPlatform == buildPlatform then ""
+     else stdenv.targetPlatform.config;
+-
+-  # Upstream AsteroidOS pins libhybris to this revision and layers two patches
+-  # on top of it. Keep this package identical to upstream instead of carrying
+-  # local fork patches: the newer libhybris contains the EGL display reference
+-  # counting that the hwcomposer QPA plugin relies on.
+-  # https://github.com/AsteroidOS/meta-asteroid/blob/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-core/libhybris/libhybris_git.bbappend
+-  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-  upstreamPatch = name: hash: fetchurl {
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-core/libhybris/libhybris/${name}";
+-    inherit hash;
+-  };
+ in
+ stdenv.mkDerivation {
+   pname = "libhybris";
+@@ -45,14 +35,8 @@ stdenv.mkDerivation {
+   postPatch = ''
+     # These upstream patches are generated from the repository root, while
+     # sourceRoot points at hybris/.
+-    patch -p2 -i ${
+-      upstreamPatch "0001-Remove-references-to-host-path-in-package-config-fil.patch"
+-        "sha256-9JtlPyiqN8CrMikCBOwUDZ8+BShDCDefiiZZ5KPeVg8="
+-    }
+-    patch -p2 -i ${
+-      upstreamPatch "0002-tests-workaround-Wimplicit-function-declaration-in-s.patch"
+-        "sha256-B3ffNEfjJf8Xz7Wv+pK84Dk3jY6FvgAE3otf158+oLo="
+-    }
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0001-Remove-references-to-host-path-in-package-config-fil.patch
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0002-tests-workaround-Wimplicit-function-declaration-in-s.patch
+   '';
+ 
+   postAutoreconf = ''
+@@ -106,5 +90,6 @@ stdenv.mkDerivation {
      # Android headers this libhybris was configured against. Out-of-tree
      # libhybris plugins must compile against the same set.
      androidHeaders = android-headers;

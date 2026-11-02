@@ -14,7 +14,7 @@ into the asteroid desktop profile.
  examples/asteroid/asteroid-desktop.nix        | 124 ++++++++++-
  overlay/asteroidos/apps/default.nix           |   4 +-
  overlay/asteroidos/assets/default.nix         |  84 ++++++++
- .../asteroidos/asteroid-launcher/default.nix  |   8 +-
+ .../asteroidos/asteroid-launcher/default.nix  |  34 ++-
  .../qml-boot-diagnostics.patch                |  58 +++++
  overlay/asteroidos/default.nix                |   8 +-
  overlay/asteroidos/libiodata/default.nix      |   7 +
@@ -22,8 +22,8 @@ into the asteroid desktop profile.
  .../nemo-qml-plugin-notifications/default.nix | 117 ++++++++++
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   1 +
  .../hwc-present-diagnostics.patch             | 204 ++++++++++++++++++
- overlay/asteroidos/timed-qt6/default.nix      | 163 +++++++++++++-
- 13 files changed, 889 insertions(+), 22 deletions(-)
+ overlay/asteroidos/timed-qt6/default.nix      | 170 ++++++++++++++-
+ 13 files changed, 922 insertions(+), 22 deletions(-)
  create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
@@ -404,10 +404,10 @@ index 5188043b..703662c4 100644
 +    };
  }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 95bab117..6ef74f4c 100644
+index 95bab117..f904b791 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -32,8 +32,8 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -32,12 +32,32 @@ stdenv.mkDerivation (finalAttrs: {
    src = fetchFromGitHub {
      owner = "AsteroidOS";
      repo = "asteroid-launcher";
@@ -418,7 +418,44 @@ index 95bab117..6ef74f4c 100644
    };
  
    strictDeps = true;
-@@ -59,6 +59,10 @@ stdenv.mkDerivation (finalAttrs: {
+ 
++  postPatch = ''
++    substituteInPlace src/qml/MainScreen.qml \
++      --replace-fail "/usr/share/asteroid-launcher" "$out/share/asteroid-launcher"
++
++    substituteInPlace lipstick/src/localemanager.cpp \
++      --replace-fail '"/usr/share/translations"' "\"$out/share/translations\""
++
++    substituteInPlace lipstick/src/components/launchermodel.cpp \
++      --replace-fail '"/usr/share/lipstick/lipstick.conf"' "\"$out/share/lipstick/lipstick.conf\"" \
++      --replace-fail '#define LAUNCHER_APPS_PATH "/usr/share/applications/"' '#define LAUNCHER_APPS_PATH "/run/current-system/sw/share/applications/"' \
++      --replace-fail '#define LAUNCHER_ICONS_PATH "/usr/share/icons/hicolor/86x86/apps/"' '#define LAUNCHER_ICONS_PATH "/run/current-system/sw/share/icons/hicolor/86x86/apps/"'
++
++    substituteInPlace lipstick/src/notifications/notificationmanager.cpp \
++      --replace-fail '"/usr/share/lipstick/notificationcategories"' "\"$out/share/lipstick/notificationcategories\"" \
++      --replace-fail 'DESKTOP_ENTRY_PATH= "/usr/share/applications/"' 'DESKTOP_ENTRY_PATH= "/run/current-system/sw/share/applications/"'
++
++    substituteInPlace src/notificationsnoozer.cpp \
++      --replace-fail "/usr/bin/notificationtool" "/run/current-system/sw/bin/notificationtool"
++  '';
++
+   # AsteroidOS wayland compositor & shell
+   # Upstream repository: https://github.com/AsteroidOS/asteroid-launcher
+   patches = [
+@@ -49,6 +69,12 @@ stdenv.mkDerivation (finalAttrs: {
+       url = "https://github.com/AsteroidOS/asteroid-launcher/pull/310.patch";
+       hash = "sha256-zFU7CbI4YqPSDWirkhUW5wxYwYLi0rft2AxwJ7TGqMg=";
+     })
++    # App-branded notification preview and view improvements
++    # Upstream PR: https://github.com/AsteroidOS/asteroid-launcher/pull/308
++    (fetchpatch {
++      url = "https://github.com/AsteroidOS/asteroid-launcher/pull/308.diff";
++      hash = "sha256-QzBzGPIk9khM8Q5b7ZHMhxd/TVI6UrDIthZMzn7el1I=";
++    })
+     # Remove OpacityMask dependency from the 400ms initial splash animation
+     ./splash-no-opacitymask.patch
+     # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
+@@ -59,6 +85,10 @@ stdenv.mkDerivation (finalAttrs: {
      # Upstream: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
      # Upstream CMake qt_add_shaders: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
      ./circlemask-qrc.patch
@@ -1035,7 +1072,7 @@ index 00000000..fb5f9bd6
 + #ifdef QPA_HWC_TIMING
 +     qDebug("HWComposerBackend::swap(), present=%.3f, sync=%.3f, prepare=%.3f, set=%.3f, total=%.3f",
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
-index acffe994..9f31293c 100644
+index acffe994..e52b5713 100644
 --- a/overlay/asteroidos/timed-qt6/default.nix
 +++ b/overlay/asteroidos/timed-qt6/default.nix
 @@ -1,4 +1,4 @@
@@ -1044,7 +1081,7 @@ index acffe994..9f31293c 100644
  # Upstream repository: https://github.com/sailfishos/timed
  # Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/timed
  {
-@@ -8,9 +8,16 @@
+@@ -8,9 +8,17 @@
    cmake,
    pkg-config,
    qt6,
@@ -1052,6 +1089,7 @@ index acffe994..9f31293c 100644
    libiodata,
 +  buildPackages,
 +  metaAsteroidSrc,
++  tzdata,
  }:
  
 +let
@@ -1061,7 +1099,7 @@ index acffe994..9f31293c 100644
  stdenv.mkDerivation (finalAttrs: {
    pname = "timed-qt6";
    version = "3.6.0";
-@@ -24,26 +31,39 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -24,26 +32,40 @@ stdenv.mkDerivation (finalAttrs: {
  
    strictDeps = true;
  
@@ -1080,6 +1118,7 @@ index acffe994..9f31293c 100644
      qt6.qtbase
 +    systemd
      libiodata
++    tzdata
    ];
  
 +  # timed-qt6.pc Requires iodata-qt6, so consumers need its pkg-config file.
@@ -1102,7 +1141,7 @@ index acffe994..9f31293c 100644
    '';
  
    postPatch = ''
-@@ -56,8 +76,10 @@ set(CMAKE_AUTOMOC ON)
+@@ -56,8 +78,10 @@ set(CMAKE_AUTOMOC ON)
  find_package(Qt6 REQUIRED COMPONENTS Core DBus)
  find_package(PkgConfig REQUIRED)
  pkg_check_modules(IODATA REQUIRED iodata-qt6)
@@ -1113,7 +1152,7 @@ index acffe994..9f31293c 100644
    src/lib/interface.cpp
    src/lib/event-io.cpp
    src/lib/event-pimple.cpp
-@@ -79,12 +101,121 @@ target_include_directories(timed-qt6 PUBLIC
+@@ -79,12 +103,121 @@ target_include_directories(timed-qt6 PUBLIC
  target_link_libraries(timed-qt6 PUBLIC Qt6::Core Qt6::DBus ''${IODATA_LIBRARIES} rt)
  set_target_properties(timed-qt6 PROPERTIES VERSION 3.6.0 SOVERSION 3)
  
@@ -1237,7 +1276,7 @@ index acffe994..9f31293c 100644
  EOF
  
      cat << "EOF" > timed-qt6.pc.in
-@@ -98,12 +229,32 @@ Description: Timed Qt6 client library
+@@ -98,12 +231,37 @@ Description: Timed Qt6 client library
  Version: 3.6.0
  Requires: Qt6Core Qt6DBus iodata-qt6
  Libs: -L''${libdir} -ltimed-qt6
@@ -1258,6 +1297,11 @@ index acffe994..9f31293c 100644
 +Libs: -L''${libdir} -ltimed-voland-qt6
 +Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
 +EOF
++
++    substituteInPlace src/server/settings.cpp \
++      --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
++    substituteInPlace src/lib/aliases.cpp \
++      --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
 +  '';
 +
 +  postInstall = ''

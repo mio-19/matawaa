@@ -10,8 +10,8 @@ Subject: [PATCH] asteroid-desktop: configure Wayland client environment, QML
 2. Pkg-config and override libpcap/rdma-core conditionally for 32-bit ARM.
 ---
  examples/asteroid/asteroid-desktop.nix | 109 +++++++++++++++++--------
- overlay/overlay.nix                    |   9 +-
- 2 files changed, 78 insertions(+), 40 deletions(-)
+ overlay/overlay.nix                    |  24 ++++--
+ 2 files changed, 92 insertions(+), 41 deletions(-)
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 index c4d200a7..476f571c 100644
@@ -161,10 +161,24 @@ index c4d200a7..476f571c 100644
 +  });
  }
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index bb5de193..e74c9bd0 100644
+index bb5de193..085bea2e 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
-@@ -85,10 +85,11 @@ in
+@@ -14,9 +14,12 @@ in
+       inherit callPackage;
+       pkgs = final;
+     };
++    meta-asteroid-src = final.asteroid.meta-asteroid-src;
+     dtbTool = callPackage ./dtbtool { };
+     dtbTool-exynos = callPackage ./dtbtool-exynos { };
+-    libhybris = callPackage ./libhybris { };
++    libhybris = callPackage ./libhybris {
++      inherit (final) meta-asteroid-src;
++    };
+     mkbootimg = callPackage ./mkbootimg { };
+     oans = callPackage ./oans { };
+     msm-fb-refresher = callPackage ./msm-fb-refresher { };
+@@ -85,10 +88,21 @@ in
      # On 32-bit ARM (armv7l-linux), GHC cannot bootstrap (cannot bootstrap GHC on
      # this platform ('armv7l-linux' with libc 'defaultLibc')), breaking native ARM CI.
      # Neither mobile devices nor smartwatches have RDMA hardware (InfiniBand/RoCE),
@@ -177,6 +191,16 @@ index bb5de193..e74c9bd0 100644
 +    libpcap = if super.stdenv.hostPlatform.isAarch32 then super.libpcap.override { withRdma = false; } else super.libpcap;
 +    rdma-core = if super.stdenv.hostPlatform.isAarch32 then super.rdma-core.override { withManPages = false; } else super.rdma-core;
 +    tpm2-tss = super.tpm2-tss.overrideAttrs (_: { doCheck = false; });
++    # jemalloc's unit test suite (check_unit, e.g. zero_reallocs and arena_reset_prof)
++    # experiences timing and address-space assertion failures under 32-bit ARM execution on
++    # 64-bit ARM host kernels (e.g. GitHub Actions ubuntu-24.04-arm running armv7l userspace).
++    # In Nixpkgs cross-compilation builds, doCheck is already disabled by default. Disable
++    # doCheck conditionally only for armv7l native (not cross) builds so dependencies like
++    # bind-9.20.30 succeed without failing on known 32-bit ARM jemalloc unit test quirks.
++    jemalloc =
++      if super.stdenv.hostPlatform.isAarch32 && super.stdenv.buildPlatform.system == super.stdenv.hostPlatform.system
++      then super.jemalloc.overrideAttrs (_: { doCheck = false; })
++      else super.jemalloc;
  
      # Things specific to mobile-nixos.
      # Not necessarily internals, but they probably won't go into <nixpkgs>.

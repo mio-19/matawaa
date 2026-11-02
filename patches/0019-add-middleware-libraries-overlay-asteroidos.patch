@@ -21,7 +21,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++
  overlay/asteroidos/default.nix                |  67 ++
- overlay/asteroidos/dsme/default.nix           | 122 ++++
+ overlay/asteroidos/dsme/default.nix           | 107 ++++
  overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
  overlay/asteroidos/keepalive/default.nix      | 131 ++++
  .../patches/0001-Disable-tests.patch          |  23 +
@@ -58,7 +58,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
  overlay/libhybris/default.nix                 |  68 +-
- 41 files changed, 4585 insertions(+), 36 deletions(-)
+ 41 files changed, 4570 insertions(+), 36 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -464,10 +464,10 @@ index 2fc834f0..7788a0e5 100644
  }
 diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
 new file mode 100644
-index 00000000..23dc6802
+index 00000000..49c4f3f1
 --- /dev/null
 +++ b/overlay/asteroidos/dsme/default.nix
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,107 @@
 +# Nemomobile DSME (device state machine daemon) with AsteroidOS patches
 +# Upstream repository: https://github.com/sailfishos/dsme
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/dsme
@@ -488,24 +488,9 @@ index 00000000..23dc6802
 +  libngf,
 +  libiphb,
 +  libdsme,
++  metaAsteroidSrc,
 +}:
 +
-+let
-+  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
-+
-+  asteroidPatch =
-+    name: hash:
-+    fetchurl {
-+      inherit name hash;
-+      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/dsme/dsme/${name}";
-+    };
-+
-+  dsmeService = fetchurl {
-+    name = "dsme.service";
-+    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/dsme/dsme/dsme.service";
-+    hash = "sha256-6IO1Q6tCkMRcYtlq5eU06ZlrHpRYGkKfurYMZwa4os4=";
-+  };
-+in
 +stdenv.mkDerivation (finalAttrs: {
 +  pname = "dsme";
 +  version = "0.84.7";
@@ -518,7 +503,7 @@ index 00000000..23dc6802
 +  };
 +
 +  patches = [
-+    (asteroidPatch "0002-Fix-and-improve-alarm-time-serialization.patch" "sha256-GCpSPP8EtQsly7VC91s5PFJnx+uFqJHQ+GQR9yI6rqI=")
++    "${metaAsteroidSrc}/recipes-nemomobile/dsme/dsme/0002-Fix-and-improve-alarm-time-serialization.patch"
 +  ];
 +
 +  strictDeps = true;
@@ -580,7 +565,7 @@ index 00000000..23dc6802
 +
 +  postInstall = ''
 +    install -Dm644 reboot-via-dsme.sh $out/etc/profile.d/reboot-via-dsme.sh
-+    install -Dm644 ${dsmeService} $out/lib/systemd/system/dsme.service
++    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/dsme/dsme/dsme.service $out/lib/systemd/system/dsme.service
 +  '';
 +
 +  meta = with lib; {

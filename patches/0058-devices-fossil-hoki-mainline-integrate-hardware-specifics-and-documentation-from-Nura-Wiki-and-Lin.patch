@@ -6,9 +6,9 @@ Subject: [PATCH] devices/fossil-hoki-mainline: integrate hardware specifics
 
 ---
  devices/fossil-hoki-mainline/README.md       | 46 ++++++++++++++++++++
- devices/fossil-hoki-mainline/default.nix     | 14 ++++++
+ devices/fossil-hoki-mainline/default.nix     | 20 +++++++--
  devices/fossil-hoki-mainline/sda429-hoki.dts | 13 ++++--
- 3 files changed, 69 insertions(+), 4 deletions(-)
+ 3 files changed, 72 insertions(+), 7 deletions(-)
  create mode 100644 devices/fossil-hoki-mainline/README.md
 
 diff --git a/devices/fossil-hoki-mainline/README.md b/devices/fossil-hoki-mainline/README.md
@@ -64,7 +64,7 @@ index 00000000..2c5ea433
 +   - Mainline rootfs is placed on the `userdata` partition.
 +   - When using `lk2nd` secondary bootloader, flash a dummy DTBO image (`dtbo-fossil-hoki.img`) to `dtbo`.
 diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
-index 2c15ecd0..17fc251a 100644
+index 2c15ecd0..1195ba0e 100644
 --- a/devices/fossil-hoki-mainline/default.nix
 +++ b/devices/fossil-hoki-mainline/default.nix
 @@ -7,6 +7,20 @@
@@ -88,6 +88,19 @@ index 2c15ecd0..17fc251a 100644
  # This target runs the modern upstream Linux 6.18 kernel without Android
  # proprietary blobs or libhybris. It uses Freedreno Mesa graphics with DRM/KMS,
  # standard Wayland / Qt EGLFS KMS display stack, systemd 262+, and CDC-NCM USB
+@@ -92,9 +106,9 @@
+   };
+ 
+   environment.sessionVariables = {
+-    QT_QPA_PLATFORM = "eglfs";
+-    QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
+-    QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++    QT_QPA_PLATFORM = lib.mkDefault "eglfs";
++    QT_QPA_EGLFS_INTEGRATION = lib.mkDefault "eglfs_kms";
++    QT_QPA_EGLFS_ALWAYS_SET_MODE = lib.mkDefault "1";
+   };
+ 
+   zramSwap.enable = true;
 diff --git a/devices/fossil-hoki-mainline/sda429-hoki.dts b/devices/fossil-hoki-mainline/sda429-hoki.dts
 index 52df28eb..be2c4a05 100644
 --- a/devices/fossil-hoki-mainline/sda429-hoki.dts

@@ -15,14 +15,14 @@ Chinese layouts:
   pre-deploy common schemas with the host rime_deployer.
 ---
  .../0001-add-rime-plugin-and-layouts.patch    |  49 +++
- .../asteroidos/virtualkeyboard/default.nix    |  36 +-
+ .../asteroidos/virtualkeyboard/default.nix    |  38 ++-
  .../virtualkeyboard/layouts/zh_CN/main.qml    |  60 ++++
  .../virtualkeyboard/layouts/zh_CN/symbols.qml |  54 +++
  .../virtualkeyboard/layouts/zh_HK/main.qml    |  60 ++++
  .../virtualkeyboard/layouts/zh_TW/main.qml    |  60 ++++
  .../virtualkeyboard/rimeinputmethod.cpp       | 312 ++++++++++++++++++
  .../virtualkeyboard/rimeinputmethod.h         |  68 ++++
- 8 files changed, 698 insertions(+), 1 deletion(-)
+ 8 files changed, 700 insertions(+), 1 deletion(-)
  create mode 100644 overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
  create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
  create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml
@@ -87,7 +87,7 @@ index 00000000..b08fcd8e
 ++install(FILES style.qml DESTINATION "${CMAKE_INSTALL_LIBDIR}/qml/QtQuick/VirtualKeyboard/Styles/watch")
 ++install(DIRECTORY images/ DESTINATION "${CMAKE_INSTALL_LIBDIR}/qml/QtQuick/VirtualKeyboard/Styles/watch/images")
 diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
-index f5df8828..5d616bcb 100644
+index f5df8828..54ce4ee1 100644
 --- a/overlay/asteroidos/virtualkeyboard/default.nix
 +++ b/overlay/asteroidos/virtualkeyboard/default.nix
 @@ -5,6 +5,8 @@
@@ -99,7 +99,7 @@ index f5df8828..5d616bcb 100644
    buildPackages,
  }:
  
-@@ -19,18 +21,31 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -19,18 +21,33 @@ stdenv.mkDerivation (finalAttrs: {
      sha256 = "0yw1xq315p7q7illjpq92cs0060lrw94bfk8ywc7fbrr1gmkmvjf";
    };
  
@@ -110,6 +110,8 @@ index f5df8828..5d616bcb 100644
 +  postPatch = ''
 +    cp ${./rimeinputmethod.cpp} rimeinputmethod.cpp
 +    cp ${./rimeinputmethod.h} rimeinputmethod.h
++    substituteInPlace rimeinputmethod.cpp \
++      --replace-fail '"/usr/share/rime-data"' '"${rime-data}/share/rime-data"'
 +    mkdir -p layouts
 +    cp -r ${./layouts}/* layouts/
 +  '';
@@ -131,7 +133,7 @@ index f5df8828..5d616bcb 100644
    ];
  
    cmakeFlags = [
-@@ -43,8 +58,27 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -43,8 +60,27 @@ stdenv.mkDerivation (finalAttrs: {
      "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
    ];
  

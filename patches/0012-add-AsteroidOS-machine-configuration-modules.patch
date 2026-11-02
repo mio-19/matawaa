@@ -7,17 +7,17 @@ Generate /etc/asteroid/machine.conf from the mobile device identity and
 screen geometry. AsteroidOS userland reads this file to select the
 correct watchface layout, display shape, and hardware capabilities.
 ---
- modules/asteroid-config.nix | 39 +++++++++++++++++++++++++++++++++++++
+ modules/asteroid-config.nix | 42 +++++++++++++++++++++++++++++++++++++
  modules/module-list.nix     |  1 +
- 2 files changed, 40 insertions(+)
+ 2 files changed, 43 insertions(+)
  create mode 100644 modules/asteroid-config.nix
 
 diff --git a/modules/asteroid-config.nix b/modules/asteroid-config.nix
 new file mode 100644
-index 00000000..e7f2f5a3
+index 00000000..dc08f497
 --- /dev/null
 +++ b/modules/asteroid-config.nix
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,42 @@
 +{
 +  config,
 +  lib,
@@ -40,8 +40,11 @@ index 00000000..e7f2f5a3
 +  machineConf = pkgs.writeText "machine.conf" ''
 +    [Display]
 +    FLAT_TIRE=${toString screenCfg.chinHeight}
-+    BORDER_GESTURE_WIDTH=15
-+    ROUND=${if screenCfg.shape == "round" || screenCfg.shape == "chin" then "true" else "false"}
++    ${
++      lib.optionalString (
++        watchCfg.borderGestureWidth != null
++      ) "BORDER_GESTURE_WIDTH=${toString watchCfg.borderGestureWidth}\n"
++    }ROUND=${if screenCfg.shape == "round" || screenCfg.shape == "chin" then "true" else "false"}
 +    NEEDS_BURN_IN_PROTECTION=${if watchCfg.burnInProtection then "true" else "false"}
 +
 +    [Capabilities]

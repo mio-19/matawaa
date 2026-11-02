@@ -11,8 +11,8 @@ to dlopen the library, configure the Wayland client environment, and invoke
 main directly.
 ---
  .../0003-invoker-fallback-dlopen-so.patch     | 69 +++++++++++++++++++
- overlay/asteroidos/mapplauncherd/default.nix  |  1 +
- 2 files changed, 70 insertions(+)
+ overlay/asteroidos/mapplauncherd/default.nix  |  8 +--
+ 2 files changed, 72 insertions(+), 5 deletions(-)
  create mode 100644 overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
 
 diff --git a/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
@@ -91,12 +91,34 @@ index 00000000..4a96ad3c
 +     execve(args->prog_name, args->prog_argv, environ);
 +     perror("execve");   /* execve() only returns on error */
 diff --git a/overlay/asteroidos/mapplauncherd/default.nix b/overlay/asteroidos/mapplauncherd/default.nix
-index a8bd2d87..56478b7c 100644
+index a8bd2d87..711acf6a 100644
 --- a/overlay/asteroidos/mapplauncherd/default.nix
 +++ b/overlay/asteroidos/mapplauncherd/default.nix
-@@ -29,6 +29,7 @@ stdenv.mkDerivation {
-       hash = "sha256-c2sqCkdjFN5G7JXyzMnLHbzCM1SDQue9z6He+YwogGI=";
-     })
+@@ -2,7 +2,6 @@
+   lib,
+   stdenv,
+   fetchFromGitHub,
+-  fetchurl,
+   cmake,
+   pkg-config,
+   glib,
+@@ -10,6 +9,7 @@
+   systemd,
+   libcap,
+   kdePackages,
++  metaAsteroidSrc,
+ }:
+ 
+ stdenv.mkDerivation {
+@@ -24,11 +24,9 @@ stdenv.mkDerivation {
+   };
+ 
+   patches = [
+-    (fetchurl {
+-      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-nemomobile/mapplauncherd/mapplauncherd/0001-Fix-dynamic-opening-issues.patch";
+-      hash = "sha256-c2sqCkdjFN5G7JXyzMnLHbzCM1SDQue9z6He+YwogGI=";
+-    })
++    "${metaAsteroidSrc}/recipes-nemomobile/mapplauncherd/mapplauncherd/0001-Fix-dynamic-opening-issues.patch"
      ./0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
 +    ./0003-invoker-fallback-dlopen-so.patch
    ];

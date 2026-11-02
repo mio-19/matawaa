@@ -15,8 +15,9 @@ current systemd 262. Keep the old-kernel-patched 262 package as
 systemd262oldkernel.
 ---
  devices/families/asteroidos.nix               |    4 +
- modules/hardware-watch.nix                    |   40 +
- overlay/cross-compile.nix                     |   92 +-
+ modules/hardware-watch.nix                    |   50 +
+ overlay/cross-compile.nix                     |  125 +-
+ overlay/overlay.nix                           |   14 +-
  .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
  ...on-t-try-to-unmount-nix-or-nix-store.patch |   45 +
@@ -42,7 +43,8 @@ systemd262oldkernel.
  ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
- 28 files changed, 2389 insertions(+), 9 deletions(-)
+ overlay/systemd.nix                           |   68 +
+ 30 files changed, 2458 insertions(+), 65 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -68,6 +70,7 @@ systemd262oldkernel.
  create mode 100644 overlay/systemd-257/oe-Handle-missing-STATX_MNT_ID-on-older-kernels.patch
  create mode 100644 overlay/systemd-257/systemd-search-path-revert.patch
  create mode 100644 overlay/systemd-257/systemd-udevd-varlink.socket
+ create mode 100644 overlay/systemd.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 index 4417fb4b..f9fc1173 100644
@@ -85,10 +88,10 @@ index 4417fb4b..f9fc1173 100644
    mobile.system.system = mkDefault "armv7l-linux";
  
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
-index 35ac4030..1dfe1365 100644
+index 35ac4030..4c9a9b22 100644
 --- a/modules/hardware-watch.nix
 +++ b/modules/hardware-watch.nix
-@@ -92,6 +92,16 @@ in
+@@ -92,6 +92,26 @@ in
        '';
      };
  
@@ -102,10 +105,20 @@ index 35ac4030..1dfe1365 100644
 +      '';
 +    };
 +
++    borderGestureWidth = mkOption {
++      type = types.nullOr (types.either types.str types.float);
++      default = null;
++      description = ''
++        Fraction of display width/height dedicated to border gestures (0.0 - 1.0).
++        Mirrors upstream MACHINE_DISPLAY_BORDER_GESTURE_WIDTH in /etc/asteroid/machine.conf.
++        When null, qml-asteroid defaults to 0.1 (10% of screen edge).
++      '';
++    };
++
      aodSupport = mkOption {
        type = types.bool;
        default = true;
-@@ -117,6 +127,36 @@ in
+@@ -117,6 +137,36 @@ in
        '';
      };
  
@@ -143,90 +156,89 @@ index 35ac4030..1dfe1365 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index 3145a5c7..a5c80f3d 100644
+index 3145a5c7..02caaf5e 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
-@@ -17,7 +17,7 @@ else
-     # Pinned revision of AsteroidOS meta-asteroid used as the source for
-     # upstream patches, so nothing has to be vendored in this repository.
-     # https://github.com/AsteroidOS/meta-asteroid
--    asteroidOSRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
-+    asteroidOSRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+@@ -1,8 +1,8 @@
+ # Overlays and package workarounds that only make sense during cross-compilation.
+ #
+-# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
+-# When cross-compiling, it provides upstream fixes for Qt 6, 32-bit ARM toolchains,
+-# NetSurf host build tools, Skia, systemd, and libkiwix.
++# When building natively, this overlay selects vendored Qt 6.11 for matching
++# Qt host tools. When cross-compiling, it also provides upstream fixes for Qt 6,
++# 32-bit ARM toolchains, NetSurf host build tools, Skia, systemd, and libkiwix.
+ final: super:
  
+ let
+@@ -11,14 +11,14 @@ let
+     superStdenv != null && superStdenv.buildPlatform.system != superStdenv.hostPlatform.system;
+ in
+ if !isCross then
+-  { }
++  {
++    # Use the same vendored Qt package definitions for host tools as for the
++    # target Qt libraries during cross compilation. Their dependencies and
++    # toolchains still come from the current Nixpkgs package set.
++    qt6 = final.callPackage ./vendor/qt-6.11 { };
++  }
+ else
+   let
+-    # Pinned revision of AsteroidOS meta-asteroid used as the source for
+-    # upstream patches, so nothing has to be vendored in this repository.
+-    # https://github.com/AsteroidOS/meta-asteroid
+-    asteroidOSRev = "5af858f49f33efe6d6ef4aa027bee7eeffb27cee";
+-
      addCrossQuickTools =
        pkg:
-@@ -37,13 +37,14 @@ else
-       url = "https://raw.githubusercontent.com/openembedded/openembedded-core/99c96202a2c9aea84f5ceb267a8c63c0cff58b1e/meta/recipes-core/systemd/systemd/Handle-missing-STATX_MNT_ID-on-older-kernels.patch";
-       hash = "sha256-griFG/VhaG1Y5CJeWPuwIo2tCFF5EN9R1YE6T7b80gQ=";
-     };
--  in
--  {
+       pkg.overrideAttrs (old: {
+@@ -29,40 +29,8 @@ else
+         ];
+       });
+ 
+-    # Prefer OpenEmbedded's fdinfo-based STATX_MNT_ID fallback over our
+-    # st_dev approximation. OE marks it native-tools-only, but /proc/self/fdinfo
+-    # is available in stage-2, so apply it to the target as well.
+-    # Reference: https://github.com/openembedded/openembedded-core/blob/master/meta/recipes-core/systemd/systemd/Handle-missing-STATX_MNT_ID-on-older-kernels.patch
+-    systemdStatxPatch = final.fetchurl {
+-      url = "https://raw.githubusercontent.com/openembedded/openembedded-core/99c96202a2c9aea84f5ceb267a8c63c0cff58b1e/meta/recipes-core/systemd/systemd/Handle-missing-STATX_MNT_ID-on-older-kernels.patch";
+-      hash = "sha256-griFG/VhaG1Y5CJeWPuwIo2tCFF5EN9R1YE6T7b80gQ=";
+-    };
+   in
+   {
 -    # systemd 261 requires STATX_ATTR_MOUNT_ROOT (Linux 5.8+) for mount point
 -    # detection. Backport the v257 name_to_handle_at()/fstat() fallback for
 -    # vendor kernels older than that.
 -    # Reference: https://github.com/systemd/systemd/blob/v257/src/basic/mountpoint-util.c
 -    systemd =
-+
-+    # systemd 261/262 require newer kernel primitives. Keep the current
-+    # old-kernel-patched package under the explicit fallback name, but use
-+    # systemd 257 from the NixOS 25.05 nixpkgs for the 4.14 target. 25.05 was
-+    # the last nixpkgs release building systemd 257 (257.10).
-+    #
-+    # Reference: https://github.com/systemd/systemd/blob/v257/NEWS
-+    systemd262OldKernel =
-       (super.systemd.override (
-         super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
-           # systemd BPF framework fails when cross-compiling on 32-bit ARM
-@@ -63,6 +64,46 @@ else
-           ];
-         });
- 
-+    # The systemd 257 definition comes from Nixpkgs 25.05, but GCC 16.2.0's
-+    # libgomp sizes the omp_get_uid_from_device buffer for 10 digits and
-+    # misses the sign, so the target build fails under -Werror=format-truncation.
-+    systemdStdenv = super.stdenv.override {
-+      cc = super.stdenv.cc.override {
-+        cc = super.stdenv.cc.cc.overrideAttrs (old: {
-+          patches = (old.patches or [ ]) ++ [ ./patches/gcc-16.2.0-libgomp-uid-buffer.patch ];
-+        });
-+      };
-+    };
-+
-+    systemd257 =
-+      (super.lib.callPackageWith
-+        (builtins.intersectAttrs (super.lib.functionArgs (import ./systemd-257)) final)
-+        ./systemd-257
-+        { stdenv = systemdStdenv; }
-+      ).override
-+        (
-+          {
-+            # hoki has no encrypted root or EFI UKI; dropping these removes the
-+            # only postFixup users of makeBinaryWrapper, whose helper hook pulls
-+            # in the GCC build that currently fails on armv7.
-+            withCryptsetup = false;
-+            withUkify = false;
-+            withHomed = false;
-+            withRepart = false;
-+            withFido2 = false;
-+          }
-+          // super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
-+            withLibBPF = false;
-+          }
-+        );
-+  in
-+  {
-+    inherit systemd257;
-+    # Keep the patched systemd 262 for old kernels available for debugging
-+    # or fallback even when the legacy profile selects systemd 257.
-+    systemd262oldkernel = systemd262OldKernel;
-+    systemd_latest-oldkernel = systemd262OldKernel;
-+
+-      (super.systemd.override (
+-        super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
+-          # systemd BPF framework fails when cross-compiling on 32-bit ARM
+-          # due to missing linux/types.h in clang target bpf.
+-          withLibBPF = false;
+-        }
+-      )).overrideAttrs
+-        (old: {
+-          patches = (old.patches or [ ]) ++ [
+-            ./patches/systemd-261-mountpoint-old-kernel.patch
+-            ./patches/systemd-261-faccessat-old-kernel.patch
+-            ./patches/systemd-262-pidfd-old-kernel.patch
+-            systemdStatxPatch
+-            ./patches/systemd-262-close-range-old-kernel.patch
+-            ./patches/systemd-262-epoll-pwait2-old-kernel.patch
+-            ./patches/systemd-262-proc-credentials-old-kernel.patch
+-          ];
+-        });
+-
      # ModemManager's generated GDBus sources race with the static archive link
      # when building in parallel; serialize its build.
      modemmanager = super.modemmanager.overrideAttrs (old: {
-@@ -83,6 +124,20 @@ else
+@@ -81,8 +49,22 @@ else
+ 
+     # Upstream nixpkgs Qt6 modules skip QtQuick integration during cross-compilation
      # because cross Qt6QuickTools, Qt6QmlTools, and Qt6ShaderToolsTools cmake flags are missing.
-     qt6 = super.qt6.overrideScope (
+-    qt6 = super.qt6.overrideScope (
++    qt6 = (final.callPackage ./vendor/qt-6.11 { }).overrideScope (
        qfinal: qsuper: {
 +        # Upstream AsteroidOS builds Qt without desktop GL on hybris machines:
 +        # meta-asteroid/recipes-qt/qt6/qtbase_git.bbappend does
@@ -245,7 +257,7 @@ index 3145a5c7..a5c80f3d 100644
          qtdeclarative = qsuper.qtdeclarative.overrideAttrs (old: {
            cmakeFlags =
              (map (
-@@ -98,7 +153,26 @@ else
+@@ -98,7 +80,22 @@ else
                "-DQt6QuickTools_DIR=${final.pkgsBuildBuild.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
              ];
          });
@@ -259,11 +271,7 @@ index 3145a5c7..a5c80f3d 100644
 +        # QT_WAYLAND_SERVER_BUFFER_INTEGRATION=libhybris-egl-server.
 +        qtwayland = (addCrossQuickTools qsuper.qtwayland).overrideAttrs (old: {
 +          patches = (old.patches or [ ]) ++ [
-+            (final.fetchpatch {
-+              name = "0001-Fix-libhybris-egl-server-compilation.patch";
-+              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch";
-+              hash = "sha256-emo6w37aUY8ujwzvVJZ9zPFXbvSZHKA8/0lByzo06Zs=";
-+            })
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch"
 +          ];
 +          cmakeFlags = (old.cmakeFlags or [ ]) ++ [
 +            "-DQT_FEATURE_wayland_libhybris_egl_server_buffer=ON"
@@ -273,6 +281,95 @@ index 3145a5c7..a5c80f3d 100644
          qtvirtualkeyboard = addCrossQuickTools qsuper.qtvirtualkeyboard;
          qtmultimedia = (addCrossQuickTools qsuper.qtmultimedia).overrideAttrs (old: {
            buildInputs = final.lib.filter (
+@@ -141,26 +138,10 @@ else
+               --replace-fail 'DESTINATION /etc/xdg/QtProject' 'DESTINATION etc/xdg/QtProject'
+           '';
+           patches = (old.patches or [ ]) ++ [
+-            (final.fetchpatch {
+-              name = "0001-Enable-sensorfw.patch";
+-              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0001-Enable-sensorfw.patch";
+-              hash = "sha256-H58A7wp9kX8V2NHhQAufDsQKllUnAgZLjbN8geYLvLo=";
+-            })
+-            (final.fetchpatch {
+-              name = "0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch";
+-              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch";
+-              hash = "sha256-2MvTv0IVD1kYgyny/V535U3MjCkx9xMTwduguNxgmjk=";
+-            })
+-            (final.fetchpatch {
+-              name = "0003-Add-step-counter-sensor-with-sensorfw-backend.patch";
+-              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0003-Add-step-counter-sensor-with-sensorfw-backend.patch";
+-              hash = "sha256-rboCPatCx2FnPnGEPwGXw/X4uaHNm8kCOUYfMCm0/xk=";
+-            })
+-            (final.fetchpatch {
+-              name = "0004-Add-sensorfw-backend-for-pressure-sensor.patch";
+-              url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-qt/qt6/qtsensors/0004-Add-sensorfw-backend-for-pressure-sensor.patch";
+-              hash = "sha256-pMCDkMeLW50i8elrrBtwHb5EYqA3iX2K3iavpn8mHQ8=";
+-            })
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtsensors/0001-Enable-sensorfw.patch"
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtsensors/0002-Add-heart-rate-monitor-sensor-with-sensorfw-backend.patch"
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtsensors/0003-Add-step-counter-sensor-with-sensorfw-backend.patch"
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtsensors/0004-Add-sensorfw-backend-for-pressure-sensor.patch"
+           ];
+         });
+         qtconnectivity = addCrossQuickTools qsuper.qtconnectivity;
+@@ -274,6 +255,24 @@ else
+     });
+   }
+   // super.lib.optionalAttrs (superStdenv != null && superStdenv.hostPlatform.isAarch32) {
++    # GCC 16 triggers format-truncation errors in libgomp during 32-bit ARM cross compilation.
++    # Disable -Werror on target library builds so Clang/Mesa toolchain dependencies succeed.
++    gcc-unwrapped = super.gcc-unwrapped.overrideAttrs (old: {
++      configureFlags = (old.configureFlags or [ ]) ++ [
++        "--disable-werror"
++      ];
++      env = (old.env or { }) // {
++        EXTRA_FLAGS_FOR_TARGET = (old.env.EXTRA_FLAGS_FOR_TARGET or "") + " -Wno-error=format-truncation";
++      };
++    });
++
++    # Ensure Clang wrapper links target C++ libraries from the patched GCC runtime
++    llvmPackages = super.llvmPackages // {
++      clang = super.llvmPackages.clang.override {
++        gccForLibs = final.gcc-unwrapped;
++      };
++    };
++
+     # libpcap pulls in rdma-core (InfiniBand/RoCE), which fails to cross-compile
+     # on 32-bit ARM due to CMake Python host/target architecture checks.
+     # Smartwatches do not use InfiniBand, so disable RDMA.
+diff --git a/overlay/overlay.nix b/overlay/overlay.nix
+index 78fdbdd7..bb5de193 100644
+--- a/overlay/overlay.nix
++++ b/overlay/overlay.nix
+@@ -2,8 +2,10 @@ final: super:
+ 
+ let
+   callPackage = final.callPackage;
++  systemdOverlay = import ./systemd.nix final super;
+ in
+-  {
++  systemdOverlay
++  // {
+     # Misc. tools.
+     # Keep sorted.
+     adbd = callPackage ./adbd { };
+@@ -78,7 +80,15 @@ in
+     # All that follows will have to be cleaned and then upstreamed.
+     #
+ 
+-    # No such fixes as of now, this comment is merely a placeholder to keep the general structure.
++    # Upstream libpcap defaults to withRdma = true on Linux, pulling rdma-core.
++    # rdma-core builds man pages using pandoc by default, which pulls in GHC.
++    # On 32-bit ARM (armv7l-linux), GHC cannot bootstrap (cannot bootstrap GHC on
++    # this platform ('armv7l-linux' with libc 'defaultLibc')), breaking native ARM CI.
++    # Neither mobile devices nor smartwatches have RDMA hardware (InfiniBand/RoCE),
++    # so disable RDMA in libpcap and disable man pages in rdma-core to prevent pulling
++    # the entire Pandoc and GHC toolchain.
++    libpcap = super.libpcap.override { withRdma = false; };
++    rdma-core = super.rdma-core.override { withManPages = false; };
+ 
+     # Things specific to mobile-nixos.
+     # Not necessarily internals, but they probably won't go into <nixpkgs>.
 diff --git a/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch b/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
 new file mode 100644
 index 00000000..17006966
@@ -2685,3 +2782,77 @@ index 00000000..e2cc9594
 +DeferTrigger=yes
 +XAttrEntryPoint=user.varlink=entrypoint
 +XAttrListen=user.varlink=listen
+diff --git a/overlay/systemd.nix b/overlay/systemd.nix
+new file mode 100644
+index 00000000..45012ded
+--- /dev/null
++++ b/overlay/systemd.nix
+@@ -0,0 +1,68 @@
++final: super:
++
++let
++  superStdenv = super.stdenv;
++
++  systemdStatxPatch = final.fetchurl {
++    url = "https://raw.githubusercontent.com/openembedded/openembedded-core/99c96202a2c9aea84f5ceb267a8c63c0cff58b1e/meta/recipes-core/systemd/systemd/Handle-missing-STATX_MNT_ID-on-older-kernels.patch";
++    hash = "sha256-griFG/VhaG1Y5CJeWPuwIo2tCFF5EN9R1YE6T7b80gQ=";
++  };
++
++  systemd262OldKernel =
++    (super.systemd.override (
++      super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
++        withLibBPF = false;
++      }
++    )).overrideAttrs
++      (old: {
++        patches = (old.patches or [ ]) ++ [
++          ./patches/systemd-261-mountpoint-old-kernel.patch
++          ./patches/systemd-261-faccessat-old-kernel.patch
++          ./patches/systemd-262-pidfd-old-kernel.patch
++          systemdStatxPatch
++          ./patches/systemd-262-close-range-old-kernel.patch
++          ./patches/systemd-262-epoll-pwait2-old-kernel.patch
++          ./patches/systemd-262-proc-credentials-old-kernel.patch
++        ];
++      });
++
++  systemdStdenv = super.stdenv.override {
++    cc = super.stdenv.cc.override {
++      cc = super.stdenv.cc.cc.overrideAttrs (old: {
++        patches = (old.patches or [ ]) ++ [ ./patches/gcc-16.2.0-libgomp-uid-buffer.patch ];
++      });
++    };
++  };
++
++  systemd257 =
++    (super.lib.callPackageWith
++      (builtins.intersectAttrs (super.lib.functionArgs (import ./systemd-257)) super)
++      ./systemd-257
++      {
++        stdenv = systemdStdenv;
++        libcap = super.libcap.override { usePam = false; };
++        util-linux = super.util-linuxMinimal;
++      }
++    ).override
++      (
++        {
++          withCryptsetup = false;
++          withUkify = false;
++          withHomed = false;
++          withRepart = false;
++          withFido2 = false;
++          withIptables = false;
++          withRemote = false;
++          withTpm2Tss = false;
++          withImportd = false;
++        }
++        // super.lib.optionalAttrs (superStdenv.hostPlatform.isAarch32) {
++          withLibBPF = false;
++        }
++      );
++in
++{
++  inherit systemd257;
++  systemd262oldkernel = systemd262OldKernel;
++  systemd_latest-oldkernel = systemd262OldKernel;
++}
