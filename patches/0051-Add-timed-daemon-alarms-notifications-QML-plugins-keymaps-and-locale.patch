@@ -30,7 +30,7 @@ into the asteroid desktop profile.
  create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index f5979e50..d804b27f 100644
+index f5979e50..191ff280 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -341,7 +341,7 @@ in
@@ -38,7 +38,7 @@ index f5979e50..d804b27f 100644
  
      cp ${pkgs.writeText "20-device.conf" ''
 -      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4 -plugin evdevkeyboard:/dev/input/event0 -plugin evdevmouse:/dev/input/event1"
-+      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=/usr/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
++      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
        QPA_HWC_FORCE_GLES=1
        QPA_HWC2_FORCE_DOZE_UPDATE=1
        QT_OPENGL_NO_BGRA=1

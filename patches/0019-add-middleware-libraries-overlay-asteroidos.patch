@@ -32,7 +32,8 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/libiphb/default.nix        |  54 ++
  overlay/asteroidos/libngf/default.nix         |  53 ++
  ...-sailjaild-D-Bus-query-when-sailjail.patch |  40 ++
- overlay/asteroidos/mapplauncherd/default.nix  |  61 ++
+ .../0003-invoker-fallback-dlopen-so.patch     |  69 ++
+ overlay/asteroidos/mapplauncherd/default.nix  |  59 ++
  overlay/asteroidos/mce-dev/default.nix        |  41 ++
  .../mce-plugin-libhybris/default.nix          |  72 +++
  overlay/asteroidos/mce-qt6/default.nix        | 100 +++
@@ -58,7 +59,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
  overlay/libhybris/default.nix                 |  68 +-
- 41 files changed, 4583 insertions(+), 36 deletions(-)
+ 42 files changed, 4650 insertions(+), 36 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -73,6 +74,7 @@ libraries, without wrapping the Qt apps.
  create mode 100644 overlay/asteroidos/libiphb/default.nix
  create mode 100644 overlay/asteroidos/libngf/default.nix
  create mode 100644 overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
+ create mode 100644 overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
  create mode 100644 overlay/asteroidos/mapplauncherd/default.nix
  create mode 100644 overlay/asteroidos/mce-dev/default.nix
  create mode 100644 overlay/asteroidos/mce-plugin-libhybris/default.nix
@@ -1360,17 +1362,91 @@ index 00000000..0597e987
 +-- 
 +2.47.3
 +
+diff --git a/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
+new file mode 100644
+index 00000000..4a96ad3c
+--- /dev/null
++++ b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
+@@ -0,0 +1,69 @@
++diff --git a/src/invoker/CMakeLists.txt b/src/invoker/CMakeLists.txt
++index 8ef4ade..df5efb5 100644
++--- a/src/invoker/CMakeLists.txt
+++++ b/src/invoker/CMakeLists.txt
++@@ -17,7 +17,7 @@ add_definitions(-DPROG_NAME_INVOKER="invoker")
++ # Set target
++ add_executable(invoker ${SRC})
++ 
++-target_link_libraries(invoker ${DBUS_LDFLAGS} ${GLIB_LDFLAGS})
+++target_link_libraries(invoker ${DBUS_LDFLAGS} ${GLIB_LDFLAGS} ${CMAKE_DL_LIBS})
++ 
++ # Add install rule
++ install(TARGETS invoker DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
++diff --git a/src/invoker/invoker.c b/src/invoker/invoker.c
++index 9642a7d..e245abc 100644
++--- a/src/invoker/invoker.c
+++++ b/src/invoker/invoker.c
++@@ -38,6 +38,8 @@
++ #include <errno.h>
++ #include <sys/wait.h>
++ #include <limits.h>
+++#include <dlfcn.h>
+++#include <string.h>
++ #include <getopt.h>
++ #include <fcntl.h>
++ #include <time.h>
++@@ -859,6 +861,42 @@ static void invoke_fallback(const InvokeArgs *args)
++         }
++     }
++ 
+++    /* When launched from asteroid-launcher compositor, the environment has
+++     * QT_QPA_PLATFORM=hwcomposer and EGL_PLATFORM=hwcomposer.
+++     * Smartwatch client applications must connect as Wayland clients to the compositor.
+++     */
+++    const char *qpa = getenv("QT_QPA_PLATFORM");
+++    if (!qpa || strcmp(qpa, "hwcomposer") == 0) {
+++        setenv("QT_QPA_PLATFORM", "wayland", 1);
+++    }
+++    const char *egl_plat = getenv("EGL_PLATFORM");
+++    if (!egl_plat || strcmp(egl_plat, "hwcomposer") == 0) {
+++        setenv("EGL_PLATFORM", "wayland", 1);
+++    }
+++    if (!getenv("WAYLAND_DISPLAY")) {
+++        setenv("WAYLAND_DISPLAY", "wayland-0", 0);
+++    }
+++    if (!getenv("XDG_RUNTIME_DIR")) {
+++        setenv("XDG_RUNTIME_DIR", "/run/user/1000", 0);
+++    }
+++
+++    const char *dot_so = strstr(args->prog_name, ".so");
+++    if (dot_so && (dot_so[3] == '\0' || dot_so[3] == '.')) {
+++        dlopen("libEGL.so.1", RTLD_NOW | RTLD_GLOBAL);
+++        dlopen("libGLESv2.so.2", RTLD_NOW | RTLD_GLOBAL);
+++        void *handle = dlopen(args->prog_name, RTLD_NOW | RTLD_GLOBAL);
+++        if (!handle) {
+++            error("dlopen(%s) failed: %s\n", args->prog_name, dlerror());
+++            exit(EXIT_FAILURE);
+++        }
+++        int (*app_main)(int, char **) = (int (*)(int, char **))dlsym(handle, "main");
+++        if (!app_main) {
+++            error("dlsym(main) in %s failed: %s\n", args->prog_name, dlerror());
+++            exit(EXIT_FAILURE);
+++        }
+++        exit(app_main(args->prog_argc, args->prog_argv));
+++    }
+++
++     // Exec the process image
++     execve(args->prog_name, args->prog_argv, environ);
++     perror("execve");   /* execve() only returns on error */
 diff --git a/overlay/asteroidos/mapplauncherd/default.nix b/overlay/asteroidos/mapplauncherd/default.nix
 new file mode 100644
-index 00000000..a8bd2d87
+index 00000000..711acf6a
 --- /dev/null
 +++ b/overlay/asteroidos/mapplauncherd/default.nix
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,59 @@
 +{
 +  lib,
 +  stdenv,
 +  fetchFromGitHub,
-+  fetchurl,
 +  cmake,
 +  pkg-config,
 +  glib,
@@ -1378,6 +1454,7 @@ index 00000000..a8bd2d87
 +  systemd,
 +  libcap,
 +  kdePackages,
++  metaAsteroidSrc,
 +}:
 +
 +stdenv.mkDerivation {
@@ -1392,11 +1469,9 @@ index 00000000..a8bd2d87
 +  };
 +
 +  patches = [
-+    (fetchurl {
-+      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-nemomobile/mapplauncherd/mapplauncherd/0001-Fix-dynamic-opening-issues.patch";
-+      hash = "sha256-c2sqCkdjFN5G7JXyzMnLHbzCM1SDQue9z6He+YwogGI=";
-+    })
++    "${metaAsteroidSrc}/recipes-nemomobile/mapplauncherd/mapplauncherd/0001-Fix-dynamic-opening-issues.patch"
 +    ./0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
++    ./0003-invoker-fallback-dlopen-so.patch
 +  ];
 +
 +  strictDeps = true;
