@@ -14,7 +14,7 @@ Select systemd 257 only for the legacy kernel; modern kernels use the
 current systemd 262. Keep the old-kernel-patched 262 package as
 systemd262oldkernel.
 ---
- devices/families/asteroidos.nix               |    4 +
+ devices/families/asteroidos.nix               |   15 +
  modules/hardware-watch.nix                    |   13 +
  overlay/cross-compile.nix                     |   79 +-
  overlay/overlay.nix                           |   30 +-
@@ -44,7 +44,7 @@ systemd262oldkernel.
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
  overlay/systemd.nix                           |   68 +
- 30 files changed, 2396 insertions(+), 60 deletions(-)
+ 30 files changed, 2407 insertions(+), 60 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -73,16 +73,27 @@ systemd262oldkernel.
  create mode 100644 overlay/systemd.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 4417fb4b..f9fc1173 100644
+index 4417fb4b..1081d085 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
-@@ -12,6 +12,10 @@ let
+@@ -12,6 +12,21 @@ let
      ;
  in
  {
-+  systemd.package = lib.mkForce (
-+    if config.mobile.hardware.watch.kernel == "legacy" then pkgs.systemd257 else pkgs.systemd
-+  );
++  # Legacy smartwatch kernels (Linux 4.x) lack STATX_MNT_ID, close_range, and modern
++  # cgroup/pidfd APIs required by systemd >= 261. Override systemd and udev system-wide
++  # to systemd 257 for all consumers on legacy watch targets (without polluting buildPackages).
++  nixpkgs.overlays = lib.mkIf (config.mobile.hardware.watch.kernel == "legacy") (lib.mkAfter [
++    (final: super: super.lib.optionalAttrs (super.stdenv.hostPlatform.isAarch32) {
++      systemd = final.systemd257;
++      udev = final.systemd257;
++      lvm2 = super.lvm2.overrideAttrs (old: {
++        outputChecks = builtins.mapAttrs (_: v: (v // { disallowedRequisites = [ ]; })) (
++          old.outputChecks or { }
++        );
++      });
++    })
++  ]);
 +
    mobile.system.type = mkDefault "android";
    mobile.system.system = mkDefault "armv7l-linux";

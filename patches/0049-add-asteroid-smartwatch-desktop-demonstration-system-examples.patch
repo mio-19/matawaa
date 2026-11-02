@@ -39,10 +39,10 @@ Run the launcher the way upstream AsteroidOS does: start it as a user service wi
  create mode 100644 overlay/asteroidos/udev-droid-system/default.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index f9fc1173..f2b892bc 100644
+index 1081d085..f0f0decc 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
-@@ -141,6 +141,24 @@ in
+@@ -152,6 +152,24 @@ in
      memoryPercent = lib.mkOptionDefault 50;
    };
  

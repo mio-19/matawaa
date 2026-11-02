@@ -1,43 +1,26 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Mon, 2 Nov 2026 12:21:18 +1100
-Subject: [PATCH] examples/asteroid, devices/families: link mce against
- config.systemd.package and export battery udev attributes
+Subject: [PATCH] asteroid-desktop, devices/families: configure Wayland client
+ environment, QML import paths, and battery udev attributes
 
+1. Expose WAYLAND_DISPLAY, XDG_RUNTIME_DIR, QT_QPA_PLATFORM=wayland, EGL_PLATFORM=wayland,
+   LD_PRELOAD and QML import paths to the systemd user manager session so client apps
+   can launch with proper hardware-accelerated OpenGL / libhybris Wayland contexts.
+2. Eliminate hardcoded meta-asteroid URL fetches in favor of pkgs.asteroid.meta-asteroid-src.
+3. Export battery power_supply capacity and status to the udev database for the MCE
+   battery-udev plugin.
+4. Set ConditionPathExists on droid-boot-completed to avoid failures on mainline kernels.
 ---
- devices/families/asteroidos.nix        |  23 ++-
+ devices/families/asteroidos.nix        |   6 +
  examples/asteroid/asteroid-desktop.nix | 218 ++++++++++++++-----------
- 2 files changed, 142 insertions(+), 99 deletions(-)
+ 2 files changed, 128 insertions(+), 96 deletions(-)
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 72acc76f..f1e3d863 100644
+index 893e57a6..f1e3d863 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
-@@ -17,9 +17,20 @@ let
-   debugNetwork = cfg.enable || stage2SshCfg.enable;
- in
- {
--  systemd.package = lib.mkForce (
--    if config.mobile.hardware.watch.kernel == "legacy" then pkgs.systemd257 else pkgs.systemd
--  );
-+  # Legacy smartwatch kernels (Linux 4.x) lack STATX_MNT_ID, close_range, and modern
-+  # cgroup/pidfd APIs required by systemd >= 261. Override systemd and udev system-wide
-+  # to systemd 257 for all consumers on legacy watch targets (without polluting buildPackages).
-+  nixpkgs.overlays = lib.mkIf (config.mobile.hardware.watch.kernel == "legacy") (lib.mkAfter [
-+    (final: super: super.lib.optionalAttrs (super.stdenv.hostPlatform.isAarch32) {
-+      systemd = final.systemd257;
-+      udev = final.systemd257;
-+      lvm2 = super.lvm2.overrideAttrs (old: {
-+        outputChecks = builtins.mapAttrs (_: v: (v // { disallowedRequisites = [ ]; })) (
-+          old.outputChecks or { }
-+        );
-+      });
-+    })
-+  ]);
- 
-   assertions = [
-     {
-@@ -171,6 +182,12 @@ in
+@@ -182,6 +182,12 @@ in
      ACTION=="add", KERNEL=="MTK_SMI", MODE="0664", GROUP="video"
      ACTION=="add", KERNEL=="mali", MODE="0664", GROUP="video"
      ACTION=="add", KERNEL=="vboxguest", MODE="0664", GROUP="video"
