@@ -20,10 +20,10 @@ Run the launcher the way upstream AsteroidOS does: start it as a user service wi
  overlay/asteroidos/libnciplugin/default.nix   |  90 +++
  overlay/asteroidos/libnfcdef/default.nix      |  71 ++
  overlay/asteroidos/nfcd/default.nix           | 197 +++++
- overlay/asteroidos/ngfd/default.nix           | 105 +++
+ overlay/asteroidos/ngfd/default.nix           | 111 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 15 files changed, 1661 insertions(+)
+ 15 files changed, 1667 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -1631,10 +1631,10 @@ index 00000000..d12414ad
 +}
 diff --git a/overlay/asteroidos/ngfd/default.nix b/overlay/asteroidos/ngfd/default.nix
 new file mode 100644
-index 00000000..3bd40e33
+index 00000000..e82464c0
 --- /dev/null
 +++ b/overlay/asteroidos/ngfd/default.nix
-@@ -0,0 +1,105 @@
+@@ -0,0 +1,111 @@
 +# Upstream: meta-asteroid/recipes-nemomobile/ngfd/ngfd_git.bb
 +# Nemomobile's non graphical feedback daemon (haptics / system sounds).
 +{
@@ -1691,6 +1691,12 @@ index 00000000..3bd40e33
 +    autoreconfHook
 +    pkg-config
 +  ];
++
++  # GCC preprocessor defines `linux=1` by default on GNU/Linux. When Autotools bakes
++  # -DDEFAULT_PLUGIN_PATH=@NGFD_PLUGIN_DIR@ into ngfd, the path component
++  # `armv7l-unknown-linux-gnueabihf` gets corrupted into `armv7l-unknown-1-gnueabihf`,
++  # causing ngfd to fail to locate plugins. Undefine `linux` with `-Ulinux`.
++  NIX_CFLAGS_COMPILE = [ "-Ulinux" ];
 +
 +  buildInputs = [
 +    glib

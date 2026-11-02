@@ -8,11 +8,11 @@ builder, and the qml-asteroid wearable QML controls. Register the new
 package set in the Mobile-NixOS overlay.
 ---
  overlay/asteroidos/default.nix              |  11 ++
- overlay/asteroidos/lib/mk-asteroid-app.nix  | 100 ++++++++++++++++++
- overlay/asteroidos/qml-asteroid/default.nix | 107 ++++++++++++++++++++
+ overlay/asteroidos/lib/mk-asteroid-app.nix  | 109 ++++++++++++++++++++
+ overlay/asteroidos/qml-asteroid/default.nix | 107 +++++++++++++++++++
  overlay/oans/default.nix                    |  61 +++++++++++
  overlay/overlay.nix                         |   5 +
- 5 files changed, 284 insertions(+)
+ 5 files changed, 293 insertions(+)
  create mode 100644 overlay/asteroidos/default.nix
  create mode 100644 overlay/asteroidos/lib/mk-asteroid-app.nix
  create mode 100644 overlay/asteroidos/qml-asteroid/default.nix
@@ -37,10 +37,10 @@ index 00000000..2fc834f0
 +}
 diff --git a/overlay/asteroidos/lib/mk-asteroid-app.nix b/overlay/asteroidos/lib/mk-asteroid-app.nix
 new file mode 100644
-index 00000000..f89af365
+index 00000000..04769ec4
 --- /dev/null
 +++ b/overlay/asteroidos/lib/mk-asteroid-app.nix
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,109 @@
 +# Unified builder for AsteroidOS smartwatch applications
 +# Inspired by Nixpkgs mkKdeDerivation: https://github.com/NixOS/nixpkgs/blob/master/pkgs/kde/lib/mk-kde-derivation.nix
 +{
@@ -50,6 +50,7 @@ index 00000000..f89af365
 +  pkg-config,
 +  qt6,
 +  qml-asteroid,
++  mapplauncherd,
 +  kdePackages,
 +  buildPackages,
 +}:
@@ -94,6 +95,7 @@ index 00000000..f89af365
 +
 +  postPatch = ''
 +    find . -name CMakeLists.txt -exec sed -i 's|/usr/share|share|g' {} +
++    find . -name "*.qml" -exec sed -i 's|/usr/share/asteroid-launcher|/run/current-system/sw/share/asteroid-launcher|g' {} +
 +  ''
 +  + postPatch;
 +
@@ -129,6 +131,13 @@ index 00000000..f89af365
 +    qml-asteroid
 +  ]
 +  ++ extraBuildInputs;
++
++  # Self-contained app launcher scripts: ensure invoker is resolved to its absolute Nix store path
++  postFixup = ''
++    if [ -d "$out/bin" ]; then
++      find "$out/bin" -type f -exec sed -i "s|\\bexec invoker\\b|exec ${mapplauncherd}/bin/invoker|g" {} +
++    fi
++  '';
 +
 +  meta =
 +    with lib;

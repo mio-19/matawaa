@@ -18,12 +18,12 @@ into the asteroid desktop profile.
  .../qml-boot-diagnostics.patch                |  58 +++++
  overlay/asteroidos/default.nix                |   8 +-
  overlay/asteroidos/libiodata/default.nix      |   7 +
- .../nemo-qml-plugin-alarms/default.nix        | 131 +++++++++++
- .../nemo-qml-plugin-notifications/default.nix | 117 ++++++++++
+ .../nemo-qml-plugin-alarms/default.nix        | 135 ++++++++++++
+ .../nemo-qml-plugin-notifications/default.nix | 121 +++++++++++
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   1 +
  .../hwc-present-diagnostics.patch             | 204 ++++++++++++++++++
  overlay/asteroidos/timed-qt6/default.nix      | 170 ++++++++++++++-
- 13 files changed, 922 insertions(+), 22 deletions(-)
+ 13 files changed, 930 insertions(+), 22 deletions(-)
  create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
@@ -591,10 +591,10 @@ index 36607b9c..25646355 100644
    src/validator.h
 diff --git a/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
 new file mode 100644
-index 00000000..2d20303c
+index 00000000..261c3149
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,135 @@
 +# Nemomobile alarms QML plugin (Nemo.Alarms)
 +# Upstream repository: https://github.com/sailfishos/nemo-qml-plugin-alarms
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-qml-plugins/nemo-qml-plugin-alarms_git.bb
@@ -696,7 +696,6 @@ index 00000000..2d20303c
 +    )
 +
 +    set_target_properties(nemoalarms PROPERTIES
-+      PREFIX ""
 +      OUTPUT_NAME nemoalarms
 +      LIBRARY_OUTPUT_DIRECTORY "''${CMAKE_CURRENT_BINARY_DIR}"
 +    )
@@ -705,6 +704,11 @@ index 00000000..2d20303c
 +    install(FILES ''${SRC_DIR}/qmldir ''${SRC_DIR}/plugins.qmltypes
 +      DESTINATION lib/qt-6/qml/Nemo/Alarms)
 +    EOF
++  '';
++
++  postInstall = ''
++    # Provide both libnemoalarms.so and nemoalarms.so symlinks for QML plugin loader
++    ln -s libnemoalarms.so $out/lib/qt-6/qml/Nemo/Alarms/nemoalarms.so
 +  '';
 +
 +  cmakeFlags = [
@@ -728,10 +732,10 @@ index 00000000..2d20303c
 +})
 diff --git a/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
 new file mode 100644
-index 00000000..ea808abd
+index 00000000..3b6dc415
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,121 @@
 +# Nemomobile notifications library and QML plugin (Nemo.Notifications)
 +# Upstream repository: https://github.com/sailfishos/nemo-qml-plugin-notifications
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-qml-plugins/nemo-qml-plugin-notifications_git.bb
@@ -812,7 +816,6 @@ index 00000000..ea808abd
 +      Qt6::Qml
 +      Qt6::DBus)
 +    set_target_properties(nemonotifications PROPERTIES
-+      PREFIX ""
 +      OUTPUT_NAME nemonotifications)
 +
 +    install(TARGETS nemonotifications-qt6 DESTINATION lib)
@@ -827,6 +830,11 @@ index 00000000..ea808abd
 +      ''${SRC_DIR}/notificationexport.h
 +      DESTINATION include/nemonotifications-qt6)
 +    EOF
++  '';
++
++  postInstall = ''
++    # Provide both libnemonotifications.so and nemonotifications.so symlinks for QML plugin loader
++    ln -s libnemonotifications.so $out/lib/qt-6/qml/Nemo/Notifications/nemonotifications.so
 +  '';
 +
 +  cmakeFlags = [
