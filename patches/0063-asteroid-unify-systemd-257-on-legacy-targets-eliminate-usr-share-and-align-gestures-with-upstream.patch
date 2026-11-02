@@ -5,17 +5,19 @@ Subject: [PATCH] asteroid: unify systemd 257 on legacy targets, eliminate
  /usr/share, and align gestures with upstream
 
 ---
- devices/families/asteroidos.nix               | 17 ++++++++++---
- devices/fossil-hoki/default.nix               |  3 +--
- examples/asteroid/asteroid-desktop.nix        | 24 ++++---------------
- modules/asteroid-config.nix                   |  7 ++++--
- modules/hardware-watch.nix                    | 10 ++++++++
- .../asteroidos/asteroid-launcher/default.nix  | 20 ++++++++++++++++
+ devices/families/asteroidos.nix               | 17 ++++-
+ devices/fossil-hoki-mainline/default.nix      |  6 +-
+ devices/fossil-hoki/default.nix               |  3 +-
+ devices/oppo-beluga-mainline/default.nix      |  6 +-
+ examples/asteroid/asteroid-desktop.nix        | 65 +++++++++----------
+ modules/asteroid-config.nix                   |  7 +-
+ modules/hardware-watch.nix                    | 10 +++
+ .../asteroidos/asteroid-launcher/default.nix  | 20 ++++++
  overlay/asteroidos/lib/mk-asteroid-app.nix    |  1 +
- overlay/asteroidos/timed-qt6/default.nix      |  7 ++++++
- .../asteroidos/virtualkeyboard/default.nix    |  2 ++
- overlay/systemd.nix                           | 12 ++++++++--
- 10 files changed, 74 insertions(+), 29 deletions(-)
+ overlay/asteroidos/timed-qt6/default.nix      |  7 ++
+ .../asteroidos/virtualkeyboard/default.nix    |  2 +
+ overlay/systemd.nix                           | 12 +++-
+ 12 files changed, 107 insertions(+), 49 deletions(-)
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 index 4e495943..f1e3d863 100644
@@ -45,6 +47,23 @@ index 4e495943..f1e3d863 100644
  
    assertions = [
      {
+diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
+index 17fc251a..1195ba0e 100644
+--- a/devices/fossil-hoki-mainline/default.nix
++++ b/devices/fossil-hoki-mainline/default.nix
+@@ -106,9 +106,9 @@
+   };
+ 
+   environment.sessionVariables = {
+-    QT_QPA_PLATFORM = "eglfs";
+-    QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
+-    QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++    QT_QPA_PLATFORM = lib.mkDefault "eglfs";
++    QT_QPA_EGLFS_INTEGRATION = lib.mkDefault "eglfs_kms";
++    QT_QPA_EGLFS_ALWAYS_SET_MODE = lib.mkDefault "1";
+   };
+ 
+   zramSwap.enable = true;
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 index 2c5fb96a..191ff280 100644
 --- a/devices/fossil-hoki/default.nix
@@ -59,11 +78,28 @@ index 2c5fb96a..191ff280 100644
        QPA_HWC_FORCE_GLES=1
        QPA_HWC2_FORCE_DOZE_UPDATE=1
        QT_OPENGL_NO_BGRA=1
+diff --git a/devices/oppo-beluga-mainline/default.nix b/devices/oppo-beluga-mainline/default.nix
+index e14f5032..6ed487dd 100644
+--- a/devices/oppo-beluga-mainline/default.nix
++++ b/devices/oppo-beluga-mainline/default.nix
+@@ -90,9 +90,9 @@
+   };
+ 
+   environment.sessionVariables = {
+-    QT_QPA_PLATFORM = "eglfs";
+-    QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
+-    QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++    QT_QPA_PLATFORM = lib.mkDefault "eglfs";
++    QT_QPA_EGLFS_INTEGRATION = lib.mkDefault "eglfs_kms";
++    QT_QPA_EGLFS_ALWAYS_SET_MODE = lib.mkDefault "1";
+   };
+ 
+   zramSwap.enable = true;
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index bcb3f0ea..71dd5852 100644
+index bcb3f0ea..4e72786f 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -16,13 +16,6 @@ let
+@@ -16,12 +16,7 @@ let
      || config.mobile.hardware.watch.stage2-save-logs.enable
      || config.mobile.hardware.watch.stage2-ssh.enable;
  
@@ -73,11 +109,11 @@ index bcb3f0ea..71dd5852 100644
 -    systemd = config.systemd.package;
 -    udev = config.systemd.package;
 -  };
--
++  isLegacy = config.mobile.hardware.watch.kernel == "legacy";
+ 
    # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
    # policies at build time instead of vendoring copies in this repository.
-   # https://github.com/AsteroidOS/meta-asteroid
-@@ -136,7 +129,7 @@ in
+@@ -136,7 +131,7 @@ in
          asteroid.asteroid-btsyncd
          asteroid.nemo-qml-plugin-dbus
          asteroid.libconnman-qt
@@ -86,7 +122,7 @@ index bcb3f0ea..71dd5852 100644
          asteroid.ngfd
          asteroid.nfcd
          asteroid.keepalive
-@@ -202,12 +195,11 @@ in
+@@ -202,12 +197,11 @@ in
  
      systemd.tmpfiles.rules = [
        "d /var/lib/kiwix 0775 ceres users -"
@@ -100,7 +136,7 @@ index bcb3f0ea..71dd5852 100644
        # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
        "d /var/lib/connman 0755 root root -"
        "C+ /var/lib/connman/settings 0644 root root - ${
-@@ -236,8 +228,6 @@ in
+@@ -236,8 +230,6 @@ in
        "d /var/lib/timed 0775 ceres users -"
        "d /var/lib/timed/shared_events 0775 ceres users -"
        "d /var/lib/timed/shared_settings 0775 ceres users -"
@@ -109,7 +145,7 @@ index bcb3f0ea..71dd5852 100644
        # Upstream supported-languages_git.bb seeds the ceres locale drop-in that
        # user@.service.d/locale.conf reads (installed via environment.etc below).
        "d /home/.system/var/lib/environment/1000 0755 ceres users -"
-@@ -279,12 +269,6 @@ in
+@@ -279,12 +271,6 @@ in
        pkgs.asteroid.assets.fonts
      ];
  
@@ -122,7 +158,7 @@ index bcb3f0ea..71dd5852 100644
      # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
      # Reference: https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/src/main.conf
      hardware.bluetooth.settings = {
-@@ -346,7 +330,7 @@ in
+@@ -346,7 +332,7 @@ in
          # fails ("Cannot open `/var/run/mce/boot' for writing").
          RuntimeDirectory = "mce";
          RuntimeDirectoryMode = "0755";
@@ -131,7 +167,7 @@ index bcb3f0ea..71dd5852 100644
          TimeoutSec = 2;
          Restart = "always";
          RestartSec = "1s";
-@@ -558,7 +542,7 @@ in
+@@ -558,7 +544,7 @@ in
      # upstream AsteroidOS connman policy replaces connman's own one.
      services.dbus.packages = [
        pkgs.dconf
@@ -140,6 +176,104 @@ index bcb3f0ea..71dd5852 100644
        pkgs.asteroid.dsme
        pkgs.asteroid.sensorfw
        pkgs.asteroid.ngfd
+@@ -594,18 +580,19 @@ in
+       QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+       RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
+       # Default platform for client apps running under the Wayland compositor
+-      QT_QPA_PLATFORM = "wayland";
++      QT_QPA_PLATFORM = lib.mkForce "wayland";
+       EGL_PLATFORM = "wayland";
+       WAYLAND_DISPLAY = "wayland-0";
+       XDG_RUNTIME_DIR = "/run/user/1000";
+-      LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
+-      LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
+       QML2_IMPORT_PATH = qmlImportPath;
+       QML_IMPORT_PATH = qmlImportPath;
+       NIXPKGS_QT6_QML_IMPORT_PATH = qmlImportPath;
+       QT_PLUGIN_PATH = qtPluginPath;
+       # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
+       QT_ENABLE_HIGHDPI_SCALING = "0";
++    } // lib.optionalAttrs isLegacy {
++      LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++      LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
+     };
+ 
+     # Upstream asteroid-alarmclock installs share/systemd/user/alarmpresenter.service
+@@ -668,21 +655,26 @@ in
+           QT_VIRTUALKEYBOARD_STYLE = "watch";
+           QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+           RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
+-          # The launcher is the compositor: use the hwcomposer QPA, not xcb.
+-          EGL_PLATFORM = "hwcomposer";
+-          QT_QPA_PLATFORM = "hwcomposer";
+-          # Upstream Qt selects the libhybris EGL server buffer integration
+-          # automatically; Qt 6.12's loadServerBufferIntegration() only loads a
+-          # key named in this variable, so name the same upstream integration.
+-          QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "libhybris-egl-server";
+-          LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
+-          LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
++          # The launcher is the compositor.
++          # On legacy targets with Android kernels, use hwcomposer and libhybris.
++          # On modern mainline targets, use eglfs on DRM/KMS.
++          EGL_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
++          QT_QPA_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
+           QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
+           QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
+           # Direct Qt diagnostic logs to stderr/launcher.log instead of hidden journal
+           QT_FORCE_STDERR_LOGGING = "1";
+           QT_ASSUME_STDERR_HAS_CONSOLE = "1";
+         }
++        // lib.optionalAttrs isLegacy {
++          QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "libhybris-egl-server";
++          LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++          LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
++        }
++        // lib.optionalAttrs (!isLegacy) {
++          QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
++          QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++        }
+         // lib.optionalAttrs debugBuild {
+         # Debug builds: turn on every trace the graphics stack can emit.
+         # These are runtime switches only; the upstream code path is unchanged.
+@@ -763,7 +755,10 @@ in
+       description = "Tells the Android init system that the boot has been completed";
+       wantedBy = [ "default.target" ];
+       after = [ "asteroid-launcher.service" ];
+-      unitConfig.ConditionUser = "!root";
++      unitConfig = {
++        ConditionUser = "!root";
++        ConditionPathExists = "/system/bin/getprop";
++      };
+       serviceConfig = {
+         Type = "simple";
+         ExecStartPre = "-${pkgs.coreutils}/bin/sleep 1";
+@@ -776,14 +771,16 @@ in
+     # all systemd user services so AsteroidOS apps and service wrappers can find
+     # `invoker`, core utilities, QML modules, and libhybris EGL.
+     systemd.user.settings.Manager = {
+-      DefaultEnvironment = lib.concatStringsSep " " [
++      DefaultEnvironment = lib.concatStringsSep " " ([
+         "\"PATH=/run/wrappers/bin:/run/current-system/sw/bin\""
+         "\"WAYLAND_DISPLAY=wayland-0\""
+         "\"XDG_RUNTIME_DIR=/run/user/1000\""
+         "\"QT_QPA_PLATFORM=wayland\""
+         "\"EGL_PLATFORM=wayland\""
++      ] ++ lib.optionals isLegacy [
+         "\"LD_PRELOAD=${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2\""
+         "\"LD_LIBRARY_PATH=${pkgs.libhybris}/lib\""
++      ] ++ [
+         "\"QML2_IMPORT_PATH=${qmlImportPath}\""
+         "\"QML_IMPORT_PATH=${qmlImportPath}\""
+         "\"NIXPKGS_QT6_QML_IMPORT_PATH=${qmlImportPath}\""
+@@ -793,7 +790,7 @@ in
+         "\"QT_VIRTUALKEYBOARD_LAYOUT_PATH=${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts\""
+         "\"RIME_SHARED_DATA_DIR=${pkgs.asteroid.virtualkeyboard}/share/rime-data\""
+         "\"QT_ENABLE_HIGHDPI_SCALING=0\""
+-      ];
++      ]);
+     };
+ 
+     # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
 diff --git a/modules/asteroid-config.nix b/modules/asteroid-config.nix
 index e7f2f5a3..dc08f497 100644
 --- a/modules/asteroid-config.nix

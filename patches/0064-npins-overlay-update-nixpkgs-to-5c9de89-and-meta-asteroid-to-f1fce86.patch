@@ -12,10 +12,10 @@ Subject: [PATCH] npins, overlay: update nixpkgs to 5c9de89 and meta-asteroid
  4 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 71dd5852..cd1bc3a2 100644
+index 4e72786f..ec91a65f 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -19,7 +19,7 @@ let
+@@ -21,7 +21,7 @@ let
    # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
    # policies at build time instead of vendoring copies in this repository.
    # https://github.com/AsteroidOS/meta-asteroid
