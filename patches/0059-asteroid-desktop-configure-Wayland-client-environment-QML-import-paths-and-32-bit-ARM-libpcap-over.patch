@@ -9,15 +9,68 @@ Subject: [PATCH] asteroid-desktop: configure Wayland client environment, QML
    can launch with proper hardware-accelerated OpenGL / libhybris Wayland contexts.
 2. Pkg-config and override libpcap/rdma-core conditionally for 32-bit ARM.
 ---
- examples/asteroid/asteroid-desktop.nix | 109 +++++++++++++++++--------
- overlay/overlay.nix                    |  24 ++++--
- 2 files changed, 92 insertions(+), 41 deletions(-)
+ examples/asteroid/asteroid-desktop.nix | 233 +++++++++++++------------
+ overlay/overlay.nix                    |  26 ++-
+ 2 files changed, 151 insertions(+), 108 deletions(-)
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index c4d200a7..476f571c 100644
+index c4d200a7..8b6b586d 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -72,7 +72,44 @@ in
+@@ -16,47 +16,19 @@ let
+     || config.mobile.hardware.watch.stage2-save-logs.enable
+     || config.mobile.hardware.watch.stage2-ssh.enable;
+ 
+-  # MCE daemon compiled with the active systemd / udev package (e.g. systemd 257 for legacy kernels)
+-  # to ensure libudev device enumeration compatibility on vendor kernels.
+-  mcePkg = pkgs.asteroid.mce.override {
+-    systemd = config.systemd.package;
+-    udev = config.systemd.package;
+-  };
+-
+-  # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
+-  # policies at build time instead of vendoring copies in this repository.
+-  # https://github.com/AsteroidOS/meta-asteroid
+-  asteroidOSRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
++  isLegacy = config.mobile.hardware.watch.kernel == "legacy";
+ 
+   # Upstream asteroid-launcher_git.bb installs a seeded notification database
+   # into the ceres user's privileged data directory.
+   # https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications
+-  launcherNotifications = pkgs.fetchurl {
+-    name = "notifications.db";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db";
+-    hash = "sha256-QK2tngW8h/K/IcYaTXs61RdfKb8NshS4n7AtK41K6aM=";
+-  };
+-  launcherNotificationsWal = pkgs.fetchurl {
+-    name = "notifications.db-wal";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-wal";
+-    hash = "sha256-gRtpUBYYtNI3tKDw3/2If5nFyiTLfKPLNUC1gF83qm4=";
+-  };
+-  launcherNotificationsShm = pkgs.fetchurl {
+-    name = "notifications.db-shm";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-shm";
+-    hash = "sha256-lZXfg4awjBp0HSRIpdqyyFrtRXWv5HUst9u5tha/ZVo=";
+-  };
++  launcherNotifications = "${pkgs.asteroid.meta-asteroid-src}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db";
++  launcherNotificationsWal = "${pkgs.asteroid.meta-asteroid-src}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-wal";
++  launcherNotificationsShm = "${pkgs.asteroid.meta-asteroid-src}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-shm";
+ 
+   # Upstream connman_%.bbappend replaces connman's D-Bus policy with one that
+   # also admits the ceres user; expose it through services.dbus.packages.
+   connmanDbusPolicy = pkgs.runCommand "asteroid-connman-dbus-policy" { } ''
+-    install -Dm644 ${
+-      pkgs.fetchurl {
+-        name = "connman-dbus.conf";
+-        url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-connectivity/connman/connman/connman-dbus.conf";
+-        hash = "sha256-iC4/pjt6UB/fcUqukFX/nEavNuETNmAvVW0T8T0ody0=";
+-      }
+-    } $out/share/dbus-1/system.d/connman.conf
++    install -Dm644 ${pkgs.asteroid.meta-asteroid-src}/recipes-connectivity/connman/connman/connman-dbus.conf $out/share/dbus-1/system.d/connman.conf
+   '';
+ in
+ {
+@@ -72,7 +44,44 @@ in
      };
    };
  
@@ -63,7 +116,16 @@ index c4d200a7..476f571c 100644
  
      # Watch system beautification and boot visibility
      mobile.beautification = {
-@@ -107,7 +144,8 @@ in
+@@ -99,7 +108,7 @@ in
+         asteroid.asteroid-btsyncd
+         asteroid.nemo-qml-plugin-dbus
+         asteroid.libconnman-qt
+-        mcePkg
++        asteroid.mce
+         asteroid.ngfd
+         asteroid.nfcd
+         asteroid.keepalive
+@@ -107,7 +116,8 @@ in
          asteroid.nemo-qml-plugin-alarms
          asteroid.nemo-qml-plugin-notifications
          asteroid.timed-qt6
@@ -73,7 +135,73 @@ index c4d200a7..476f571c 100644
          qt6.qt5compat
          # Asset suite
          asteroid.assets.wallpapers
-@@ -552,35 +590,17 @@ in
+@@ -160,16 +170,18 @@ in
+         asteroid.community-apps.shopper
+         asteroid.community-apps.toolwatch
+         asteroid.community-apps.touchdown
++        asteroid.community-apps.hackwatch
++        asteroid.community-apps.neofetch
++        tree
+       ]);
+ 
+     systemd.tmpfiles.rules = [
+       "d /var/lib/kiwix 0775 ceres users -"
+-      "L+ /usr/share - - - - /run/current-system/sw/share"
+       # MCE runtime/config directories; upstream mce_git.bb installs
+       # builtin-gconf.values into /var/lib/mce.
+       "d /run/mce 0755 root root -"
+       "d /var/lib/mce 0755 root root -"
+-      "L+ /var/lib/mce/builtin-gconf.values - - - - ${mcePkg}/share/mce/builtin-gconf.values"
++      "L+ /var/lib/mce/builtin-gconf.values - - - - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
+       # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
+       "d /var/lib/connman 0755 root root -"
+       "C+ /var/lib/connman/settings 0644 root root - ${
+@@ -194,9 +206,10 @@ in
+       # Upstream nfcd state storage directory.
+       "d /var/lib/nfcd 0700 root root -"
+       # Upstream timed_git.bb creates /var/lib/timed for shared events/settings.
+-      "d /var/lib/timed 0775 root root -"
+-      "d /var/lib/timed/shared_events 0775 root root -"
+-      "d /var/lib/timed/shared_settings 0775 root root -"
++      # timed runs in user session (ceres), so shared events/settings must be owned by ceres.
++      "d /var/lib/timed 0775 ceres users -"
++      "d /var/lib/timed/shared_events 0775 ceres users -"
++      "d /var/lib/timed/shared_settings 0775 ceres users -"
+       # Upstream supported-languages_git.bb seeds the ceres locale drop-in that
+       # user@.service.d/locale.conf reads (installed via environment.etc below).
+       "d /home/.system/var/lib/environment/1000 0755 ceres users -"
+@@ -238,12 +251,6 @@ in
+       pkgs.asteroid.assets.fonts
+     ];
+ 
+-    # Create /usr/share early in activation for AsteroidOS apps and shell
+-    system.activationScripts.usrshare = ''
+-      mkdir -p /usr
+-      ln -sfn /run/current-system/sw/share /usr/share
+-    '';
+-
+     # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
+     # Reference: https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/src/main.conf
+     hardware.bluetooth.settings = {
+@@ -305,7 +312,7 @@ in
+         # fails ("Cannot open `/var/run/mce/boot' for writing").
+         RuntimeDirectory = "mce";
+         RuntimeDirectoryMode = "0755";
+-        ExecStart = "${mcePkg}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
++        ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
+         TimeoutSec = 2;
+         Restart = "always";
+         RestartSec = "1s";
+@@ -517,7 +524,7 @@ in
+     # upstream AsteroidOS connman policy replaces connman's own one.
+     services.dbus.packages = [
+       pkgs.dconf
+-      mcePkg
++      pkgs.asteroid.mce
+       pkgs.asteroid.dsme
+       pkgs.asteroid.sensorfw
+       pkgs.asteroid.ngfd
+@@ -552,37 +559,20 @@ in
        QT_VIRTUALKEYBOARD_STYLE = "watch";
        QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
@@ -107,20 +235,95 @@ index c4d200a7..476f571c 100644
 -        "${pkgs.qt6.qtwayland}/lib/qt-6/plugins"
 -      ];
 +      # Default platform for client apps running under the Wayland compositor
-+      QT_QPA_PLATFORM = "wayland";
++      QT_QPA_PLATFORM = lib.mkForce "wayland";
 +      EGL_PLATFORM = "wayland";
 +      WAYLAND_DISPLAY = "wayland-0";
 +      XDG_RUNTIME_DIR = "/run/user/1000";
-+      LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
-+      LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
 +      QML2_IMPORT_PATH = qmlImportPath;
 +      QML_IMPORT_PATH = qmlImportPath;
 +      NIXPKGS_QT6_QML_IMPORT_PATH = qmlImportPath;
 +      QT_PLUGIN_PATH = qtPluginPath;
        # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
        QT_ENABLE_HIGHDPI_SCALING = "0";
++    } // lib.optionalAttrs isLegacy {
++      LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++      LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
      };
-@@ -747,11 +767,28 @@ in
+ 
+     # Upstream asteroid-alarmclock installs share/systemd/user/alarmpresenter.service
+@@ -637,28 +627,35 @@ in
+       wantedBy = [ "default.target" ];
+       requires = [ "dbus.socket" ];
+       unitConfig.ConditionUser = "!root";
+-      environment = {
+-        QT_IM_MODULE = "qtvirtualkeyboard";
+-        QT_VIRTUALKEYBOARD_STYLE = "watch";
+-        QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+-        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
+-        # The launcher is the compositor: use the hwcomposer QPA, not xcb.
+-        EGL_PLATFORM = "hwcomposer";
+-        QT_QPA_PLATFORM = "hwcomposer";
+-        # Upstream Qt selects the libhybris EGL server buffer integration
+-        # automatically; Qt 6.12's loadServerBufferIntegration() only loads a
+-        # key named in this variable, so name the same upstream integration.
+-        QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "libhybris-egl-server";
+-        LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
+-        LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
+-        QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
+-        QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
+-        # Direct Qt diagnostic logs to stderr/launcher.log instead of hidden journal
+-        QT_FORCE_STDERR_LOGGING = "1";
+-        QT_ASSUME_STDERR_HAS_CONSOLE = "1";
+-      }
+-      // config.environment.variables
+-      // lib.optionalAttrs debugBuild {
++      environment =
++        config.environment.variables
++        // {
++          PATH = lib.mkForce "/run/wrappers/bin:/run/current-system/sw/bin";
++          QT_IM_MODULE = "qtvirtualkeyboard";
++          QT_VIRTUALKEYBOARD_STYLE = "watch";
++          QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
++          RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
++          # The launcher is the compositor.
++          # On legacy targets with Android kernels, use hwcomposer and libhybris.
++          # On modern mainline targets, use eglfs on DRM/KMS.
++          EGL_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
++          QT_QPA_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
++          QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
++          QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
++          # Direct Qt diagnostic logs to stderr/launcher.log instead of hidden journal
++          QT_FORCE_STDERR_LOGGING = "1";
++          QT_ASSUME_STDERR_HAS_CONSOLE = "1";
++        }
++        // lib.optionalAttrs isLegacy {
++          QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "libhybris-egl-server";
++          LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++          LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
++        }
++        // lib.optionalAttrs (!isLegacy) {
++          QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
++          QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++        }
++        // lib.optionalAttrs debugBuild {
+         # Debug builds: turn on every trace the graphics stack can emit.
+         # These are runtime switches only; the upstream code path is unchanged.
+         # `*=false` also silences the default category, which is where QML
+@@ -738,20 +735,42 @@ in
+       description = "Tells the Android init system that the boot has been completed";
+       wantedBy = [ "default.target" ];
+       after = [ "asteroid-launcher.service" ];
+-      unitConfig.ConditionUser = "!root";
++      unitConfig = {
++        ConditionUser = "!root";
++        ConditionPathExists = "/system/bin/getprop";
++      };
+       serviceConfig = {
+         Type = "simple";
+         ExecStartPre = "-${pkgs.coreutils}/bin/sleep 1";
+-        ExecStart = "${pkgs.bash}/bin/bash -ec 'if [ \"$(/system/bin/getprop sys.boot_completed)\" != 1 ]; then /system/bin/setprop sys.boot_completed 1; fi'";
++        ExecStart = "${pkgs.bash}/bin/bash -ec 'if [ \"$(env -u LD_PRELOAD -u LD_LIBRARY_PATH /system/bin/getprop sys.boot_completed)\" != 1 ]; then env -u LD_PRELOAD -u LD_LIBRARY_PATH /system/bin/setprop sys.boot_completed 1; fi'";
+       };
      };
  
      # AsteroidOS desktop entries and service wrappers invoke apps through
@@ -132,14 +335,16 @@ index c4d200a7..476f571c 100644
 +    # `invoker`, core utilities, QML modules, and libhybris EGL.
      systemd.user.settings.Manager = {
 -      DefaultEnvironment = "PATH=/run/wrappers/bin:/run/current-system/sw/bin";
-+      DefaultEnvironment = lib.concatStringsSep " " [
++      DefaultEnvironment = lib.concatStringsSep " " ([
 +        "\"PATH=/run/wrappers/bin:/run/current-system/sw/bin\""
 +        "\"WAYLAND_DISPLAY=wayland-0\""
 +        "\"XDG_RUNTIME_DIR=/run/user/1000\""
 +        "\"QT_QPA_PLATFORM=wayland\""
 +        "\"EGL_PLATFORM=wayland\""
++      ] ++ lib.optionals isLegacy [
 +        "\"LD_PRELOAD=${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2\""
 +        "\"LD_LIBRARY_PATH=${pkgs.libhybris}/lib\""
++      ] ++ [
 +        "\"QML2_IMPORT_PATH=${qmlImportPath}\""
 +        "\"QML_IMPORT_PATH=${qmlImportPath}\""
 +        "\"NIXPKGS_QT6_QML_IMPORT_PATH=${qmlImportPath}\""
@@ -149,11 +354,11 @@ index c4d200a7..476f571c 100644
 +        "\"QT_VIRTUALKEYBOARD_LAYOUT_PATH=${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts\""
 +        "\"RIME_SHARED_DATA_DIR=${pkgs.asteroid.virtualkeyboard}/share/rime-data\""
 +        "\"QT_ENABLE_HIGHDPI_SCALING=0\""
-+      ];
++      ]);
      };
  
      # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
-@@ -841,5 +878,5 @@ in
+@@ -841,5 +860,5 @@ in
          RestartSec = "5s";
        };
      };
@@ -161,7 +366,7 @@ index c4d200a7..476f571c 100644
 +  });
  }
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index bb5de193..085bea2e 100644
+index b2e69081..085bea2e 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
 @@ -14,9 +14,12 @@ in
@@ -178,14 +383,15 @@ index bb5de193..085bea2e 100644
      mkbootimg = callPackage ./mkbootimg { };
      oans = callPackage ./oans { };
      msm-fb-refresher = callPackage ./msm-fb-refresher { };
-@@ -85,10 +88,21 @@ in
-     # On 32-bit ARM (armv7l-linux), GHC cannot bootstrap (cannot bootstrap GHC on
-     # this platform ('armv7l-linux' with libc 'defaultLibc')), breaking native ARM CI.
-     # Neither mobile devices nor smartwatches have RDMA hardware (InfiniBand/RoCE),
--    # so disable RDMA in libpcap and disable man pages in rdma-core to prevent pulling
--    # the entire Pandoc and GHC toolchain.
--    libpcap = super.libpcap.override { withRdma = false; };
--    rdma-core = super.rdma-core.override { withManPages = false; };
+@@ -80,6 +83,27 @@ in
+     # All that follows will have to be cleaned and then upstreamed.
+     #
+ 
++    # Upstream libpcap defaults to withRdma = true on Linux, pulling rdma-core.
++    # rdma-core builds man pages using pandoc by default, which pulls in GHC.
++    # On 32-bit ARM (armv7l-linux), GHC cannot bootstrap (cannot bootstrap GHC on
++    # this platform ('armv7l-linux' with libc 'defaultLibc')), breaking native ARM CI.
++    # Neither mobile devices nor smartwatches have RDMA hardware (InfiniBand/RoCE),
 +    # so disable RDMA in libpcap and disable man pages in rdma-core on 32-bit ARM to prevent
 +    # pulling the entire Pandoc and GHC toolchain without invalidating the x86_64 build cache.
 +    libpcap = if super.stdenv.hostPlatform.isAarch32 then super.libpcap.override { withRdma = false; } else super.libpcap;
@@ -201,6 +407,7 @@ index bb5de193..085bea2e 100644
 +      if super.stdenv.hostPlatform.isAarch32 && super.stdenv.buildPlatform.system == super.stdenv.hostPlatform.system
 +      then super.jemalloc.overrideAttrs (_: { doCheck = false; })
 +      else super.jemalloc;
- 
++
      # Things specific to mobile-nixos.
      # Not necessarily internals, but they probably won't go into <nixpkgs>.
+     mobile-nixos = {

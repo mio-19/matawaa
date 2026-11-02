@@ -531,10 +531,10 @@ index 00000000..858ba581
 +                 // Loader instead of rewriting the dconf-backed watchFaceSource
 +                 // avoids a cross-process write that can clobber a concurrent
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index e92e5f1b..35888440 100644
+index 3c4eb08e..c1bbd18e 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -110,8 +110,12 @@ rec {
+@@ -123,8 +123,12 @@ rec {
      inherit mce-dev libiphb;
    };
    timed-qt6 = callPackage ./timed-qt6 {
@@ -548,7 +548,7 @@ index e92e5f1b..35888440 100644
  
    # Calendar subsystem: accounts-qt, kcalendarcore, mkcal, and nemo-qml-plugin-calendar
    # Upstream repository: https://gitlab.com/accounts-sso/accounts-qt
-@@ -159,7 +163,7 @@ rec {
+@@ -172,7 +176,7 @@ rec {
        inherit browser telegram kiwix;
      };
  

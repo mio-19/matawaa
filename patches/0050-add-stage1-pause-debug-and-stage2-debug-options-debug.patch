@@ -13,8 +13,9 @@ Add the development-only stage debugging modes:
  boot/init/tasks/switch_root.rb  |  19 +++++
  devices/families/asteroidos.nix | 134 ++++++++++++++++++++++++++++++++
  devices/fossil-hoki/default.nix |  21 +++--
+ modules/hardware-watch.nix      |  18 +++++
  modules/initrd-ssh.nix          |  72 +++++++++++++----
- 4 files changed, 226 insertions(+), 20 deletions(-)
+ 5 files changed, 244 insertions(+), 20 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
 index b3a6045b..0644044c 100644
@@ -289,6 +290,35 @@ index b7793a6a..f5979e50 100644
        ${lib.optionalString debugBuild ''
          QT_DEBUG_PLUGINS=1
        ''}
+diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
+index e5050bea..4c9a9b22 100644
+--- a/modules/hardware-watch.nix
++++ b/modules/hardware-watch.nix
+@@ -149,6 +149,24 @@ in
+         current systemd package.
+       '';
+     };
++
++    stage1-pause-debug.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "Enable development-only stage-1 console, SSH/telnet, and switch-root pause; enable explicitly in the debug device/example configuration.";
++    };
++
++    stage2-save-logs.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "Persist the stage-2 systemd journal to /var/log/journal and coredumps to /var/lib/systemd/coredump for debugging; disabled for production watches.";
++    };
++
++    stage2-ssh.enable = mkOption {
++      type = types.bool;
++      default = false;
++      description = "Enable the stage-2 SSH server and USB networking without the stage-1 pause/console.";
++    };
+   };
+ 
+   config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/modules/initrd-ssh.nix b/modules/initrd-ssh.nix
 index db771346..b4842997 100644
 --- a/modules/initrd-ssh.nix

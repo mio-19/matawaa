@@ -13,17 +13,17 @@ Introduce mobile.hardware.watch with opt-in smartwatch hardware options:
 The module defaults watch.enable to false so existing phone, tablet, and
 UEFI configurations remain unchanged.
 ---
- modules/hardware-watch.nix | 146 +++++++++++++++++++++++++++++++++++++
+ modules/hardware-watch.nix | 165 +++++++++++++++++++++++++++++++++++++
  modules/module-list.nix    |   1 +
- 2 files changed, 147 insertions(+)
+ 2 files changed, 166 insertions(+)
  create mode 100644 modules/hardware-watch.nix
 
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
 new file mode 100644
-index 00000000..35ac4030
+index 00000000..71f4b2d6
 --- /dev/null
 +++ b/modules/hardware-watch.nix
-@@ -0,0 +1,146 @@
+@@ -0,0 +1,165 @@
 +{
 +  config,
 +  lib,
@@ -118,6 +118,26 @@ index 00000000..35ac4030
 +      '';
 +    };
 +
++    hasSpeaker = mkOption {
++      type = types.bool;
++      default = false;
++      description = ''
++        Whether the device has a loudspeaker. Mirrors upstream
++        MACHINE_HAS_SPEAKER and is exposed to the UI through
++        /etc/asteroid/machine.conf.
++      '';
++    };
++
++    borderGestureWidth = mkOption {
++      type = types.nullOr (types.either types.str types.float);
++      default = null;
++      description = ''
++        Fraction of display width/height dedicated to border gestures (0.0 - 1.0).
++        Mirrors upstream MACHINE_DISPLAY_BORDER_GESTURE_WIDTH in /etc/asteroid/machine.conf.
++        When null, qml-asteroid defaults to 0.1 (10% of screen edge).
++      '';
++    };
++
 +    aodSupport = mkOption {
 +      type = types.bool;
 +      default = true;
@@ -142,7 +162,6 @@ index 00000000..35ac4030
 +        for safe prolonged skin contact on the wrist.
 +      '';
 +    };
-+
 +  };
 +
 +  config = mkIf (config.mobile.enable && watchCfg.enable) {

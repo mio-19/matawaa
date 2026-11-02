@@ -8,17 +8,17 @@ map, qmltester, skedaddle, weatherfetch, beatfork, benchymark,
 docking-bay, heliograph, horizon, meteormatch, pulsar, rag, shopper,
 toolwatch, and touchdown.
 ---
- overlay/asteroidos/community-apps/default.nix | 337 ++++++++++++++++++
+ overlay/asteroidos/community-apps/default.nix | 345 ++++++++++++++++++
  overlay/asteroidos/default.nix                |   5 +
- 2 files changed, 342 insertions(+)
+ 2 files changed, 350 insertions(+)
  create mode 100644 overlay/asteroidos/community-apps/default.nix
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
 new file mode 100644
-index 00000000..4baec981
+index 00000000..782fb0f0
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/default.nix
-@@ -0,0 +1,337 @@
+@@ -0,0 +1,345 @@
 +{
 +  lib,
 +  stdenv,
@@ -324,6 +324,14 @@ index 00000000..4baec981
 +    desc = "Keystroke injection and penetration testing utility for AsteroidOS";
 +    rev = "b2af485c78e26e18e950e3e064584b0765c163e5";
 +    sha256 = "1cf0vrc9s3s72p0b3iyrjjmy0zd4rmvpyhlzjhfbi4yn590ylkkk";
++    postPatch = ''
++      substituteInPlace CMakeLists.txt \
++        --replace "find_package(AsteroidApp REQUIRED)" "find_package(AsteroidApp6 REQUIRED)" \
++        --replace "include(AsteroidCMakeSettings)" "include(Asteroid6CMakeSettings)" \
++        --replace "include(AsteroidTranslations)" "include(Asteroid6Translations)"
++      substituteInPlace src/CMakeLists.txt \
++        --replace "AsteroidApp" "Asteroid::AsteroidApp6"
++    '';
 +    postBuild = ''
 +      $CC $CFLAGS $LDFLAGS ../src/utilities/keyboard_interface.c -o keyboard_interface
 +    '';
@@ -357,10 +365,10 @@ index 00000000..4baec981
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index e390b36b..d4468c6d 100644
+index f3ff23cd..03f1bca1 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -111,5 +111,10 @@ rec {
+@@ -124,5 +124,10 @@ rec {
  
    virtualkeyboard = callPackage ./virtualkeyboard { };
  

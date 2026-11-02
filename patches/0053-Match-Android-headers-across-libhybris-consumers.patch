@@ -86,10 +86,10 @@ index ecc9e884..cc0a48d6 100644
          EGL_LOG_LEVEL = "debug";
          LIBGL_DEBUG = "verbose";
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 35888440..964a67bf 100644
+index c1bbd18e..e29a49ff 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -39,7 +39,6 @@ rec {
+@@ -46,7 +46,6 @@ rec {
    qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
      inherit (pkgs)
        libhybris
@@ -97,7 +97,7 @@ index 35888440..964a67bf 100644
        glib
        mtdev
        ;
-@@ -95,7 +94,7 @@ rec {
+@@ -102,7 +101,7 @@ rec {
    # Nemomobile SensorFW daemon and client API (qtsensors sensorfw backend).
    # Upstream: https://github.com/sailfishos/sensorfw
    sensorfw = callPackage ./sensorfw {

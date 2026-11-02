@@ -962,10 +962,10 @@ index 00000000..e38bf0b5
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 5e7c1500..e92e5f1b 100644
+index a5f698b7..3c4eb08e 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -8,6 +8,34 @@ rec {
+@@ -15,6 +15,34 @@ rec {
    qml-asteroid = callPackage ./qml-asteroid { };
    mapplauncherd = callPackage ./mapplauncherd { };
  
@@ -1000,15 +1000,15 @@ index 5e7c1500..e92e5f1b 100644
    qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
      inherit (pkgs)
        libhybris
-@@ -72,6 +100,8 @@ rec {
+@@ -79,6 +107,8 @@ rec {
  
    # Device state machine daemon MCE talks to.
    # Upstream: https://github.com/sailfishos/dsme
 +  egl-probe = callPackage ./egl-probe { };
 +
    dsme = callPackage ./dsme {
-     inherit libdsme libngf libiphb mce-dev;
-   };
+     inherit
+       metaAsteroidSrc
 diff --git a/overlay/asteroidos/egl-probe/default.nix b/overlay/asteroidos/egl-probe/default.nix
 new file mode 100644
 index 00000000..81ca384f

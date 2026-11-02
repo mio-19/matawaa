@@ -20,7 +20,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/accounts-qt/default.nix    |  85 +++
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++
- overlay/asteroidos/default.nix                |  67 ++
+ overlay/asteroidos/default.nix                |  80 +++
  overlay/asteroidos/dsme/default.nix           | 107 ++++
  overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
  overlay/asteroidos/keepalive/default.nix      | 131 ++++
@@ -58,7 +58,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
  overlay/libhybris/default.nix                 |  68 +-
- 41 files changed, 4570 insertions(+), 36 deletions(-)
+ 41 files changed, 4583 insertions(+), 36 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -385,10 +385,22 @@ index 00000000..bcdd9f13
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 2fc834f0..7788a0e5 100644
+index 2fc834f0..4e0b1aab 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -6,6 +6,73 @@ rec {
+@@ -1,11 +1,91 @@
+ { callPackage, pkgs }:
+ 
+ rec {
++  metaAsteroidSrc = pkgs.fetchgit {
++    url = "https://github.com/AsteroidOS/meta-asteroid";
++    rev = "f1fce86f8d6488066ac266216b7e68be00d8499d";
++    hash = "sha256-FZlt4YrN+y4dSXz8zbBsK+ulwKIaoSi4eDpTWLPiYvQ=";
++  };
++  meta-asteroid-src = metaAsteroidSrc;
++
+   mkAsteroidApp = callPackage ./lib/mk-asteroid-app.nix {
+     inherit qml-asteroid;
    };
  
    qml-asteroid = callPackage ./qml-asteroid { };
@@ -436,7 +448,13 @@ index 2fc834f0..7788a0e5 100644
 +  # Device state machine daemon MCE talks to.
 +  # Upstream: https://github.com/sailfishos/dsme
 +  dsme = callPackage ./dsme {
-+    inherit libdsme libngf libiphb mce-dev;
++    inherit
++      metaAsteroidSrc
++      libdsme
++      libngf
++      libiphb
++      mce-dev
++      ;
 +  };
 +
 +  keepalive = callPackage ./keepalive {

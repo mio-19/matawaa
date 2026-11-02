@@ -15,9 +15,9 @@ current systemd 262. Keep the old-kernel-patched 262 package as
 systemd262oldkernel.
 ---
  devices/families/asteroidos.nix               |    4 +
- modules/hardware-watch.nix                    |   50 +
+ modules/hardware-watch.nix                    |   13 +
  overlay/cross-compile.nix                     |  125 +-
- overlay/overlay.nix                           |   14 +-
+ overlay/overlay.nix                           |    6 +-
  .../gcc-16.2.0-libgomp-uid-buffer.patch       |   13 +
  ...ts-for-uninitialised-encrypted-devic.patch |   29 +
  ...on-t-try-to-unmount-nix-or-nix-store.patch |   45 +
@@ -44,7 +44,7 @@ systemd262oldkernel.
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
  overlay/systemd.nix                           |   68 +
- 30 files changed, 2458 insertions(+), 65 deletions(-)
+ 30 files changed, 2412 insertions(+), 66 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -88,40 +88,14 @@ index 4417fb4b..f9fc1173 100644
    mobile.system.system = mkDefault "armv7l-linux";
  
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
-index 35ac4030..4c9a9b22 100644
+index 71f4b2d6..e5050bea 100644
 --- a/modules/hardware-watch.nix
 +++ b/modules/hardware-watch.nix
-@@ -92,6 +92,26 @@ in
+@@ -136,6 +136,19 @@ in
+         for safe prolonged skin contact on the wrist.
        '';
      };
- 
-+    hasSpeaker = mkOption {
-+      type = types.bool;
-+      default = false;
-+      description = ''
-+        Whether the device has a loudspeaker. Mirrors upstream
-+        MACHINE_HAS_SPEAKER and is exposed to the UI through
-+        /etc/asteroid/machine.conf.
-+      '';
-+    };
 +
-+    borderGestureWidth = mkOption {
-+      type = types.nullOr (types.either types.str types.float);
-+      default = null;
-+      description = ''
-+        Fraction of display width/height dedicated to border gestures (0.0 - 1.0).
-+        Mirrors upstream MACHINE_DISPLAY_BORDER_GESTURE_WIDTH in /etc/asteroid/machine.conf.
-+        When null, qml-asteroid defaults to 0.1 (10% of screen edge).
-+      '';
-+    };
-+
-     aodSupport = mkOption {
-       type = types.bool;
-       default = true;
-@@ -117,6 +137,36 @@ in
-       '';
-     };
- 
 +    kernel = mkOption {
 +      type = types.enum [
 +        "legacy"
@@ -133,24 +107,6 @@ index 35ac4030..4c9a9b22 100644
 +        old systemd 257 package; "modern" uses the mainline kernel and the
 +        current systemd package.
 +      '';
-+    };
-+
-+    stage1-pause-debug.enable = mkOption {
-+      type = types.bool;
-+      default = false;
-+      description = "Enable development-only stage-1 console, SSH/telnet, and switch-root pause; enable explicitly in the debug device/example configuration.";
-+    };
-+
-+    stage2-save-logs.enable = mkOption {
-+      type = types.bool;
-+      default = false;
-+      description = "Persist the stage-2 systemd journal to /var/log/journal and coredumps to /var/lib/systemd/coredump for debugging; disabled for production watches.";
-+    };
-+
-+    stage2-ssh.enable = mkOption {
-+      type = types.bool;
-+      default = false;
-+      description = "Enable the stage-2 SSH server and USB networking without the stage-1 pause/console.";
 +    };
    };
  
@@ -338,7 +294,7 @@ index 3145a5c7..02caaf5e 100644
      # on 32-bit ARM due to CMake Python host/target architecture checks.
      # Smartwatches do not use InfiniBand, so disable RDMA.
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index 78fdbdd7..bb5de193 100644
+index 78fdbdd7..b2e69081 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
 @@ -2,8 +2,10 @@ final: super:
@@ -353,23 +309,15 @@ index 78fdbdd7..bb5de193 100644
      # Misc. tools.
      # Keep sorted.
      adbd = callPackage ./adbd { };
-@@ -78,7 +80,15 @@ in
+@@ -78,8 +80,6 @@ in
      # All that follows will have to be cleaned and then upstreamed.
      #
  
 -    # No such fixes as of now, this comment is merely a placeholder to keep the general structure.
-+    # Upstream libpcap defaults to withRdma = true on Linux, pulling rdma-core.
-+    # rdma-core builds man pages using pandoc by default, which pulls in GHC.
-+    # On 32-bit ARM (armv7l-linux), GHC cannot bootstrap (cannot bootstrap GHC on
-+    # this platform ('armv7l-linux' with libc 'defaultLibc')), breaking native ARM CI.
-+    # Neither mobile devices nor smartwatches have RDMA hardware (InfiniBand/RoCE),
-+    # so disable RDMA in libpcap and disable man pages in rdma-core to prevent pulling
-+    # the entire Pandoc and GHC toolchain.
-+    libpcap = super.libpcap.override { withRdma = false; };
-+    rdma-core = super.rdma-core.override { withManPages = false; };
- 
+-
      # Things specific to mobile-nixos.
      # Not necessarily internals, but they probably won't go into <nixpkgs>.
+     mobile-nixos = {
 diff --git a/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch b/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
 new file mode 100644
 index 00000000..17006966
