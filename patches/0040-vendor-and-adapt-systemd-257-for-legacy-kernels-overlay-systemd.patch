@@ -4,7 +4,7 @@ Date: Fri, 23 Oct 2026 21:18:15 +1100
 Subject: [PATCH] vendor and adapt systemd 257 for legacy kernels
  (overlay/systemd)
 
-Nixpkgs no longer ships systemd 257. Vendor the 257.10 definition from
+Nixpkgs no longer ships systemd 257. Vendor the 257.13 definition from
 the Nixpkgs 25.05 branch, merge the OpenEmbedded STATX_MNT_ID fallback,
 and adapt the 25.05 definition to the current package-set ABI. Patch GCC
 16.2.0's libgomp uid buffer, install the current NixOS unit set, and
@@ -30,7 +30,7 @@ systemd262oldkernel.
  ...9-add-rootprefix-to-lookup-dir-paths.patch |   35 +
  ...-execute-scripts-in-etc-systemd-syst.patch |   23 +
  ...ecute-scripts-in-etc-systemd-system-.patch |   22 +
- ...-placeholder-for-DEFAULT_PATH_NORMAL.patch |   29 +
+ ...-placeholder-for-DEFAULT_PATH_NORMAL.patch |   28 +
  ...-environment-when-calling-generators.patch |   39 +
  ...014-core-don-t-taint-on-unmerged-usr.patch |   37 +
  ...ontext_init-fix-driver-name-checking.patch |   41 +
@@ -44,7 +44,7 @@ systemd262oldkernel.
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
  overlay/systemd.nix                           |   68 +
- 30 files changed, 2407 insertions(+), 60 deletions(-)
+ 30 files changed, 2406 insertions(+), 60 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -989,10 +989,10 @@ index 00000000..13578115
 + 
 diff --git a/overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch b/overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch
 new file mode 100644
-index 00000000..9e29c34e
+index 00000000..9f7de370
 --- /dev/null
 +++ b/overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,28 @@
 +From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 +From: Florian Klink <flokli@flokli.de>
 +Date: Sun, 8 Mar 2020 01:05:54 +0100
@@ -1001,24 +1001,23 @@ index 00000000..9e29c34e
 +This will be the $PATH used to lookup ExecStart= etc. options, which
 +systemd itself uses extensively.
 +---
-+ src/basic/path-util.h | 6 +++---
-+ 1 file changed, 3 insertions(+), 3 deletions(-)
++ src/basic/path-util.h | 8 ++++----
++ 1 file changed, 4 insertions(+), 4 deletions(-)
 +
 +diff --git a/src/basic/path-util.h b/src/basic/path-util.h
 +index dff5a3a549..01344e5cf6 100644
 +--- a/src/basic/path-util.h
 ++++ b/src/basic/path-util.h
-+@@ -17,10 +17,10 @@
-+ #define PATH_MERGED_BIN(x) x "bin"
-+ #define PATH_MERGED_BIN_NULSTR(x) x "bin\0"
-+ 
-+-#define DEFAULT_PATH_WITH_SBIN PATH_SPLIT_BIN("/usr/local/") ":" PATH_SPLIT_BIN("/usr/")
++@@ -20,8 +20,8 @@
++-#define DEFAULT_PATH_WITH_FULL_SBIN PATH_SPLIT_BIN("/usr/local/") ":" PATH_SPLIT_BIN("/usr/")
++-#define DEFAULT_PATH_WITH_LOCAL_SBIN PATH_SPLIT_BIN("/usr/local/") ":" PATH_MERGED_BIN("/usr/")
 +-#define DEFAULT_PATH_WITHOUT_SBIN PATH_MERGED_BIN("/usr/local/") ":" PATH_MERGED_BIN("/usr/")
-++#define DEFAULT_PATH_WITH_SBIN "@defaultPathNormal@"
-++#define DEFAULT_PATH_WITHOUT_SBIN DEFAULT_PATH_WITH_SBIN
+++#define DEFAULT_PATH_WITH_FULL_SBIN "@defaultPathNormal@"
+++#define DEFAULT_PATH_WITH_LOCAL_SBIN DEFAULT_PATH_WITH_FULL_SBIN
+++#define DEFAULT_PATH_WITHOUT_SBIN DEFAULT_PATH_WITH_FULL_SBIN
 + 
-+-#define DEFAULT_PATH_COMPAT PATH_SPLIT_BIN("/usr/local/") ":" PATH_SPLIT_BIN("/usr/") ":" PATH_SPLIT_BIN("/")
-++#define DEFAULT_PATH_COMPAT DEFAULT_PATH_WITH_SBIN
++-#define DEFAULT_PATH_COMPAT DEFAULT_PATH_WITH_FULL_SBIN ":" PATH_SPLIT_BIN("/")
+++#define DEFAULT_PATH_COMPAT DEFAULT_PATH_WITH_FULL_SBIN
 + 
 + const char* default_PATH(void);
 + 
@@ -1349,7 +1348,7 @@ index 00000000..a1b1575a
 +         notify_message = notify_start("READY=1\n"
 diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
 new file mode 100644
-index 00000000..e8613cf2
+index 00000000..47e5f750
 --- /dev/null
 +++ b/overlay/systemd-257/default.nix
 @@ -0,0 +1,1121 @@
@@ -1565,14 +1564,14 @@ index 00000000..e8613cf2
 +let
 +  wantCurl = withRemote || withImportd;
 +
-+  version = "257.10";
++  version = "257.13";
 +
 +  # Use the command below to update `releaseTimestamp` on every (major) version
 +  # change. More details in the commentary at mesonFlags.
 +  # command:
 +  #  $ curl -s https://api.github.com/repos/systemd/systemd/releases/latest | \
 +  #     jq '.created_at|strptime("%Y-%m-%dT%H:%M:%SZ")|mktime'
-+  releaseTimestamp = "1734643670";
++  releaseTimestamp = "1773427016";
 +in
 +stdenv.mkDerivation (finalAttrs: {
 +  inherit pname version;
@@ -1583,7 +1582,7 @@ index 00000000..e8613cf2
 +    owner = "systemd";
 +    repo = "systemd";
 +    rev = "v${version}";
-+    hash = "sha256-08zGfnHzHjTupg7xjyGrauVxPwj5hNQDPHkuFNjNjec=";
++    hash = "sha256-VcZUzWiNcK9rXyM5GQTY6W7QZEQ6iEDNJ0uMVgdbEKY=";
 +  };
 +
 +  # On major changes, or when otherwise required, you *must* :
