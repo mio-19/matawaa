@@ -25,7 +25,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  devices/fossil-hoki/hybris-android.nix        |  30 ++
  devices/fossil-hoki/hybris.nix                |  45 ++
- devices/fossil-hoki/kernel/default.nix        | 252 +++++++++
+ devices/fossil-hoki/kernel/default.nix        | 342 ++++++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 +
  .../kernel/linux-4.14.211-212.patch.patch     | 152 ++++++
@@ -40,7 +40,7 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  65 ++-
- 23 files changed, 2178 insertions(+), 53 deletions(-)
+ 23 files changed, 2268 insertions(+), 53 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -1048,15 +1048,16 @@ index 00000000..4dcaa20c
 +}
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
-index 00000000..7963bedd
+index 00000000..931bf401
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/default.nix
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,342 @@
 +{
 +  mobile-nixos,
 +  stdenv,
 +  cpio,
 +  fetchFromGitHub,
++  fetchpatch,
 +  fetchurl,
 +  runCommand,
 +  xz,
@@ -1251,6 +1252,85 @@ index 00000000..7963bedd
 +        cp "$TMPDIR/stable/linux-4.14.213-214.patch" "$out"
 +      '';
 +
++  # Keep the USB gadget fixes while preserving the vendor's synchronous audio
++  # endpoints. Omit only already-applied IDE/composite/configfs hunks and the
++  # Makefile: the kernel builder rewrites depmod in prePatch, and SUBLEVEL is
++  # updated centrally in postPatch.
++  stablePatch215 =
++    runCommand "linux-4.14.214-215.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.214-215.xz";
++          hash = "sha256-a8t/fKYhziLbxxWND18CLQwKyN57k4HXxYcZFkSk5W4=";
++        };
++        patchFile = ./linux-4.14.214-215.patch.patch;
++      }
++      ''
++        mkdir -p "$TMPDIR/stable"
++        xz -dc "$src" > "$TMPDIR/stable/linux-4.14.214-215.patch"
++        (cd "$TMPDIR/stable" && patch -p1 -i "$patchFile")
++        cp "$TMPDIR/stable/linux-4.14.214-215.patch" "$out"
++      '';
++
++  # Incremental 4.14.215 -> 4.14.216 stable patch.
++  stablePatch216 = fetchpatch {
++    name = "linux-4.14.215-216.patch";
++    url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.215-216.xz";
++    hash = "sha256-W7WwCr+SecZGXSbvjC1xLogNRBvwmCq7lfXd7FImQfs=";
++    decode = "xz -d";
++    nativeBuildInputs = [ xz ];
++    excludes = [ "Makefile" ];
++  };
++
++  # Incremental 4.14.216 -> 4.14.217 stable patch.
++  stablePatch217 = fetchpatch {
++    name = "linux-4.14.216-217.patch";
++    url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.216-217.xz";
++    hash = "sha256-zq6P+Gpk/IfyHcvvE+YfqHbPLMkZ8KFQGkvQXq46QmQ=";
++    decode = "xz -d";
++    nativeBuildInputs = [ xz ];
++    excludes = [ "Makefile" ];
++  };
++
++  # Adapt partial vendor backports of the lazytime and futex fixes, retaining
++  # their missing hunks and the UFS reset fix. Preserve vendor UFS logging and
++  # DMA allocation. The adaptation also omits the central SUBLEVEL update.
++  stablePatch218 =
++    runCommand "linux-4.14.217-218.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.217-218.xz";
++          hash = "sha256-f/POnOl5cLdhcWvKZBeJq/3Hi3SHS0azPwyQc9ed1Bw=";
++        };
++        patchFile = ./linux-4.14.217-218.patch.patch;
++      }
++      ''
++        mkdir -p "$TMPDIR/stable"
++        xz -dc "$src" > "$TMPDIR/stable/linux-4.14.217-218.patch"
++        (cd "$TMPDIR/stable" && patch -p1 -i "$patchFile")
++        cp "$TMPDIR/stable/linux-4.14.217-218.patch" "$out"
++      '';
++
++  stablePatch219 = fetchpatch {
++    name = "linux-4.14.218-219.patch";
++    url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.218-219.xz";
++    hash = "sha256-319YCAE7WP+OMLXkyf/QI/pOH5xsQ1j9UdZHfjxe3SA=";
++    decode = "xz -d";
++    nativeBuildInputs = [ xz ];
++    excludes = [ "Makefile" ];
++  };
++
++  stablePatch220 = fetchpatch {
++    name = "linux-4.14.219-220.patch";
++    url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.219-220.xz";
++    hash = "sha256-/VLilbJpo94/iuxVEH1XtvirQQ2s6+NOshWy/k/DhnE=";
++    decode = "xz -d";
++    nativeBuildInputs = [ xz ];
++    excludes = [ "Makefile" ];
++  };
++
 +  # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
 +  # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
 +  configfile =
@@ -1265,8 +1345,12 @@ index 00000000..7963bedd
 +in
 +
 +kernel-builder-gcc8 {
-+  version = "4.14.214";
++  version = "4.14.220";
 +  inherit configfile;
++
++  postPatch = ''
++    sed -i 's/^SUBLEVEL = 214$/SUBLEVEL = 220/' Makefile
++  '';
 +
 +  src = fetchFromGitHub {
 +    owner = "fossil-engineering";
@@ -1284,6 +1368,12 @@ index 00000000..7963bedd
 +    stablePatch212
 +    stablePatch213
 +    stablePatch214
++    stablePatch215
++    stablePatch216
++    stablePatch217
++    stablePatch218
++    stablePatch219
++    stablePatch220
 +    (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
 +    (upstreamPatch "0002-mmc-Fix-embedded_sdio_data-duplicate-definition.patch" "0h7d3pxz8di2rh257kmc83iwcpf8xmrqhbqq4an2vclfdhyr297j")
 +    (upstreamPatch "0003-video-fbdev-msm-Provide-mdss_dsi_switch_page.patch" "1igqg795cvr81w948k4dj8nrbzc2pz5bg6gdp68jfplm2hcs4nch")

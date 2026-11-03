@@ -1,18 +1,14 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Sat, 24 Oct 2026 13:37:18 +1100
-Subject: [PATCH] add the AsteroidOS 4.9.112 vendor kernel and image
+Subject: [PATCH] add the AsteroidOS 4.9 vendor kernel and image
  (devices/oppo-beluga)
 
-Add the OPPO Watch (beluga) port with the AsteroidOS 4.9.112 msm8909w
-vendor kernel, its 17 upstream kernel patches, the extracted defconfig,
-the correct qualcomm-msm8909w SoC metadata and the Android fastboot
-layout. Keep the device best-effort until it has been boot-tested.
 ---
  devices/oppo-beluga/android-init.nix   | 113 +++++++++++++++++
  devices/oppo-beluga/default.nix        | 168 +++++++++++++++++++++++--
- devices/oppo-beluga/kernel/default.nix |  95 ++++++++++++++
- 3 files changed, 366 insertions(+), 10 deletions(-)
+ devices/oppo-beluga/kernel/default.nix | 112 +++++++++++++++++
+ 3 files changed, 383 insertions(+), 10 deletions(-)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
@@ -346,17 +342,19 @@ index c2cef490..fbb7a582 100644
  }
 diff --git a/devices/oppo-beluga/kernel/default.nix b/devices/oppo-beluga/kernel/default.nix
 new file mode 100644
-index 00000000..d01de3b0
+index 00000000..a814af0c
 --- /dev/null
 +++ b/devices/oppo-beluga/kernel/default.nix
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,112 @@
 +{
 +  mobile-nixos,
 +  stdenv,
 +  cpio,
 +  fetchgit,
++  fetchpatch,
 +  fetchurl,
 +  runCommand,
++  xz,
 +  ...
 +}:
 +
@@ -397,13 +395,27 @@ index 00000000..d01de3b0
 +      inherit hash;
 +    };
 +
++  # Incremental 4.9.112 -> 4.9.113 stable patch from kernel.org
++  stablePatch113 = fetchpatch {
++    name = "linux-4.9.112-113.patch";
++    url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.9.112-113.xz";
++    hash = "sha256-2ox6sDB/JEkVZ/9vRvA9ISCkJ/58jPNy1q5Y7Bxvyf4=";
++    decode = "xz -d";
++    nativeBuildInputs = [ xz ];
++    excludes = [ "Makefile" ];
++  };
++
 +  configfile = runCommand "oppo-beluga-defconfig" { inherit upstreamDefconfig; } ''
 +    cp "$upstreamDefconfig" "$out"
 +  '';
 +in
 +kernel-builder-gcc8 {
-+  version = "4.9.112";
++  version = "4.9.113";
 +  inherit configfile;
++
++  postPatch = ''
++    sed -i 's/^SUBLEVEL = 112/SUBLEVEL = 113/' Makefile
++  '';
 +
 +  src = fetchgit {
 +    url = "https://github.com/aosp-mirror/kernel_msm";
@@ -412,6 +424,7 @@ index 00000000..d01de3b0
 +  };
 +
 +  patches = [
++    stablePatch113
 +    (upstreamPatch "0001-scripts-dtc-Remove-redundant-YYLOC-global-declaratio.patch" "sha256-mrpPIBWIT7Ex97F4skQ9h8YOhTzLJotQGnwY/dPK72g=")
 +    (upstreamPatch "0002-dts-Add-oppo-device-trees.patch" "sha256-P/zal1/f0P9h27mpMaEbwDQ0JbAkbncPVl0ORnGaho0=")
 +    (upstreamPatch "0003-cyttsp5-Fix-compilation.patch" "sha256-FyYsC6oOXO5xfuCt6KyjZohgiPbITwcQz5y0V0sc39Q=")

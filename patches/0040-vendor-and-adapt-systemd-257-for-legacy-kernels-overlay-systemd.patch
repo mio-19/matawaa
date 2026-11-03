@@ -43,8 +43,8 @@ systemd262oldkernel.
  ...issing-STATX_MNT_ID-on-older-kernels.patch |  166 +++
  .../systemd-search-path-revert.patch          |   21 +
  .../systemd-257/systemd-udevd-varlink.socket  |   26 +
- overlay/systemd.nix                           |   68 +
- 30 files changed, 2406 insertions(+), 60 deletions(-)
+ overlay/systemd.nix                           |   65 +
+ 30 files changed, 2403 insertions(+), 60 deletions(-)
  create mode 100644 overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
  create mode 100644 overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
  create mode 100644 overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
@@ -2706,10 +2706,10 @@ index 00000000..e2cc9594
 +XAttrListen=user.varlink=listen
 diff --git a/overlay/systemd.nix b/overlay/systemd.nix
 new file mode 100644
-index 00000000..45012ded
+index 00000000..277c5c53
 --- /dev/null
 +++ b/overlay/systemd.nix
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,65 @@
 +final: super:
 +
 +let
@@ -2747,15 +2747,12 @@ index 00000000..45012ded
 +  };
 +
 +  systemd257 =
-+    (super.lib.callPackageWith
-+      (builtins.intersectAttrs (super.lib.functionArgs (import ./systemd-257)) super)
-+      ./systemd-257
-+      {
-+        stdenv = systemdStdenv;
-+        libcap = super.libcap.override { usePam = false; };
-+        util-linux = super.util-linuxMinimal;
-+      }
-+    ).override
++    (super.callPackage ./systemd-257 {
++      stdenv = systemdStdenv;
++      systemd = super.systemd;
++      libcap = super.libcap.override { usePam = false; };
++      util-linux = super.util-linuxMinimal;
++    }).override
 +      (
 +        {
 +          withCryptsetup = false;
