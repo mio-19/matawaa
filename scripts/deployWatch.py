@@ -415,8 +415,8 @@ Examples:
     parser.add_argument(
         "-u",
         "--user",
-        default="ceres",
-        help="SSH user on the watch (default: ceres)",
+        default="root",
+        help="SSH user on the watch (default: root)",
     )
     parser.add_argument(
         "-a",
