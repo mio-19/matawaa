@@ -8,8 +8,8 @@ builder, and the qml-asteroid wearable QML controls. Register the new
 package set in the Mobile-NixOS overlay.
 ---
  overlay/asteroidos/default.nix              |  11 ++
- overlay/asteroidos/lib/mk-asteroid-app.nix  | 111 ++++++++++++++++++++++
- overlay/asteroidos/qml-asteroid/default.nix | 110 +++++++++++++++++++++
+ overlay/asteroidos/lib/mk-asteroid-app.nix  | 111 ++++++++++++++++++++
+ overlay/asteroidos/qml-asteroid/default.nix | 110 +++++++++++++++++++
  overlay/oans/default.nix                    |  61 +++++++++++
  overlay/overlay.nix                         |   5 +
  5 files changed, 298 insertions(+)
