@@ -9,10 +9,10 @@ package set in the Mobile-NixOS overlay.
 ---
  overlay/asteroidos/default.nix              |  11 ++
  overlay/asteroidos/lib/mk-asteroid-app.nix  | 109 ++++++++++++++++++++
- overlay/asteroidos/qml-asteroid/default.nix | 107 +++++++++++++++++++
+ overlay/asteroidos/qml-asteroid/default.nix | 110 +++++++++++++++++++++
  overlay/oans/default.nix                    |  61 +++++++++++
  overlay/overlay.nix                         |   5 +
- 5 files changed, 293 insertions(+)
+ 5 files changed, 296 insertions(+)
  create mode 100644 overlay/asteroidos/default.nix
  create mode 100644 overlay/asteroidos/lib/mk-asteroid-app.nix
  create mode 100644 overlay/asteroidos/qml-asteroid/default.nix
@@ -152,10 +152,10 @@ index 00000000..04769ec4
 +})
 diff --git a/overlay/asteroidos/qml-asteroid/default.nix b/overlay/asteroidos/qml-asteroid/default.nix
 new file mode 100644
-index 00000000..e7c38aa8
+index 00000000..c275fbde
 --- /dev/null
 +++ b/overlay/asteroidos/qml-asteroid/default.nix
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,110 @@
 +{
 +  lib,
 +  stdenv,
@@ -196,6 +196,9 @@ index 00000000..e7c38aa8
 +  ];
 +
 +  postPatch = ''
++        substituteInPlace src/settings/src/languagemodel.cpp \
++          --replace-fail '"/usr/share/supported-languages"' '"/run/current-system/sw/share/supported-languages"'
++
 +        substituteInPlace CMakeLists.txt \
 +          --replace-fail 'find_package(Mapplauncherd_qt6 MODULE REQUIRED)' ""
 +        substituteInPlace src/app/CMakeLists.txt \
