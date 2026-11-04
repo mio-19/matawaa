@@ -8,11 +8,11 @@ builder, and the qml-asteroid wearable QML controls. Register the new
 package set in the Mobile-NixOS overlay.
 ---
  overlay/asteroidos/default.nix              |  11 ++
- overlay/asteroidos/lib/mk-asteroid-app.nix  | 109 ++++++++++++++++++++
+ overlay/asteroidos/lib/mk-asteroid-app.nix  | 111 ++++++++++++++++++++++
  overlay/asteroidos/qml-asteroid/default.nix | 110 +++++++++++++++++++++
  overlay/oans/default.nix                    |  61 +++++++++++
  overlay/overlay.nix                         |   5 +
- 5 files changed, 296 insertions(+)
+ 5 files changed, 298 insertions(+)
  create mode 100644 overlay/asteroidos/default.nix
  create mode 100644 overlay/asteroidos/lib/mk-asteroid-app.nix
  create mode 100644 overlay/asteroidos/qml-asteroid/default.nix
@@ -37,10 +37,10 @@ index 00000000..2fc834f0
 +}
 diff --git a/overlay/asteroidos/lib/mk-asteroid-app.nix b/overlay/asteroidos/lib/mk-asteroid-app.nix
 new file mode 100644
-index 00000000..04769ec4
+index 00000000..25094e27
 --- /dev/null
 +++ b/overlay/asteroidos/lib/mk-asteroid-app.nix
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,111 @@
 +# Unified builder for AsteroidOS smartwatch applications
 +# Inspired by Nixpkgs mkKdeDerivation: https://github.com/NixOS/nixpkgs/blob/master/pkgs/kde/lib/mk-kde-derivation.nix
 +{
@@ -95,7 +95,9 @@ index 00000000..04769ec4
 +
 +  postPatch = ''
 +    find . -name CMakeLists.txt -exec sed -i 's|/usr/share|share|g' {} +
-+    find . -name "*.qml" -exec sed -i 's|/usr/share/asteroid-launcher|/run/current-system/sw/share/asteroid-launcher|g' {} +
++    grep -IlR '/usr/share/asteroid-launcher' . | while IFS= read -r file; do
++      sed -i 's|/usr/share/asteroid-launcher|/run/current-system/sw/share/asteroid-launcher|g' "$file"
++    done
 +  ''
 +  + postPatch;
 +
