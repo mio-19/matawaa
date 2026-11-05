@@ -43,6 +43,8 @@ TODO
 
 ## LLM Policy
 
-LLM usage shall be discouraged when resources are available. An LLM writes code based on false assumptions confidently.
+LLM usage (including read-only and read-write) shall be discouraged when resources are available. An LLM writes code based on false assumptions confidently.
 
 At a bare minimum, communications shall be written by human, and code intended for other people to review shall only be submitted by human and has been reviewed by human.
+
+
