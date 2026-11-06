@@ -1,0 +1,117 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 7 Nov 2026 09:47:31 +1100
+Subject: [PATCH] asteroidos: resolve shared asset paths without /usr/share
+
+---
+ .../asteroidos/asteroid-launcher/default.nix  |  2 +-
+ overlay/asteroidos/community-apps/default.nix | 25 +++++++++++++++++++
+ overlay/asteroidos/lib/mk-asteroid-app.nix    |  3 ++-
+ overlay/asteroidos/qml-asteroid/default.nix   | 10 ++++++++
+ 4 files changed, 38 insertions(+), 2 deletions(-)
+
+diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
+index f904b791..b517f30d 100644
+--- a/overlay/asteroidos/asteroid-launcher/default.nix
++++ b/overlay/asteroidos/asteroid-launcher/default.nix
+@@ -40,7 +40,7 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+   postPatch = ''
+     substituteInPlace src/qml/MainScreen.qml \
+-      --replace-fail "/usr/share/asteroid-launcher" "$out/share/asteroid-launcher"
++      --replace-fail "/usr/share/asteroid-launcher" "/run/current-system/sw/share/asteroid-launcher"
+ 
+     substituteInPlace lipstick/src/localemanager.cpp \
+       --replace-fail '"/usr/share/translations"' "\"$out/share/translations\""
+diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
+index b82d53bc..05378baf 100644
+--- a/overlay/asteroidos/community-apps/default.nix
++++ b/overlay/asteroidos/community-apps/default.nix
+@@ -153,6 +153,10 @@ rec {
+     patches = [
+       ./beatfork-tack-improvements.patch
+     ];
++    postPatch = ''
++      substituteInPlace src/events.d/beatfork-tick.ini \
++        --replace-fail '/usr/share/sounds/tick.wav' "$out/share/sounds/tick.wav"
++    '';
+     extraBuildInputs = [
+       qt6.qtmultimedia
+     ];
+@@ -166,6 +170,12 @@ rec {
+     desc = "Benchmark tool for AsteroidOS smartwatches";
+     rev = "11e90920e76e6c62fe1076d4c3927b81b1154e96";
+     sha256 = "0x3c5rm2b8b8cfq7a1kl1699lmn88id70zmrsqzf53bxiv1ms8x4";
++    postPatch = ''
++      for phase in src/phases/CloudLight.qml src/phases/CloudHeavy.qml; do
++        substituteInPlace "$phase" \
++          --replace-fail 'file:///usr/share/benchymark/' "file://$out/share/benchymark/"
++      done
++    '';
+     extraBuildInputs = [
+       qt6.qtsensors
+     ];
+@@ -183,6 +193,16 @@ rec {
+       sha256 = "0g8x6v27ni3zqwir2sif7a0csb78adii47g4y4mnqm3vfklknnp1";
+     };
+ 
++    postPatch = ''
++      substituteInPlace asteroid_docking_bay/watchctl.py \
++        --replace-fail '/usr/share/locale' '/run/current-system/sw/share/locale' \
++        --replace-fail '/usr/share/sounds/notification.wav' '/run/current-system/sw/share/sounds/notification.wav'
++      substituteInPlace asteroid_docking_bay/wanze.py \
++        --replace-fail 'Path("/usr/share/wanze")' 'Path("/run/current-system/sw/share/wanze")'
++      substituteInPlace asteroid_docking_bay/rpcops.py \
++        --replace-fail '/usr/share/locale' '/run/current-system/sw/share/locale'
++    '';
++
+     dontBuild = true;
+ 
+     installPhase = ''
+@@ -339,6 +359,11 @@ rec {
+       rev = "ccd5d9f52609bbdcd5d8fa78c4fdb0f12954125f";
+       hash = "sha256-9MoX6ykqvd2iB0VrZCfhSyhtztMpBTukeKejfAWYW1w=";
+     };
++    postPatch = ''
++      substituteInPlace neofetch \
++        --replace-fail '/usr/share/gtk-2.0/gtkrc' '/run/current-system/sw/share/gtk-2.0/gtkrc' \
++        --replace-fail '/usr/share/gtk-3.0/settings.ini' '/run/current-system/sw/share/gtk-3.0/settings.ini'
++    '';
+     dontBuild = true;
+     installPhase = ''
+       runHook preInstall
+diff --git a/overlay/asteroidos/lib/mk-asteroid-app.nix b/overlay/asteroidos/lib/mk-asteroid-app.nix
+index 25094e27..e099a01b 100644
+--- a/overlay/asteroidos/lib/mk-asteroid-app.nix
++++ b/overlay/asteroidos/lib/mk-asteroid-app.nix
+@@ -51,7 +51,8 @@ stdenv.mkDerivation (finalAttrs: {
+   inherit patches;
+ 
+   postPatch = ''
+-    find . -name CMakeLists.txt -exec sed -i 's|/usr/share|share|g' {} +
++    # CMake install destinations must stay relative to CMAKE_INSTALL_PREFIX.
++    find . -name CMakeLists.txt -exec sed -i 's|DESTINATION /usr/share|DESTINATION share|g' {} +
+     grep -IlR '/usr/share/asteroid-launcher' . | while IFS= read -r file; do
+       sed -i 's|/usr/share/asteroid-launcher|/run/current-system/sw/share/asteroid-launcher|g' "$file"
+     done
+diff --git a/overlay/asteroidos/qml-asteroid/default.nix b/overlay/asteroidos/qml-asteroid/default.nix
+index c275fbde..83e29e4b 100644
+--- a/overlay/asteroidos/qml-asteroid/default.nix
++++ b/overlay/asteroidos/qml-asteroid/default.nix
+@@ -41,6 +41,16 @@ stdenv.mkDerivation (finalAttrs: {
+         substituteInPlace src/settings/src/languagemodel.cpp \
+           --replace-fail '"/usr/share/supported-languages"' '"/run/current-system/sw/share/supported-languages"'
+ 
++        substituteInPlace src/app/asteroidapp.cpp \
++          --replace-fail '"/usr/share/translations"' '"/run/current-system/sw/share/translations"' \
++          --replace-fail '"/usr/share/applications/"' '"/run/current-system/sw/share/applications/"'
++
++        substituteInPlace src/controls/src/icon.cpp \
++          --replace-fail '"/usr/share/icons/asteroid/"' '"/run/current-system/sw/share/icons/asteroid/"'
++
++        substituteInPlace src/controls/CMakeLists.txt \
++          --replace-fail '"-indexdir" "/usr/share/doc/qt5" ' ""
++
+         substituteInPlace CMakeLists.txt \
+           --replace-fail 'find_package(Mapplauncherd_qt6 MODULE REQUIRED)' ""
+         substituteInPlace src/app/CMakeLists.txt \
