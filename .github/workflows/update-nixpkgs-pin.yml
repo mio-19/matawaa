@@ -62,7 +62,7 @@ jobs:
           ./scripts/rebuildPatches.sh
 
           echo "Formatting nix files..."
-          nixfmt flake.nix
+          nix shell nixpkgs#nixfmt --command nixfmt flake.nix
 
       - name: Create Pull Request for nixpkgs update
         if: steps.update_npins.outputs.changed == 'true'

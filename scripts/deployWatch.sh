@@ -2,7 +2,7 @@
 #
 # deployWatch.sh — Deploy or upgrade AsteroidOS NixOS systems on smartwatches over-the-air
 #
-# Wrapper around scripts/deployWatch.py for safe, atomic, over-the-air deployments.
+# Wrapper around scripts/deployWatch.py for watch deployments.
 #
 
 set -euo pipefail

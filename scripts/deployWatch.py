@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """deployWatch.py — Deploy and upgrade AsteroidOS NixOS systems on smartwatches.
 
-Provides safe, atomic, over-the-air deployment for wearable devices:
+Stages NixOS system profiles and Android boot images on wearable devices:
   1. Builds the full AsteroidOS UI desktop toplevel closure locally.
   2. Builds the stage-1 Android boot image (`boot.img`).
   3. Copies closures via `nix-copy-closure` over USB networking or Wi-Fi.
   4. Flashes stage-1 to the Android boot partition if updated.
-  5. Stages the new generation and activates via `boot` (staged for next startup)
-     or `switch` (immediate in-place restart).
+  5. Stages the new generation for the next boot, or activates it immediately.
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 
 def get_repo_root() -> Path:
@@ -47,14 +46,21 @@ def run_cmd(
     cwd: Optional[Path] = None,
     capture_output: bool = False,
     check: bool = True,
+    env: Optional[dict[str, str]] = None,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        cmd,
-        cwd=cwd,
-        text=True,
-        capture_output=capture_output,
-        check=check,
-    )
+    try:
+        return subprocess.run(
+            cmd,
+            cwd=cwd,
+            text=True,
+            capture_output=capture_output,
+            check=check,
+            env=env,
+        )
+    except subprocess.CalledProcessError as error:
+        if capture_output and error.stderr:
+            log_error(error.stderr.rstrip())
+        raise
 
 
 def check_ssh_connectivity(host: str, port: int, user: str) -> bool:
@@ -74,8 +80,7 @@ def check_ssh_connectivity(host: str, port: int, user: str) -> bool:
     ]
     res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if res.returncode != 0:
-        log_warn("Batch SSH authentication failed or target not yet trusted.")
-        log_warn("Will use interactive SSH / password prompt (default is '1234' for user 'ceres').")
+        log_warn("Non-interactive SSH is unavailable; subsequent commands may prompt for authentication.")
         return False
     log_success("SSH connection verified.")
     return True
@@ -89,15 +94,15 @@ def ssh_exec(
     sudo: bool = False,
     capture_output: bool = False,
 ) -> subprocess.CompletedProcess[str]:
-    prefix = "sudo " if sudo and user != "root" else ""
-    full_remote = f"{prefix}{remote_cmd}"
+    shell_command = f"sh -c {shlex.quote(remote_cmd)}"
+    full_remote = f"sudo -- {shell_command}" if sudo and user != "root" else shell_command
     cmd = [
         "ssh",
         "-p",
         str(port),
         "-o",
         "StrictHostKeyChecking=accept-new",
-        "-t",
+        "-tt" if sudo and user != "root" else "-T",
         f"{user}@{host}",
         full_remote,
     ]
@@ -136,39 +141,32 @@ def build_asteroid_toplevel(repo_root: Path, device: str) -> str:
     return toplevel
 
 
-def build_stage1_bootimg(repo_root: Path, device: str) -> Optional[str]:
+def build_stage1_bootimg(repo_root: Path, device: str) -> str:
     log(f"Building stage-1 boot.img (kernel + initrd) for '{device}'...")
     examples_path = repo_root / "work" / "mobile-nixos" / "examples" / "asteroid"
-    try:
-        if examples_path.is_dir():
-            cmd = [
-                "nix-build",
-                str(examples_path),
-                "--argstr",
-                "device",
-                device,
-                "-A",
-                "outputs.android.android-bootimg",
-                "--no-link",
-            ]
-            res = run_cmd(cmd, cwd=repo_root, capture_output=True)
-            bootimg_path = res.stdout.strip().splitlines()[-1]
-        else:
-            cmd = [
-                "nix",
-                "build",
-                f"{repo_root}#nixosConfigurations.{device}.config.mobile.outputs.android.android-bootimg",
-                "--no-link",
-                "--print-out-paths",
-            ]
-            res = run_cmd(cmd, cwd=repo_root, capture_output=True)
-            bootimg_path = res.stdout.strip().splitlines()[-1]
-
-        log_success(f"Built stage-1 boot image: {bootimg_path}")
-        return bootimg_path
-    except subprocess.CalledProcessError as e:
-        log_warn(f"Device '{device}' does not define an Android bootimg: {e}")
-        return None
+    if examples_path.is_dir():
+        cmd = [
+            "nix-build",
+            str(examples_path),
+            "--argstr",
+            "device",
+            device,
+            "-A",
+            "outputs.android.android-bootimg",
+            "--no-link",
+        ]
+    else:
+        cmd = [
+            "nix",
+            "build",
+            f"{repo_root}#nixosConfigurations.{device}.config.mobile.outputs.android.android-bootimg",
+            "--no-link",
+            "--print-out-paths",
+        ]
+    res = run_cmd(cmd, cwd=repo_root, capture_output=True)
+    bootimg_path = res.stdout.strip().splitlines()[-1]
+    log_success(f"Built stage-1 boot image: {bootimg_path}")
+    return bootimg_path
 
 
 def flash_stage1_bootimg_remote(
@@ -184,17 +182,19 @@ def flash_stage1_bootimg_remote(
         if candidate.is_file():
             bootimg_file = candidate
         else:
-            log_warn(f"Cannot locate boot.img file at {local_bootimg}; skipping stage-1 flash.")
-            return
+            raise FileNotFoundError(f"Cannot locate boot.img at {local_bootimg}")
 
     img_size = bootimg_file.stat().st_size
+    digest = hashlib.sha256()
     with open(bootimg_file, "rb") as f:
-        img_sha256 = hashlib.sha256(f.read()).hexdigest()
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    img_sha256 = digest.hexdigest()
 
     log(f"Stage-1 boot.img size: {img_size} bytes, sha256: {img_sha256[:16]}...")
 
     # Copy boot.img to watch /tmp
-    remote_tmp_img = "/tmp/new-stage1-boot.img"
+    remote_tmp_img = f"/tmp/new-stage1-{img_sha256[:16]}-{os.getpid()}.img"
     log(f"Transferring stage-1 boot.img to watch at {remote_tmp_img}...")
     scp_cmd = [
         "scp",
@@ -209,14 +209,13 @@ def flash_stage1_bootimg_remote(
 
     # Shell script to locate boot partition, compare hash, and dd flash if needed
     remote_script = f"""
-set -eu
+set -euo pipefail
+trap 'rm -f {remote_tmp_img}' EXIT
 BOOT_PART=""
 for cand in \\
     /dev/block/bootdevice/by-name/boot \\
     /dev/block/by-name/boot \\
     /dev/block/platform/*/by-name/boot \\
-    /dev/block/bootdevice/by-name/boot_a \\
-    /dev/block/by-name/boot_a \\
     /dev/disk/by-partlabel/boot \\
     /dev/disk/by-partlabel/BOOT; do
     if [ -b "$cand" ]; then
@@ -226,9 +225,29 @@ for cand in \\
 done
 
 if [ -z "$BOOT_PART" ]; then
-    echo "[!] Warning: No boot partition block device found on target. Skipping stage-1 flash."
-    rm -f {remote_tmp_img}
-    exit 0
+    slot=$(sed -n 's/.*androidboot.slot_suffix=\\(_[ab]\\).*/\\1/p' /proc/cmdline)
+    if [ -n "$slot" ]; then
+        for cand in /dev/block/bootdevice/by-name/boot"$slot" /dev/block/by-name/boot"$slot"; do
+            if [ -b "$cand" ]; then BOOT_PART="$cand"; break; fi
+        done
+    fi
+fi
+
+if [ -z "$BOOT_PART" ]; then
+    echo "No active boot partition block device found" >&2
+    exit 1
+fi
+
+actual_sha=$(sha256sum {remote_tmp_img} | cut -d' ' -f1)
+if [ "$actual_sha" != "{img_sha256}" ]; then
+    echo "Transferred boot image checksum mismatch" >&2
+    exit 1
+fi
+
+part_size=$(blockdev --getsize64 "$BOOT_PART")
+if [ "$part_size" -lt {img_size} ]; then
+    echo "Boot image exceeds $BOOT_PART ($part_size bytes)" >&2
+    exit 1
 fi
 
 echo "[*] Found boot partition block device: $BOOT_PART"
@@ -241,10 +260,13 @@ else
     echo "[*] Stage-1 hash mismatch ($PART_SHA != $NEW_SHA). Flashing new boot.img..."
     dd if={remote_tmp_img} of="$BOOT_PART" bs=4M status=none conv=fsync
     sync
+    flashed_sha=$(head -c {img_size} "$BOOT_PART" | sha256sum | cut -d' ' -f1)
+    if [ "$flashed_sha" != "$NEW_SHA" ]; then
+        echo "Boot partition read-back checksum mismatch" >&2
+        exit 1
+    fi
     echo "[+] Stage-1 successfully flashed to $BOOT_PART!"
 fi
-
-rm -f {remote_tmp_img}
 """
     ssh_exec(host, port, user, f"bash -c {shlex.quote(remote_script)}", sudo=True)
 
@@ -261,7 +283,9 @@ def deploy_copy(
     reboot: bool,
 ) -> None:
     toplevel = build_asteroid_toplevel(repo_root, device)
-    bootimg = build_stage1_bootimg(repo_root, device) if flash_boot else None
+    # Test and dry-activate must not change the device's boot partition.
+    should_flash = flash_boot and action in ("boot", "switch")
+    bootimg = build_stage1_bootimg(repo_root, device) if should_flash else None
 
     if dry_run:
         log("Dry run requested. Closures built successfully; skipping transmission and activation.")
@@ -273,21 +297,31 @@ def deploy_copy(
     env = os.environ.copy()
     env["NIX_SSHOPTS"] = f"-p {port} -o StrictHostKeyChecking=accept-new"
     cmd = ["nix-copy-closure", "--to", f"{user}@{host}", toplevel]
-    run_cmd(cmd)
+    run_cmd(cmd, env=env)
 
     if bootimg:
         flash_stage1_bootimg_remote(host, port, user, bootimg)
 
     log(f"Activating configuration (action: {action}) on target watch...")
-    remote_activate = (
-        f"nix-env -p /nix/var/nix/profiles/system --set {toplevel} && "
-        f"{toplevel}/bin/switch-to-configuration {action}"
-    )
+    if action == "boot":
+        # Mobile NixOS stage-1 selects the system profile directly. There is
+        # no conventional NixOS boot loader for switch-to-configuration to edit.
+        remote_activate = (
+            f"nix-env -p /nix/var/nix/profiles/system --set {shlex.quote(toplevel)} && "
+            f"test \"$(readlink -f /nix/var/nix/profiles/system)\" = {shlex.quote(toplevel)}"
+        )
+    elif action == "switch":
+        remote_activate = (
+            f"nix-env -p /nix/var/nix/profiles/system --set {shlex.quote(toplevel)} && "
+            f"{shlex.quote(toplevel)}/bin/switch-to-configuration switch"
+        )
+    else:
+        remote_activate = f"{shlex.quote(toplevel)}/bin/switch-to-configuration {action}"
     ssh_exec(host, port, user, remote_activate, sudo=True)
 
-    log_success(f"Deployment successfully staged on {device} with action '{action}'!")
+    log_success(f"Deployment action '{action}' completed on {device}.")
     if action == "boot":
-        log("[*] New generation staged for next startup.")
+        log("New system profile staged for Mobile NixOS stage-1 on next startup.")
         if reboot:
             log("Rebooting watch now (--reboot requested)...")
             ssh_exec(host, port, user, "reboot", sudo=True)
@@ -459,6 +493,8 @@ Examples:
     )
 
     args = parser.parse_args()
+    if args.reboot and args.action != "boot":
+        parser.error("--reboot requires --action boot")
     repo_root = get_repo_root()
 
     print("=" * 60)
@@ -468,7 +504,7 @@ Examples:
     print(f" Target:     {args.user}@{args.target}:{args.port}")
     print(f" Action:     {args.action}")
     print(f" Method:     {args.method}")
-    print(f" Flash Boot: {args.flash_boot}")
+    print(f" Flash Boot: {args.flash_boot and args.method == 'copy' and args.action in ('boot', 'switch')}")
     print(f" Dry run:    {args.dry_run}")
     print("=" * 60)
 
@@ -509,4 +545,12 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except subprocess.CalledProcessError as error:
+        command = error.cmd[0] if isinstance(error.cmd, (list, tuple)) else error.cmd
+        log_error(f"Deployment stopped: {command} exited with status {error.returncode}.")
+        raise SystemExit(1) from None
+    except OSError as error:
+        log_error(f"Deployment stopped: {error}")
+        raise SystemExit(1) from None
