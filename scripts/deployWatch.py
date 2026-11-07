@@ -495,13 +495,24 @@ Examples:
     args = parser.parse_args()
     if args.reboot and args.action != "boot":
         parser.error("--reboot requires --action boot")
+    if args.method == "deploy-rs" and (
+        args.target != "172.16.42.1" or args.port != 22 or args.user != "root"
+    ):
+        parser.error("deploy-rs uses the hostname and SSH user configured in flake.nix")
+    if args.method == "nixos-rebuild" and args.port != 22:
+        parser.error("--port is supported only by --method copy")
     repo_root = get_repo_root()
 
     print("=" * 60)
     print(" AsteroidOS Smartwatch OTA Deployment Tool")
     print("=" * 60)
     print(f" Device:     {args.device}")
-    print(f" Target:     {args.user}@{args.target}:{args.port}")
+    target = (
+        "flake.nix deploy.nodes configuration"
+        if args.method == "deploy-rs"
+        else f"{args.user}@{args.target}:{args.port}"
+    )
+    print(f" Target:     {target}")
     print(f" Action:     {args.action}")
     print(f" Method:     {args.method}")
     print(f" Flash Boot: {args.flash_boot and args.method == 'copy' and args.action in ('boot', 'switch')}")
