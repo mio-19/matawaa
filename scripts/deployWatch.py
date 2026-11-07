@@ -352,7 +352,7 @@ def deploy_copy(
     if action == "boot":
         log("New system profile staged for Mobile NixOS stage-1 on next startup.")
         if reboot:
-            log("Rebooting watch now (--reboot requested)...")
+            log("Rebooting watch now...")
             ssh_exec(host, port, user, "reboot", sudo=True)
         else:
             log(f"Reboot the watch when ready: ssh -p {port} {user}@{host} 'sudo reboot'")
@@ -515,15 +515,23 @@ Examples:
         help="Skip flashing stage-1 boot.img",
     )
     parser.add_argument(
+        "--no-reboot",
+        dest="reboot",
+        action="store_false",
+        help="Do not reboot the watch automatically after deployment",
+    )
+    parser.add_argument(
         "-r",
         "--reboot",
+        dest="reboot",
         action="store_true",
-        help="Reboot the watch automatically after staging (when action=boot)",
+        default=True,
+        help="Reboot the watch automatically after deployment (default: True for action 'boot')",
     )
 
     args = parser.parse_args()
-    if args.reboot and args.action != "boot":
-        parser.error("--reboot requires --action boot")
+    if args.action != "boot":
+        args.reboot = False
     if args.method == "deploy-rs" and (
         args.target != "172.16.42.1" or args.port != 22 or args.user != "root"
     ):

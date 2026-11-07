@@ -21,7 +21,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/android-init.nix          | 148 +++++
  devices/fossil-hoki/android-system-data.nix   |  26 +
  devices/fossil-hoki/audio-modules.nix         | 122 +++++
- devices/fossil-hoki/default.nix               | 509 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 510 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  .../hwcomposer-allocation-diagnostics.patch   |  31 ++
  devices/fossil-hoki/hybris-android.nix        |  30 ++
@@ -43,7 +43,7 @@ they cannot hold multi-user.target.
  overlay/asteroidos/default.nix                |   2 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  95 +++-
  .../hwc-present-diagnostics.patch             | 204 +++++++
- 26 files changed, 2521 insertions(+), 72 deletions(-)
+ 26 files changed, 2522 insertions(+), 72 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -446,10 +446,10 @@ index 00000000..4bcf1878
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..ad696be7
+index 00000000..05284e22
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,509 @@
+@@ -0,0 +1,510 @@
 +{
 +  config,
 +  lib,
@@ -788,6 +788,7 @@ index 00000000..ad696be7
 +    cp ${pkgs.writeText "20-device.conf" ''
 +      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
 +      QPA_HWC_FORCE_GLES=1
++      QPA_HWC2_FORCE_DOZE_UPDATE=1
 +      QT_OPENGL_NO_BGRA=1
 +      ${lib.optionalString debugBuild ''
 +        QT_DEBUG_PLUGINS=1
