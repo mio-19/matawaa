@@ -109,6 +109,41 @@ def ssh_exec(
     return run_cmd(cmd, capture_output=capture_output)
 
 
+def run_build_cmd(
+    cmd: List[str],
+    cwd: Optional[Path] = None,
+    env: Optional[dict[str, str]] = None,
+) -> str:
+    """Run a nix-build or nix build command without hiding output.
+
+    Streams stderr (evaluation traces, compiler messages, progress) live directly
+    to the terminal and prints stdout lines as they arrive while capturing the
+    resulting store path.
+    """
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=None,
+        text=True,
+        env=env,
+    )
+    stdout_lines: List[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+        stripped = line.strip()
+        if stripped:
+            stdout_lines.append(stripped)
+    ret = proc.wait()
+    if ret != 0:
+        raise subprocess.CalledProcessError(ret, cmd)
+    if not stdout_lines:
+        raise RuntimeError(f"Build command produced no output path: {' '.join(cmd)}")
+    return stdout_lines[-1]
+
+
 def build_asteroid_toplevel(repo_root: Path, device: str) -> str:
     log(f"Building full AsteroidOS UI desktop toplevel for '{device}'...")
     examples_path = repo_root / "work" / "mobile-nixos" / "examples" / "asteroid"
@@ -123,9 +158,6 @@ def build_asteroid_toplevel(repo_root: Path, device: str) -> str:
             "config.system.build.toplevel",
             "--no-link",
         ]
-        res = run_cmd(cmd, cwd=repo_root, capture_output=True)
-        paths = res.stdout.strip().splitlines()
-        toplevel = paths[-1]
     else:
         cmd = [
             "nix",
@@ -134,9 +166,7 @@ def build_asteroid_toplevel(repo_root: Path, device: str) -> str:
             "--no-link",
             "--print-out-paths",
         ]
-        res = run_cmd(cmd, cwd=repo_root, capture_output=True)
-        toplevel = res.stdout.strip().splitlines()[-1]
-
+    toplevel = run_build_cmd(cmd, cwd=repo_root)
     log_success(f"Built full AsteroidOS desktop toplevel: {toplevel}")
     return toplevel
 
@@ -163,8 +193,7 @@ def build_stage1_bootimg(repo_root: Path, device: str) -> str:
             "--no-link",
             "--print-out-paths",
         ]
-    res = run_cmd(cmd, cwd=repo_root, capture_output=True)
-    bootimg_path = res.stdout.strip().splitlines()[-1]
+    bootimg_path = run_build_cmd(cmd, cwd=repo_root)
     log_success(f"Built stage-1 boot image: {bootimg_path}")
     return bootimg_path
 
