@@ -20,7 +20,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/accounts-qt/default.nix    |  85 +++
  overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
  overlay/asteroidos/amber-mpris/default.nix    |  54 ++
- overlay/asteroidos/default.nix                |  80 +++
+ overlay/asteroidos/default.nix                |  89 ++-
  overlay/asteroidos/dsme/default.nix           | 107 ++++
  overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
  overlay/asteroidos/keepalive/default.nix      | 131 ++++
@@ -28,14 +28,14 @@ libraries, without wrapping the Qt apps.
  .../keepalive/patches/0002-Fix-build.patch    |  23 +
  overlay/asteroidos/libconnman-qt/default.nix  | 139 ++++
  overlay/asteroidos/libdsme/default.nix        |  82 +++
- overlay/asteroidos/libiodata/default.nix      | 111 ++++
+ overlay/asteroidos/libiodata/default.nix      | 118 ++++
  overlay/asteroidos/libiphb/default.nix        |  54 ++
  overlay/asteroidos/libngf/default.nix         |  53 ++
  ...-sailjaild-D-Bus-query-when-sailjail.patch |  40 ++
  .../0003-invoker-fallback-dlopen-so.patch     |  69 ++
  overlay/asteroidos/mapplauncherd/default.nix  |  59 ++
  overlay/asteroidos/mce-dev/default.nix        |  41 ++
- .../mce-plugin-libhybris/default.nix          |  72 +++
+ .../mce-plugin-libhybris/default.nix          |  69 ++
  overlay/asteroidos/mce-qt6/default.nix        | 100 +++
  overlay/asteroidos/mce/builtin-gconf.values   |   1 +
  overlay/asteroidos/mce/default.nix            | 107 ++++
@@ -50,16 +50,18 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/mkcal/default.nix          |  60 ++
  overlay/asteroidos/mlite/CMakeLists.txt       | 122 ++++
  overlay/asteroidos/mlite/default.nix          |  52 ++
+ .../nemo-qml-plugin-alarms/default.nix        | 135 ++++
  .../nemo-qml-plugin-calendar/default.nix      |  94 +++
+ .../nemo-qml-plugin-notifications/default.nix | 121 ++++
  overlay/asteroidos/ngf-qt6/default.nix        |  96 +++
  overlay/asteroidos/sensorfw/CMakeLists.txt    | 264 ++++++++
- overlay/asteroidos/sensorfw/default.nix       |  82 +++
- overlay/asteroidos/timed-qt6/default.nix      | 111 ++++
+ overlay/asteroidos/sensorfw/default.nix       |  71 ++
+ overlay/asteroidos/timed-qt6/default.nix      | 269 ++++++++
  overlay/asteroidos/usb-moded-dev/default.nix  |  42 ++
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
- overlay/libhybris/default.nix                 |  68 +-
- 42 files changed, 4650 insertions(+), 36 deletions(-)
+ overlay/libhybris/default.nix                 |  53 +-
+ 44 files changed, 5050 insertions(+), 37 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -92,7 +94,9 @@ libraries, without wrapping the Qt apps.
  create mode 100644 overlay/asteroidos/mkcal/default.nix
  create mode 100644 overlay/asteroidos/mlite/CMakeLists.txt
  create mode 100644 overlay/asteroidos/mlite/default.nix
+ create mode 100644 overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
+ create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
  create mode 100644 overlay/asteroidos/ngf-qt6/default.nix
  create mode 100644 overlay/asteroidos/sensorfw/CMakeLists.txt
  create mode 100644 overlay/asteroidos/sensorfw/default.nix
@@ -103,7 +107,7 @@ libraries, without wrapping the Qt apps.
 
 diff --git a/overlay/asteroidos/accounts-qt/default.nix b/overlay/asteroidos/accounts-qt/default.nix
 new file mode 100644
-index 00000000..b0ba7f11
+index 0000000..b0ba7f1
 --- /dev/null
 +++ b/overlay/asteroidos/accounts-qt/default.nix
 @@ -0,0 +1,85 @@
@@ -194,7 +198,7 @@ index 00000000..b0ba7f11
 +})
 diff --git a/overlay/asteroidos/amber-mpris/CMakeLists.txt b/overlay/asteroidos/amber-mpris/CMakeLists.txt
 new file mode 100644
-index 00000000..03a35cfe
+index 0000000..03a35cf
 --- /dev/null
 +++ b/overlay/asteroidos/amber-mpris/CMakeLists.txt
 @@ -0,0 +1,128 @@
@@ -328,7 +332,7 @@ index 00000000..03a35cfe
 +)
 diff --git a/overlay/asteroidos/amber-mpris/default.nix b/overlay/asteroidos/amber-mpris/default.nix
 new file mode 100644
-index 00000000..bcdd9f13
+index 0000000..bcdd9f1
 --- /dev/null
 +++ b/overlay/asteroidos/amber-mpris/default.nix
 @@ -0,0 +1,54 @@
@@ -387,26 +391,28 @@ index 00000000..bcdd9f13
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 2fc834f0..4e0b1aab 100644
+index f3735b0..1daf957 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -1,11 +1,91 @@
- { callPackage, pkgs }:
+@@ -4,10 +4,97 @@ rec {
+   noUsrShareHook = callPackage ./lib/no-usr-share-hook.nix { };
  
- rec {
-+  metaAsteroidSrc = pkgs.fetchgit {
-+    url = "https://github.com/AsteroidOS/meta-asteroid";
-+    rev = "f1fce86f8d6488066ac266216b7e68be00d8499d";
-+    hash = "sha256-FZlt4YrN+y4dSXz8zbBsK+ulwKIaoSi4eDpTWLPiYvQ=";
-+  };
-+  meta-asteroid-src = metaAsteroidSrc;
-+
    mkAsteroidApp = callPackage ./lib/mk-asteroid-app.nix {
-     inherit qml-asteroid;
+-    inherit qml-asteroid noUsrShareHook;
++    inherit qml-asteroid mapplauncherd noUsrShareHook;
    };
  
-   qml-asteroid = callPackage ./qml-asteroid { };
-+  mapplauncherd = callPackage ./mapplauncherd { };
+   qml-asteroid = callPackage ./qml-asteroid { inherit noUsrShareHook; };
++  mapplauncherd = callPackage ./mapplauncherd { inherit metaAsteroidSrc; };
++
++  # Upstream meta-asteroid checkout, used for unmodified recipe payloads
++  # (udev rules, unit files, patches) instead of vendoring them.
++  metaAsteroidSrc = pkgs.fetchgit {
++    url = "https://github.com/AsteroidOS/meta-asteroid";
++    rev = "c84c0bbd731f9dfa3b04295bac239dd7fa64c722";
++    hash = "sha256-AZF9IUTtSNTpgcu7kOL4OLIg/WJIGBI04Q9WIrnMQUA=";
++  };
++  meta-asteroid-src = metaAsteroidSrc;
 +
 +  amber-mpris = callPackage ./amber-mpris { };
 +  mlite = callPackage ./mlite { };
@@ -444,7 +450,8 @@ index 2fc834f0..4e0b1aab 100644
 +  # Nemomobile SensorFW daemon and client API (qtsensors sensorfw backend).
 +  # Upstream: https://github.com/sailfishos/sensorfw
 +  sensorfw = callPackage ./sensorfw {
-+    inherit (pkgs) libhybris android-headers;
++    inherit metaAsteroidSrc;
++    inherit (pkgs) libhybris;
 +  };
 +
 +  # Device state machine daemon MCE talks to.
@@ -463,8 +470,12 @@ index 2fc834f0..4e0b1aab 100644
 +    inherit mce-dev libiphb;
 +  };
 +  timed-qt6 = callPackage ./timed-qt6 {
-+    inherit libiodata;
++    inherit libiodata metaAsteroidSrc;
 +  };
++  nemo-qml-plugin-alarms = callPackage ./nemo-qml-plugin-alarms {
++    inherit timed-qt6;
++  };
++  nemo-qml-plugin-notifications = callPackage ./nemo-qml-plugin-notifications { };
 +
 +  # Calendar subsystem: accounts-qt, kcalendarcore, mkcal, and nemo-qml-plugin-calendar
 +  # Upstream repository: https://gitlab.com/accounts-sso/accounts-qt
@@ -484,7 +495,7 @@ index 2fc834f0..4e0b1aab 100644
  }
 diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
 new file mode 100644
-index 00000000..49c4f3f1
+index 0000000..49c4f3f
 --- /dev/null
 +++ b/overlay/asteroidos/dsme/default.nix
 @@ -0,0 +1,107 @@
@@ -597,7 +608,7 @@ index 00000000..49c4f3f1
 +})
 diff --git a/overlay/asteroidos/kcalendarcore/default.nix b/overlay/asteroidos/kcalendarcore/default.nix
 new file mode 100644
-index 00000000..9b875b0d
+index 0000000..9b875b0
 --- /dev/null
 +++ b/overlay/asteroidos/kcalendarcore/default.nix
 @@ -0,0 +1,51 @@
@@ -654,7 +665,7 @@ index 00000000..9b875b0d
 +})
 diff --git a/overlay/asteroidos/keepalive/default.nix b/overlay/asteroidos/keepalive/default.nix
 new file mode 100644
-index 00000000..d98c0386
+index 0000000..d98c038
 --- /dev/null
 +++ b/overlay/asteroidos/keepalive/default.nix
 @@ -0,0 +1,131 @@
@@ -791,7 +802,7 @@ index 00000000..d98c0386
 +})
 diff --git a/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch b/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
 new file mode 100644
-index 00000000..fe431276
+index 0000000..fe43127
 --- /dev/null
 +++ b/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
 @@ -0,0 +1,23 @@
@@ -820,7 +831,7 @@ index 00000000..fe431276
 + examples.files = examples/qml/*.qml
 diff --git a/overlay/asteroidos/keepalive/patches/0002-Fix-build.patch b/overlay/asteroidos/keepalive/patches/0002-Fix-build.patch
 new file mode 100644
-index 00000000..a430a281
+index 0000000..a430a28
 --- /dev/null
 +++ b/overlay/asteroidos/keepalive/patches/0002-Fix-build.patch
 @@ -0,0 +1,23 @@
@@ -849,7 +860,7 @@ index 00000000..a430a281
 +     displayblanking.cpp \
 diff --git a/overlay/asteroidos/libconnman-qt/default.nix b/overlay/asteroidos/libconnman-qt/default.nix
 new file mode 100644
-index 00000000..38928a7b
+index 0000000..38928a7
 --- /dev/null
 +++ b/overlay/asteroidos/libconnman-qt/default.nix
 @@ -0,0 +1,139 @@
@@ -994,7 +1005,7 @@ index 00000000..38928a7b
 +})
 diff --git a/overlay/asteroidos/libdsme/default.nix b/overlay/asteroidos/libdsme/default.nix
 new file mode 100644
-index 00000000..2278e470
+index 0000000..2278e47
 --- /dev/null
 +++ b/overlay/asteroidos/libdsme/default.nix
 @@ -0,0 +1,82 @@
@@ -1082,10 +1093,10 @@ index 00000000..2278e470
 +})
 diff --git a/overlay/asteroidos/libiodata/default.nix b/overlay/asteroidos/libiodata/default.nix
 new file mode 100644
-index 00000000..36607b9c
+index 0000000..2564635
 --- /dev/null
 +++ b/overlay/asteroidos/libiodata/default.nix
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,118 @@
 +# Nemomobile's libiodata library
 +# Upstream repository: https://github.com/sailfishos/libiodata
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/libiodata/libiodata_git.bb
@@ -1098,6 +1109,7 @@ index 00000000..36607b9c
 +  bison,
 +  flex,
 +  qt6,
++  libxcrypt,
 +}:
 +
 +stdenv.mkDerivation (finalAttrs: {
@@ -1123,6 +1135,7 @@ index 00000000..36607b9c
 +
 +  buildInputs = [
 +    qt6.qtbase
++    libxcrypt
 +  ];
 +
 +  postPatch = ''
@@ -1159,6 +1172,11 @@ index 00000000..36607b9c
 +set_target_properties(iodata-qt6 PROPERTIES VERSION 0.20.0 SOVERSION 0)
 +
 +install(TARGETS iodata-qt6 DESTINATION lib)
++
++add_executable(iodata-qt6-type-to-c++ type-to-cxx/type-to-cxx.cpp)
++target_link_libraries(iodata-qt6-type-to-c++ PRIVATE iodata-qt6 crypt)
++install(TARGETS iodata-qt6-type-to-c++ DESTINATION bin)
++
 +install(FILES
 +  src/iodata.h
 +  src/validator.h
@@ -1199,7 +1217,7 @@ index 00000000..36607b9c
 +})
 diff --git a/overlay/asteroidos/libiphb/default.nix b/overlay/asteroidos/libiphb/default.nix
 new file mode 100644
-index 00000000..6da52c87
+index 0000000..6da52c8
 --- /dev/null
 +++ b/overlay/asteroidos/libiphb/default.nix
 @@ -0,0 +1,54 @@
@@ -1259,7 +1277,7 @@ index 00000000..6da52c87
 +})
 diff --git a/overlay/asteroidos/libngf/default.nix b/overlay/asteroidos/libngf/default.nix
 new file mode 100644
-index 00000000..a2f16428
+index 0000000..a2f1642
 --- /dev/null
 +++ b/overlay/asteroidos/libngf/default.nix
 @@ -0,0 +1,53 @@
@@ -1318,7 +1336,7 @@ index 00000000..a2f16428
 +})
 diff --git a/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
 new file mode 100644
-index 00000000..0597e987
+index 0000000..0597e98
 --- /dev/null
 +++ b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
 @@ -0,0 +1,40 @@
@@ -1364,7 +1382,7 @@ index 00000000..0597e987
 +
 diff --git a/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
 new file mode 100644
-index 00000000..4a96ad3c
+index 0000000..4a96ad3
 --- /dev/null
 +++ b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
 @@ -0,0 +1,69 @@
@@ -1439,7 +1457,7 @@ index 00000000..4a96ad3c
 +     perror("execve");   /* execve() only returns on error */
 diff --git a/overlay/asteroidos/mapplauncherd/default.nix b/overlay/asteroidos/mapplauncherd/default.nix
 new file mode 100644
-index 00000000..711acf6a
+index 0000000..711acf6
 --- /dev/null
 +++ b/overlay/asteroidos/mapplauncherd/default.nix
 @@ -0,0 +1,59 @@
@@ -1504,7 +1522,7 @@ index 00000000..711acf6a
 +}
 diff --git a/overlay/asteroidos/mce-dev/default.nix b/overlay/asteroidos/mce-dev/default.nix
 new file mode 100644
-index 00000000..29cca049
+index 0000000..29cca04
 --- /dev/null
 +++ b/overlay/asteroidos/mce-dev/default.nix
 @@ -0,0 +1,41 @@
@@ -1551,10 +1569,10 @@ index 00000000..29cca049
 +}
 diff --git a/overlay/asteroidos/mce-plugin-libhybris/default.nix b/overlay/asteroidos/mce-plugin-libhybris/default.nix
 new file mode 100644
-index 00000000..b8e68a89
+index 0000000..6066dc3
 --- /dev/null
 +++ b/overlay/asteroidos/mce-plugin-libhybris/default.nix
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,69 @@
 +# libhybris plugin for MCE: display brightness/blanking and LED control on
 +# Android hardware. Without it MCE falls back to sysfs backlights, which do not
 +# exist on Android devices, so the panel never gets powered/brightness set.
@@ -1568,10 +1586,6 @@ index 00000000..b8e68a89
 +  pkg-config,
 +  glib,
 +  libhybris,
-+  # The plugin includes <android-config.h>, <system/window.h> and
-+  # <hardware/lights.h>, which must match the headers libhybris was built
-+  # against.
-+  android-headers ? libhybris.passthru.androidHeaders,
 +}:
 +
 +stdenv.mkDerivation {
@@ -1600,8 +1614,9 @@ index 00000000..b8e68a89
 +    "-I${glib.dev}/lib/glib-2.0/include"
 +    # glibconfig.h is arch-specific and lives in the main output.
 +    "-I${glib}/lib/glib-2.0/include"
-+    "-I${android-headers}/include"
-+    "-I${android-headers}/include/android"
++    # Use libhybris's device headers directly. A defaulted android-headers
++    # argument would still be filled with the generic package by callPackage.
++    "-I${libhybris.androidHeadersInclude}"
 +    "-I${libhybris}/include"
 +  ];
 +
@@ -1629,7 +1644,7 @@ index 00000000..b8e68a89
 +}
 diff --git a/overlay/asteroidos/mce-qt6/default.nix b/overlay/asteroidos/mce-qt6/default.nix
 new file mode 100644
-index 00000000..3e1c5c4d
+index 0000000..3e1c5c4
 --- /dev/null
 +++ b/overlay/asteroidos/mce-qt6/default.nix
 @@ -0,0 +1,100 @@
@@ -1735,7 +1750,7 @@ index 00000000..3e1c5c4d
 +})
 diff --git a/overlay/asteroidos/mce/builtin-gconf.values b/overlay/asteroidos/mce/builtin-gconf.values
 new file mode 100644
-index 00000000..617c1bc5
+index 0000000..617c1bc
 --- /dev/null
 +++ b/overlay/asteroidos/mce/builtin-gconf.values
 @@ -0,0 +1 @@
@@ -1743,7 +1758,7 @@ index 00000000..617c1bc5
 \ No newline at end of file
 diff --git a/overlay/asteroidos/mce/default.nix b/overlay/asteroidos/mce/default.nix
 new file mode 100644
-index 00000000..8ce4a485
+index 0000000..8ce4a48
 --- /dev/null
 +++ b/overlay/asteroidos/mce/default.nix
 @@ -0,0 +1,107 @@
@@ -1856,7 +1871,7 @@ index 00000000..8ce4a485
 +})
 diff --git a/overlay/asteroidos/mce/mce.service b/overlay/asteroidos/mce/mce.service
 new file mode 100644
-index 00000000..d771f776
+index 0000000..d771f77
 --- /dev/null
 +++ b/overlay/asteroidos/mce/mce.service
 @@ -0,0 +1,17 @@
@@ -1879,7 +1894,7 @@ index 00000000..d771f776
 +WantedBy=multi-user.target
 diff --git a/overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch b/overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
 new file mode 100644
-index 00000000..8c408824
+index 0000000..8c40882
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
 @@ -0,0 +1,421 @@
@@ -2306,7 +2321,7 @@ index 00000000..8c408824
 + #endif /* MCE_MULTITOUCH_H_ */
 diff --git a/overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch b/overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch
 new file mode 100644
-index 00000000..9868cf16
+index 0000000..9868cf1
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch
 @@ -0,0 +1,606 @@
@@ -2918,7 +2933,7 @@ index 00000000..9868cf16
 +                 .flag        = 'a',
 diff --git a/overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch b/overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch
 new file mode 100644
-index 00000000..8b448d15
+index 0000000..8b448d1
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch
 @@ -0,0 +1,64 @@
@@ -2988,7 +3003,7 @@ index 00000000..8b448d15
 +     allowed = true;
 diff --git a/overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch b/overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch
 new file mode 100644
-index 00000000..c653a26e
+index 0000000..c653a26
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch
 @@ -0,0 +1,574 @@
@@ -3568,7 +3583,7 @@ index 00000000..c653a26e
 +     case MCE_DISPLAY_ON:
 diff --git a/overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch b/overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
 new file mode 100644
-index 00000000..cb9f7a20
+index 0000000..cb9f7a2
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
 @@ -0,0 +1,61 @@
@@ -3635,7 +3650,7 @@ index 00000000..cb9f7a20
 +                           &mdy_blanking_inhibit_mode,
 diff --git a/overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch b/overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
 new file mode 100644
-index 00000000..aefe53f7
+index 0000000..aefe53f
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
 @@ -0,0 +1,67 @@
@@ -3708,7 +3723,7 @@ index 00000000..aefe53f7
 +         .output_cb = mdy_datapipe_packagekit_locked_cb,
 diff --git a/overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch b/overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch
 new file mode 100644
-index 00000000..30575249
+index 0000000..3057524
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch
 @@ -0,0 +1,161 @@
@@ -3875,7 +3890,7 @@ index 00000000..30575249
 +         .input_cb = pwrkey_datapipe_ngfd_event_request_cb,
 diff --git a/overlay/asteroidos/mkcal/default.nix b/overlay/asteroidos/mkcal/default.nix
 new file mode 100644
-index 00000000..07fc7975
+index 0000000..07fc797
 --- /dev/null
 +++ b/overlay/asteroidos/mkcal/default.nix
 @@ -0,0 +1,60 @@
@@ -3941,7 +3956,7 @@ index 00000000..07fc7975
 +})
 diff --git a/overlay/asteroidos/mlite/CMakeLists.txt b/overlay/asteroidos/mlite/CMakeLists.txt
 new file mode 100644
-index 00000000..b82207f8
+index 0000000..b82207f
 --- /dev/null
 +++ b/overlay/asteroidos/mlite/CMakeLists.txt
 @@ -0,0 +1,122 @@
@@ -4069,7 +4084,7 @@ index 00000000..b82207f8
 +)
 diff --git a/overlay/asteroidos/mlite/default.nix b/overlay/asteroidos/mlite/default.nix
 new file mode 100644
-index 00000000..87a963eb
+index 0000000..87a963e
 --- /dev/null
 +++ b/overlay/asteroidos/mlite/default.nix
 @@ -0,0 +1,52 @@
@@ -4125,9 +4140,150 @@ index 00000000..87a963eb
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
+new file mode 100644
+index 0000000..261c314
+--- /dev/null
++++ b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
+@@ -0,0 +1,135 @@
++# Nemomobile alarms QML plugin (Nemo.Alarms)
++# Upstream repository: https://github.com/sailfishos/nemo-qml-plugin-alarms
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-qml-plugins/nemo-qml-plugin-alarms_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++  timed-qt6,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "nemo-qml-plugin-alarms";
++  version = "nightly";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-qml-plugin-alarms";
++    rev = "4377d1e31a56c763ba3e2d61137f97529281c1bd";
++    sha256 = "07phqhlfkiq8fb10l7y1czfqnij2kda55jg5vx8ig92khzxj49gz";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    timed-qt6
++  ];
++
++  # Upstream is a qmake project; mirror the src/src.pro target (Qt QML plugin
++  # using the timed-qt6 and timed-voland-qt6 client libraries).
++  postPatch = ''
++    # timed-qt6 intentionally does not install src/lib/hidden/exception (a
++    # file named "exception" in the public include dir shadows the C++
++    # standard header). alarms only includes it, never uses it.
++    substituteInPlace src/alarmobject.cpp \
++      --replace "#include <timed-qt6/exception>" "#include <timed-qt6/exception.h>"
++
++    cat > CMakeLists.txt << 'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(nemoalarms LANGUAGES CXX)
++
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_CXX_STANDARD_REQUIRED ON)
++    set(CMAKE_AUTOMOC ON)
++
++    find_package(Qt6 REQUIRED COMPONENTS Core Qml DBus)
++    find_package(PkgConfig REQUIRED)
++    pkg_check_modules(TIMED REQUIRED timed-qt6)
++    pkg_check_modules(TIMED_VOLAND REQUIRED timed-voland-qt6)
++
++    set(SRC_DIR "''${CMAKE_CURRENT_SOURCE_DIR}/src")
++
++    add_library(nemoalarms MODULE
++      ''${SRC_DIR}/plugin.cpp
++      ''${SRC_DIR}/alarmsbackendmodel.cpp
++      ''${SRC_DIR}/alarmsbackendmodel_p.cpp
++      ''${SRC_DIR}/enabledalarmsproxymodel.cpp
++      ''${SRC_DIR}/alarmobject.cpp
++      ''${SRC_DIR}/alarmhandlerinterface.cpp
++      ''${SRC_DIR}/alarmdialogobject.cpp
++      ''${SRC_DIR}/alarmsettings.cpp
++      ''${SRC_DIR}/interface.cpp
++      ''${SRC_DIR}/alarmsbackendmodel.h
++      ''${SRC_DIR}/alarmsbackendmodel_p.h
++      ''${SRC_DIR}/enabledalarmsproxymodel.h
++      ''${SRC_DIR}/alarmobject.h
++      ''${SRC_DIR}/alarmhandlerinterface.h
++      ''${SRC_DIR}/alarmdialogobject.h
++      ''${SRC_DIR}/alarmsettings.h
++      ''${SRC_DIR}/interface.h
++      ''${SRC_DIR}/time_interface.cpp
++    )
++
++    target_include_directories(nemoalarms PRIVATE
++      ''${SRC_DIR}
++      ''${CMAKE_CURRENT_BINARY_DIR}
++      ''${TIMED_INCLUDE_DIRS}
++      ''${TIMED_VOLAND_INCLUDE_DIRS}
++    )
++
++    target_link_libraries(nemoalarms PRIVATE
++      Qt6::Core
++      Qt6::Qml
++      Qt6::DBus
++      ''${TIMED_LIBRARIES}
++      ''${TIMED_VOLAND_LIBRARIES}
++    )
++
++    set_target_properties(nemoalarms PROPERTIES
++      OUTPUT_NAME nemoalarms
++      LIBRARY_OUTPUT_DIRECTORY "''${CMAKE_CURRENT_BINARY_DIR}"
++    )
++
++    install(TARGETS nemoalarms DESTINATION lib/qt-6/qml/Nemo/Alarms)
++    install(FILES ''${SRC_DIR}/qmldir ''${SRC_DIR}/plugins.qmltypes
++      DESTINATION lib/qt-6/qml/Nemo/Alarms)
++    EOF
++  '';
++
++  postInstall = ''
++    # Provide both libnemoalarms.so and nemoalarms.so symlinks for QML plugin loader
++    ln -s libnemoalarms.so $out/lib/qt-6/qml/Nemo/Alarms/nemoalarms.so
++  '';
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  preConfigure = ''
++    # qmake's DBUS_INTERFACES generates time_interface.h/.cpp from the
++    # introspection XML (header_flags/source_flags: -N -c TimeDaemon).
++    (cd src && ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp \
++      -p time_interface -N -c TimeDaemon com.nokia.time.xml)
++  '';
++
++  meta = with lib; {
++    description = "Nemomobile alarms QML plugin for AsteroidOS";
++    homepage = "https://github.com/sailfishos/nemo-qml-plugin-alarms";
++    license = licenses.bsd3;
++    platforms = platforms.linux;
++  };
++})
 diff --git a/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix b/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
 new file mode 100644
-index 00000000..7111ae88
+index 0000000..7111ae8
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
 @@ -0,0 +1,94 @@
@@ -4225,9 +4381,136 @@ index 00000000..7111ae88
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
+new file mode 100644
+index 0000000..3b6dc41
+--- /dev/null
++++ b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
+@@ -0,0 +1,121 @@
++# Nemomobile notifications library and QML plugin (Nemo.Notifications)
++# Upstream repository: https://github.com/sailfishos/nemo-qml-plugin-notifications
++# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-qml-plugins/nemo-qml-plugin-notifications_git.bb
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "nemo-qml-plugin-notifications";
++  version = "nightly";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-qml-plugin-notifications";
++    rev = "d4d0a0ce8257b90293b8df469830f0e288faeeae";
++    sha256 = "0d12viyjigmz823d9ghkr7i1iifyl5vrkn2c98lw32kr4micb9nf";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++  ];
++
++  # Upstream is a qmake project: src/src.pro builds libnemonotifications-qt6
++  # and src/plugin/plugin.pro builds the Nemo.Notifications QML plugin.
++  postPatch = ''
++    cat > CMakeLists.txt << 'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(nemonotifications LANGUAGES CXX)
++
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_CXX_STANDARD_REQUIRED ON)
++    set(CMAKE_AUTOMOC ON)
++
++    find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml DBus)
++
++    set(SRC_DIR "''${CMAKE_CURRENT_SOURCE_DIR}/src")
++
++    add_library(nemonotifications-qt6 SHARED
++      ''${SRC_DIR}/notification.cpp
++      ''${SRC_DIR}/notificationmanagerproxy.cpp
++      ''${SRC_DIR}/notification.h
++      ''${SRC_DIR}/notification_p.h
++      ''${SRC_DIR}/notificationmanagerproxy.h
++      ''${SRC_DIR}/notificationexport.h
++    )
++    target_compile_definitions(nemonotifications-qt6 PRIVATE
++      BUILD_NEMO_QML_PLUGIN_NOTIFICATIONS_LIB)
++    target_include_directories(nemonotifications-qt6 PUBLIC
++      ''${SRC_DIR}
++      ''${CMAKE_CURRENT_BINARY_DIR})
++    target_link_libraries(nemonotifications-qt6 PUBLIC Qt6::Core Qt6::Gui Qt6::DBus)
++    set_target_properties(nemonotifications-qt6 PROPERTIES
++      OUTPUT_NAME nemonotifications-qt6)
++
++    add_library(nemonotifications MODULE ''${SRC_DIR}/plugin/plugin.cpp)
++    target_include_directories(nemonotifications PRIVATE
++      ''${SRC_DIR}
++      ''${CMAKE_CURRENT_BINARY_DIR})
++    target_link_libraries(nemonotifications PRIVATE
++      nemonotifications-qt6
++      Qt6::Core
++      Qt6::Qml
++      Qt6::DBus)
++    set_target_properties(nemonotifications PROPERTIES
++      OUTPUT_NAME nemonotifications)
++
++    install(TARGETS nemonotifications-qt6 DESTINATION lib)
++    install(TARGETS nemonotifications DESTINATION lib/qt-6/qml/Nemo/Notifications)
++    install(FILES
++      ''${SRC_DIR}/plugin/qmldir
++      ''${SRC_DIR}/plugin/plugins.qmltypes
++      DESTINATION lib/qt-6/qml/Nemo/Notifications)
++    install(FILES
++      ''${SRC_DIR}/notification.h
++      ''${SRC_DIR}/notification_p.h
++      ''${SRC_DIR}/notificationexport.h
++      DESTINATION include/nemonotifications-qt6)
++    EOF
++  '';
++
++  postInstall = ''
++    # Provide both libnemonotifications.so and nemonotifications.so symlinks for QML plugin loader
++    ln -s libnemonotifications.so $out/lib/qt-6/qml/Nemo/Notifications/nemonotifications.so
++  '';
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  preConfigure = ''
++    # Upstream src.pro generates the proxy through qdbusxml2cpp with
++    # QT_HOST_BINS; do the same explicitly for cross builds.
++    (cd src && ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp \
++      -p notificationmanagerproxy -c NotificationManagerProxy -i notification_p.h \
++      org.freedesktop.Notifications.xml)
++  '';
++
++  meta = with lib; {
++    description = "Nemomobile notifications library and QML plugin for AsteroidOS";
++    homepage = "https://github.com/sailfishos/nemo-qml-plugin-notifications";
++    license = licenses.bsd3;
++    platforms = platforms.linux;
++  };
++})
 diff --git a/overlay/asteroidos/ngf-qt6/default.nix b/overlay/asteroidos/ngf-qt6/default.nix
 new file mode 100644
-index 00000000..d16b452f
+index 0000000..d16b452
 --- /dev/null
 +++ b/overlay/asteroidos/ngf-qt6/default.nix
 @@ -0,0 +1,96 @@
@@ -4329,7 +4612,7 @@ index 00000000..d16b452f
 +})
 diff --git a/overlay/asteroidos/sensorfw/CMakeLists.txt b/overlay/asteroidos/sensorfw/CMakeLists.txt
 new file mode 100644
-index 00000000..6ad5cc23
+index 0000000..6ad5cc2
 --- /dev/null
 +++ b/overlay/asteroidos/sensorfw/CMakeLists.txt
 @@ -0,0 +1,264 @@
@@ -4599,10 +4882,10 @@ index 00000000..6ad5cc23
 +install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sensord-qt6.pc DESTINATION lib/pkgconfig)
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
 new file mode 100644
-index 00000000..6cab054d
+index 0000000..fa31860
 --- /dev/null
 +++ b/overlay/asteroidos/sensorfw/default.nix
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,71 @@
 +# Nemomobile SensorFW sensor daemon and Qt client API
 +# Upstream repository: https://github.com/sailfishos/sensorfw
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/sensorfw
@@ -4610,26 +4893,15 @@ index 00000000..6cab054d
 +  lib,
 +  stdenv,
 +  fetchFromGitHub,
-+  fetchpatch,
 +  cmake,
 +  pkg-config,
 +  qt6,
 +  systemd,
 +  libhybris,
-+  android-headers,
 +  udev,
++  metaAsteroidSrc,
 +}:
 +
-+let
-+  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
-+
-+  upstreamPatch =
-+    name: hash:
-+    fetchpatch {
-+      inherit name hash;
-+      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/sensorfw/files/${name}";
-+    };
-+in
 +stdenv.mkDerivation (finalAttrs: {
 +  pname = "sensorfw";
 +  version = "0.15.1";
@@ -4642,13 +4914,13 @@ index 00000000..6cab054d
 +  };
 +
 +  patches = [
-+    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-7eFjofMXAkQSvZf6RwkINBwLYSe+u3kJ8lCnOkoFhBE=")
-+    (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-qRXs9vrszoG1bVnjkIVtRaXEvaLtNKs7Z1PsR759VQo=")
-+    (upstreamPatch "0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch" "sha256-WyVwM0KEtADQhAeZTGy6we9BSyITchcClT+phNTdhuc=")
-+    (upstreamPatch "0004-Fix-compilation-when-autohybris-is-used.patch" "sha256-RJ711Knze6feQOPfa/UD6r9jG870H//hOnbFPzhoS5s=")
-+    (upstreamPatch "0005-Fix-compilation-when-hybris-is-used.patch" "sha256-evbbTXcBF/a6Y998373+p2vv7PnYWX71Ei9GFH+BaA8=")
-+    (upstreamPatch "0006-hybrisadaptor-Queue-erroneous-events-too.patch" "sha256-6kLVFeEXnpldLWw976ckEMYaM1jBXYAepvBKLKP62/c=")
-+    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-qH3mMqgPPNq9oqGOmP1xdc/EQ7f95ia8HFcmuBD2oMs=")
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0001-Do-not-hide-stepcounter-by-default.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0004-Fix-compilation-when-autohybris-is-used.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0005-Fix-compilation-when-hybris-is-used.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0006-hybrisadaptor-Queue-erroneous-events-too.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch"
 +  ];
 +
 +  strictDeps = true;
@@ -4663,7 +4935,7 @@ index 00000000..6cab054d
 +    qt6.qtbase
 +    systemd
 +    libhybris
-+    android-headers
++    libhybris.androidHeaders
 +    udev
 +  ];
 +
@@ -4675,7 +4947,7 @@ index 00000000..6cab054d
 +  cmakeFlags = [
 +    "-DENABLE_HYBRIS=ON"
 +    "-DHYBRIS_LIB=${libhybris}"
-+    "-DANDROID_INCLUDE=${android-headers}/include/android"
++    "-DANDROID_INCLUDE=${libhybris.androidHeadersInclude}"
 +  ];
 +
 +  meta = with lib; {
@@ -4687,11 +4959,11 @@ index 00000000..6cab054d
 +})
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
 new file mode 100644
-index 00000000..acffe994
+index 0000000..e52b571
 --- /dev/null
 +++ b/overlay/asteroidos/timed-qt6/default.nix
-@@ -0,0 +1,111 @@
-+# Timed Qt6 client library interface
+@@ -0,0 +1,269 @@
++# Timed Qt6 daemon, Voland client library, and Timed client library
 +# Upstream repository: https://github.com/sailfishos/timed
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/timed
 +{
@@ -4701,9 +4973,17 @@ index 00000000..acffe994
 +  cmake,
 +  pkg-config,
 +  qt6,
++  systemd,
 +  libiodata,
++  buildPackages,
++  metaAsteroidSrc,
++  tzdata,
 +}:
 +
++let
++  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
++  nativeIodata = if isCross then buildPackages.callPackage ../libiodata { } else libiodata;
++in
 +stdenv.mkDerivation (finalAttrs: {
 +  pname = "timed-qt6";
 +  version = "3.6.0";
@@ -4717,26 +4997,40 @@ index 00000000..acffe994
 +
 +  strictDeps = true;
 +
++  patches = [
++    "${metaAsteroidSrc}/recipes-nemomobile/timed/timed/0002-Drop-sailfish-access-control-dependency.patch"
++  ];
++
 +  nativeBuildInputs = [
 +    cmake
 +    pkg-config
 +    qt6.wrapQtAppsHook
++    nativeIodata
 +  ];
 +
 +  buildInputs = [
 +    qt6.qtbase
++    systemd
 +    libiodata
++    tzdata
 +  ];
 +
++  # timed-qt6.pc Requires iodata-qt6, so consumers need its pkg-config file.
++  propagatedBuildInputs = [ libiodata ];
++
 +  preConfigure = ''
-+    mkdir -p include/timed-qt6
++    mkdir -p include/timed-qt6 include/timed-voland-qt6
 +    cp src/lib/*.h include/timed-qt6/
 +    cp src/lib/event src/lib/interface src/lib/wallclock src/lib/qmacro include/timed-qt6/
++    cp src/voland/reminder src/voland/interface src/voland/ta_interface src/voland/reminder.h src/voland/interface.h include/timed-voland-qt6/
 +    # NOTE: src/lib/hidden/exception is a qmake-only shim that makes the
 +    # in-tree "#include <exception>" resolve to timed-qt6/exception.h. Do not
 +    # install it: the public include dir is passed as -I to all consumers, and
 +    # a file named "exception" there shadows the C++ standard <exception>
 +    # header (breaking std::exception_ptr / <future> in every dependent).
++    for t in queue config settings customization tzdata; do
++      iodata-qt6-type-to-c++ src/server/$t.type -o src/server/iodata_$t.cpp -d src/server/$t.type.h
++    done
 +  '';
 +
 +  postPatch = ''
@@ -4749,8 +5043,10 @@ index 00000000..acffe994
 +find_package(Qt6 REQUIRED COMPONENTS Core DBus)
 +find_package(PkgConfig REQUIRED)
 +pkg_check_modules(IODATA REQUIRED iodata-qt6)
++pkg_check_modules(SYSTEMD REQUIRED libsystemd)
 +
 +set(LIB_SRC
++  src/lib/interface.h
 +  src/lib/interface.cpp
 +  src/lib/event-io.cpp
 +  src/lib/event-pimple.cpp
@@ -4772,12 +5068,121 @@ index 00000000..acffe994
 +target_link_libraries(timed-qt6 PUBLIC Qt6::Core Qt6::DBus ''${IODATA_LIBRARIES} rt)
 +set_target_properties(timed-qt6 PROPERTIES VERSION 3.6.0 SOVERSION 3)
 +
-+install(TARGETS timed-qt6 DESTINATION lib)
++set(VOLAND_SRC
++  src/voland/interface.h
++  src/voland/reminder.h
++  src/voland/interface.cpp
++  src/voland/reminder-pimple.cpp
++)
++
++add_library(timed-voland-qt6 SHARED ''${VOLAND_SRC})
++target_include_directories(timed-voland-qt6 PUBLIC
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/include>
++  $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/src/voland>
++  $<INSTALL_INTERFACE:include/timed-voland-qt6>
++)
++target_link_libraries(timed-voland-qt6 PUBLIC Qt6::Core Qt6::DBus timed-qt6)
++set_target_properties(timed-voland-qt6 PROPERTIES VERSION 0.3.6 SOVERSION 0)
++
++set(SERVER_SRC
++  src/server/tzdata.h
++  src/server/cellular.h
++  src/server/settings.h
++  src/server/csd.h
++  src/server/adaptor.h
++  src/server/timed.h
++  src/server/state.h
++  src/server/cluster.h
++  src/server/machine.h
++  src/server/singleshot.h
++  src/server/pinguin.h
++  src/server/unix-signal.h
++  src/server/networktime.h
++  src/server/networktimewatcher.h
++  src/server/networkoperator.h
++  src/server/networkregistrationwatcher.h
++  src/server/networktimeinfo.h
++  src/server/ofonomodemmanager.h
++  src/server/modemwatcher.h
++  src/server/ofonoconstants.h
++  src/server/ntpcontroller.h
++  src/server/credentials.h
++  src/server/tz.h
++  src/server/notification.h
++  src/server/tzdata.cpp
++  src/server/cellular.cpp
++  src/server/csd.cpp
++  src/server/cluster.cpp
++  src/server/machine.cpp
++  src/server/state.cpp
++  src/server/main.cpp
++  src/server/timed.cpp
++  src/server/timeutil.cpp
++  src/server/event.cpp
++  src/server/misc.cpp
++  src/server/settings.cpp
++  src/server/pinguin.cpp
++  src/server/unix-signal.cpp
++  src/server/networktime.cpp
++  src/server/networktimewatcher.cpp
++  src/server/networkoperator.cpp
++  src/server/networkregistrationwatcher.cpp
++  src/server/networktimeinfo.cpp
++  src/server/ofonomodemmanager.cpp
++  src/server/modemwatcher.cpp
++  src/server/ofonoconstants.cpp
++  src/server/ntpcontroller.cpp
++  src/server/credentials.cpp
++  src/server/olson.cpp
++  src/server/tz.cpp
++  src/server/notification.cpp
++  src/server/iodata_queue.cpp
++  src/server/iodata_config.cpp
++  src/server/iodata_settings.cpp
++  src/server/iodata_customization.cpp
++  src/server/iodata_tzdata.cpp
++)
++
++add_executable(timed ''${SERVER_SRC})
++target_include_directories(timed PRIVATE
++  ''${CMAKE_CURRENT_SOURCE_DIR}
++  ''${CMAKE_CURRENT_SOURCE_DIR}/include
++  ''${CMAKE_CURRENT_SOURCE_DIR}/src/server
++  ''${CMAKE_CURRENT_SOURCE_DIR}/src/lib
++  ''${CMAKE_CURRENT_SOURCE_DIR}/src/voland
++  ''${IODATA_INCLUDE_DIRS}
++  ''${SYSTEMD_INCLUDE_DIRS}
++)
++target_link_libraries(timed PRIVATE
++  timed-qt6
++  timed-voland-qt6
++  Qt6::Core
++  Qt6::DBus
++  ''${IODATA_LIBRARIES}
++  ''${SYSTEMD_LIBRARIES}
++)
++
++add_executable(timedclient-qt6 tools/timedclient/timedclient.cpp)
++target_include_directories(timedclient-qt6 PRIVATE
++  ''${CMAKE_CURRENT_SOURCE_DIR}/include
++  ''${CMAKE_CURRENT_SOURCE_DIR}/src/lib
++)
++target_link_libraries(timedclient-qt6 PRIVATE timed-qt6 Qt6::Core Qt6::DBus)
++
++install(TARGETS timed-qt6 timed-voland-qt6 DESTINATION lib)
++install(TARGETS timed timedclient-qt6 DESTINATION bin)
 +file(GLOB HEADERS "include/timed-qt6/*")
 +install(FILES ''${HEADERS} DESTINATION include/timed-qt6)
++file(GLOB VOLAND_HEADERS "include/timed-voland-qt6/*")
++install(FILES ''${VOLAND_HEADERS} DESTINATION include/timed-voland-qt6)
 +
 +configure_file(timed-qt6.pc.in timed-qt6.pc @ONLY)
-+install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/timed-qt6.pc DESTINATION lib/pkgconfig)
++configure_file(timed-voland-qt6.pc.in timed-voland-qt6.pc @ONLY)
++install(FILES
++  ''${CMAKE_CURRENT_BINARY_DIR}/timed-qt6.pc
++  ''${CMAKE_CURRENT_BINARY_DIR}/timed-voland-qt6.pc
++  DESTINATION lib/pkgconfig
++)
 +EOF
 +
 +    cat << "EOF" > timed-qt6.pc.in
@@ -4791,12 +5196,37 @@ index 00000000..acffe994
 +Version: 3.6.0
 +Requires: Qt6Core Qt6DBus iodata-qt6
 +Libs: -L''${libdir} -ltimed-qt6
-+Cflags: -I''${includedir}
++Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
 +EOF
++
++    cat << "EOF" > timed-voland-qt6.pc.in
++prefix=@CMAKE_INSTALL_PREFIX@
++exec_prefix=''${prefix}
++libdir=''${prefix}/lib
++includedir=''${prefix}/include/timed-voland-qt6
++
++Name: timed-voland-qt6
++Description: Timed Voland Qt6 communication library
++Version: 3.6.0
++Requires: Qt6Core Qt6DBus timed-qt6
++Libs: -L''${libdir} -ltimed-voland-qt6
++Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
++EOF
++
++    substituteInPlace src/server/settings.cpp \
++      --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
++    substituteInPlace src/lib/aliases.cpp \
++      --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
++  '';
++
++  postInstall = ''
++    install -Dm644 ${finalAttrs.src}/src/server/timed.rc $out/etc/timed.rc
++    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/timed/timed/timed.conf $out/share/dbus-1/system.d/timed.conf
++    install -Dm644 ${finalAttrs.src}/src/server/timed.service $out/lib/systemd/user/timed.service
 +  '';
 +
 +  meta = with lib; {
-+    description = "Time daemon Qt6 client library";
++    description = "Nemomobile time daemon and Qt6 client libraries";
 +    homepage = "https://github.com/sailfishos/timed";
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
@@ -4804,7 +5234,7 @@ index 00000000..acffe994
 +})
 diff --git a/overlay/asteroidos/usb-moded-dev/default.nix b/overlay/asteroidos/usb-moded-dev/default.nix
 new file mode 100644
-index 00000000..6f957515
+index 0000000..6f95751
 --- /dev/null
 +++ b/overlay/asteroidos/usb-moded-dev/default.nix
 @@ -0,0 +1,42 @@
@@ -4852,7 +5282,7 @@ index 00000000..6f957515
 +})
 diff --git a/overlay/asteroidos/usb-moded-qt6/default.nix b/overlay/asteroidos/usb-moded-qt6/default.nix
 new file mode 100644
-index 00000000..0e985634
+index 0000000..0e98563
 --- /dev/null
 +++ b/overlay/asteroidos/usb-moded-qt6/default.nix
 @@ -0,0 +1,90 @@
@@ -4948,7 +5378,7 @@ index 00000000..0e985634
 +})
 diff --git a/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch b/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
 deleted file mode 100644
-index 20e222dc..00000000
+index 20e222d..0000000
 --- a/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
 +++ /dev/null
 @@ -1,24 +0,0 @@
@@ -4977,10 +5407,10 @@ index 20e222dc..00000000
 -2.23.0
 -
 diff --git a/overlay/libhybris/default.nix b/overlay/libhybris/default.nix
-index 37b0df7d..807ec78e 100644
+index 37b0df7..3c1e853 100644
 --- a/overlay/libhybris/default.nix
 +++ b/overlay/libhybris/default.nix
-@@ -1,12 +1,15 @@
+@@ -1,12 +1,16 @@
  {
 -stdenv
 +  stdenv
@@ -4994,24 +5424,11 @@ index 37b0df7d..807ec78e 100644
  , file
 +, wayland
 +, buildPackages
++, meta-asteroid-src ? null
  , useLegacyProperties ? false
  }:
  
-@@ -14,23 +17,43 @@ let
-   inherit (stdenv) targetPlatform buildPlatform;
-   libPrefix = if targetPlatform == buildPlatform then ""
-     else stdenv.targetPlatform.config;
-+
-+  # Upstream AsteroidOS pins libhybris to this revision and layers two patches
-+  # on top of it. Keep this package identical to upstream instead of carrying
-+  # local fork patches: the newer libhybris contains the EGL display reference
-+  # counting that the hwcomposer QPA plugin relies on.
-+  # https://github.com/AsteroidOS/meta-asteroid/blob/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-core/libhybris/libhybris_git.bbappend
-+  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
-+  upstreamPatch = name: hash: fetchurl {
-+    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-core/libhybris/libhybris/${name}";
-+    inherit hash;
-+  };
+@@ -17,20 +21,23 @@ let
  in
  stdenv.mkDerivation {
    pname = "libhybris";
@@ -5037,19 +5454,13 @@ index 37b0df7d..807ec78e 100644
 +  postPatch = ''
 +    # These upstream patches are generated from the repository root, while
 +    # sourceRoot points at hybris/.
-+    patch -p2 -i ${
-+      upstreamPatch "0001-Remove-references-to-host-path-in-package-config-fil.patch"
-+        "sha256-9JtlPyiqN8CrMikCBOwUDZ8+BShDCDefiiZZ5KPeVg8="
-+    }
-+    patch -p2 -i ${
-+      upstreamPatch "0002-tests-workaround-Wimplicit-function-declaration-in-s.patch"
-+        "sha256-B3ffNEfjJf8Xz7Wv+pK84Dk3jY6FvgAE3otf158+oLo="
-+    }
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0001-Remove-references-to-host-path-in-package-config-fil.patch
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0002-tests-workaround-Wimplicit-function-declaration-in-s.patch
 +  '';
  
    postAutoreconf = ''
      substituteInPlace configure \
-@@ -38,9 +61,8 @@ stdenv.mkDerivation {
+@@ -38,9 +45,8 @@ stdenv.mkDerivation {
    '';
  
    NIX_CFLAGS_COMPILE = [
@@ -5061,7 +5472,7 @@ index 37b0df7d..807ec78e 100644
      "-Wno-implicit-function-declaration"
      "-Wno-incompatible-pointer-types"
      "-Wno-int-conversion"
-@@ -52,15 +74,37 @@ stdenv.mkDerivation {
+@@ -52,15 +58,38 @@ stdenv.mkDerivation {
  
    configureFlags = [
      "--with-android-headers=${android-headers}/include/android/"
@@ -5097,5 +5508,6 @@ index 37b0df7d..807ec78e 100644
 +    # Android headers this libhybris was configured against. Out-of-tree
 +    # libhybris plugins must compile against the same set.
 +    androidHeaders = android-headers;
++    androidHeadersInclude = "${android-headers}/include/android";
 +  };
  }

@@ -8,17 +8,17 @@ map, qmltester, skedaddle, weatherfetch, beatfork, benchymark,
 docking-bay, heliograph, horizon, meteormatch, pulsar, rag, shopper,
 toolwatch, and touchdown.
 ---
- overlay/asteroidos/community-apps/default.nix | 345 ++++++++++++++++++
+ overlay/asteroidos/community-apps/default.nix | 378 ++++++++++++++++++
  overlay/asteroidos/default.nix                |   5 +
- 2 files changed, 350 insertions(+)
+ 2 files changed, 383 insertions(+)
  create mode 100644 overlay/asteroidos/community-apps/default.nix
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
 new file mode 100644
-index 00000000..782fb0f0
+index 0000000..9ef2532
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/default.nix
-@@ -0,0 +1,345 @@
+@@ -0,0 +1,378 @@
 +{
 +  lib,
 +  stdenv,
@@ -27,6 +27,7 @@ index 00000000..782fb0f0
 +  mkAsteroidApp,
 +  mlite,
 +  espeak-classic,
++  noUsrShareHook,
 +}:
 +
 +rec {
@@ -37,8 +38,8 @@ index 00000000..782fb0f0
 +    src = fetchFromGitHub {
 +      owner = "AsteroidOS";
 +      repo = "unofficial-watchfaces";
-+      rev = "e1b5a205b72f8a249a6d85c81493a933b5b5edcc";
-+      sha256 = "0ml8i4p5h6fv3d3x0xqlz6qngf2063scbm2mrr7ssbbv4q3vsf36";
++      rev = "7d1d2673922c1e6a8d8d0650032795ee2bd19683";
++      sha256 = "047jyapyc3h7vgi4apgkgw76116z76mb1n2z71j11mi9x8y3x72a";
 +    };
 +
 +    installPhase = ''
@@ -157,6 +158,7 @@ index 00000000..782fb0f0
 +
 +  # A metronome and chromatic tuning fork app for smartwatches
 +  # Upstream repository: https://github.com/moWerk/asteroid-beatfork
++  # Inspired by Tack metronome features (tap tempo, accented subdivisions, pulse ring, haptics): https://github.com/patzly/tack-android
 +  beatfork = mkAsteroidApp {
 +    name = "beatfork";
 +    owner = "moWerk";
@@ -164,6 +166,13 @@ index 00000000..782fb0f0
 +    desc = "Metronome and chromatic tuning fork app for smartwatches";
 +    rev = "e3fbc5dd6da40868e0f338c9a0d3f6e877afca25";
 +    sha256 = "1s4n5qfqximi05szksjbl806rpd37j3q7245z1iip5rrnlbkc7m2";
++    patches = [
++      ./beatfork-tack-improvements.patch
++    ];
++    postPatch = ''
++      substituteInPlace src/events.d/beatfork-tick.ini \
++        --replace-fail '/usr/share/sounds/tick.wav' "$out/share/sounds/tick.wav"
++    '';
 +    extraBuildInputs = [
 +      qt6.qtmultimedia
 +    ];
@@ -177,6 +186,12 @@ index 00000000..782fb0f0
 +    desc = "Benchmark tool for AsteroidOS smartwatches";
 +    rev = "11e90920e76e6c62fe1076d4c3927b81b1154e96";
 +    sha256 = "0x3c5rm2b8b8cfq7a1kl1699lmn88id70zmrsqzf53bxiv1ms8x4";
++    postPatch = ''
++      for phase in src/phases/CloudLight.qml src/phases/CloudHeavy.qml; do
++        substituteInPlace "$phase" \
++          --replace-fail 'file:///usr/share/benchymark/' "file://$out/share/benchymark/"
++      done
++    '';
 +    extraBuildInputs = [
 +      qt6.qtsensors
 +    ];
@@ -194,7 +209,19 @@ index 00000000..782fb0f0
 +      sha256 = "0g8x6v27ni3zqwir2sif7a0csb78adii47g4y4mnqm3vfklknnp1";
 +    };
 +
++    postPatch = ''
++      substituteInPlace asteroid_docking_bay/watchctl.py \
++        --replace-fail '/usr/share/locale' '/run/current-system/sw/share/locale' \
++        --replace-fail '/usr/share/sounds/notification.wav' '/run/current-system/sw/share/sounds/notification.wav'
++      substituteInPlace asteroid_docking_bay/wanze.py \
++        --replace-fail 'Path("/usr/share/wanze")' 'Path("/run/current-system/sw/share/wanze")'
++      substituteInPlace asteroid_docking_bay/rpcops.py \
++        --replace-fail '/usr/share/locale' '/run/current-system/sw/share/locale'
++    '';
++
 +    dontBuild = true;
++
++    nativeBuildInputs = [ noUsrShareHook ];
 +
 +    installPhase = ''
 +      runHook preInstall
@@ -350,7 +377,13 @@ index 00000000..782fb0f0
 +      rev = "ccd5d9f52609bbdcd5d8fa78c4fdb0f12954125f";
 +      hash = "sha256-9MoX6ykqvd2iB0VrZCfhSyhtztMpBTukeKejfAWYW1w=";
 +    };
++    postPatch = ''
++      substituteInPlace neofetch \
++        --replace-fail '/usr/share/gtk-2.0/gtkrc' '/run/current-system/sw/share/gtk-2.0/gtkrc' \
++        --replace-fail '/usr/share/gtk-3.0/settings.ini' '/run/current-system/sw/share/gtk-3.0/settings.ini'
++    '';
 +    dontBuild = true;
++    nativeBuildInputs = [ noUsrShareHook ];
 +    installPhase = ''
 +      runHook preInstall
 +      install -Dm755 neofetch $out/bin/neofetch
@@ -365,15 +398,15 @@ index 00000000..782fb0f0
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index f3ff23cd..03f1bca1 100644
+index 0784d4b..d04f4f3 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -124,5 +124,10 @@ rec {
+@@ -134,5 +134,10 @@ rec {
  
-   virtualkeyboard = callPackage ./virtualkeyboard { };
+   virtualkeyboard = callPackage ./virtualkeyboard { inherit noUsrShareHook; };
  
 +  community-apps = callPackage ./community-apps {
-+    inherit mkAsteroidApp mlite;
++    inherit mkAsteroidApp mlite noUsrShareHook;
 +    inherit (pkgs) espeak-classic;
 +  };
 +

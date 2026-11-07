@@ -16,7 +16,7 @@ This patch updates the btrfs image builder module:
  1 file changed, 90 insertions(+), 1 deletion(-)
 
 diff --git a/overlay/image-builder/filesystem-image/filesystem/btrfs.nix b/overlay/image-builder/filesystem-image/filesystem/btrfs.nix
-index f6d95e13..a25d9181 100644
+index f6d95e1..a25d918 100644
 --- a/overlay/image-builder/filesystem-image/filesystem/btrfs.nix
 +++ b/overlay/image-builder/filesystem-image/filesystem/btrfs.nix
 @@ -12,7 +12,11 @@ let

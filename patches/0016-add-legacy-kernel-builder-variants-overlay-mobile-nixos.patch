@@ -12,7 +12,7 @@ older vendor Android/Linux kernels.
  1 file changed, 11 insertions(+)
 
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index 02dfb3ac..9598347c 100644
+index 02dfb3a..9598347 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
 @@ -81,6 +81,17 @@ in

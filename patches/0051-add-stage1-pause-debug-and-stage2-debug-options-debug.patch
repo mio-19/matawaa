@@ -12,13 +12,13 @@ Add the development-only stage debugging modes:
 ---
  boot/init/tasks/switch_root.rb  |  19 +++++
  devices/families/asteroidos.nix | 140 ++++++++++++++++++++++++++++++++
- devices/fossil-hoki/default.nix |  21 +++--
+ devices/fossil-hoki/default.nix |   7 ++
  modules/hardware-watch.nix      |  18 ++++
  modules/initrd-ssh.nix          |  72 ++++++++++++----
- 5 files changed, 250 insertions(+), 20 deletions(-)
+ 5 files changed, 241 insertions(+), 15 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
-index b3a6045b..0644044c 100644
+index b3a6045..0644044 100644
 --- a/boot/init/tasks/switch_root.rb
 +++ b/boot/init/tasks/switch_root.rb
 @@ -383,6 +383,23 @@ class Tasks::SwitchRoot < SingletonTask
@@ -55,7 +55,7 @@ index b3a6045b..0644044c 100644
  
      Tasks::UDev.instance.teardown()
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index f0f0decc..f1e3d863 100644
+index f0f0dec..f1e3d86 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -1,5 +1,6 @@
@@ -238,7 +238,7 @@ index f0f0decc..f1e3d863 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index b7793a6a..f5979e50 100644
+index 05284e2..191ff28 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -54,6 +54,10 @@ in
@@ -262,50 +262,8 @@ index b7793a6a..f5979e50 100644
      };
    };
  
-@@ -122,10 +129,19 @@ in
-     "androidboot.usbconfigfs=true"
-     "loop.max_part=7"
-     "cgroup.memory=nokmem,nosocket"
-+  ]
-+  ++ lib.optionals config.mobile.hardware.watch.stage1-pause-debug.enable [
-+    # Verbose systemd logging for early stage-2 debugging.
-+    "systemd.log_level=debug"
-+    "systemd.log_target=kmsg"
-   ];
- 
-   mobile.system.type = "android";
- 
-+  # The hoki vendor kernel does not provide a zram module; avoid the
-+  # dev-zram0.device boot timeout.
-+  zramSwap.enable = lib.mkForce false;
-+
-   # Ensure stage-1 udev immediately links userdata to /dev/disk/by-label/NIXOS_SYSTEM and /dev/disk/by-partlabel/userdata
-   mobile.boot.stage-1.extraUdevRules = ''
-     KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
-@@ -319,11 +335,9 @@ in
- 
-     cp ${pkgs.writeText "10-platform.conf" ''
-       EGL_PLATFORM=hwcomposer
--      HYBRIS_EGLPLATFORM=hwcomposer
-       QT_QPA_PLATFORM=hwcomposer
-       QT_ENABLE_GLYPH_CACHE_WORKAROUND=true
-       QT_GSTREAMER_CAMERABIN_SRC=droidcamsrc
--      QT_QPA_NO_FRAMEBUFFER_FIRST=1
-     ''} ./var/lib/environment/compositor/10-platform.conf
- 
-     cp ${pkgs.writeText "20-device.conf" ''
-@@ -331,9 +345,6 @@ in
-       QPA_HWC_FORCE_GLES=1
-       QPA_HWC2_FORCE_DOZE_UPDATE=1
-       QT_OPENGL_NO_BGRA=1
--      HYBRIS_EGLPLATFORM=hwcomposer
--      EGL_PLATFORM=hwcomposer
--      QT_QPA_NO_FRAMEBUFFER_FIRST=1
-       ${lib.optionalString debugBuild ''
-         QT_DEBUG_PLUGINS=1
-       ''}
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
-index e5050bea..4c9a9b22 100644
+index e5050be..4c9a9b2 100644
 --- a/modules/hardware-watch.nix
 +++ b/modules/hardware-watch.nix
 @@ -149,6 +149,24 @@ in
@@ -334,7 +292,7 @@ index e5050bea..4c9a9b22 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/modules/initrd-ssh.nix b/modules/initrd-ssh.nix
-index db771346..b4842997 100644
+index db77134..b484299 100644
 --- a/modules/initrd-ssh.nix
 +++ b/modules/initrd-ssh.nix
 @@ -1,15 +1,27 @@

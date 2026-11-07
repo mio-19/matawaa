@@ -20,7 +20,7 @@ UEFI configurations remain unchanged.
 
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
 new file mode 100644
-index 00000000..71f4b2d6
+index 0000000..71f4b2d
 --- /dev/null
 +++ b/modules/hardware-watch.nix
 @@ -0,0 +1,165 @@
@@ -190,7 +190,7 @@ index 00000000..71f4b2d6
 +  };
 +}
 diff --git a/modules/module-list.nix b/modules/module-list.nix
-index 039be083..e9d9a143 100644
+index 039be08..e9d9a14 100644
 --- a/modules/module-list.nix
 +++ b/modules/module-list.nix
 @@ -23,6 +23,7 @@

@@ -25,7 +25,7 @@ Multimedia/Qt Base modules required by the viewfinder.
 
 diff --git a/overlay/asteroidos/apps/camera/camera-companion.patch b/overlay/asteroidos/apps/camera/camera-companion.patch
 new file mode 100644
-index 00000000..1329c71c
+index 0000000..1329c71
 --- /dev/null
 +++ b/overlay/asteroidos/apps/camera/camera-companion.patch
 @@ -0,0 +1,567 @@
@@ -598,7 +598,7 @@ index 00000000..1329c71c
 + }
 diff --git a/overlay/asteroidos/apps/camera/remotecamerabridge.cpp b/overlay/asteroidos/apps/camera/remotecamerabridge.cpp
 new file mode 100644
-index 00000000..416b066e
+index 0000000..416b066
 --- /dev/null
 +++ b/overlay/asteroidos/apps/camera/remotecamerabridge.cpp
 @@ -0,0 +1,130 @@
@@ -734,7 +734,7 @@ index 00000000..416b066e
 +}
 diff --git a/overlay/asteroidos/apps/camera/remotecamerabridge.h b/overlay/asteroidos/apps/camera/remotecamerabridge.h
 new file mode 100644
-index 00000000..2a57118f
+index 0000000..2a57118
 --- /dev/null
 +++ b/overlay/asteroidos/apps/camera/remotecamerabridge.h
 @@ -0,0 +1,61 @@
@@ -800,7 +800,7 @@ index 00000000..2a57118f
 +
 +#endif // REMOTECAMERABRIDGE_H
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
-index 9758e955..d704af2b 100644
+index 81812e7..ef93765 100644
 --- a/overlay/asteroidos/apps/default.nix
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -97,9 +97,20 @@

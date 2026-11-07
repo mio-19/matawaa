@@ -7,13 +7,12 @@ Apply the Tack-inspired patch to moWerk/asteroid-beatfork, adding tap
 tempo, accented subdivisions, a pulse ring, and haptic feedback.
 ---
  .../beatfork-tack-improvements.patch          | 449 ++++++++++++++++++
- overlay/asteroidos/community-apps/default.nix |   4 +
- 2 files changed, 453 insertions(+)
+ 1 file changed, 449 insertions(+)
  create mode 100644 overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
 
 diff --git a/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch b/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
 new file mode 100644
-index 00000000..3887693a
+index 0000000..3887693
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
 @@ -0,0 +1,449 @@
@@ -466,25 +465,3 @@ index 00000000..3887693a
 +     Connections {
 +         target: bpmSpinner
 +         function onCurrentIndexChanged() {
-diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
-index ef4e2836..b82d53bc 100644
---- a/overlay/asteroidos/community-apps/default.nix
-+++ b/overlay/asteroidos/community-apps/default.nix
-@@ -142,6 +142,7 @@ rec {
- 
-   # A metronome and chromatic tuning fork app for smartwatches
-   # Upstream repository: https://github.com/moWerk/asteroid-beatfork
-+  # Inspired by Tack metronome features (tap tempo, accented subdivisions, pulse ring, haptics): https://github.com/patzly/tack-android
-   beatfork = mkAsteroidApp {
-     name = "beatfork";
-     owner = "moWerk";
-@@ -149,6 +150,9 @@ rec {
-     desc = "Metronome and chromatic tuning fork app for smartwatches";
-     rev = "e3fbc5dd6da40868e0f338c9a0d3f6e877afca25";
-     sha256 = "1s4n5qfqximi05szksjbl806rpd37j3q7245z1iip5rrnlbkc7m2";
-+    patches = [
-+      ./beatfork-tack-improvements.patch
-+    ];
-     extraBuildInputs = [
-       qt6.qtmultimedia
-     ];

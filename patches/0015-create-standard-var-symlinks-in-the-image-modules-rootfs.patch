@@ -9,7 +9,7 @@ The generated Mobile-NixOS rootfs image did not contain /var/run or /var/lock, s
  1 file changed, 5 insertions(+)
 
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
-index 0af0c136..6c49de0b 100644
+index 0af0c13..6c49de0 100644
 --- a/modules/rootfs.nix
 +++ b/modules/rootfs.nix
 @@ -49,6 +49,11 @@ in

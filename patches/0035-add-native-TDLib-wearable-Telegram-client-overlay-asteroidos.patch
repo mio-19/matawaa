@@ -12,7 +12,7 @@ This patch provides a native C++/QML Telegram client for AsteroidOS:
 - Voice note playback and notification integration.
 - Exposes telegram in overlay/asteroidos/default.nix and apps attribute set.
 ---
- overlay/asteroidos/default.nix                |   9 +-
+ overlay/asteroidos/default.nix                |  18 +-
  overlay/asteroidos/telegram/CMakeLists.txt    |  58 ++
  .../telegram/asteroid-telegram.desktop        |   9 +
  .../asteroidos/telegram/asteroid-telegram.svg |  10 +
@@ -31,7 +31,7 @@ This patch provides a native C++/QML Telegram client for AsteroidOS:
  overlay/asteroidos/telegram/src/resources.qrc |  11 +
  .../telegram/src/telegramclient.cpp           | 688 ++++++++++++++++++
  .../asteroidos/telegram/src/telegramclient.h  | 165 +++++
- 19 files changed, 2648 insertions(+), 1 deletion(-)
+ 19 files changed, 2656 insertions(+), 2 deletions(-)
  create mode 100644 overlay/asteroidos/telegram/CMakeLists.txt
  create mode 100644 overlay/asteroidos/telegram/asteroid-telegram.desktop
  create mode 100644 overlay/asteroidos/telegram/asteroid-telegram.svg
@@ -52,10 +52,33 @@ This patch provides a native C++/QML Telegram client for AsteroidOS:
  create mode 100644 overlay/asteroidos/telegram/src/telegramclient.h
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 5c501e51..57202d04 100644
+index a538ff4..064f5c2 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -120,12 +120,19 @@ rec {
+@@ -125,7 +125,7 @@ rec {
+       inherit mkAsteroidApp mce-dev ngf-qt6;
+     })
+     // {
+-      inherit browser;
++      inherit browser telegram;
+     };
+ 
+ 
+@@ -140,6 +140,13 @@ rec {
+     inherit (pkgs) wpewebkit;
+   };
+ 
++  telegram = callPackage ./telegram {
++    inherit qml-asteroid;
++    inherit virtualkeyboard;
++    qtvirtualkeyboard = pkgs.qt6.qtvirtualkeyboard;
++    tdlib = if pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform then pkgs.tdlib else null;
++  };
++
+   asteroid-btsyncd = callPackage ./asteroid-btsyncd {
+     inherit qml-asteroid amber-mpris mlite;
+   };
+@@ -153,12 +160,19 @@ rec {
      inherit (pkgs) wpewebkit;
    };
  
@@ -78,7 +101,7 @@ index 5c501e51..57202d04 100644
    assets = (callPackage ./assets { }) // {
 diff --git a/overlay/asteroidos/telegram/CMakeLists.txt b/overlay/asteroidos/telegram/CMakeLists.txt
 new file mode 100644
-index 00000000..5da6c3d0
+index 0000000..5da6c3d
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/CMakeLists.txt
 @@ -0,0 +1,58 @@
@@ -142,7 +165,7 @@ index 00000000..5da6c3d0
 +)
 diff --git a/overlay/asteroidos/telegram/asteroid-telegram.desktop b/overlay/asteroidos/telegram/asteroid-telegram.desktop
 new file mode 100644
-index 00000000..f3227d08
+index 0000000..f3227d0
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/asteroid-telegram.desktop
 @@ -0,0 +1,9 @@
@@ -157,7 +180,7 @@ index 00000000..f3227d08
 +StartupNotify=false
 diff --git a/overlay/asteroidos/telegram/asteroid-telegram.svg b/overlay/asteroidos/telegram/asteroid-telegram.svg
 new file mode 100644
-index 00000000..f7d66167
+index 0000000..f7d6616
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/asteroid-telegram.svg
 @@ -0,0 +1,10 @@
@@ -173,7 +196,7 @@ index 00000000..f7d66167
 +</svg>
 diff --git a/overlay/asteroidos/telegram/default.nix b/overlay/asteroidos/telegram/default.nix
 new file mode 100644
-index 00000000..19044600
+index 0000000..1904460
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/default.nix
 @@ -0,0 +1,83 @@
@@ -262,7 +285,7 @@ index 00000000..19044600
 +})
 diff --git a/overlay/asteroidos/telegram/src/chatmodel.cpp b/overlay/asteroidos/telegram/src/chatmodel.cpp
 new file mode 100644
-index 00000000..860523e3
+index 0000000..860523e
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/chatmodel.cpp
 @@ -0,0 +1,171 @@
@@ -439,7 +462,7 @@ index 00000000..860523e3
 +}
 diff --git a/overlay/asteroidos/telegram/src/chatmodel.h b/overlay/asteroidos/telegram/src/chatmodel.h
 new file mode 100644
-index 00000000..07a99f0b
+index 0000000..07a99f0
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/chatmodel.h
 @@ -0,0 +1,63 @@
@@ -508,7 +531,7 @@ index 00000000..07a99f0b
 +#endif // CHATMODEL_H
 diff --git a/overlay/asteroidos/telegram/src/main.cpp b/overlay/asteroidos/telegram/src/main.cpp
 new file mode 100644
-index 00000000..c156c0e4
+index 0000000..c156c0e
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/main.cpp
 @@ -0,0 +1,30 @@
@@ -544,7 +567,7 @@ index 00000000..c156c0e4
 +}
 diff --git a/overlay/asteroidos/telegram/src/messagemodel.cpp b/overlay/asteroidos/telegram/src/messagemodel.cpp
 new file mode 100644
-index 00000000..0d6b84f6
+index 0000000..0d6b84f
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/messagemodel.cpp
 @@ -0,0 +1,81 @@
@@ -631,7 +654,7 @@ index 00000000..0d6b84f6
 +}
 diff --git a/overlay/asteroidos/telegram/src/messagemodel.h b/overlay/asteroidos/telegram/src/messagemodel.h
 new file mode 100644
-index 00000000..2b68eb3e
+index 0000000..2b68eb3
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/messagemodel.h
 @@ -0,0 +1,51 @@
@@ -688,7 +711,7 @@ index 00000000..2b68eb3e
 +#endif // MESSAGEMODEL_H
 diff --git a/overlay/asteroidos/telegram/src/qml/ChatViewPage.qml b/overlay/asteroidos/telegram/src/qml/ChatViewPage.qml
 new file mode 100644
-index 00000000..2904f995
+index 0000000..2904f99
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/qml/ChatViewPage.qml
 @@ -0,0 +1,250 @@
@@ -944,7 +967,7 @@ index 00000000..2904f995
 +}
 diff --git a/overlay/asteroidos/telegram/src/qml/ChatsPage.qml b/overlay/asteroidos/telegram/src/qml/ChatsPage.qml
 new file mode 100644
-index 00000000..3106a3f7
+index 0000000..3106a3f
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/qml/ChatsPage.qml
 @@ -0,0 +1,292 @@
@@ -1242,7 +1265,7 @@ index 00000000..3106a3f7
 +}
 diff --git a/overlay/asteroidos/telegram/src/qml/LoginPage.qml b/overlay/asteroidos/telegram/src/qml/LoginPage.qml
 new file mode 100644
-index 00000000..1805fda8
+index 0000000..1805fda
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/qml/LoginPage.qml
 @@ -0,0 +1,310 @@
@@ -1558,7 +1581,7 @@ index 00000000..1805fda8
 +}
 diff --git a/overlay/asteroidos/telegram/src/qml/QuickRepliesPage.qml b/overlay/asteroidos/telegram/src/qml/QuickRepliesPage.qml
 new file mode 100644
-index 00000000..f05a7772
+index 0000000..f05a777
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/qml/QuickRepliesPage.qml
 @@ -0,0 +1,119 @@
@@ -1683,7 +1706,7 @@ index 00000000..f05a7772
 +}
 diff --git a/overlay/asteroidos/telegram/src/qml/SettingsPage.qml b/overlay/asteroidos/telegram/src/qml/SettingsPage.qml
 new file mode 100644
-index 00000000..94342e50
+index 0000000..94342e5
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/qml/SettingsPage.qml
 @@ -0,0 +1,204 @@
@@ -1893,7 +1916,7 @@ index 00000000..94342e50
 +}
 diff --git a/overlay/asteroidos/telegram/src/qml/main.qml b/overlay/asteroidos/telegram/src/qml/main.qml
 new file mode 100644
-index 00000000..6e756d66
+index 0000000..6e756d6
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/qml/main.qml
 @@ -0,0 +1,45 @@
@@ -1944,7 +1967,7 @@ index 00000000..6e756d66
 +}
 diff --git a/overlay/asteroidos/telegram/src/resources.qrc b/overlay/asteroidos/telegram/src/resources.qrc
 new file mode 100644
-index 00000000..3d321a40
+index 0000000..3d321a4
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/resources.qrc
 @@ -0,0 +1,11 @@
@@ -1961,7 +1984,7 @@ index 00000000..3d321a40
 +</RCC>
 diff --git a/overlay/asteroidos/telegram/src/telegramclient.cpp b/overlay/asteroidos/telegram/src/telegramclient.cpp
 new file mode 100644
-index 00000000..65005d15
+index 0000000..65005d1
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/telegramclient.cpp
 @@ -0,0 +1,688 @@
@@ -2655,7 +2678,7 @@ index 00000000..65005d15
 +}
 diff --git a/overlay/asteroidos/telegram/src/telegramclient.h b/overlay/asteroidos/telegram/src/telegramclient.h
 new file mode 100644
-index 00000000..18ef35a4
+index 0000000..18ef35a
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/src/telegramclient.h
 @@ -0,0 +1,165 @@

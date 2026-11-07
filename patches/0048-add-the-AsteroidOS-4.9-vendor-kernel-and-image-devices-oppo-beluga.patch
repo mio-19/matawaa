@@ -14,7 +14,7 @@ Subject: [PATCH] add the AsteroidOS 4.9 vendor kernel and image
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
 new file mode 100644
-index 00000000..ffc5fceb
+index 0000000..ffc5fce
 --- /dev/null
 +++ b/devices/oppo-beluga/android-init.nix
 @@ -0,0 +1,113 @@
@@ -132,7 +132,7 @@ index 00000000..ffc5fceb
 +  '';
 +}
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
-index c2cef490..fbb7a582 100644
+index c2cef49..fbb7a58 100644
 --- a/devices/oppo-beluga/default.nix
 +++ b/devices/oppo-beluga/default.nix
 @@ -5,9 +5,14 @@
@@ -342,7 +342,7 @@ index c2cef490..fbb7a582 100644
  }
 diff --git a/devices/oppo-beluga/kernel/default.nix b/devices/oppo-beluga/kernel/default.nix
 new file mode 100644
-index 00000000..a814af0c
+index 0000000..a814af0
 --- /dev/null
 +++ b/devices/oppo-beluga/kernel/default.nix
 @@ -0,0 +1,112 @@

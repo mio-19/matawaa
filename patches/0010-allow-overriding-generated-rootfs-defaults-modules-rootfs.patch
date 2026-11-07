@@ -12,7 +12,7 @@ configuration.
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
-index 818308b1..595f045d 100644
+index 818308b..595f045 100644
 --- a/modules/rootfs.nix
 +++ b/modules/rootfs.nix
 @@ -36,9 +36,9 @@ in

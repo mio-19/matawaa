@@ -14,7 +14,7 @@ watch hardware options into a Mobile-NixOS device.
 
 diff --git a/devices/google-aurora/default.nix b/devices/google-aurora/default.nix
 new file mode 100644
-index 00000000..cf82bf99
+index 0000000..cf82bf9
 --- /dev/null
 +++ b/devices/google-aurora/default.nix
 @@ -0,0 +1,106 @@

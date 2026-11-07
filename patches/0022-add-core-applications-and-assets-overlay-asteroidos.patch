@@ -10,16 +10,16 @@ Package the standard AsteroidOS application suite and its shared assets:
   and 2048
 - assets: wallpapers, system sounds, icons, and official watchfaces
 ---
- overlay/asteroidos/apps/default.nix   | 122 ++++++++++++++++++++++++++
- overlay/asteroidos/assets/default.nix | 112 +++++++++++++++++++++++
+ overlay/asteroidos/apps/default.nix   | 122 ++++++++++++++++
+ overlay/asteroidos/assets/default.nix | 196 ++++++++++++++++++++++++++
  overlay/asteroidos/default.nix        |   8 ++
- 3 files changed, 242 insertions(+)
+ 3 files changed, 326 insertions(+)
  create mode 100644 overlay/asteroidos/apps/default.nix
  create mode 100644 overlay/asteroidos/assets/default.nix
 
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
 new file mode 100644
-index 00000000..9758e955
+index 0000000..81812e7
 --- /dev/null
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -0,0 +1,122 @@
@@ -63,8 +63,8 @@ index 00000000..9758e955
 +  settings = mkAsteroidApp {
 +    name = "settings";
 +    desc = "Smartwatch preferences and configuration application";
-+    rev = "6e257e62524001d3438d3b161cbc0693afbee189";
-+    sha256 = "sha256-o/UYJmJ7xVFII2Y4B+9PPyVhJlWPsLJ3aPVNW79Cg+s=";
++    rev = "9c65aaea9910e6133e79b3b6206a1a8d18b94c80";
++    sha256 = "0c1rcwwdkqhazn6xmmxhap4zrh6yqbhcqlw30ay0qywl206kciji";
 +    extraBuildInputs = [
 +      mce-dev
 +      ngf-qt6
@@ -95,8 +95,8 @@ index 00000000..9758e955
 +  flashlight = mkAsteroidApp {
 +    name = "flashlight";
 +    desc = "Full-screen high-brightness torch utility";
-+    rev = "0cdd6068cc57f052d7b6d50576b332ca20ae2865";
-+    sha256 = "0byzy9fl8vm0fvi9i3pffck0b6nzn97dyzncrwfs4dihqww8vzzl";
++    rev = "6b8c805c49c3a5adfa345b17b5d03e40ee50275b";
++    sha256 = "0zbsh2fiv3ab1jipz141nb0qwx9vc7zlycwrnn49crf1kxs35sim";
 +  };
 +
 +  calendar = mkAsteroidApp {
@@ -147,15 +147,17 @@ index 00000000..9758e955
 +}
 diff --git a/overlay/asteroidos/assets/default.nix b/overlay/asteroidos/assets/default.nix
 new file mode 100644
-index 00000000..5188043b
+index 0000000..703662c
 --- /dev/null
 +++ b/overlay/asteroidos/assets/default.nix
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,196 @@
 +{
 +  lib,
 +  stdenv,
 +  fetchFromGitHub,
 +  cmake,
++  buildPackages,
++  metaAsteroidSrc,
 +}:
 +
 +rec {
@@ -262,23 +264,105 @@ index 00000000..5188043b
 +      platforms = platforms.all;
 +    };
 +  };
-+}
-diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 974b4c73..f3ff23cd 100644
---- a/overlay/asteroidos/default.nix
-+++ b/overlay/asteroidos/default.nix
-@@ -114,6 +114,14 @@ rec {
-     inherit qml-asteroid amber-mpris mlite;
-   };
- 
-+  apps = callPackage ./apps {
-+    inherit mkAsteroidApp mce-dev ngf-qt6;
++
++  supported-languages = stdenv.mkDerivation {
++    pname = "supported-languages";
++    version = "2.1";
++
++    src = fetchFromGitHub {
++      owner = "AsteroidOS";
++      repo = "supported-languages";
++      rev = "182c3e31a93b157eea3d51f2152d712d16c71f1a";
++      sha256 = "17kv5jfd8l0hk0x838m983kjpqv3pp52snnzqb8vmihc1968lgaw";
++    };
++
++    installPhase = ''
++      runHook preInstall
++      mkdir -p $out/share/supported-languages
++      cp *.conf $out/share/supported-languages/
++      runHook postInstall
++    '';
++
++    meta = with lib; {
++      description = "Supported locale configuration files for AsteroidOS";
++      homepage = "https://asteroidos.org/";
++      license = licenses.gpl3Plus;
++      platforms = platforms.all;
++    };
 +  };
 +
-+  assets = (callPackage ./assets { }) // {
++  keymaps =
++    let
++      qtbase = buildPackages.qt6.qtbase;
++      kmap2qmap = buildPackages.stdenv.mkDerivation {
++        pname = "kmap2qmap";
++        inherit (buildPackages.qt6.qttools) version src;
++        patches = [
++          "${metaAsteroidSrc}/recipes-qt/qt6/qttools/0001-kmap2qmap-Map-MenuKB-key.patch"
++          "${metaAsteroidSrc}/recipes-qt/qt6/qttools/0002-kmap2qmap-Map-Sleep-key.patch"
++        ];
++        buildPhase = ''
++          runHook preBuild
++          $CXX -std=c++17 -fPIC -O2 \
++            src/kmap2qmap/main.cpp \
++            -I${qtbase}/include \
++            -I${qtbase}/include/QtCore \
++            -I${qtbase}/include/QtCore/${qtbase.version} \
++            -I${qtbase}/include/QtCore/${qtbase.version}/QtCore \
++            -I${qtbase}/include/QtGui \
++            -I${qtbase}/include/QtGui/${qtbase.version} \
++            -I${qtbase}/include/QtGui/${qtbase.version}/QtGui \
++            -I${qtbase}/include/QtInputSupport \
++            -I${qtbase}/include/QtInputSupport/${qtbase.version} \
++            -I${qtbase}/include/QtInputSupport/${qtbase.version}/QtInputSupport \
++            -L${qtbase}/lib \
++            -Wl,-rpath,${qtbase}/lib \
++            -lQt6InputSupport -lQt6Gui -lQt6Core \
++            -o kmap2qmap
++          runHook postBuild
++        '';
++        installPhase = ''
++          runHook preInstall
++          install -Dm755 kmap2qmap $out/bin/kmap2qmap
++          runHook postInstall
++        '';
++      };
++    in
++    stdenv.mkDerivation {
++      pname = "asteroid-keymaps";
++      version = "2.1";
++      dontUnpack = true;
++      nativeBuildInputs = [ kmap2qmap ];
++      installPhase = ''
++        runHook preInstall
++        mkdir -p $out/share/qt6/keymaps
++        kmap2qmap ${metaAsteroidSrc}/recipes-asteroid/asteroid-launcher/asteroid-launcher-configs/keys.kmap $out/share/qt6/keymaps/keys.qmap
++        runHook postInstall
++      '';
++      meta = with lib; {
++        description = "Hardware button keymap for AsteroidOS smartwatches";
++        homepage = "https://asteroidos.org/";
++        license = licenses.gpl3Plus;
++        platforms = platforms.all;
++      };
++    };
++}
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index 8a63fff..0784d4b 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -120,6 +120,14 @@ rec {
+     inherit accounts-qt kcalendarcore mkcal timed-qt6 libiodata;
+   };
+ 
++  apps = (callPackage ./apps {
++    inherit mkAsteroidApp mce-dev ngf-qt6;
++  });
++
++  assets = (callPackage ./assets { inherit metaAsteroidSrc; }) // {
 +    inherit virtualkeyboard;
 +  };
 +
-   virtualkeyboard = callPackage ./virtualkeyboard { };
- 
-   inherit (pkgs) msm-fb-refresher;
+   asteroid-btsyncd = callPackage ./asteroid-btsyncd {
+     inherit qml-asteroid amber-mpris mlite;
+   };

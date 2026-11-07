@@ -19,7 +19,7 @@ so it remains reproducible without adding a separate Nixpkgs flake input.
  create mode 100644 overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
 
 diff --git a/npins/sources.json b/npins/sources.json
-index 8a487595..574e5b3e 100644
+index 8a48759..a1ecbbd 100644
 --- a/npins/sources.json
 +++ b/npins/sources.json
 @@ -1,11 +1,17 @@
@@ -38,15 +38,15 @@ index 8a487595..574e5b3e 100644
 +        "repo": "nixpkgs"
 +      },
 +      "branch": "nixpkgs-unstable",
-+      "revision": "5c9de89ec55bff981cb8da1a4ee92b10f1438ffc",
-+      "url": "https://github.com/NixOS/nixpkgs/archive/5c9de89ec55bff981cb8da1a4ee92b10f1438ffc.tar.gz",
 +      "submodules": false,
-+      "hash": "sha256-WDValiY9se78X2Wh7aWWaq/c7HN29U555+OKbHEzYrw="
++      "revision": "6dadaf4375be35033e1c84395adbd53ff5fded96",
++      "url": "https://github.com/NixOS/nixpkgs/archive/6dadaf4375be35033e1c84395adbd53ff5fded96.tar.gz",
++      "hash": "sha256-D5H7H+qMoTGI/jJtxKP4u7BdjkFnUyhOovTrf3pTOr0="
      }
    },
    "version": 8
 diff --git a/overlay/mobile-nixos/kernel/builder.nix b/overlay/mobile-nixos/kernel/builder.nix
-index 7fd32f28..a4588661 100644
+index 7fd32f2..a458866 100644
 --- a/overlay/mobile-nixos/kernel/builder.nix
 +++ b/overlay/mobile-nixos/kernel/builder.nix
 @@ -244,8 +244,8 @@ stdenv.mkDerivation (inputArgs // {
@@ -62,7 +62,7 @@ index 7fd32f28..a4588661 100644
        (fetchpatch {
 diff --git a/overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch b/overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
 new file mode 100644
-index 00000000..85a8660f
+index 0000000..85a8660
 --- /dev/null
 +++ b/overlay/nixpkgs-patches/0001-qt6-cross-host-leak.patch
 @@ -0,0 +1,95 @@
@@ -162,7 +162,7 @@ index 00000000..85a8660f
 +     doInstallCheck = true;
 + 
 diff --git a/pkgs.nix b/pkgs.nix
-index da735500..49a7d93a 100644
+index da73550..49a7d93 100644
 --- a/pkgs.nix
 +++ b/pkgs.nix
 @@ -6,23 +6,24 @@

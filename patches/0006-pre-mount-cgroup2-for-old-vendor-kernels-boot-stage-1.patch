@@ -12,7 +12,7 @@ freeze on.
  1 file changed, 11 insertions(+)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
-index 6a3ad197..b3a6045b 100644
+index 6a3ad19..b3a6045 100644
 --- a/boot/init/tasks/switch_root.rb
 +++ b/boot/init/tasks/switch_root.rb
 @@ -416,6 +416,17 @@ class Tasks::SwitchRoot < SingletonTask

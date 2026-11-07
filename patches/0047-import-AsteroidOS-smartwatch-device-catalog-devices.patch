@@ -65,7 +65,7 @@ This patch imports configurations for the AsteroidOS smartwatch catalog:
 
 diff --git a/devices/asus-anthias/default.nix b/devices/asus-anthias/default.nix
 new file mode 100644
-index 00000000..0d0d7d5e
+index 0000000..0d0d7d5
 --- /dev/null
 +++ b/devices/asus-anthias/default.nix
 @@ -0,0 +1,57 @@
@@ -128,7 +128,7 @@ index 00000000..0d0d7d5e
 +}
 diff --git a/devices/asus-sparrow/default.nix b/devices/asus-sparrow/default.nix
 new file mode 100644
-index 00000000..cad2f302
+index 0000000..cad2f30
 --- /dev/null
 +++ b/devices/asus-sparrow/default.nix
 @@ -0,0 +1,56 @@
@@ -190,7 +190,7 @@ index 00000000..cad2f302
 +}
 diff --git a/devices/asus-swift/default.nix b/devices/asus-swift/default.nix
 new file mode 100644
-index 00000000..1b8520fd
+index 0000000..1b8520f
 --- /dev/null
 +++ b/devices/asus-swift/default.nix
 @@ -0,0 +1,56 @@
@@ -252,7 +252,7 @@ index 00000000..1b8520fd
 +}
 diff --git a/devices/asus-wren/default.nix b/devices/asus-wren/default.nix
 new file mode 100644
-index 00000000..5e306742
+index 0000000..5e30674
 --- /dev/null
 +++ b/devices/asus-wren/default.nix
 @@ -0,0 +1,57 @@
@@ -315,7 +315,7 @@ index 00000000..5e306742
 +}
 diff --git a/devices/casio-koi/default.nix b/devices/casio-koi/default.nix
 new file mode 100644
-index 00000000..e5661f5d
+index 0000000..e5661f5
 --- /dev/null
 +++ b/devices/casio-koi/default.nix
 @@ -0,0 +1,55 @@
@@ -376,7 +376,7 @@ index 00000000..e5661f5d
 +}
 diff --git a/devices/lg-bass/default.nix b/devices/lg-bass/default.nix
 new file mode 100644
-index 00000000..ee5e7150
+index 0000000..ee5e715
 --- /dev/null
 +++ b/devices/lg-bass/default.nix
 @@ -0,0 +1,55 @@
@@ -437,7 +437,7 @@ index 00000000..ee5e7150
 +}
 diff --git a/devices/lg-dory/default.nix b/devices/lg-dory/default.nix
 new file mode 100644
-index 00000000..4627627e
+index 0000000..4627627
 --- /dev/null
 +++ b/devices/lg-dory/default.nix
 @@ -0,0 +1,57 @@
@@ -500,7 +500,7 @@ index 00000000..4627627e
 +}
 diff --git a/devices/lg-lenok/default.nix b/devices/lg-lenok/default.nix
 new file mode 100644
-index 00000000..7ac3aab1
+index 0000000..7ac3aab
 --- /dev/null
 +++ b/devices/lg-lenok/default.nix
 @@ -0,0 +1,55 @@
@@ -561,7 +561,7 @@ index 00000000..7ac3aab1
 +}
 diff --git a/devices/lg-narwhal/default.nix b/devices/lg-narwhal/default.nix
 new file mode 100644
-index 00000000..5142fbdd
+index 0000000..5142fbd
 --- /dev/null
 +++ b/devices/lg-narwhal/default.nix
 @@ -0,0 +1,56 @@
@@ -623,7 +623,7 @@ index 00000000..5142fbdd
 +}
 diff --git a/devices/lg-nemo/default.nix b/devices/lg-nemo/default.nix
 new file mode 100644
-index 00000000..083b4a92
+index 0000000..083b4a9
 --- /dev/null
 +++ b/devices/lg-nemo/default.nix
 @@ -0,0 +1,56 @@
@@ -685,7 +685,7 @@ index 00000000..083b4a92
 +}
 diff --git a/devices/motorola-minnow/default.nix b/devices/motorola-minnow/default.nix
 new file mode 100644
-index 00000000..41e8e99e
+index 0000000..41e8e99
 --- /dev/null
 +++ b/devices/motorola-minnow/default.nix
 @@ -0,0 +1,55 @@
@@ -746,7 +746,7 @@ index 00000000..41e8e99e
 +}
 diff --git a/devices/motorola-smelt/default.nix b/devices/motorola-smelt/default.nix
 new file mode 100644
-index 00000000..8dbdd63b
+index 0000000..8dbdd63
 --- /dev/null
 +++ b/devices/motorola-smelt/default.nix
 @@ -0,0 +1,57 @@
@@ -809,7 +809,7 @@ index 00000000..8dbdd63b
 +}
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
 new file mode 100644
-index 00000000..c2cef490
+index 0000000..c2cef49
 --- /dev/null
 +++ b/devices/oppo-beluga/default.nix
 @@ -0,0 +1,57 @@
@@ -872,7 +872,7 @@ index 00000000..c2cef490
 +}
 diff --git a/devices/polar-pike/default.nix b/devices/polar-pike/default.nix
 new file mode 100644
-index 00000000..94a2f0f8
+index 0000000..94a2f0f
 --- /dev/null
 +++ b/devices/polar-pike/default.nix
 @@ -0,0 +1,54 @@
@@ -932,7 +932,7 @@ index 00000000..94a2f0f8
 +}
 diff --git a/devices/samsung-rinato/default.nix b/devices/samsung-rinato/default.nix
 new file mode 100644
-index 00000000..30a23a62
+index 0000000..30a23a6
 --- /dev/null
 +++ b/devices/samsung-rinato/default.nix
 @@ -0,0 +1,54 @@
@@ -992,7 +992,7 @@ index 00000000..30a23a62
 +}
 diff --git a/devices/samsung-sprat/default.nix b/devices/samsung-sprat/default.nix
 new file mode 100644
-index 00000000..55ce34d8
+index 0000000..55ce34d
 --- /dev/null
 +++ b/devices/samsung-sprat/default.nix
 @@ -0,0 +1,57 @@
@@ -1055,7 +1055,7 @@ index 00000000..55ce34d8
 +}
 diff --git a/devices/sony-tetra/default.nix b/devices/sony-tetra/default.nix
 new file mode 100644
-index 00000000..2984ba6c
+index 0000000..2984ba6
 --- /dev/null
 +++ b/devices/sony-tetra/default.nix
 @@ -0,0 +1,54 @@
@@ -1115,7 +1115,7 @@ index 00000000..2984ba6c
 +}
 diff --git a/devices/ticwatch-catfish/default.nix b/devices/ticwatch-catfish/default.nix
 new file mode 100644
-index 00000000..7fc7fb2a
+index 0000000..7fc7fb2
 --- /dev/null
 +++ b/devices/ticwatch-catfish/default.nix
 @@ -0,0 +1,56 @@
@@ -1177,7 +1177,7 @@ index 00000000..7fc7fb2a
 +}
 diff --git a/devices/ticwatch-harmony/default.nix b/devices/ticwatch-harmony/default.nix
 new file mode 100644
-index 00000000..9bff8de0
+index 0000000..9bff8de
 --- /dev/null
 +++ b/devices/ticwatch-harmony/default.nix
 @@ -0,0 +1,54 @@
@@ -1237,7 +1237,7 @@ index 00000000..9bff8de0
 +}
 diff --git a/devices/ticwatch-inharmony/default.nix b/devices/ticwatch-inharmony/default.nix
 new file mode 100644
-index 00000000..7a9baf50
+index 0000000..7a9baf5
 --- /dev/null
 +++ b/devices/ticwatch-inharmony/default.nix
 @@ -0,0 +1,54 @@
@@ -1297,7 +1297,7 @@ index 00000000..7a9baf50
 +}
 diff --git a/devices/ticwatch-mooneye/default.nix b/devices/ticwatch-mooneye/default.nix
 new file mode 100644
-index 00000000..6a76cef2
+index 0000000..6a76cef
 --- /dev/null
 +++ b/devices/ticwatch-mooneye/default.nix
 @@ -0,0 +1,54 @@
@@ -1357,7 +1357,7 @@ index 00000000..6a76cef2
 +}
 diff --git a/devices/ticwatch-rubyfish/default.nix b/devices/ticwatch-rubyfish/default.nix
 new file mode 100644
-index 00000000..71420dce
+index 0000000..71420dc
 --- /dev/null
 +++ b/devices/ticwatch-rubyfish/default.nix
 @@ -0,0 +1,56 @@
@@ -1419,7 +1419,7 @@ index 00000000..71420dce
 +}
 diff --git a/devices/ticwatch-skipjack/default.nix b/devices/ticwatch-skipjack/default.nix
 new file mode 100644
-index 00000000..454a6f99
+index 0000000..454a6f9
 --- /dev/null
 +++ b/devices/ticwatch-skipjack/default.nix
 @@ -0,0 +1,56 @@
@@ -1481,7 +1481,7 @@ index 00000000..454a6f99
 +}
 diff --git a/devices/ticwatch-tunny/default.nix b/devices/ticwatch-tunny/default.nix
 new file mode 100644
-index 00000000..69a52c41
+index 0000000..69a52c4
 --- /dev/null
 +++ b/devices/ticwatch-tunny/default.nix
 @@ -0,0 +1,56 @@

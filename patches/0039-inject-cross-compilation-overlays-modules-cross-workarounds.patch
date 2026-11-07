@@ -14,7 +14,7 @@ package fixes to the overlay.
  1 file changed, 18 insertions(+), 37 deletions(-)
 
 diff --git a/modules/cross-workarounds.nix b/modules/cross-workarounds.nix
-index 185117de..9d894d94 100644
+index 185117d..9d894d9 100644
 --- a/modules/cross-workarounds.nix
 +++ b/modules/cross-workarounds.nix
 @@ -1,44 +1,25 @@

@@ -15,14 +15,14 @@ Chinese layouts:
   pre-deploy common schemas with the host rime_deployer.
 ---
  .../0001-add-rime-plugin-and-layouts.patch    |  49 +++
- .../asteroidos/virtualkeyboard/default.nix    |  38 ++-
+ .../asteroidos/virtualkeyboard/default.nix    |  55 ++-
  .../virtualkeyboard/layouts/zh_CN/main.qml    |  60 ++++
  .../virtualkeyboard/layouts/zh_CN/symbols.qml |  54 +++
  .../virtualkeyboard/layouts/zh_HK/main.qml    |  60 ++++
  .../virtualkeyboard/layouts/zh_TW/main.qml    |  60 ++++
  .../virtualkeyboard/rimeinputmethod.cpp       | 312 ++++++++++++++++++
  .../virtualkeyboard/rimeinputmethod.h         |  68 ++++
- 8 files changed, 700 insertions(+), 1 deletion(-)
+ 8 files changed, 714 insertions(+), 4 deletions(-)
  create mode 100644 overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
  create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
  create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml
@@ -33,7 +33,7 @@ Chinese layouts:
 
 diff --git a/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch b/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
 new file mode 100644
-index 00000000..b08fcd8e
+index 0000000..b08fcd8
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
 @@ -0,0 +1,49 @@
@@ -87,20 +87,31 @@ index 00000000..b08fcd8e
 ++install(FILES style.qml DESTINATION "${CMAKE_INSTALL_LIBDIR}/qml/QtQuick/VirtualKeyboard/Styles/watch")
 ++install(DIRECTORY images/ DESTINATION "${CMAKE_INSTALL_LIBDIR}/qml/QtQuick/VirtualKeyboard/Styles/watch/images")
 diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
-index f5df8828..54ce4ee1 100644
+index 13590e9..12ef6cf 100644
 --- a/overlay/asteroidos/virtualkeyboard/default.nix
 +++ b/overlay/asteroidos/virtualkeyboard/default.nix
-@@ -5,6 +5,8 @@
+@@ -5,26 +5,43 @@
    cmake,
    pkg-config,
    qt6,
 +  librime,
 +  rime-data,
-   buildPackages,
++  buildPackages,
+   noUsrShareHook,
  }:
  
-@@ -19,18 +21,33 @@ stdenv.mkDerivation (finalAttrs: {
-     sha256 = "0yw1xq315p7q7illjpq92cs0060lrw94bfk8ywc7fbrr1gmkmvjf";
+ stdenv.mkDerivation (finalAttrs: {
+   pname = "asteroid-virtualkeyboard";
+-  version = "nightly";
++  version = "2.1.0";
+ 
+   src = fetchFromGitHub {
+     owner = "AsteroidOS";
+     repo = "asteroid-virtualkeyboard";
+-    rev = "319a971216093557e497fbaaa071db1eb47b2c0f";
+-    sha256 = "1f8jvd0z5zdfm1pwwk575s01r60n8q1q926715fcr0g55627jlyj";
++    rev = "666743fc42eaa02b9f82155ff3aff3a40e0d45ac";
++    sha256 = "0yw1xq315p7q7illjpq92cs0060lrw94bfk8ywc7fbrr1gmkmvjf";
    };
  
 +  patches = [
@@ -123,18 +134,24 @@ index f5df8828..54ce4ee1 100644
      pkg-config
      qt6.wrapQtAppsHook
 +    buildPackages.librime
+     noUsrShareHook
    ];
  
-   buildInputs = [
+@@ -32,10 +49,40 @@ stdenv.mkDerivation (finalAttrs: {
      qt6.qtbase
      qt6.qtdeclarative
      qt6.qtvirtualkeyboard
 +    librime
-   ];
- 
-   cmakeFlags = [
-@@ -43,8 +60,27 @@ stdenv.mkDerivation (finalAttrs: {
-     "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
++  ];
++
++  cmakeFlags = [
++    "-DCMAKE_INSTALL_LIBDIR=lib"
++    "-DCMAKE_INSTALL_DATADIR=share"
++  ]
++  ++ lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
++    "-DQt6QuickTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++    "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
    ];
  
 +  # Pre-deploy common Chinese schemas (Pinyin, Shuangpin, Wubi, Cangjie, Stroke, Bopomofo, Jyutping)
@@ -164,7 +181,7 @@ index f5df8828..54ce4ee1 100644
      platforms = platforms.linux;
 diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
 new file mode 100644
-index 00000000..911c2dc6
+index 0000000..911c2dc
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
 @@ -0,0 +1,60 @@
@@ -230,7 +247,7 @@ index 00000000..911c2dc6
 +}
 diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml
 new file mode 100644
-index 00000000..9157df43
+index 0000000..9157df4
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml
 @@ -0,0 +1,54 @@
@@ -290,7 +307,7 @@ index 00000000..9157df43
 +}
 diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml
 new file mode 100644
-index 00000000..815ca8a1
+index 0000000..815ca8a
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml
 @@ -0,0 +1,60 @@
@@ -356,7 +373,7 @@ index 00000000..815ca8a1
 +}
 diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml
 new file mode 100644
-index 00000000..8231897a
+index 0000000..8231897
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml
 @@ -0,0 +1,60 @@
@@ -422,7 +439,7 @@ index 00000000..8231897a
 +}
 diff --git a/overlay/asteroidos/virtualkeyboard/rimeinputmethod.cpp b/overlay/asteroidos/virtualkeyboard/rimeinputmethod.cpp
 new file mode 100644
-index 00000000..d9c2f026
+index 0000000..d9c2f02
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/rimeinputmethod.cpp
 @@ -0,0 +1,312 @@
@@ -740,7 +757,7 @@ index 00000000..d9c2f026
 +} // namespace QtVirtualKeyboard
 diff --git a/overlay/asteroidos/virtualkeyboard/rimeinputmethod.h b/overlay/asteroidos/virtualkeyboard/rimeinputmethod.h
 new file mode 100644
-index 00000000..2c64e4f0
+index 0000000..2c64e4f
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/rimeinputmethod.h
 @@ -0,0 +1,68 @@

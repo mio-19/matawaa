@@ -15,7 +15,7 @@ missed. Existing volume and keyboard recovery keys are unchanged.
  1 file changed, 22 insertions(+), 1 deletion(-)
 
 diff --git a/boot/lib/hal/recovery.rb b/boot/lib/hal/recovery.rb
-index 6eaaf611..0fda186a 100644
+index 6eaaf61..0fda186 100644
 --- a/boot/lib/hal/recovery.rb
 +++ b/boot/lib/hal/recovery.rb
 @@ -14,6 +14,17 @@ module Hal

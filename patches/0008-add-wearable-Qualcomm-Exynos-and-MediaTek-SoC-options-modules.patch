@@ -19,7 +19,7 @@ Each option defaults to false to preserve existing device behavior.
  3 files changed, 99 insertions(+)
 
 diff --git a/modules/hardware-exynos.nix b/modules/hardware-exynos.nix
-index 4a00b153..136c974b 100644
+index 4a00b15..136c974 100644
 --- a/modules/hardware-exynos.nix
 +++ b/modules/hardware-exynos.nix
 @@ -5,6 +5,7 @@ let
@@ -55,7 +55,7 @@ index 4a00b153..136c974b 100644
        mobile.kernel.structuredConfig = [
          (helpers: with helpers; {
 diff --git a/modules/hardware-mediatek.nix b/modules/hardware-mediatek.nix
-index eaf350c9..1b0bfed1 100644
+index eaf350c..1b0bfed 100644
 --- a/modules/hardware-mediatek.nix
 +++ b/modules/hardware-mediatek.nix
 @@ -8,6 +8,8 @@ let
@@ -102,7 +102,7 @@ index eaf350c9..1b0bfed1 100644
        mobile.kernel.structuredConfig = [
          (helpers: with helpers; {
 diff --git a/modules/hardware-qualcomm.nix b/modules/hardware-qualcomm.nix
-index 0959687f..43b980ea 100644
+index 0959687..43b980e 100644
 --- a/modules/hardware-qualcomm.nix
 +++ b/modules/hardware-qualcomm.nix
 @@ -20,6 +20,12 @@ let

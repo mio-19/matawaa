@@ -15,7 +15,7 @@ Subject: [PATCH] devices/oppo-beluga-mainline: add standalone experimental
 
 diff --git a/devices/oppo-beluga-mainline/default.nix b/devices/oppo-beluga-mainline/default.nix
 new file mode 100644
-index 00000000..6ed487dd
+index 0000000..6ed487d
 --- /dev/null
 +++ b/devices/oppo-beluga-mainline/default.nix
 @@ -0,0 +1,111 @@
@@ -132,7 +132,7 @@ index 00000000..6ed487dd
 +}
 diff --git a/devices/oppo-beluga-mainline/kernel/default.nix b/devices/oppo-beluga-mainline/kernel/default.nix
 new file mode 100644
-index 00000000..f5ce3778
+index 0000000..f5ce377
 --- /dev/null
 +++ b/devices/oppo-beluga-mainline/kernel/default.nix
 @@ -0,0 +1,19 @@
@@ -157,7 +157,7 @@ index 00000000..f5ce3778
 +})
 diff --git a/devices/oppo-beluga-mainline/msm8909w-beluga.dts b/devices/oppo-beluga-mainline/msm8909w-beluga.dts
 new file mode 100644
-index 00000000..42e8ec76
+index 0000000..42e8ec7
 --- /dev/null
 +++ b/devices/oppo-beluga-mainline/msm8909w-beluga.dts
 @@ -0,0 +1,10257 @@

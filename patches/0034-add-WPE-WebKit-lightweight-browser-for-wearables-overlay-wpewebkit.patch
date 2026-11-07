@@ -20,11 +20,11 @@ This patch integrates the lightweight WPE WebKit rendering engine and browser:
  overlay/asteroidos/browser/default.nix        |  52 +++
  overlay/asteroidos/browser/portal.html        | 237 +++++++++++
  overlay/asteroidos/browser/src/main.c         | 388 ++++++++++++++++++
- overlay/asteroidos/default.nix                |  14 +-
+ overlay/asteroidos/default.nix                |  40 +-
  overlay/asteroidos/wpewebkit-qt/default.nix   |  70 ++++
  overlay/overlay.nix                           |   2 +
  overlay/wpewebkit/default.nix                 | 163 ++++++++
- 10 files changed, 1012 insertions(+), 2 deletions(-)
+ 10 files changed, 1037 insertions(+), 3 deletions(-)
  create mode 100644 overlay/asteroidos/browser/CMakeLists.txt
  create mode 100644 overlay/asteroidos/browser/asteroid-browser.desktop
  create mode 100644 overlay/asteroidos/browser/asteroid-browser.svg
@@ -36,7 +36,7 @@ This patch integrates the lightweight WPE WebKit rendering engine and browser:
 
 diff --git a/overlay/asteroidos/browser/CMakeLists.txt b/overlay/asteroidos/browser/CMakeLists.txt
 new file mode 100644
-index 00000000..cb9a9691
+index 0000000..cb9a969
 --- /dev/null
 +++ b/overlay/asteroidos/browser/CMakeLists.txt
 @@ -0,0 +1,54 @@
@@ -96,7 +96,7 @@ index 00000000..cb9a9691
 +)
 diff --git a/overlay/asteroidos/browser/asteroid-browser.desktop b/overlay/asteroidos/browser/asteroid-browser.desktop
 new file mode 100644
-index 00000000..6e0de5d7
+index 0000000..6e0de5d
 --- /dev/null
 +++ b/overlay/asteroidos/browser/asteroid-browser.desktop
 @@ -0,0 +1,12 @@
@@ -114,7 +114,7 @@ index 00000000..6e0de5d7
 +Keywords=web;browser;internet;
 diff --git a/overlay/asteroidos/browser/asteroid-browser.svg b/overlay/asteroidos/browser/asteroid-browser.svg
 new file mode 100644
-index 00000000..6ce8f579
+index 0000000..6ce8f57
 --- /dev/null
 +++ b/overlay/asteroidos/browser/asteroid-browser.svg
 @@ -0,0 +1,22 @@
@@ -142,7 +142,7 @@ index 00000000..6ce8f579
 +</svg>
 diff --git a/overlay/asteroidos/browser/default.nix b/overlay/asteroidos/browser/default.nix
 new file mode 100644
-index 00000000..fe875e78
+index 0000000..fe875e7
 --- /dev/null
 +++ b/overlay/asteroidos/browser/default.nix
 @@ -0,0 +1,52 @@
@@ -200,7 +200,7 @@ index 00000000..fe875e78
 +})
 diff --git a/overlay/asteroidos/browser/portal.html b/overlay/asteroidos/browser/portal.html
 new file mode 100644
-index 00000000..1924bbc8
+index 0000000..1924bbc
 --- /dev/null
 +++ b/overlay/asteroidos/browser/portal.html
 @@ -0,0 +1,237 @@
@@ -443,7 +443,7 @@ index 00000000..1924bbc8
 +</html>
 diff --git a/overlay/asteroidos/browser/src/main.c b/overlay/asteroidos/browser/src/main.c
 new file mode 100644
-index 00000000..abd05227
+index 0000000..abd0522
 --- /dev/null
 +++ b/overlay/asteroidos/browser/src/main.c
 @@ -0,0 +1,388 @@
@@ -836,21 +836,16 @@ index 00000000..abd05227
 +    return status;
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 03f1bca1..5c501e51 100644
+index d04f4f3..a538ff4 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -114,10 +114,20 @@ rec {
-     inherit qml-asteroid amber-mpris mlite;
+@@ -120,19 +120,53 @@ rec {
+     inherit accounts-qt kcalendarcore mkcal timed-qt6 libiodata;
    };
  
--  apps = callPackage ./apps {
+-  apps = (callPackage ./apps {
 -    inherit mkAsteroidApp mce-dev ngf-qt6;
-+  browser = callPackage ./browser { };
-+
-+  wpewebkit-qt = callPackage ./wpewebkit-qt {
-+    inherit (pkgs) wpewebkit;
-   };
- 
+-  });
 +  apps =
 +    (callPackage ./apps {
 +      inherit mkAsteroidApp mce-dev ngf-qt6;
@@ -859,12 +854,51 @@ index 03f1bca1..5c501e51 100644
 +      inherit browser;
 +    };
 +
-   assets = (callPackage ./assets { }) // {
++
+ 
+   assets = (callPackage ./assets { inherit metaAsteroidSrc; }) // {
      inherit virtualkeyboard;
    };
+ 
++  browser = callPackage ./browser { };
++
++  wpewebkit-qt = callPackage ./wpewebkit-qt {
++    inherit (pkgs) wpewebkit;
++  };
++
+   asteroid-btsyncd = callPackage ./asteroid-btsyncd {
+     inherit qml-asteroid amber-mpris mlite;
+   };
+ 
++<<<<<<< HEAD
+   virtualkeyboard = callPackage ./virtualkeyboard { inherit noUsrShareHook; };
++=======
++  browser = callPackage ./browser { };
++
++  wpewebkit-qt = callPackage ./wpewebkit-qt {
++    inherit (pkgs) wpewebkit;
++  };
++
++  apps =
++    (callPackage ./apps {
++      inherit mkAsteroidApp mce-dev ngf-qt6;
++    })
++    // {
++      inherit browser;
++    };
++
++  assets = (callPackage ./assets { }) // {
++    inherit virtualkeyboard;
++  };
++
++  virtualkeyboard = callPackage ./virtualkeyboard { };
++>>>>>>> 26a3811 (add WPE WebKit lightweight browser for wearables (overlay/wpewebkit))
+ 
+   community-apps = callPackage ./community-apps {
+     inherit mkAsteroidApp mlite noUsrShareHook;
 diff --git a/overlay/asteroidos/wpewebkit-qt/default.nix b/overlay/asteroidos/wpewebkit-qt/default.nix
 new file mode 100644
-index 00000000..e2a9aedc
+index 0000000..e2a9aed
 --- /dev/null
 +++ b/overlay/asteroidos/wpewebkit-qt/default.nix
 @@ -0,0 +1,70 @@
@@ -939,7 +973,7 @@ index 00000000..e2a9aedc
 +  };
 +})
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index f60c2311..78fdbdd7 100644
+index f60c231..78fdbdd 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
 @@ -54,6 +54,8 @@ in
@@ -953,7 +987,7 @@ index f60c2311..78fdbdd7 100644
      #
 diff --git a/overlay/wpewebkit/default.nix b/overlay/wpewebkit/default.nix
 new file mode 100644
-index 00000000..bfc7ecb0
+index 0000000..bfc7ecb
 --- /dev/null
 +++ b/overlay/wpewebkit/default.nix
 @@ -0,0 +1,163 @@

@@ -13,15 +13,15 @@ Add Matawaa's "Find My Phone" feature on top of upstream AsteroidOS:
  .../asteroidos/asteroid-btsyncd/default.nix   |   9 +
  .../asteroid-btsyncd/find-phone.patch         | 206 ++++++++++++++++++
  .../asteroidos/asteroid-btsyncd/find-phone.sh |  37 ++++
- .../asteroidos/asteroid-launcher/default.nix  |   4 +
+ .../asteroidos/asteroid-launcher/default.nix  |   7 +
  .../asteroid-launcher/find-phone.patch        |  60 +++++
- 5 files changed, 316 insertions(+)
+ 5 files changed, 319 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/find-phone.patch
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/find-phone.sh
  create mode 100644 overlay/asteroidos/asteroid-launcher/find-phone.patch
 
 diff --git a/overlay/asteroidos/asteroid-btsyncd/default.nix b/overlay/asteroidos/asteroid-btsyncd/default.nix
-index af76edf4..0cb3257c 100644
+index af76edf..0cb3257 100644
 --- a/overlay/asteroidos/asteroid-btsyncd/default.nix
 +++ b/overlay/asteroidos/asteroid-btsyncd/default.nix
 @@ -29,6 +29,14 @@ stdenv.mkDerivation (finalAttrs: {
@@ -49,7 +49,7 @@ index af76edf4..0cb3257c 100644
  
 diff --git a/overlay/asteroidos/asteroid-btsyncd/find-phone.patch b/overlay/asteroidos/asteroid-btsyncd/find-phone.patch
 new file mode 100644
-index 00000000..20c1e484
+index 0000000..20c1e48
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/find-phone.patch
 @@ -0,0 +1,206 @@
@@ -261,7 +261,7 @@ index 00000000..20c1e484
 ++#endif // FINDPHONESERVICE_H
 diff --git a/overlay/asteroidos/asteroid-btsyncd/find-phone.sh b/overlay/asteroidos/asteroid-btsyncd/find-phone.sh
 new file mode 100644
-index 00000000..d34883f4
+index 0000000..d34883f
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/find-phone.sh
 @@ -0,0 +1,37 @@
@@ -303,24 +303,43 @@ index 00000000..d34883f4
 +        ;;
 +esac
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 207c2c07..235c277e 100644
+index 0d5e9b8..6a681bc 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -37,7 +37,11 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -39,6 +39,7 @@ stdenv.mkDerivation (finalAttrs: {
  
    strictDeps = true;
  
-+  # AsteroidOS wayland compositor & shell
-+  # Upstream repository: https://github.com/AsteroidOS/asteroid-launcher
++<<<<<<< HEAD
+   postPatch = ''
+     substituteInPlace src/qml/MainScreen.qml \
+       --replace-fail "/usr/share/asteroid-launcher" "/run/current-system/sw/share/asteroid-launcher"
+@@ -59,16 +60,22 @@ stdenv.mkDerivation (finalAttrs: {
+       --replace-fail "/usr/bin/notificationtool" "/run/current-system/sw/bin/notificationtool"
+   '';
+ 
++=======
++>>>>>>> b77c271 (add Find My Phone support (overlay/asteroidos))
+   # AsteroidOS wayland compositor & shell
+   # Upstream repository: https://github.com/AsteroidOS/asteroid-launcher
    patches = [
-+    # QuickPanel quick-toggle button to trigger the find-phone alarm on the companion phone
+     # QuickPanel quick-toggle button to trigger the find-phone alarm on the companion phone
++<<<<<<< HEAD
+     # App-branded notification preview and view improvements
+     # Upstream PR: https://github.com/AsteroidOS/asteroid-launcher/pull/308
+     (fetchpatch {
+       url = "https://github.com/AsteroidOS/asteroid-launcher/pull/308.diff";
+       hash = "sha256-QzBzGPIk9khM8Q5b7ZHMhxd/TVI6UrDIthZMzn7el1I=";
+     })
++=======
 +    ./find-phone.patch
++>>>>>>> b77c271 (add Find My Phone support (overlay/asteroidos))
      # Remove OpacityMask dependency from the 400ms initial splash animation
      ./splash-no-opacitymask.patch
      # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
 diff --git a/overlay/asteroidos/asteroid-launcher/find-phone.patch b/overlay/asteroidos/asteroid-launcher/find-phone.patch
 new file mode 100644
-index 00000000..cb025507
+index 0000000..cb02550
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/find-phone.patch
 @@ -0,0 +1,60 @@

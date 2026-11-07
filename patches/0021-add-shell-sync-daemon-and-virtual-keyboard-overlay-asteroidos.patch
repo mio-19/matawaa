@@ -18,22 +18,24 @@ current nightly.
  .../asteroidos/asteroid-btsyncd/default.nix   |  68 ++++++
  .../org.asteroidos.btsyncd.conf               |  13 ++
  .../asteroid-launcher/circlemask-qrc.patch    |  15 ++
- .../asteroidos/asteroid-launcher/default.nix  | 108 ++++++++++
+ .../asteroidos/asteroid-launcher/default.nix  | 144 +++++++++++++
  .../display-on-startup.patch                  |  44 ++++
  .../org.nemomobile.compositor.conf            |  28 +++
+ .../qml-boot-diagnostics.patch                |  58 +++++
  .../splash-no-opacitymask.patch               |  54 +++++
- overlay/asteroidos/default.nix                |  29 +++
+ overlay/asteroidos/default.nix                |  30 +++
  .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
  .../nemo-qml-plugin-dbus/default.nix          |  80 +++++++
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 201 ++++++++++++++++++
- .../asteroidos/virtualkeyboard/default.nix    |  52 +++++
- 12 files changed, 761 insertions(+)
+ .../asteroidos/virtualkeyboard/default.nix    |  43 ++++
+ 13 files changed, 847 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
  create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
  create mode 100644 overlay/asteroidos/asteroid-launcher/display-on-startup.patch
  create mode 100644 overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
+ create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
  create mode 100644 overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
@@ -42,7 +44,7 @@ current nightly.
 
 diff --git a/overlay/asteroidos/asteroid-btsyncd/default.nix b/overlay/asteroidos/asteroid-btsyncd/default.nix
 new file mode 100644
-index 00000000..af76edf4
+index 0000000..af76edf
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/default.nix
 @@ -0,0 +1,68 @@
@@ -116,7 +118,7 @@ index 00000000..af76edf4
 +})
 diff --git a/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
 new file mode 100644
-index 00000000..a856e19c
+index 0000000..a856e19
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
 @@ -0,0 +1,13 @@
@@ -135,7 +137,7 @@ index 00000000..a856e19c
 +</busconfig>
 diff --git a/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
 new file mode 100644
-index 00000000..d8a0670d
+index 0000000..d8a0670
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
 @@ -0,0 +1,15 @@
@@ -156,14 +158,15 @@ index 00000000..d8a0670d
 + }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
 new file mode 100644
-index 00000000..207c2c07
+index 0000000..0d5e9b8
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -0,0 +1,108 @@
+@@ -0,0 +1,144 @@
 +{
 +  lib,
 +  stdenv,
 +  fetchFromGitHub,
++  fetchpatch,
 +  cmake,
 +  pkg-config,
 +  qt6,
@@ -181,6 +184,7 @@ index 00000000..207c2c07
 +  kdePackages,
 +  buildPackages,
 +  libhybris,
++  noUsrShareHook,
 +}:
 +
 +let
@@ -193,13 +197,42 @@ index 00000000..207c2c07
 +  src = fetchFromGitHub {
 +    owner = "AsteroidOS";
 +    repo = "asteroid-launcher";
-+    rev = "4bd3d281fe3a2ea9631c640e1f00871fa19bbd4c";
-+    sha256 = "194hn7pkq100339gnavvjmyib15m557bykkyqr77jrgz0wl07bpz";
++    rev = "29f4257ec9835ead090c8157e46948c769081ed2";
++    sha256 = "1c7swnsqxsrfdhdim9rbq4d33ivxskkck4yz8hmridfwdzzpiv53";
 +  };
 +
 +  strictDeps = true;
 +
++  postPatch = ''
++    substituteInPlace src/qml/MainScreen.qml \
++      --replace-fail "/usr/share/asteroid-launcher" "/run/current-system/sw/share/asteroid-launcher"
++
++    substituteInPlace lipstick/src/localemanager.cpp \
++      --replace-fail '"/usr/share/translations"' "\"$out/share/translations\""
++
++    substituteInPlace lipstick/src/components/launchermodel.cpp \
++      --replace-fail '"/usr/share/lipstick/lipstick.conf"' "\"$out/share/lipstick/lipstick.conf\"" \
++      --replace-fail '#define LAUNCHER_APPS_PATH "/usr/share/applications/"' '#define LAUNCHER_APPS_PATH "/run/current-system/sw/share/applications/"' \
++      --replace-fail '#define LAUNCHER_ICONS_PATH "/usr/share/icons/hicolor/86x86/apps/"' '#define LAUNCHER_ICONS_PATH "/run/current-system/sw/share/icons/hicolor/86x86/apps/"'
++
++    substituteInPlace lipstick/src/notifications/notificationmanager.cpp \
++      --replace-fail '"/usr/share/lipstick/notificationcategories"' "\"$out/share/lipstick/notificationcategories\"" \
++      --replace-fail 'DESKTOP_ENTRY_PATH= "/usr/share/applications/"' 'DESKTOP_ENTRY_PATH= "/run/current-system/sw/share/applications/"'
++
++    substituteInPlace src/notificationsnoozer.cpp \
++      --replace-fail "/usr/bin/notificationtool" "/run/current-system/sw/bin/notificationtool"
++  '';
++
++  # AsteroidOS wayland compositor & shell
++  # Upstream repository: https://github.com/AsteroidOS/asteroid-launcher
 +  patches = [
++    # QuickPanel quick-toggle button to trigger the find-phone alarm on the companion phone
++    # App-branded notification preview and view improvements
++    # Upstream PR: https://github.com/AsteroidOS/asteroid-launcher/pull/308
++    (fetchpatch {
++      url = "https://github.com/AsteroidOS/asteroid-launcher/pull/308.diff";
++      hash = "sha256-QzBzGPIk9khM8Q5b7ZHMhxd/TVI6UrDIthZMzn7el1I=";
++    })
 +    # Remove OpacityMask dependency from the 400ms initial splash animation
 +    ./splash-no-opacitymask.patch
 +    # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
@@ -210,6 +243,10 @@ index 00000000..207c2c07
 +    # Upstream: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
 +    # Upstream CMake qt_add_shaders: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
 +    ./circlemask-qrc.patch
++    # Log which stage of the compositor scene came up, so an empty scene (black
++    # screen with a live render loop) names the failing Loader instead of
++    # leaving only "update from item" chatter in the log.
++    ./qml-boot-diagnostics.patch
 +  ];
 +
 +  nativeBuildInputs = [
@@ -217,6 +254,7 @@ index 00000000..207c2c07
 +    kdePackages.extra-cmake-modules
 +    pkg-config
 +    qt6.wrapQtAppsHook
++    noUsrShareHook
 +  ];
 +
 +  cmakeFlags = [
@@ -270,7 +308,7 @@ index 00000000..207c2c07
 +})
 diff --git a/overlay/asteroidos/asteroid-launcher/display-on-startup.patch b/overlay/asteroidos/asteroid-launcher/display-on-startup.patch
 new file mode 100644
-index 00000000..6d842685
+index 0000000..6d84268
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/display-on-startup.patch
 @@ -0,0 +1,44 @@
@@ -320,7 +358,7 @@ index 00000000..6d842685
 +         emit displayOff();
 diff --git a/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf b/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
 new file mode 100644
-index 00000000..b8271665
+index 0000000..b827166
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
 @@ -0,0 +1,28 @@
@@ -352,9 +390,73 @@ index 00000000..b8271665
 +    <allow receive_sender="org.nemomobile.compositor"/>
 +  </policy>
 +</busconfig>
+diff --git a/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+new file mode 100644
+index 0000000..858ba58
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+@@ -0,0 +1,58 @@
++# Bring-up diagnostics: report what actually made it into the compositor scene.
++#
++# A black screen with a live render loop (frames swapping while the renderer
++# reports no geometry) means the QML tree came up empty, and lipstick's own
++# loader only reports that through the default logging category. These lines
++# make the three stages observable in launcher.log: the compositor root and its
++# scene size, the home screen Loader, and the watchface Loader.
++--- a/src/qml/compositor/compositor.qml
+++++ b/src/qml/compositor/compositor.qml
++@@ -44,6 +44,10 @@
++     height: Dims.h(100)
++     rotation: Screen.angleBetween(Screen.primaryScreen, Lipstick.compositor.screenOrientation)
++ 
+++    Component.onCompleted: console.info("compositor: scene root", width, "x", height,
+++                                        "round screen:", DeviceSpecs.hasRoundScreen,
+++                                        "orientation:", rotation)
+++
++     // The home screen is a persistent item at the bottom of the z-stack, not
++     // an in-process "window". Its z follows MainScreen's own z (raised while
++     // the splash is up) so it can sit above running apps when needed.
++@@ -57,6 +61,15 @@
++             anchors.fill: parent
++             source: "MainScreen.qml"
++             onLoaded: item.aboutToOpen = Qt.binding(function() { return !comp.homeActive && !appLayer.ready })
+++
+++            // A failing Loader leaves the scene empty and the screen black with
+++            // no further trace, so name the stage that failed.
+++            onStatusChanged: {
+++                if (status === Loader.Ready)
+++                    console.info("compositor: home screen loaded,", width, "x", height)
+++                else if (status === Loader.Error)
+++                    console.warn("compositor: home screen failed to load (see the QML error above)")
+++            }
++         }
++     }
++ 
++--- a/src/qml/MainScreen.qml
+++++ b/src/qml/MainScreen.qml
++@@ -113,6 +113,9 @@
++         lipstickSettings.lockScreen(true)
++         if(firstRun.isFirstRun())
++             firstRunComponent.createObject(desktop)
+++        console.info("launcher: home screen", width, "x", height, "visible:", visible,
+++                     "dims:", Dims.w(100), "x", Dims.h(100),
+++                     "first run:", firstRun.isFirstRun())
++     }
++ 
++     Splash {
++@@ -396,6 +399,9 @@
++                 anchors.fill: parent
++                 source: watchFaceSource.value
++ 
+++                onStatusChanged: console.info("launcher: watchface", source,
+++                                              "status:", status)
+++
++                 // Reinstantiate to re-read the source from disk. Toggling the
++                 // Loader instead of rewriting the dconf-backed watchFaceSource
++                 // avoids a cross-process write that can clobber a concurrent
 diff --git a/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch b/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
 new file mode 100644
-index 00000000..c8fc8896
+index 0000000..c8fc889
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
 @@ -0,0 +1,54 @@
@@ -413,12 +515,12 @@ index 00000000..c8fc8896
 +-    }
 + }
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 4e0b1aab..974b4c73 100644
+index 1daf957..8a63fff 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -15,6 +15,29 @@ rec {
-   qml-asteroid = callPackage ./qml-asteroid { };
-   mapplauncherd = callPackage ./mapplauncherd { };
+@@ -19,6 +19,30 @@ rec {
+   };
+   meta-asteroid-src = metaAsteroidSrc;
  
 +  qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
 +    inherit (pkgs)
@@ -440,13 +542,14 @@ index 4e0b1aab..974b4c73 100644
 +      usb-moded-qt6
 +      keepalive
 +      timed-qt6
++      noUsrShareHook
 +      ;
 +  };
 +
    amber-mpris = callPackage ./amber-mpris { };
    mlite = callPackage ./mlite { };
    nemo-qml-plugin-configuration = callPackage ./nemo-qml-plugin-configuration {
-@@ -87,5 +110,11 @@ rec {
+@@ -96,5 +120,11 @@ rec {
      inherit accounts-qt kcalendarcore mkcal timed-qt6 libiodata;
    };
  
@@ -454,13 +557,13 @@ index 4e0b1aab..974b4c73 100644
 +    inherit qml-asteroid amber-mpris mlite;
 +  };
 +
-+  virtualkeyboard = callPackage ./virtualkeyboard { };
++  virtualkeyboard = callPackage ./virtualkeyboard { inherit noUsrShareHook; };
 +
    inherit (pkgs) msm-fb-refresher;
  }
 diff --git a/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
 new file mode 100644
-index 00000000..214fc9e5
+index 0000000..214fc9e
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
 @@ -0,0 +1,69 @@
@@ -535,7 +638,7 @@ index 00000000..214fc9e5
 +})
 diff --git a/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
 new file mode 100644
-index 00000000..9cad05fc
+index 0000000..9cad05f
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
 @@ -0,0 +1,80 @@
@@ -621,7 +724,7 @@ index 00000000..9cad05fc
 +})
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 new file mode 100644
-index 00000000..f426aead
+index 0000000..f426aea
 --- /dev/null
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 @@ -0,0 +1,201 @@
@@ -828,10 +931,10 @@ index 00000000..f426aead
 +})
 diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
 new file mode 100644
-index 00000000..f5df8828
+index 0000000..13590e9
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/default.nix
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,43 @@
 +{
 +  lib,
 +  stdenv,
@@ -839,18 +942,18 @@ index 00000000..f5df8828
 +  cmake,
 +  pkg-config,
 +  qt6,
-+  buildPackages,
++  noUsrShareHook,
 +}:
 +
 +stdenv.mkDerivation (finalAttrs: {
 +  pname = "asteroid-virtualkeyboard";
-+  version = "2.1.0";
++  version = "nightly";
 +
 +  src = fetchFromGitHub {
 +    owner = "AsteroidOS";
 +    repo = "asteroid-virtualkeyboard";
-+    rev = "666743fc42eaa02b9f82155ff3aff3a40e0d45ac";
-+    sha256 = "0yw1xq315p7q7illjpq92cs0060lrw94bfk8ywc7fbrr1gmkmvjf";
++    rev = "319a971216093557e497fbaaa071db1eb47b2c0f";
++    sha256 = "1f8jvd0z5zdfm1pwwk575s01r60n8q1q926715fcr0g55627jlyj";
 +  };
 +
 +  strictDeps = true;
@@ -859,22 +962,13 @@ index 00000000..f5df8828
 +    cmake
 +    pkg-config
 +    qt6.wrapQtAppsHook
++    noUsrShareHook
 +  ];
 +
 +  buildInputs = [
 +    qt6.qtbase
 +    qt6.qtdeclarative
 +    qt6.qtvirtualkeyboard
-+  ];
-+
-+  cmakeFlags = [
-+    "-DCMAKE_INSTALL_LIBDIR=lib"
-+    "-DCMAKE_INSTALL_DATADIR=share"
-+  ]
-+  ++ lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
-+    "-DQt6QuickTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
-+    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
-+    "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
 +  ];
 +
 +  meta = with lib; {

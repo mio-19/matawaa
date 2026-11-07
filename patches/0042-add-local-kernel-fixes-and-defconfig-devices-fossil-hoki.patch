@@ -27,7 +27,7 @@ AsteroidOS meta-smartwatch revision by the kernel derivation.
 
 diff --git a/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch b/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
 new file mode 100644
-index 00000000..cd5c429b
+index 0000000..cd5c429
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
 @@ -0,0 +1,40 @@
@@ -73,7 +73,7 @@ index 00000000..cd5c429b
 +2.34.1
 diff --git a/devices/fossil-hoki/kernel/90_dtbs-install.patch b/devices/fossil-hoki/kernel/90_dtbs-install.patch
 new file mode 100644
-index 00000000..1cd6dc69
+index 0000000..1cd6dc6
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/90_dtbs-install.patch
 @@ -0,0 +1,29 @@
@@ -108,7 +108,7 @@ index 00000000..1cd6dc69
 + 	$(foreach DIR, $(DTSSUBDIR), $(Q)$(MAKE) $(build)=$(boot)/dts/$(DIR) MACHINE=$(MACHINE) dtbs)
 diff --git a/devices/fossil-hoki/kernel/defconfig.patch b/devices/fossil-hoki/kernel/defconfig.patch
 new file mode 100644
-index 00000000..b15a40c2
+index 0000000..b15a40c
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/defconfig.patch
 @@ -0,0 +1,48 @@
@@ -162,7 +162,7 @@ index 00000000..b15a40c2
 + # Random Number Generation
 diff --git a/devices/fossil-hoki/kernel/linux-4.14.214-215.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.214-215.patch.patch
 new file mode 100644
-index 00000000..e87e8c14
+index 0000000..e87e8c1
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/linux-4.14.214-215.patch.patch
 @@ -0,0 +1,148 @@
@@ -316,7 +316,7 @@ index 00000000..e87e8c14
 +  	.bInterval = 4,
 diff --git a/devices/fossil-hoki/kernel/linux-4.14.217-218.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.217-218.patch.patch
 new file mode 100644
-index 00000000..1bf0a89d
+index 0000000..1bf0a89
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/linux-4.14.217-218.patch.patch
 @@ -0,0 +1,669 @@

@@ -12,7 +12,7 @@ rootfs mount.
  1 file changed, 39 insertions(+)
 
 diff --git a/boot/init/tasks/udev.rb b/boot/init/tasks/udev.rb
-index 3d9d98c0..fa99eba2 100644
+index 3d9d98c..fa99eba 100644
 --- a/boot/init/tasks/udev.rb
 +++ b/boot/init/tasks/udev.rb
 @@ -23,6 +23,8 @@ class Tasks::UDev < SingletonTask

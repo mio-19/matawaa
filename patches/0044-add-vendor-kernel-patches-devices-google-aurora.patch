@@ -28,7 +28,7 @@ The kernel patches are kept separate from the device configuration.
 
 diff --git a/devices/google-aurora/kernel/0001-video-fbdev-add-qcom-continuous-splash-framebuffer.patch b/devices/google-aurora/kernel/0001-video-fbdev-add-qcom-continuous-splash-framebuffer.patch
 new file mode 100644
-index 00000000..84eff1bb
+index 0000000..84eff1b
 --- /dev/null
 +++ b/devices/google-aurora/kernel/0001-video-fbdev-add-qcom-continuous-splash-framebuffer.patch
 @@ -0,0 +1,264 @@
@@ -298,7 +298,7 @@ index 00000000..84eff1bb
 +
 diff --git a/devices/google-aurora/kernel/cc-o-c-respfile.patch b/devices/google-aurora/kernel/cc-o-c-respfile.patch
 new file mode 100644
-index 00000000..f017ff4a
+index 0000000..f017ff4
 --- /dev/null
 +++ b/devices/google-aurora/kernel/cc-o-c-respfile.patch
 @@ -0,0 +1,29 @@
@@ -333,7 +333,7 @@ index 00000000..f017ff4a
 + # When module versioning is enabled the following steps are executed:
 diff --git a/devices/google-aurora/kernel/cmd-mod-file-func.patch b/devices/google-aurora/kernel/cmd-mod-file-func.patch
 new file mode 100644
-index 00000000..124bf73b
+index 0000000..124bf73
 --- /dev/null
 +++ b/devices/google-aurora/kernel/cmd-mod-file-func.patch
 @@ -0,0 +1,36 @@
@@ -375,7 +375,7 @@ index 00000000..124bf73b
 + 	$(call if_changed,mod)
 diff --git a/devices/google-aurora/kernel/default.nix b/devices/google-aurora/kernel/default.nix
 new file mode 100644
-index 00000000..50b08bfb
+index 0000000..50b08bf
 --- /dev/null
 +++ b/devices/google-aurora/kernel/default.nix
 @@ -0,0 +1,52 @@
@@ -433,7 +433,7 @@ index 00000000..50b08bfb
 +}
 diff --git a/devices/google-aurora/kernel/eud-secure-fail-nonfatal.patch b/devices/google-aurora/kernel/eud-secure-fail-nonfatal.patch
 new file mode 100644
-index 00000000..d1b2d89a
+index 0000000..d1b2d89
 --- /dev/null
 +++ b/devices/google-aurora/kernel/eud-secure-fail-nonfatal.patch
 @@ -0,0 +1,44 @@
@@ -483,7 +483,7 @@ index 00000000..d1b2d89a
 + 	/* Ensure Register Writes Complete */
 diff --git a/devices/google-aurora/kernel/modfinal-cc-o-c-respfile.patch b/devices/google-aurora/kernel/modfinal-cc-o-c-respfile.patch
 new file mode 100644
-index 00000000..687b01a0
+index 0000000..687b01a
 --- /dev/null
 +++ b/devices/google-aurora/kernel/modfinal-cc-o-c-respfile.patch
 @@ -0,0 +1,36 @@
@@ -525,7 +525,7 @@ index 00000000..687b01a0
 + 	$(call if_changed_dep,cc_o_c)
 diff --git a/devices/google-aurora/kernel/rtc-pm8xxx-read-only.patch b/devices/google-aurora/kernel/rtc-pm8xxx-read-only.patch
 new file mode 100644
-index 00000000..1c5e64a1
+index 0000000..1c5e64a
 --- /dev/null
 +++ b/devices/google-aurora/kernel/rtc-pm8xxx-read-only.patch
 @@ -0,0 +1,42 @@

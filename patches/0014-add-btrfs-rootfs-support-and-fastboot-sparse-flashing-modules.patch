@@ -19,7 +19,7 @@ This patch improves image generation for Android smartwatch targets:
  3 files changed, 86 insertions(+), 10 deletions(-)
 
 diff --git a/boot/init/tasks/auto_resize.rb b/boot/init/tasks/auto_resize.rb
-index 3e7e33e5..8a1677e0 100644
+index 3e7e33e..8a1677e 100644
 --- a/boot/init/tasks/auto_resize.rb
 +++ b/boot/init/tasks/auto_resize.rb
 @@ -49,6 +49,26 @@ class Tasks::AutoResize < Task
@@ -59,7 +59,7 @@ index 3e7e33e5..8a1677e0 100644
        $logger.warn("Cannot resize #{@type}... filesystem left untouched.")
      end
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
-index 595f045d..0af0c136 100644
+index 595f045..0af0c13 100644
 --- a/modules/rootfs.nix
 +++ b/modules/rootfs.nix
 @@ -40,6 +40,8 @@ in
@@ -106,7 +106,7 @@ index 595f045d..0af0c136 100644
    };
  }
 diff --git a/modules/system-types/android/default.nix b/modules/system-types/android/default.nix
-index 5c5639aa..2281e409 100644
+index 5c5639a..2281e40 100644
 --- a/modules/system-types/android/default.nix
 +++ b/modules/system-types/android/default.nix
 @@ -9,7 +9,7 @@ let

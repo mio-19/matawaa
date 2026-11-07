@@ -7,18 +7,18 @@ Add overlay/cross-compile.nix, which fixes package builds for 32-bit
 ARMv7 wearable targets, and overlay/default.nix to compose the base
 Mobile-NixOS overlay with the cross-compilation hooks.
 ---
- overlay/cross-compile.nix | 303 ++++++++++++++++++++++++++++++++++++++
+ overlay/cross-compile.nix | 337 ++++++++++++++++++++++++++++++++++++++
  overlay/default.nix       |   8 +
- 2 files changed, 311 insertions(+)
+ 2 files changed, 345 insertions(+)
  create mode 100644 overlay/cross-compile.nix
  create mode 100644 overlay/default.nix
 
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
 new file mode 100644
-index 00000000..8398b22f
+index 0000000..61a3322
 --- /dev/null
 +++ b/overlay/cross-compile.nix
-@@ -0,0 +1,303 @@
+@@ -0,0 +1,337 @@
 +# Overlays and package workarounds that only make sense during cross-compilation.
 +#
 +# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
@@ -32,7 +32,12 @@ index 00000000..8398b22f
 +    superStdenv != null && superStdenv.buildPlatform.system != superStdenv.hostPlatform.system;
 +in
 +if !isCross then
-+  { }
++  {
++    # Use the same vendored Qt package definitions for host tools as for the
++    # target Qt libraries during cross compilation. Their dependencies and
++    # toolchains still come from the current Nixpkgs package set.
++    qt6 = final.callPackage ./vendor/qt-6.11 { };
++  }
 +else
 +  let
 +    # Pinned revision of AsteroidOS meta-asteroid used as the source for
@@ -89,8 +94,22 @@ index 00000000..8398b22f
 +
 +    # Upstream nixpkgs Qt6 modules skip QtQuick integration during cross-compilation
 +    # because cross Qt6QuickTools, Qt6QmlTools, and Qt6ShaderToolsTools cmake flags are missing.
-+    qt6 = super.qt6.overrideScope (
++    qt6 = (final.callPackage ./vendor/qt-6.11 { }).overrideScope (
 +      qfinal: qsuper: {
++        # Upstream AsteroidOS builds Qt without desktop GL on hybris machines:
++        # meta-asteroid/recipes-qt/qt6/qtbase_git.bbappend does
++        #   PACKAGECONFIG:append = " gles2 "
++        #   PACKAGECONFIG:remove:hybris-machine = " ... gl ... "
++        # i.e. `-opengl es2`. With the nixpkgs default (desktop GL only),
++        # QOpenGLContext::openGLModuleType() returns LibGL, so
++        # QEGLConfigChooser asks for EGL_OPENGL_BIT; the vendor EGL only
++        # exposes ES configs (renderable=0x45 in the egl-probe dump), so
++        # eglChooseConfig() returns no config and eglCreateWindowSurface()
++        # fails with EGL_BAD_CONFIG. `-opengl es2` makes Qt request
++        # EGL_OPENGL_ES2_BIT, which the vendor EGL does provide.
++        qtbase = qsuper.qtbase.overrideAttrs (old: {
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DINPUT_opengl=es2" ];
++        });
 +        qtdeclarative = qsuper.qtdeclarative.overrideAttrs (old: {
 +          cmakeFlags =
 +            (map (
@@ -106,7 +125,22 @@ index 00000000..8398b22f
 +              "-DQt6QuickTools_DIR=${final.pkgsBuildBuild.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
 +            ];
 +        });
-+        qtwayland = addCrossQuickTools qsuper.qtwayland;
++        # Upstream AsteroidOS builds qtwayland's libhybris-egl-server buffer
++        # integration (meta-asteroid recipes-qt/qt6/qtwayland_%.bbappend +
++        # 0001-Fix-libhybris-egl-server-compilation.patch). Qt 6.12 no longer
++        # defines the feature, but it still ships the plugin sources and the
++        # guard is a plain CMake variable, so enable it explicitly and apply
++        # the same upstream patch. Selected at runtime through
++        # QT_WAYLAND_SERVER_BUFFER_INTEGRATION=libhybris-egl-server.
++        qtwayland = (addCrossQuickTools qsuper.qtwayland).overrideAttrs (old: {
++          patches = (old.patches or [ ]) ++ [
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch"
++          ];
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [
++            "-DQT_FEATURE_wayland_libhybris_egl_server_buffer=ON"
++          ];
++          buildInputs = (old.buildInputs or [ ]) ++ [ final.libhybris ];
++        });
 +        qtvirtualkeyboard = addCrossQuickTools qsuper.qtvirtualkeyboard;
 +        qtmultimedia = (addCrossQuickTools qsuper.qtmultimedia).overrideAttrs (old: {
 +          buildInputs = final.lib.filter (
@@ -322,9 +356,10 @@ index 00000000..8398b22f
 +          };
 +        });
 +  }
+\ No newline at end of file
 diff --git a/overlay/default.nix b/overlay/default.nix
 new file mode 100644
-index 00000000..34e60efd
+index 0000000..34e60ef
 --- /dev/null
 +++ b/overlay/default.nix
 @@ -0,0 +1,8 @@
