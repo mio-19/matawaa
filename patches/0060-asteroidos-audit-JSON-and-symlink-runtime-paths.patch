@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 7 Nov 2026 16:13:27 +1100
+Subject: [PATCH] asteroidos: audit JSON and symlink runtime paths
+
+---
+ overlay/asteroidos/lib/no-usr-share-hook.sh | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/overlay/asteroidos/lib/no-usr-share-hook.sh b/overlay/asteroidos/lib/no-usr-share-hook.sh
+index 7188fb40..afbe09c5 100644
+--- a/overlay/asteroidos/lib/no-usr-share-hook.sh
++++ b/overlay/asteroidos/lib/no-usr-share-hook.sh
+@@ -7,16 +7,16 @@ auditNoUsrShare() {
+         for dir in ${usrShareAuditDirs:-bin lib libexec share}; do
+             if [ -d "${!output}/$dir" ]; then
+                 mapfile -d '' files < <(
+-                    find "${!output}/$dir" -type f \
++                    find "${!output}/$dir" \( -type f -o -type l \) \
+                         ! -path '*/share/doc/*' \
+                         ! -path '*/docs/*' \
+                         ! -path '*/tests/*' \
+                         ! -name '*.md' \
+-                        ! -name '*.json' \
+                         -print0
+                 )
+                 for file in "${files[@]}"; do
+-                    if LC_ALL=C grep -aFq '/usr/share' "$file"; then
++                    if { [ -L "$file" ] && [[ $(readlink "$file") == *'/usr/share'* ]]; } || \
++                       { [ -f "$file" ] && LC_ALL=C grep -aFq '/usr/share' "$file"; }; then
+                         echo "Unpatched /usr/share reference: $file" >&2
+                         found=1
+                     fi
