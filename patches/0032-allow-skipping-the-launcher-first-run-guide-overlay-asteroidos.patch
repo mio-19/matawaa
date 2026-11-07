@@ -11,7 +11,7 @@ and setup guide with a visible "Long press to skip" hint and long-press handler.
  1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 6a681bc..34a7fd1 100644
+index 6a681bcf..34a7fd1e 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -39,7 +39,6 @@ stdenv.mkDerivation (finalAttrs: {

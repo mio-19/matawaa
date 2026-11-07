@@ -18,7 +18,7 @@ Add the development-only stage debugging modes:
  5 files changed, 241 insertions(+), 15 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
-index b3a6045..0644044 100644
+index b3a6045b..0644044c 100644
 --- a/boot/init/tasks/switch_root.rb
 +++ b/boot/init/tasks/switch_root.rb
 @@ -383,6 +383,23 @@ class Tasks::SwitchRoot < SingletonTask
@@ -55,7 +55,7 @@ index b3a6045..0644044 100644
  
      Tasks::UDev.instance.teardown()
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index f0f0dec..f1e3d86 100644
+index f0f0decc..f1e3d863 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -1,5 +1,6 @@
@@ -238,7 +238,7 @@ index f0f0dec..f1e3d86 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 05284e2..191ff28 100644
+index ad696be7..5e78a792 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -54,6 +54,10 @@ in
@@ -263,7 +263,7 @@ index 05284e2..191ff28 100644
    };
  
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
-index e5050be..4c9a9b2 100644
+index e5050bea..4c9a9b22 100644
 --- a/modules/hardware-watch.nix
 +++ b/modules/hardware-watch.nix
 @@ -149,6 +149,24 @@ in
@@ -292,7 +292,7 @@ index e5050be..4c9a9b2 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/modules/initrd-ssh.nix b/modules/initrd-ssh.nix
-index db77134..b484299 100644
+index db771346..b4842997 100644
 --- a/modules/initrd-ssh.nix
 +++ b/modules/initrd-ssh.nix
 @@ -1,15 +1,27 @@

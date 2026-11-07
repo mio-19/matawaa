@@ -14,7 +14,7 @@ the watch display stack.
  2 files changed, 36 insertions(+), 23 deletions(-)
 
 diff --git a/overlay/msm-fb-refresher/default.nix b/overlay/msm-fb-refresher/default.nix
-index fec3de7..37ce451 100644
+index fec3de71..37ce451f 100644
 --- a/overlay/msm-fb-refresher/default.nix
 +++ b/overlay/msm-fb-refresher/default.nix
 @@ -1,27 +1,36 @@
@@ -72,7 +72,7 @@ index fec3de7..37ce451 100644
 +  };
  }
 diff --git a/overlay/qrtr/qrtr.nix b/overlay/qrtr/qrtr.nix
-index c4c8cf8..ee05a62 100644
+index c4c8cf84..ee05a620 100644
 --- a/overlay/qrtr/qrtr.nix
 +++ b/overlay/qrtr/qrtr.nix
 @@ -2,21 +2,25 @@

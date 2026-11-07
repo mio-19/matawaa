@@ -26,7 +26,7 @@ bidirectional companion-phone communication:
 
 diff --git a/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch b/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
 new file mode 100644
-index 0000000..a0117d6
+index 00000000..a0117d6c
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
 @@ -0,0 +1,85 @@
@@ -117,7 +117,7 @@ index 0000000..a0117d6
 +     Advertisement advert;
 diff --git a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
 new file mode 100644
-index 0000000..8802310
+index 00000000..8802310f
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
 @@ -0,0 +1,261 @@
@@ -384,7 +384,7 @@ index 0000000..8802310
 +}
 diff --git a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
 new file mode 100644
-index 0000000..d01a4e6
+index 00000000..d01a4e6c
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
 @@ -0,0 +1,86 @@
@@ -476,7 +476,7 @@ index 0000000..d01a4e6
 +#endif // APPBRIDGESERVICE_H
 diff --git a/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh b/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh
 new file mode 100644
-index 0000000..843b716
+index 00000000..843b7162
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh
 @@ -0,0 +1,19 @@
@@ -500,7 +500,7 @@ index 0000000..843b716
 +
 +exec busctl --system call "$DEST" "$OBJECT" "$INTERFACE" sendMessage sss "org.asteroidos.camera" "$ACTION" ""
 diff --git a/overlay/asteroidos/asteroid-btsyncd/default.nix b/overlay/asteroidos/asteroid-btsyncd/default.nix
-index 0cb3257..770dc95 100644
+index 0cb3257c..770dc95b 100644
 --- a/overlay/asteroidos/asteroid-btsyncd/default.nix
 +++ b/overlay/asteroidos/asteroid-btsyncd/default.nix
 @@ -35,8 +35,15 @@ stdenv.mkDerivation (finalAttrs: {
@@ -528,7 +528,7 @@ index 0cb3257..770dc95 100644
    '';
  
 diff --git a/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
-index a856e19..6a5592d 100644
+index a856e19c..6a5592d0 100644
 --- a/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
 +++ b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
 @@ -1,12 +1,15 @@

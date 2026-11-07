@@ -16,7 +16,7 @@ The module is disabled by default so existing devices are unaffected.
 
 diff --git a/modules/fscrypt.nix b/modules/fscrypt.nix
 new file mode 100644
-index 0000000..2f846b6
+index 00000000..2f846b6e
 --- /dev/null
 +++ b/modules/fscrypt.nix
 @@ -0,0 +1,76 @@
@@ -97,7 +97,7 @@ index 0000000..2f846b6
 +  };
 +}
 diff --git a/modules/module-list.nix b/modules/module-list.nix
-index fe4ce59..4006ce8 100644
+index fe4ce596..4006ce88 100644
 --- a/modules/module-list.nix
 +++ b/modules/module-list.nix
 @@ -12,6 +12,7 @@

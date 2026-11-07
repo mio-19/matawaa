@@ -15,7 +15,7 @@ Improve stage-1 udev bring-up on older vendor kernels:
  1 file changed, 25 insertions(+), 2 deletions(-)
 
 diff --git a/boot/init/tasks/udev.rb b/boot/init/tasks/udev.rb
-index ff0f068..3d9d98c 100644
+index ff0f068a..3d9d98c0 100644
 --- a/boot/init/tasks/udev.rb
 +++ b/boot/init/tasks/udev.rb
 @@ -22,14 +22,35 @@ class Tasks::UDev < SingletonTask

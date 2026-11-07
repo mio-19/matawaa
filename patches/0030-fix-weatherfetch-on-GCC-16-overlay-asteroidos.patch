@@ -12,7 +12,7 @@ compile with modern GCC 16 toolchains.
  create mode 100644 overlay/asteroidos/community-apps/weatherfetch-gcc16.patch
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
-index 2bcc118..1c6b5f8 100644
+index 2bcc118b..1c6b5f86 100644
 --- a/overlay/asteroidos/community-apps/default.nix
 +++ b/overlay/asteroidos/community-apps/default.nix
 @@ -133,6 +133,9 @@ rec {
@@ -27,7 +27,7 @@ index 2bcc118..1c6b5f8 100644
      ];
 diff --git a/overlay/asteroidos/community-apps/weatherfetch-gcc16.patch b/overlay/asteroidos/community-apps/weatherfetch-gcc16.patch
 new file mode 100644
-index 0000000..26bb039
+index 00000000..26bb0392
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/weatherfetch-gcc16.patch
 @@ -0,0 +1,11 @@

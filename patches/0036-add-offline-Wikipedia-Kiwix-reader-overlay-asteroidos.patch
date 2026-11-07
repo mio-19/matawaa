@@ -43,7 +43,7 @@ This patch provides an offline Wikipedia / Zim reader for AsteroidOS:
  create mode 100644 overlay/asteroidos/kiwix/src/zimmanager.h
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 064f5c2..d4faeb6 100644
+index 064f5c2b..d4faeb61 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -125,7 +125,7 @@ rec {
@@ -92,7 +92,7 @@ index 064f5c2..d4faeb6 100644
    assets = (callPackage ./assets { }) // {
 diff --git a/overlay/asteroidos/kiwix/CMakeLists.txt b/overlay/asteroidos/kiwix/CMakeLists.txt
 new file mode 100644
-index 0000000..714b9bc
+index 00000000..714b9bc7
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/CMakeLists.txt
 @@ -0,0 +1,58 @@
@@ -156,7 +156,7 @@ index 0000000..714b9bc
 +)
 diff --git a/overlay/asteroidos/kiwix/default.nix b/overlay/asteroidos/kiwix/default.nix
 new file mode 100644
-index 0000000..2581bb4
+index 00000000..2581bb4b
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/default.nix
 @@ -0,0 +1,86 @@
@@ -248,7 +248,7 @@ index 0000000..2581bb4
 +})
 diff --git a/overlay/asteroidos/kiwix/kiwix.svg b/overlay/asteroidos/kiwix/kiwix.svg
 new file mode 100644
-index 0000000..ec2029e
+index 00000000..ec2029ed
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/kiwix.svg
 @@ -0,0 +1,43 @@
@@ -297,7 +297,7 @@ index 0000000..ec2029e
 +</svg>
 diff --git a/overlay/asteroidos/kiwix/org.kiwix.desktop.desktop b/overlay/asteroidos/kiwix/org.kiwix.desktop.desktop
 new file mode 100644
-index 0000000..d977034
+index 00000000..d977034c
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/org.kiwix.desktop.desktop
 @@ -0,0 +1,11 @@
@@ -314,7 +314,7 @@ index 0000000..d977034
 +StartupNotify=true
 diff --git a/overlay/asteroidos/kiwix/src/main.cpp b/overlay/asteroidos/kiwix/src/main.cpp
 new file mode 100644
-index 0000000..dcbaae3
+index 00000000..dcbaae3d
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/main.cpp
 @@ -0,0 +1,43 @@
@@ -363,7 +363,7 @@ index 0000000..dcbaae3
 +}
 diff --git a/overlay/asteroidos/kiwix/src/qml/ArticlePage.qml b/overlay/asteroidos/kiwix/src/qml/ArticlePage.qml
 new file mode 100644
-index 0000000..557a194
+index 00000000..557a1944
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/qml/ArticlePage.qml
 @@ -0,0 +1,125 @@
@@ -494,7 +494,7 @@ index 0000000..557a194
 +}
 diff --git a/overlay/asteroidos/kiwix/src/qml/LibraryPage.qml b/overlay/asteroidos/kiwix/src/qml/LibraryPage.qml
 new file mode 100644
-index 0000000..a322755
+index 00000000..a3227559
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/qml/LibraryPage.qml
 @@ -0,0 +1,169 @@
@@ -669,7 +669,7 @@ index 0000000..a322755
 +}
 diff --git a/overlay/asteroidos/kiwix/src/qml/SearchPage.qml b/overlay/asteroidos/kiwix/src/qml/SearchPage.qml
 new file mode 100644
-index 0000000..a796729
+index 00000000..a7967290
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/qml/SearchPage.qml
 @@ -0,0 +1,167 @@
@@ -842,7 +842,7 @@ index 0000000..a796729
 +}
 diff --git a/overlay/asteroidos/kiwix/src/qml/main.qml b/overlay/asteroidos/kiwix/src/qml/main.qml
 new file mode 100644
-index 0000000..11efbc5
+index 00000000..11efbc50
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/qml/main.qml
 @@ -0,0 +1,39 @@
@@ -887,7 +887,7 @@ index 0000000..11efbc5
 +}
 diff --git a/overlay/asteroidos/kiwix/src/resources.qrc b/overlay/asteroidos/kiwix/src/resources.qrc
 new file mode 100644
-index 0000000..ab59199
+index 00000000..ab591995
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/resources.qrc
 @@ -0,0 +1,8 @@
@@ -901,7 +901,7 @@ index 0000000..ab59199
 +</RCC>
 diff --git a/overlay/asteroidos/kiwix/src/zimimageprovider.cpp b/overlay/asteroidos/kiwix/src/zimimageprovider.cpp
 new file mode 100644
-index 0000000..777b269
+index 00000000..777b2693
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/zimimageprovider.cpp
 @@ -0,0 +1,47 @@
@@ -954,7 +954,7 @@ index 0000000..777b269
 +}
 diff --git a/overlay/asteroidos/kiwix/src/zimimageprovider.h b/overlay/asteroidos/kiwix/src/zimimageprovider.h
 new file mode 100644
-index 0000000..e74f427
+index 00000000..e74f4273
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/zimimageprovider.h
 @@ -0,0 +1,20 @@
@@ -980,7 +980,7 @@ index 0000000..e74f427
 +#endif // ZIMIMAGEPROVIDER_H
 diff --git a/overlay/asteroidos/kiwix/src/zimmanager.cpp b/overlay/asteroidos/kiwix/src/zimmanager.cpp
 new file mode 100644
-index 0000000..b9a7594
+index 00000000..b9a7594f
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/zimmanager.cpp
 @@ -0,0 +1,338 @@
@@ -1324,7 +1324,7 @@ index 0000000..b9a7594
 +}
 diff --git a/overlay/asteroidos/kiwix/src/zimmanager.h b/overlay/asteroidos/kiwix/src/zimmanager.h
 new file mode 100644
-index 0000000..e71914a
+index 00000000..e71914a4
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/src/zimmanager.h
 @@ -0,0 +1,89 @@

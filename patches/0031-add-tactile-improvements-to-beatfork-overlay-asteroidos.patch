@@ -12,7 +12,7 @@ tempo, accented subdivisions, a pulse ring, and haptic feedback.
 
 diff --git a/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch b/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
 new file mode 100644
-index 0000000..3887693
+index 00000000..3887693a
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
 @@ -0,0 +1,449 @@

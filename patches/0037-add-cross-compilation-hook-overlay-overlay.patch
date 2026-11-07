@@ -15,7 +15,7 @@ Mobile-NixOS overlay with the cross-compilation hooks.
 
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
 new file mode 100644
-index 0000000..61a3322
+index 00000000..61a3322e
 --- /dev/null
 +++ b/overlay/cross-compile.nix
 @@ -0,0 +1,337 @@
@@ -359,7 +359,7 @@ index 0000000..61a3322
 \ No newline at end of file
 diff --git a/overlay/default.nix b/overlay/default.nix
 new file mode 100644
-index 0000000..34e60ef
+index 00000000..34e60efd
 --- /dev/null
 +++ b/overlay/default.nix
 @@ -0,0 +1,8 @@

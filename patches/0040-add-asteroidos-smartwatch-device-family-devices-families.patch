@@ -15,7 +15,7 @@ This patch introduces devices/families/asteroidos.nix:
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 new file mode 100644
-index 0000000..4417fb4
+index 00000000..4417fb4b
 --- /dev/null
 +++ b/devices/families/asteroidos.nix
 @@ -0,0 +1,147 @@

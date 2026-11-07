@@ -21,7 +21,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/android-init.nix          | 148 +++++
  devices/fossil-hoki/android-system-data.nix   |  26 +
  devices/fossil-hoki/audio-modules.nix         | 122 +++++
- devices/fossil-hoki/default.nix               | 510 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 509 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  .../hwcomposer-allocation-diagnostics.patch   |  31 ++
  devices/fossil-hoki/hybris-android.nix        |  30 ++
@@ -43,7 +43,7 @@ they cannot hold multi-user.target.
  overlay/asteroidos/default.nix                |   2 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  95 +++-
  .../hwc-present-diagnostics.patch             | 204 +++++++
- 26 files changed, 2522 insertions(+), 72 deletions(-)
+ 26 files changed, 2521 insertions(+), 72 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -70,7 +70,7 @@ they cannot hold multi-user.target.
 
 diff --git a/devices/fossil-firefish/default.nix b/devices/fossil-firefish/default.nix
 new file mode 100644
-index 0000000..b8605a4
+index 00000000..b8605a4c
 --- /dev/null
 +++ b/devices/fossil-firefish/default.nix
 @@ -0,0 +1,56 @@
@@ -132,7 +132,7 @@ index 0000000..b8605a4
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 0000000..e9ba17d
+index 00000000..e9ba17d2
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
 @@ -0,0 +1,148 @@
@@ -286,7 +286,7 @@ index 0000000..e9ba17d
 +}
 diff --git a/devices/fossil-hoki/android-system-data.nix b/devices/fossil-hoki/android-system-data.nix
 new file mode 100644
-index 0000000..36d3b73
+index 00000000..36d3b739
 --- /dev/null
 +++ b/devices/fossil-hoki/android-system-data.nix
 @@ -0,0 +1,26 @@
@@ -318,7 +318,7 @@ index 0000000..36d3b73
 +''
 diff --git a/devices/fossil-hoki/audio-modules.nix b/devices/fossil-hoki/audio-modules.nix
 new file mode 100644
-index 0000000..4bcf187
+index 00000000..4bcf1878
 --- /dev/null
 +++ b/devices/fossil-hoki/audio-modules.nix
 @@ -0,0 +1,122 @@
@@ -446,10 +446,10 @@ index 0000000..4bcf187
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 0000000..05284e2
+index 00000000..ad696be7
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,510 @@
+@@ -0,0 +1,509 @@
 +{
 +  config,
 +  lib,
@@ -788,7 +788,6 @@ index 0000000..05284e2
 +    cp ${pkgs.writeText "20-device.conf" ''
 +      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
 +      QPA_HWC_FORCE_GLES=1
-+      QPA_HWC2_FORCE_DOZE_UPDATE=1
 +      QT_OPENGL_NO_BGRA=1
 +      ${lib.optionalString debugBuild ''
 +        QT_DEBUG_PLUGINS=1
@@ -962,7 +961,7 @@ index 0000000..05284e2
 +}
 diff --git a/devices/fossil-hoki/gps_xtra.ini b/devices/fossil-hoki/gps_xtra.ini
 new file mode 100644
-index 0000000..594fc6c
+index 00000000..594fc6c1
 --- /dev/null
 +++ b/devices/fossil-hoki/gps_xtra.ini
 @@ -0,0 +1,2 @@
@@ -970,7 +969,7 @@ index 0000000..594fc6c
 +NTP_FORCE_INJECT=true
 diff --git a/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch b/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
 new file mode 100644
-index 0000000..cb9ddd4
+index 00000000..cb9ddd4b
 --- /dev/null
 +++ b/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
 @@ -0,0 +1,31 @@
@@ -1007,7 +1006,7 @@ index 0000000..cb9ddd4
 +         width, height, stride, format, usage, strerror(-status), this);
 diff --git a/devices/fossil-hoki/hybris-android.nix b/devices/fossil-hoki/hybris-android.nix
 new file mode 100644
-index 0000000..49b976f
+index 00000000..49b976fc
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris-android.nix
 @@ -0,0 +1,30 @@
@@ -1043,7 +1042,7 @@ index 0000000..49b976f
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 0000000..6c9f662
+index 00000000..6c9f6620
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
 @@ -0,0 +1,47 @@
@@ -1096,7 +1095,7 @@ index 0000000..6c9f662
 +}
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
-index 0000000..931bf40
+index 00000000..931bf401
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/default.nix
 @@ -0,0 +1,342 @@
@@ -1444,7 +1443,7 @@ index 0000000..931bf40
 +}
 diff --git a/devices/fossil-hoki/kernel/linux-4.14.206-207.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.206-207.patch.patch
 new file mode 100644
-index 0000000..c8fb0ed
+index 00000000..c8fb0ed8
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/linux-4.14.206-207.patch.patch
 @@ -0,0 +1,228 @@
@@ -1678,7 +1677,7 @@ index 0000000..c8fb0ed
 +  				  dst_metric(dst, RTAX_INITRWND));
 diff --git a/devices/fossil-hoki/kernel/linux-4.14.209-210.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.209-210.patch.patch
 new file mode 100644
-index 0000000..f7be7ed
+index 00000000..f7be7ed5
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/linux-4.14.209-210.patch.patch
 @@ -0,0 +1,28 @@
@@ -1712,7 +1711,7 @@ index 0000000..f7be7ed
 + --- a/drivers/target/iscsi/iscsi_target.c
 diff --git a/devices/fossil-hoki/kernel/linux-4.14.211-212.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.211-212.patch.patch
 new file mode 100644
-index 0000000..6e5dee4
+index 00000000..6e5dee43
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/linux-4.14.211-212.patch.patch
 @@ -0,0 +1,152 @@
@@ -1870,7 +1869,7 @@ index 0000000..6e5dee4
 + --- a/drivers/usb/serial/ch341.c
 diff --git a/devices/fossil-hoki/kernel/linux-4.14.212-213.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.212-213.patch.patch
 new file mode 100644
-index 0000000..c0688d2
+index 00000000..c0688d26
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/linux-4.14.212-213.patch.patch
 @@ -0,0 +1,99 @@
@@ -1975,7 +1974,7 @@ index 0000000..c0688d2
 + --- a/drivers/usb/gadget/function/f_midi.c
 diff --git a/devices/fossil-hoki/kernel/linux-4.14.213-214.patch.patch b/devices/fossil-hoki/kernel/linux-4.14.213-214.patch.patch
 new file mode 100644
-index 0000000..3a081d6
+index 00000000..3a081d63
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/linux-4.14.213-214.patch.patch
 @@ -0,0 +1,40 @@
@@ -2021,7 +2020,7 @@ index 0000000..3a081d6
 + +++ b/drivers/md/raid10.c
 diff --git a/devices/fossil-hoki/wlan-firmware-hoki.sh b/devices/fossil-hoki/wlan-firmware-hoki.sh
 new file mode 100644
-index 0000000..f1682bd
+index 00000000..f1682bdf
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan-firmware-hoki.sh
 @@ -0,0 +1,30 @@
@@ -2057,7 +2056,7 @@ index 0000000..f1682bd
 +modprobe wlan
 diff --git a/devices/fossil-hoki/wlan.nix b/devices/fossil-hoki/wlan.nix
 new file mode 100644
-index 0000000..18d0533
+index 00000000..18d05338
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan.nix
 @@ -0,0 +1,112 @@
@@ -2175,7 +2174,7 @@ index 0000000..18d0533
 +}
 diff --git a/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch b/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
 new file mode 100644
-index 0000000..05d22dd
+index 00000000..05d22dda
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
 @@ -0,0 +1,30 @@
@@ -2211,7 +2210,7 @@ index 0000000..05d22dd
 +2.51.1
 diff --git a/devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch b/devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
 new file mode 100644
-index 0000000..19a90d4
+index 00000000..19a90d46
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
 @@ -0,0 +1,25 @@
@@ -2242,7 +2241,7 @@ index 0000000..19a90d4
 +2.51.1
 diff --git a/devices/fossil-hoki/wlan/wakelock.h b/devices/fossil-hoki/wlan/wakelock.h
 new file mode 100644
-index 0000000..02faafd
+index 00000000..02faafd6
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan/wakelock.h
 @@ -0,0 +1,3 @@
@@ -2251,7 +2250,7 @@ index 0000000..02faafd
 + * See https://github.com/AsteroidOS/meta-smartwatch/issues/224 */
 diff --git a/devices/fossil-ray/default.nix b/devices/fossil-ray/default.nix
 new file mode 100644
-index 0000000..1aa4a56
+index 00000000..1aa4a568
 --- /dev/null
 +++ b/devices/fossil-ray/default.nix
 @@ -0,0 +1,56 @@
@@ -2313,7 +2312,7 @@ index 0000000..1aa4a56
 +}
 diff --git a/devices/fossil-triggerfish/default.nix b/devices/fossil-triggerfish/default.nix
 new file mode 100644
-index 0000000..b29f7d7
+index 00000000..b29f7d73
 --- /dev/null
 +++ b/devices/fossil-triggerfish/default.nix
 @@ -0,0 +1,56 @@
@@ -2374,7 +2373,7 @@ index 0000000..b29f7d7
 +  ];
 +}
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
-index 6c49de0..246aca4 100644
+index 6c49de0b..246aca44 100644
 --- a/modules/rootfs.nix
 +++ b/modules/rootfs.nix
 @@ -1,9 +1,19 @@
@@ -2531,7 +2530,7 @@ index 6c49de0..246aca4 100644
                "space_cache=v2"
              ]
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index d4faeb6..775c9f7 100644
+index d4faeb61..775c9f72 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -22,10 +22,10 @@ rec {
@@ -2547,7 +2546,7 @@ index d4faeb6..775c9f7 100644
    };
  
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-index f426aea..8aebcdd 100644
+index f426aead..8aebcdd9 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 @@ -9,24 +9,17 @@
@@ -2708,7 +2707,7 @@ index f426aea..8aebcdd 100644
    meta = with lib; {
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
 new file mode 100644
-index 0000000..fb5f9bd
+index 00000000..fb5f9bd6
 --- /dev/null
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
 @@ -0,0 +1,204 @@

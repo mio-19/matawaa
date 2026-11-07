@@ -40,7 +40,7 @@ kept separate from the device configuration.
 
 diff --git a/devices/google-aurora/boot/aurora-post-rootfs.conf b/devices/google-aurora/boot/aurora-post-rootfs.conf
 new file mode 100644
-index 0000000..c22fab4
+index 00000000..c22fab40
 --- /dev/null
 +++ b/devices/google-aurora/boot/aurora-post-rootfs.conf
 @@ -0,0 +1,48 @@
@@ -94,7 +94,7 @@ index 0000000..c22fab4
 +hci_vhci
 diff --git a/devices/google-aurora/boot/aurora-vkb-assemble.py b/devices/google-aurora/boot/aurora-vkb-assemble.py
 new file mode 100755
-index 0000000..cefa669
+index 00000000..cefa669a
 --- /dev/null
 +++ b/devices/google-aurora/boot/aurora-vkb-assemble.py
 @@ -0,0 +1,280 @@
@@ -380,7 +380,7 @@ index 0000000..cefa669
 +    main()
 diff --git a/devices/google-aurora/boot/aurora-vkb-modules.lst b/devices/google-aurora/boot/aurora-vkb-modules.lst
 new file mode 100644
-index 0000000..404336e
+index 00000000..404336ee
 --- /dev/null
 +++ b/devices/google-aurora/boot/aurora-vkb-modules.lst
 @@ -0,0 +1,327 @@
@@ -713,7 +713,7 @@ index 0000000..404336e
 +@dep snd-soc-cs40l26.ko: input-cs40l26-i2c.ko cl_dsp.ko cl_dsp-debugfs.ko
 diff --git a/devices/google-aurora/boot/default.nix b/devices/google-aurora/boot/default.nix
 new file mode 100644
-index 0000000..43c39db
+index 00000000..43c39dbd
 --- /dev/null
 +++ b/devices/google-aurora/boot/default.nix
 @@ -0,0 +1,148 @@
@@ -867,7 +867,7 @@ index 0000000..43c39db
 +}
 diff --git a/devices/google-aurora/boot/google-extcon-usb-shim.conf b/devices/google-aurora/boot/google-extcon-usb-shim.conf
 new file mode 100644
-index 0000000..190e088
+index 00000000..190e088d
 --- /dev/null
 +++ b/devices/google-aurora/boot/google-extcon-usb-shim.conf
 @@ -0,0 +1,5 @@
@@ -878,7 +878,7 @@ index 0000000..190e088
 +options google-extcon-usb-shim usb_force_disable_boot=0
 diff --git a/devices/google-aurora/boot/modules.load.aurora b/devices/google-aurora/boot/modules.load.aurora
 new file mode 100644
-index 0000000..248ae86
+index 00000000..248ae862
 --- /dev/null
 +++ b/devices/google-aurora/boot/modules.load.aurora
 @@ -0,0 +1,116 @@
@@ -1000,7 +1000,7 @@ index 0000000..248ae86
 +snd-soc-cs40l26.ko
 diff --git a/devices/google-aurora/boot/static/modules.alias b/devices/google-aurora/boot/static/modules.alias
 new file mode 100644
-index 0000000..ea752b9
+index 00000000..ea752b9e
 --- /dev/null
 +++ b/devices/google-aurora/boot/static/modules.alias
 @@ -0,0 +1,405 @@
@@ -1411,7 +1411,7 @@ index 0000000..ea752b9
 +alias of:N*T*Cqcom,spmi-pmic-arbC* spmi_pmic_arb
 diff --git a/devices/google-aurora/boot/static/modules.dep b/devices/google-aurora/boot/static/modules.dep
 new file mode 100644
-index 0000000..02a27d8
+index 00000000..02a27d84
 --- /dev/null
 +++ b/devices/google-aurora/boot/static/modules.dep
 @@ -0,0 +1,96 @@
@@ -1513,7 +1513,7 @@ index 0000000..02a27d8
 +/lib/modules/spmi-pmic-arb.ko:
 diff --git a/devices/google-aurora/boot/static/modules.load.charger b/devices/google-aurora/boot/static/modules.load.charger
 new file mode 100644
-index 0000000..b491393
+index 00000000..b4913932
 --- /dev/null
 +++ b/devices/google-aurora/boot/static/modules.load.charger
 @@ -0,0 +1,87 @@
@@ -1606,7 +1606,7 @@ index 0000000..b491393
 +nanohub.ko
 diff --git a/devices/google-aurora/boot/static/modules.softdep b/devices/google-aurora/boot/static/modules.softdep
 new file mode 100644
-index 0000000..b74b60f
+index 00000000..b74b60f7
 --- /dev/null
 +++ b/devices/google-aurora/boot/static/modules.softdep
 @@ -0,0 +1,5 @@
@@ -1617,7 +1617,7 @@ index 0000000..b74b60f
 +softdep pinctrl_msm pre: qcom-pdc
 diff --git a/devices/google-aurora/boot/static/vkb-base.dtb.base64 b/devices/google-aurora/boot/static/vkb-base.dtb.base64
 new file mode 100644
-index 0000000..d85b0b2
+index 00000000..d85b0b2a
 --- /dev/null
 +++ b/devices/google-aurora/boot/static/vkb-base.dtb.base64
 @@ -0,0 +1,8299 @@

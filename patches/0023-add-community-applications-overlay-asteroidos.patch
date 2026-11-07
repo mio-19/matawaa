@@ -15,7 +15,7 @@ toolwatch, and touchdown.
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
 new file mode 100644
-index 0000000..9ef2532
+index 00000000..9ef25322
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/default.nix
 @@ -0,0 +1,378 @@
@@ -398,7 +398,7 @@ index 0000000..9ef2532
 +  };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 0784d4b..d04f4f3 100644
+index 0784d4bb..d04f4f34 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -134,5 +134,10 @@ rec {

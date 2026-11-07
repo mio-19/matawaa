@@ -10,7 +10,7 @@ Make the stage-1 error screen responsive to the configured display geometry so t
  2 files changed, 63 insertions(+), 23 deletions(-)
 
 diff --git a/boot/error/lib/shaded_text.rb b/boot/error/lib/shaded_text.rb
-index ee7ecd6..bbb4317 100644
+index ee7ecd69..bbb43174 100644
 --- a/boot/error/lib/shaded_text.rb
 +++ b/boot/error/lib/shaded_text.rb
 @@ -2,16 +2,27 @@
@@ -49,7 +49,7 @@ index ee7ecd6..bbb4317 100644
      # Ensures the position is reset at least once, to sync-up the shade.
      set_pos(0, 0)
 diff --git a/boot/error/main.rb b/boot/error/main.rb
-index e033ae0..487a45d 100644
+index e033ae02..487a45d4 100644
 --- a/boot/error/main.rb
 +++ b/boot/error/main.rb
 @@ -43,9 +43,12 @@ class UI

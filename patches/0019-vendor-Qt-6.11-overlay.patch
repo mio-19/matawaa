@@ -148,7 +148,7 @@ Subject: [PATCH] vendor Qt 6.11 overlay
 
 diff --git a/overlay/vendor/qt-6.11/README.md b/overlay/vendor/qt-6.11/README.md
 new file mode 100644
-index 0000000..f9b7b01
+index 00000000..f9b7b01f
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/README.md
 @@ -0,0 +1,14 @@
@@ -168,7 +168,7 @@ index 0000000..f9b7b01
 +license text.
 diff --git a/overlay/vendor/qt-6.11/default.nix b/overlay/vendor/qt-6.11/default.nix
 new file mode 100644
-index 0000000..e8a7c28
+index 00000000..e8a7c285
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/default.nix
 @@ -0,0 +1,160 @@
@@ -334,14 +334,14 @@ index 0000000..e8a7c28
 +baseScope
 diff --git a/overlay/vendor/qt-6.11/fetch.sh b/overlay/vendor/qt-6.11/fetch.sh
 new file mode 100644
-index 0000000..d2c0f3a
+index 00000000..d2c0f3a1
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/fetch.sh
 @@ -0,0 +1 @@
 +WGET_ARGS=( https://download.qt.io/official_releases/qt/6.11/6.11.3/submodules/ -A '*.tar.xz' )
 diff --git a/overlay/vendor/qt-6.11/hooks/fix-qmake-libtool.sh b/overlay/vendor/qt-6.11/hooks/fix-qmake-libtool.sh
 new file mode 100644
-index 0000000..44bf10a
+index 00000000..44bf10a0
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/hooks/fix-qmake-libtool.sh
 @@ -0,0 +1,25 @@
@@ -372,7 +372,7 @@ index 0000000..44bf10a
 +fixupOutputHooks+=('fixQmakeLibtool $prefix')
 diff --git a/overlay/vendor/qt-6.11/hooks/fix-qt-builtin-paths.sh b/overlay/vendor/qt-6.11/hooks/fix-qt-builtin-paths.sh
 new file mode 100644
-index 0000000..d6f8ab3
+index 00000000..d6f8ab32
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/hooks/fix-qt-builtin-paths.sh
 @@ -0,0 +1,63 @@
@@ -441,7 +441,7 @@ index 0000000..d6f8ab3
 +}
 diff --git a/overlay/vendor/qt-6.11/hooks/fix-qt-module-paths.sh b/overlay/vendor/qt-6.11/hooks/fix-qt-module-paths.sh
 new file mode 100644
-index 0000000..4884f45
+index 00000000..4884f45b
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/hooks/fix-qt-module-paths.sh
 @@ -0,0 +1,27 @@
@@ -474,7 +474,7 @@ index 0000000..4884f45
 +}
 diff --git a/overlay/vendor/qt-6.11/hooks/qmake-hook.sh b/overlay/vendor/qt-6.11/hooks/qmake-hook.sh
 new file mode 100644
-index 0000000..1f696be
+index 00000000..1f696be3
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/hooks/qmake-hook.sh
 @@ -0,0 +1,43 @@
@@ -523,7 +523,7 @@ index 0000000..1f696be
 +fi
 diff --git a/overlay/vendor/qt-6.11/hooks/qtbase-setup-hook.sh b/overlay/vendor/qt-6.11/hooks/qtbase-setup-hook.sh
 new file mode 100644
-index 0000000..0001231
+index 00000000..0001231d
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/hooks/qtbase-setup-hook.sh
 @@ -0,0 +1,102 @@
@@ -631,7 +631,7 @@ index 0000000..0001231
 +fi
 diff --git a/overlay/vendor/qt-6.11/hooks/wrap-qt-apps-hook.sh b/overlay/vendor/qt-6.11/hooks/wrap-qt-apps-hook.sh
 new file mode 100644
-index 0000000..18056b9
+index 00000000..18056b9d
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/hooks/wrap-qt-apps-hook.sh
 @@ -0,0 +1,110 @@
@@ -747,7 +747,7 @@ index 0000000..18056b9
 +fi
 diff --git a/overlay/vendor/qt-6.11/modules/qt3d.nix b/overlay/vendor/qt-6.11/modules/qt3d.nix
 new file mode 100644
-index 0000000..8963b75
+index 00000000..8963b75a
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qt3d.nix
 @@ -0,0 +1,31 @@
@@ -784,7 +784,7 @@ index 0000000..8963b75
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qt5compat.nix b/overlay/vendor/qt-6.11/modules/qt5compat.nix
 new file mode 100644
-index 0000000..333f66e
+index 00000000..333f66e1
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qt5compat.nix
 @@ -0,0 +1,21 @@
@@ -811,7 +811,7 @@ index 0000000..333f66e
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/allow-translations-outside-prefix.patch b/overlay/vendor/qt-6.11/modules/qtbase/allow-translations-outside-prefix.patch
 new file mode 100644
-index 0000000..35e7845
+index 00000000..35e78451
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/allow-translations-outside-prefix.patch
 @@ -0,0 +1,11 @@
@@ -828,7 +828,7 @@ index 0000000..35e7845
 +         endif()
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/default.nix b/overlay/vendor/qt-6.11/modules/qtbase/default.nix
 new file mode 100644
-index 0000000..3930aec
+index 00000000..3930aec2
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/default.nix
 @@ -0,0 +1,392 @@
@@ -1226,7 +1226,7 @@ index 0000000..3930aec
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/derive-plugin-load-path-from-PATH.patch b/overlay/vendor/qt-6.11/modules/qtbase/derive-plugin-load-path-from-PATH.patch
 new file mode 100644
-index 0000000..447d012
+index 00000000..447d0125
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/derive-plugin-load-path-from-PATH.patch
 @@ -0,0 +1,18 @@
@@ -1250,7 +1250,7 @@ index 0000000..447d012
 +         if (self) self->d_func()->appendApplicationPathToLibraryPaths();
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/find-qmlimportscanner.patch b/overlay/vendor/qt-6.11/modules/qtbase/find-qmlimportscanner.patch
 new file mode 100644
-index 0000000..bde2c94
+index 00000000..bde2c940
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/find-qmlimportscanner.patch
 @@ -0,0 +1,13 @@
@@ -1269,7 +1269,7 @@ index 0000000..bde2c94
 +         LogError() << "qmlimportscanner not found at" << qmlImportScannerPath;
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/no-sbom.patch b/overlay/vendor/qt-6.11/modules/qtbase/no-sbom.patch
 new file mode 100644
-index 0000000..bed920d
+index 00000000..bed920da
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/no-sbom.patch
 @@ -0,0 +1,13 @@
@@ -1288,7 +1288,7 @@ index 0000000..bed920d
 +     # Toggle for SPDX V2.3 generation.
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/qmake-always-use-libname.patch b/overlay/vendor/qt-6.11/modules/qtbase/qmake-always-use-libname.patch
 new file mode 100644
-index 0000000..d1d91c3
+index 00000000..d1d91c39
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/qmake-always-use-libname.patch
 @@ -0,0 +1,28 @@
@@ -1322,7 +1322,7 @@ index 0000000..d1d91c3
 +         else()
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/qmake-fix-includedir.patch b/overlay/vendor/qt-6.11/modules/qtbase/qmake-fix-includedir.patch
 new file mode 100644
-index 0000000..3cb9a9c
+index 00000000..3cb9a9ce
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/qmake-fix-includedir.patch
 @@ -0,0 +1,12 @@
@@ -1340,7 +1340,7 @@ index 0000000..3cb9a9c
 +             t << " -F${libdir}";
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/qmlimportscanner-import-path.patch b/overlay/vendor/qt-6.11/modules/qtbase/qmlimportscanner-import-path.patch
 new file mode 100644
-index 0000000..e99dd5a
+index 00000000..e99dd5a9
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/qmlimportscanner-import-path.patch
 @@ -0,0 +1,16 @@
@@ -1362,7 +1362,7 @@ index 0000000..e99dd5a
 +     qmlImportScanner.start(qmlImportScannerPath, argumentList);
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/skip-missing-qml-directory.patch b/overlay/vendor/qt-6.11/modules/qtbase/skip-missing-qml-directory.patch
 new file mode 100644
-index 0000000..bb6257c
+index 00000000..bb6257ca
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/skip-missing-qml-directory.patch
 @@ -0,0 +1,17 @@
@@ -1385,7 +1385,7 @@ index 0000000..bb6257c
 +     // read the paths from the environment, as they are spread in multiple
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-from-path.patch b/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-from-path.patch
 new file mode 100644
-index 0000000..f439bf5
+index 00000000..f439bf5d
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-from-path.patch
 @@ -0,0 +1,34 @@
@@ -1425,7 +1425,7 @@ index 0000000..f439bf5
 + 
 diff --git a/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-path.patch b/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-path.patch
 new file mode 100644
-index 0000000..4f5b48f
+index 00000000..4f5b48f1
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtbase/use-cmake-path.patch
 @@ -0,0 +1,60 @@
@@ -1491,7 +1491,7 @@ index 0000000..4f5b48f
 +                 list(APPEND __qt_${target}_missing_deps "${__qt_${target}_pkg}")
 diff --git a/overlay/vendor/qt-6.11/modules/qtcharts.nix b/overlay/vendor/qt-6.11/modules/qtcharts.nix
 new file mode 100644
-index 0000000..8701933
+index 00000000..8701933d
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtcharts.nix
 @@ -0,0 +1,13 @@
@@ -1510,7 +1510,7 @@ index 0000000..8701933
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtconnectivity.nix b/overlay/vendor/qt-6.11/modules/qtconnectivity.nix
 new file mode 100644
-index 0000000..d0f2284
+index 00000000..d0f22841
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtconnectivity.nix
 @@ -0,0 +1,23 @@
@@ -1539,7 +1539,7 @@ index 0000000..d0f2284
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtdatavis3d.nix b/overlay/vendor/qt-6.11/modules/qtdatavis3d.nix
 new file mode 100644
-index 0000000..4e3eca8
+index 00000000..4e3eca80
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtdatavis3d.nix
 @@ -0,0 +1,13 @@
@@ -1558,7 +1558,7 @@ index 0000000..4e3eca8
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtdeclarative/default.nix b/overlay/vendor/qt-6.11/modules/qtdeclarative/default.nix
 new file mode 100644
-index 0000000..786229c
+index 00000000..786229c5
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtdeclarative/default.nix
 @@ -0,0 +1,62 @@
@@ -1626,7 +1626,7 @@ index 0000000..786229c
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtdeclarative/dont-cache-nix-store-paths.patch b/overlay/vendor/qt-6.11/modules/qtdeclarative/dont-cache-nix-store-paths.patch
 new file mode 100644
-index 0000000..ef5d108
+index 00000000..ef5d108d
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtdeclarative/dont-cache-nix-store-paths.patch
 @@ -0,0 +1,17 @@
@@ -1649,7 +1649,7 @@ index 0000000..ef5d108
 +                 const QString cachePath = localCacheFilePath(unitUrl);
 diff --git a/overlay/vendor/qt-6.11/modules/qtdeclarative/use-versioned-import-path.patch b/overlay/vendor/qt-6.11/modules/qtdeclarative/use-versioned-import-path.patch
 new file mode 100644
-index 0000000..6de31fa
+index 00000000..6de31fae
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtdeclarative/use-versioned-import-path.patch
 @@ -0,0 +1,14 @@
@@ -1669,7 +1669,7 @@ index 0000000..6de31fa
 + 
 diff --git a/overlay/vendor/qt-6.11/modules/qtdoc.nix b/overlay/vendor/qt-6.11/modules/qtdoc.nix
 new file mode 100644
-index 0000000..5e35b4b
+index 00000000..5e35b4b5
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtdoc.nix
 @@ -0,0 +1,22 @@
@@ -1697,7 +1697,7 @@ index 0000000..5e35b4b
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtgraphs.nix b/overlay/vendor/qt-6.11/modules/qtgraphs.nix
 new file mode 100644
-index 0000000..5de167c
+index 00000000..5de167cc
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtgraphs.nix
 @@ -0,0 +1,17 @@
@@ -1720,7 +1720,7 @@ index 0000000..5de167c
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtgrpc.nix b/overlay/vendor/qt-6.11/modules/qtgrpc.nix
 new file mode 100644
-index 0000000..28092b2
+index 00000000..28092b27
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtgrpc.nix
 @@ -0,0 +1,20 @@
@@ -1746,7 +1746,7 @@ index 0000000..28092b2
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qthttpserver.nix b/overlay/vendor/qt-6.11/modules/qthttpserver.nix
 new file mode 100644
-index 0000000..8a1f85d
+index 00000000..8a1f85d1
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qthttpserver.nix
 @@ -0,0 +1,13 @@
@@ -1765,7 +1765,7 @@ index 0000000..8a1f85d
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtimageformats.nix b/overlay/vendor/qt-6.11/modules/qtimageformats.nix
 new file mode 100644
-index 0000000..e5977e2
+index 00000000..e5977e22
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtimageformats.nix
 @@ -0,0 +1,19 @@
@@ -1790,7 +1790,7 @@ index 0000000..e5977e2
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtlanguageserver.nix b/overlay/vendor/qt-6.11/modules/qtlanguageserver.nix
 new file mode 100644
-index 0000000..74596e5
+index 00000000..74596e53
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtlanguageserver.nix
 @@ -0,0 +1,12 @@
@@ -1808,7 +1808,7 @@ index 0000000..74596e5
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtlocation.nix b/overlay/vendor/qt-6.11/modules/qtlocation.nix
 new file mode 100644
-index 0000000..120b05b
+index 00000000..120b05b0
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtlocation.nix
 @@ -0,0 +1,15 @@
@@ -1829,7 +1829,7 @@ index 0000000..120b05b
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtlottie.nix b/overlay/vendor/qt-6.11/modules/qtlottie.nix
 new file mode 100644
-index 0000000..c1cefda
+index 00000000..c1cefda1
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtlottie.nix
 @@ -0,0 +1,13 @@
@@ -1848,7 +1848,7 @@ index 0000000..c1cefda
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtmqtt.nix b/overlay/vendor/qt-6.11/modules/qtmqtt.nix
 new file mode 100644
-index 0000000..b5e6c6b
+index 00000000..b5e6c6bc
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtmqtt.nix
 @@ -0,0 +1,19 @@
@@ -1873,7 +1873,7 @@ index 0000000..b5e6c6b
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtmultimedia/default.nix b/overlay/vendor/qt-6.11/modules/qtmultimedia/default.nix
 new file mode 100644
-index 0000000..50829d0
+index 00000000..50829d0b
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtmultimedia/default.nix
 @@ -0,0 +1,77 @@
@@ -1956,7 +1956,7 @@ index 0000000..50829d0
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-no-uppercase-libs.patch b/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-no-uppercase-libs.patch
 new file mode 100644
-index 0000000..06cead7
+index 00000000..06cead73
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-no-uppercase-libs.patch
 @@ -0,0 +1,11 @@
@@ -1973,7 +1973,7 @@ index 0000000..06cead7
 + #include <system_error>
 diff --git a/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-resolve-function-name.patch b/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-resolve-function-name.patch
 new file mode 100644
-index 0000000..56482b3
+index 00000000..56482b30
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtmultimedia/windows-resolve-function-name.patch
 @@ -0,0 +1,28 @@
@@ -2007,7 +2007,7 @@ index 0000000..56482b3
 + 
 diff --git a/overlay/vendor/qt-6.11/modules/qtnetworkauth.nix b/overlay/vendor/qt-6.11/modules/qtnetworkauth.nix
 new file mode 100644
-index 0000000..bec5f35
+index 00000000..bec5f354
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtnetworkauth.nix
 @@ -0,0 +1,6 @@
@@ -2019,7 +2019,7 @@ index 0000000..bec5f35
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtpositioning.nix b/overlay/vendor/qt-6.11/modules/qtpositioning.nix
 new file mode 100644
-index 0000000..f0f8a3f
+index 00000000..f0f8a3f5
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtpositioning.nix
 @@ -0,0 +1,19 @@
@@ -2044,7 +2044,7 @@ index 0000000..f0f8a3f
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtquick3d.nix b/overlay/vendor/qt-6.11/modules/qtquick3d.nix
 new file mode 100644
-index 0000000..40b95df
+index 00000000..40b95dfb
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtquick3d.nix
 @@ -0,0 +1,15 @@
@@ -2065,7 +2065,7 @@ index 0000000..40b95df
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtquick3dphysics.nix b/overlay/vendor/qt-6.11/modules/qtquick3dphysics.nix
 new file mode 100644
-index 0000000..b49c286
+index 00000000..b49c286f
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtquick3dphysics.nix
 @@ -0,0 +1,16 @@
@@ -2087,7 +2087,7 @@ index 0000000..b49c286
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtquickeffectmaker.nix b/overlay/vendor/qt-6.11/modules/qtquickeffectmaker.nix
 new file mode 100644
-index 0000000..f71c891
+index 00000000..f71c891e
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtquickeffectmaker.nix
 @@ -0,0 +1,14 @@
@@ -2107,7 +2107,7 @@ index 0000000..f71c891
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtquicktimeline.nix b/overlay/vendor/qt-6.11/modules/qtquicktimeline.nix
 new file mode 100644
-index 0000000..59c774b
+index 00000000..59c774b9
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtquicktimeline.nix
 @@ -0,0 +1,13 @@
@@ -2126,7 +2126,7 @@ index 0000000..59c774b
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtremoteobjects.nix b/overlay/vendor/qt-6.11/modules/qtremoteobjects.nix
 new file mode 100644
-index 0000000..42ad13e
+index 00000000..42ad13e3
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtremoteobjects.nix
 @@ -0,0 +1,13 @@
@@ -2145,7 +2145,7 @@ index 0000000..42ad13e
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtscxml.nix b/overlay/vendor/qt-6.11/modules/qtscxml.nix
 new file mode 100644
-index 0000000..a0a821a
+index 00000000..a0a821a3
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtscxml.nix
 @@ -0,0 +1,13 @@
@@ -2164,7 +2164,7 @@ index 0000000..a0a821a
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtsensors.nix b/overlay/vendor/qt-6.11/modules/qtsensors.nix
 new file mode 100644
-index 0000000..888136e
+index 00000000..888136e3
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtsensors.nix
 @@ -0,0 +1,15 @@
@@ -2185,7 +2185,7 @@ index 0000000..888136e
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtserialbus.nix b/overlay/vendor/qt-6.11/modules/qtserialbus.nix
 new file mode 100644
-index 0000000..5276b2e
+index 00000000..5276b2e5
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtserialbus.nix
 @@ -0,0 +1,14 @@
@@ -2205,7 +2205,7 @@ index 0000000..5276b2e
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtserialport.nix b/overlay/vendor/qt-6.11/modules/qtserialport.nix
 new file mode 100644
-index 0000000..74b647c
+index 00000000..74b647c6
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtserialport.nix
 @@ -0,0 +1,14 @@
@@ -2225,7 +2225,7 @@ index 0000000..74b647c
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtshadertools.nix b/overlay/vendor/qt-6.11/modules/qtshadertools.nix
 new file mode 100644
-index 0000000..0d8c811
+index 00000000..0d8c8111
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtshadertools.nix
 @@ -0,0 +1,16 @@
@@ -2247,7 +2247,7 @@ index 0000000..0d8c811
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtspeech.nix b/overlay/vendor/qt-6.11/modules/qtspeech.nix
 new file mode 100644
-index 0000000..4867bca
+index 00000000..4867bcaf
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtspeech.nix
 @@ -0,0 +1,25 @@
@@ -2278,7 +2278,7 @@ index 0000000..4867bca
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtsvg.nix b/overlay/vendor/qt-6.11/modules/qtsvg.nix
 new file mode 100644
-index 0000000..5937c0c
+index 00000000..5937c0c7
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtsvg.nix
 @@ -0,0 +1,27 @@
@@ -2311,7 +2311,7 @@ index 0000000..5937c0c
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qttools/default.nix b/overlay/vendor/qt-6.11/modules/qttools/default.nix
 new file mode 100644
-index 0000000..c81cb2a
+index 00000000..c81cb2ac
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qttools/default.nix
 @@ -0,0 +1,53 @@
@@ -2370,7 +2370,7 @@ index 0000000..c81cb2a
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qttranslations.nix b/overlay/vendor/qt-6.11/modules/qttranslations.nix
 new file mode 100644
-index 0000000..b607362
+index 00000000..b6073620
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qttranslations.nix
 @@ -0,0 +1,12 @@
@@ -2388,7 +2388,7 @@ index 0000000..b607362
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtvirtualkeyboard.nix b/overlay/vendor/qt-6.11/modules/qtvirtualkeyboard.nix
 new file mode 100644
-index 0000000..4c9f449
+index 00000000..4c9f449f
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtvirtualkeyboard.nix
 @@ -0,0 +1,19 @@
@@ -2413,7 +2413,7 @@ index 0000000..4c9f449
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtwayland.nix b/overlay/vendor/qt-6.11/modules/qtwayland.nix
 new file mode 100644
-index 0000000..54fc9ca
+index 00000000..54fc9cac
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwayland.nix
 @@ -0,0 +1,30 @@
@@ -2449,7 +2449,7 @@ index 0000000..54fc9ca
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtwebchannel.nix b/overlay/vendor/qt-6.11/modules/qtwebchannel.nix
 new file mode 100644
-index 0000000..b60e802
+index 00000000..b60e8023
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwebchannel.nix
 @@ -0,0 +1,17 @@
@@ -2472,7 +2472,7 @@ index 0000000..b60e802
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/default.nix b/overlay/vendor/qt-6.11/modules/qtwebengine/default.nix
 new file mode 100644
-index 0000000..f44f461
+index 00000000..f44f4617
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwebengine/default.nix
 @@ -0,0 +1,294 @@
@@ -2772,7 +2772,7 @@ index 0000000..f44f461
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/gn-object-sorted.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/gn-object-sorted.patch
 new file mode 100644
-index 0000000..4e6b067
+index 00000000..4e6b0672
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwebengine/gn-object-sorted.patch
 @@ -0,0 +1,32 @@
@@ -2810,7 +2810,7 @@ index 0000000..4e6b067
 +       }
 diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/link-pulseaudio.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/link-pulseaudio.patch
 new file mode 100644
-index 0000000..05ad2a6
+index 00000000..05ad2a6d
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwebengine/link-pulseaudio.patch
 @@ -0,0 +1,12 @@
@@ -2828,7 +2828,7 @@ index 0000000..05ad2a6
 +             ARGS use_v8_context_snapshot v8_use_external_startup_data
 diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/locales-path.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/locales-path.patch
 new file mode 100644
-index 0000000..832adad
+index 00000000..832adad1
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwebengine/locales-path.patch
 @@ -0,0 +1,13 @@
@@ -2847,7 +2847,7 @@ index 0000000..832adad
 +         CONFIGURATIONS ${config}
 diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/split-prefix.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/split-prefix.patch
 new file mode 100644
-index 0000000..deb7879
+index 00000000..deb78798
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwebengine/split-prefix.patch
 @@ -0,0 +1,60 @@
@@ -2913,7 +2913,7 @@ index 0000000..deb7879
 +         }
 diff --git a/overlay/vendor/qt-6.11/modules/qtwebengine/xkb-includes.patch b/overlay/vendor/qt-6.11/modules/qtwebengine/xkb-includes.patch
 new file mode 100644
-index 0000000..5056550
+index 00000000..5056550c
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwebengine/xkb-includes.patch
 @@ -0,0 +1,12 @@
@@ -2931,7 +2931,7 @@ index 0000000..5056550
 +                                          XKB_KEYMAP_COMPILE_NO_FLAGS));
 diff --git a/overlay/vendor/qt-6.11/modules/qtwebsockets.nix b/overlay/vendor/qt-6.11/modules/qtwebsockets.nix
 new file mode 100644
-index 0000000..11264a4
+index 00000000..11264a48
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwebsockets.nix
 @@ -0,0 +1,15 @@
@@ -2952,7 +2952,7 @@ index 0000000..11264a4
 +}
 diff --git a/overlay/vendor/qt-6.11/modules/qtwebview.nix b/overlay/vendor/qt-6.11/modules/qtwebview.nix
 new file mode 100644
-index 0000000..87ea9b8
+index 00000000..87ea9b82
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/modules/qtwebview.nix
 @@ -0,0 +1,15 @@
@@ -2973,7 +2973,7 @@ index 0000000..87ea9b8
 +}
 diff --git a/overlay/vendor/qt-6.11/qt-env.nix b/overlay/vendor/qt-6.11/qt-env.nix
 new file mode 100644
-index 0000000..113e57e
+index 00000000..113e57e3
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/qt-env.nix
 @@ -0,0 +1,34 @@
@@ -3013,7 +3013,7 @@ index 0000000..113e57e
 +}
 diff --git a/overlay/vendor/qt-6.11/qtModule.nix b/overlay/vendor/qt-6.11/qtModule.nix
 new file mode 100644
-index 0000000..5e34cd4
+index 00000000..5e34cd45
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/qtModule.nix
 @@ -0,0 +1,95 @@
@@ -3114,7 +3114,7 @@ index 0000000..5e34cd4
 +}
 diff --git a/overlay/vendor/qt-6.11/srcs.nix b/overlay/vendor/qt-6.11/srcs.nix
 new file mode 100644
-index 0000000..d35caf4
+index 00000000..d35caf48
 --- /dev/null
 +++ b/overlay/vendor/qt-6.11/srcs.nix
 @@ -0,0 +1,342 @@

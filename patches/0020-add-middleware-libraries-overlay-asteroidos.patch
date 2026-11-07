@@ -107,7 +107,7 @@ libraries, without wrapping the Qt apps.
 
 diff --git a/overlay/asteroidos/accounts-qt/default.nix b/overlay/asteroidos/accounts-qt/default.nix
 new file mode 100644
-index 0000000..b0ba7f1
+index 00000000..b0ba7f11
 --- /dev/null
 +++ b/overlay/asteroidos/accounts-qt/default.nix
 @@ -0,0 +1,85 @@
@@ -198,7 +198,7 @@ index 0000000..b0ba7f1
 +})
 diff --git a/overlay/asteroidos/amber-mpris/CMakeLists.txt b/overlay/asteroidos/amber-mpris/CMakeLists.txt
 new file mode 100644
-index 0000000..03a35cf
+index 00000000..03a35cfe
 --- /dev/null
 +++ b/overlay/asteroidos/amber-mpris/CMakeLists.txt
 @@ -0,0 +1,128 @@
@@ -332,7 +332,7 @@ index 0000000..03a35cf
 +)
 diff --git a/overlay/asteroidos/amber-mpris/default.nix b/overlay/asteroidos/amber-mpris/default.nix
 new file mode 100644
-index 0000000..bcdd9f1
+index 00000000..bcdd9f13
 --- /dev/null
 +++ b/overlay/asteroidos/amber-mpris/default.nix
 @@ -0,0 +1,54 @@
@@ -391,7 +391,7 @@ index 0000000..bcdd9f1
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index f3735b0..1daf957 100644
+index f3735b09..1daf957d 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -4,10 +4,97 @@ rec {
@@ -495,7 +495,7 @@ index f3735b0..1daf957 100644
  }
 diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
 new file mode 100644
-index 0000000..49c4f3f
+index 00000000..49c4f3f1
 --- /dev/null
 +++ b/overlay/asteroidos/dsme/default.nix
 @@ -0,0 +1,107 @@
@@ -608,7 +608,7 @@ index 0000000..49c4f3f
 +})
 diff --git a/overlay/asteroidos/kcalendarcore/default.nix b/overlay/asteroidos/kcalendarcore/default.nix
 new file mode 100644
-index 0000000..9b875b0
+index 00000000..9b875b0d
 --- /dev/null
 +++ b/overlay/asteroidos/kcalendarcore/default.nix
 @@ -0,0 +1,51 @@
@@ -665,7 +665,7 @@ index 0000000..9b875b0
 +})
 diff --git a/overlay/asteroidos/keepalive/default.nix b/overlay/asteroidos/keepalive/default.nix
 new file mode 100644
-index 0000000..d98c038
+index 00000000..d98c0386
 --- /dev/null
 +++ b/overlay/asteroidos/keepalive/default.nix
 @@ -0,0 +1,131 @@
@@ -802,7 +802,7 @@ index 0000000..d98c038
 +})
 diff --git a/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch b/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
 new file mode 100644
-index 0000000..fe43127
+index 00000000..fe431276
 --- /dev/null
 +++ b/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
 @@ -0,0 +1,23 @@
@@ -831,7 +831,7 @@ index 0000000..fe43127
 + examples.files = examples/qml/*.qml
 diff --git a/overlay/asteroidos/keepalive/patches/0002-Fix-build.patch b/overlay/asteroidos/keepalive/patches/0002-Fix-build.patch
 new file mode 100644
-index 0000000..a430a28
+index 00000000..a430a281
 --- /dev/null
 +++ b/overlay/asteroidos/keepalive/patches/0002-Fix-build.patch
 @@ -0,0 +1,23 @@
@@ -860,7 +860,7 @@ index 0000000..a430a28
 +     displayblanking.cpp \
 diff --git a/overlay/asteroidos/libconnman-qt/default.nix b/overlay/asteroidos/libconnman-qt/default.nix
 new file mode 100644
-index 0000000..38928a7
+index 00000000..38928a7b
 --- /dev/null
 +++ b/overlay/asteroidos/libconnman-qt/default.nix
 @@ -0,0 +1,139 @@
@@ -1005,7 +1005,7 @@ index 0000000..38928a7
 +})
 diff --git a/overlay/asteroidos/libdsme/default.nix b/overlay/asteroidos/libdsme/default.nix
 new file mode 100644
-index 0000000..2278e47
+index 00000000..2278e470
 --- /dev/null
 +++ b/overlay/asteroidos/libdsme/default.nix
 @@ -0,0 +1,82 @@
@@ -1093,7 +1093,7 @@ index 0000000..2278e47
 +})
 diff --git a/overlay/asteroidos/libiodata/default.nix b/overlay/asteroidos/libiodata/default.nix
 new file mode 100644
-index 0000000..2564635
+index 00000000..25646355
 --- /dev/null
 +++ b/overlay/asteroidos/libiodata/default.nix
 @@ -0,0 +1,118 @@
@@ -1217,7 +1217,7 @@ index 0000000..2564635
 +})
 diff --git a/overlay/asteroidos/libiphb/default.nix b/overlay/asteroidos/libiphb/default.nix
 new file mode 100644
-index 0000000..6da52c8
+index 00000000..6da52c87
 --- /dev/null
 +++ b/overlay/asteroidos/libiphb/default.nix
 @@ -0,0 +1,54 @@
@@ -1277,7 +1277,7 @@ index 0000000..6da52c8
 +})
 diff --git a/overlay/asteroidos/libngf/default.nix b/overlay/asteroidos/libngf/default.nix
 new file mode 100644
-index 0000000..a2f1642
+index 00000000..a2f16428
 --- /dev/null
 +++ b/overlay/asteroidos/libngf/default.nix
 @@ -0,0 +1,53 @@
@@ -1336,7 +1336,7 @@ index 0000000..a2f1642
 +})
 diff --git a/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
 new file mode 100644
-index 0000000..0597e98
+index 00000000..0597e987
 --- /dev/null
 +++ b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
 @@ -0,0 +1,40 @@
@@ -1382,7 +1382,7 @@ index 0000000..0597e98
 +
 diff --git a/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
 new file mode 100644
-index 0000000..4a96ad3
+index 00000000..4a96ad3c
 --- /dev/null
 +++ b/overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
 @@ -0,0 +1,69 @@
@@ -1457,7 +1457,7 @@ index 0000000..4a96ad3
 +     perror("execve");   /* execve() only returns on error */
 diff --git a/overlay/asteroidos/mapplauncherd/default.nix b/overlay/asteroidos/mapplauncherd/default.nix
 new file mode 100644
-index 0000000..711acf6
+index 00000000..711acf6a
 --- /dev/null
 +++ b/overlay/asteroidos/mapplauncherd/default.nix
 @@ -0,0 +1,59 @@
@@ -1522,7 +1522,7 @@ index 0000000..711acf6
 +}
 diff --git a/overlay/asteroidos/mce-dev/default.nix b/overlay/asteroidos/mce-dev/default.nix
 new file mode 100644
-index 0000000..29cca04
+index 00000000..29cca049
 --- /dev/null
 +++ b/overlay/asteroidos/mce-dev/default.nix
 @@ -0,0 +1,41 @@
@@ -1569,7 +1569,7 @@ index 0000000..29cca04
 +}
 diff --git a/overlay/asteroidos/mce-plugin-libhybris/default.nix b/overlay/asteroidos/mce-plugin-libhybris/default.nix
 new file mode 100644
-index 0000000..6066dc3
+index 00000000..6066dc34
 --- /dev/null
 +++ b/overlay/asteroidos/mce-plugin-libhybris/default.nix
 @@ -0,0 +1,69 @@
@@ -1644,7 +1644,7 @@ index 0000000..6066dc3
 +}
 diff --git a/overlay/asteroidos/mce-qt6/default.nix b/overlay/asteroidos/mce-qt6/default.nix
 new file mode 100644
-index 0000000..3e1c5c4
+index 00000000..3e1c5c4d
 --- /dev/null
 +++ b/overlay/asteroidos/mce-qt6/default.nix
 @@ -0,0 +1,100 @@
@@ -1750,7 +1750,7 @@ index 0000000..3e1c5c4
 +})
 diff --git a/overlay/asteroidos/mce/builtin-gconf.values b/overlay/asteroidos/mce/builtin-gconf.values
 new file mode 100644
-index 0000000..617c1bc
+index 00000000..617c1bc5
 --- /dev/null
 +++ b/overlay/asteroidos/mce/builtin-gconf.values
 @@ -0,0 +1 @@
@@ -1758,7 +1758,7 @@ index 0000000..617c1bc
 \ No newline at end of file
 diff --git a/overlay/asteroidos/mce/default.nix b/overlay/asteroidos/mce/default.nix
 new file mode 100644
-index 0000000..8ce4a48
+index 00000000..8ce4a485
 --- /dev/null
 +++ b/overlay/asteroidos/mce/default.nix
 @@ -0,0 +1,107 @@
@@ -1871,7 +1871,7 @@ index 0000000..8ce4a48
 +})
 diff --git a/overlay/asteroidos/mce/mce.service b/overlay/asteroidos/mce/mce.service
 new file mode 100644
-index 0000000..d771f77
+index 00000000..d771f776
 --- /dev/null
 +++ b/overlay/asteroidos/mce/mce.service
 @@ -0,0 +1,17 @@
@@ -1894,7 +1894,7 @@ index 0000000..d771f77
 +WantedBy=multi-user.target
 diff --git a/overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch b/overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
 new file mode 100644
-index 0000000..8c40882
+index 00000000..8c408824
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
 @@ -0,0 +1,421 @@
@@ -2321,7 +2321,7 @@ index 0000000..8c40882
 + #endif /* MCE_MULTITOUCH_H_ */
 diff --git a/overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch b/overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch
 new file mode 100644
-index 0000000..9868cf1
+index 00000000..9868cf16
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch
 @@ -0,0 +1,606 @@
@@ -2933,7 +2933,7 @@ index 0000000..9868cf1
 +                 .flag        = 'a',
 diff --git a/overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch b/overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch
 new file mode 100644
-index 0000000..8b448d1
+index 00000000..8b448d15
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch
 @@ -0,0 +1,64 @@
@@ -3003,7 +3003,7 @@ index 0000000..8b448d1
 +     allowed = true;
 diff --git a/overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch b/overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch
 new file mode 100644
-index 0000000..c653a26
+index 00000000..c653a26e
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch
 @@ -0,0 +1,574 @@
@@ -3583,7 +3583,7 @@ index 0000000..c653a26
 +     case MCE_DISPLAY_ON:
 diff --git a/overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch b/overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
 new file mode 100644
-index 0000000..cb9f7a2
+index 00000000..cb9f7a20
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
 @@ -0,0 +1,61 @@
@@ -3650,7 +3650,7 @@ index 0000000..cb9f7a2
 +                           &mdy_blanking_inhibit_mode,
 diff --git a/overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch b/overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
 new file mode 100644
-index 0000000..aefe53f
+index 00000000..aefe53f7
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
 @@ -0,0 +1,67 @@
@@ -3723,7 +3723,7 @@ index 0000000..aefe53f
 +         .output_cb = mdy_datapipe_packagekit_locked_cb,
 diff --git a/overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch b/overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch
 new file mode 100644
-index 0000000..3057524
+index 00000000..30575249
 --- /dev/null
 +++ b/overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch
 @@ -0,0 +1,161 @@
@@ -3890,7 +3890,7 @@ index 0000000..3057524
 +         .input_cb = pwrkey_datapipe_ngfd_event_request_cb,
 diff --git a/overlay/asteroidos/mkcal/default.nix b/overlay/asteroidos/mkcal/default.nix
 new file mode 100644
-index 0000000..07fc797
+index 00000000..07fc7975
 --- /dev/null
 +++ b/overlay/asteroidos/mkcal/default.nix
 @@ -0,0 +1,60 @@
@@ -3956,7 +3956,7 @@ index 0000000..07fc797
 +})
 diff --git a/overlay/asteroidos/mlite/CMakeLists.txt b/overlay/asteroidos/mlite/CMakeLists.txt
 new file mode 100644
-index 0000000..b82207f
+index 00000000..b82207f8
 --- /dev/null
 +++ b/overlay/asteroidos/mlite/CMakeLists.txt
 @@ -0,0 +1,122 @@
@@ -4084,7 +4084,7 @@ index 0000000..b82207f
 +)
 diff --git a/overlay/asteroidos/mlite/default.nix b/overlay/asteroidos/mlite/default.nix
 new file mode 100644
-index 0000000..87a963e
+index 00000000..87a963eb
 --- /dev/null
 +++ b/overlay/asteroidos/mlite/default.nix
 @@ -0,0 +1,52 @@
@@ -4142,7 +4142,7 @@ index 0000000..87a963e
 +})
 diff --git a/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
 new file mode 100644
-index 0000000..261c314
+index 00000000..261c3149
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
 @@ -0,0 +1,135 @@
@@ -4283,7 +4283,7 @@ index 0000000..261c314
 +})
 diff --git a/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix b/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
 new file mode 100644
-index 0000000..7111ae8
+index 00000000..7111ae88
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
 @@ -0,0 +1,94 @@
@@ -4383,7 +4383,7 @@ index 0000000..7111ae8
 +})
 diff --git a/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
 new file mode 100644
-index 0000000..3b6dc41
+index 00000000..3b6dc415
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
 @@ -0,0 +1,121 @@
@@ -4510,7 +4510,7 @@ index 0000000..3b6dc41
 +})
 diff --git a/overlay/asteroidos/ngf-qt6/default.nix b/overlay/asteroidos/ngf-qt6/default.nix
 new file mode 100644
-index 0000000..d16b452
+index 00000000..d16b452f
 --- /dev/null
 +++ b/overlay/asteroidos/ngf-qt6/default.nix
 @@ -0,0 +1,96 @@
@@ -4612,7 +4612,7 @@ index 0000000..d16b452
 +})
 diff --git a/overlay/asteroidos/sensorfw/CMakeLists.txt b/overlay/asteroidos/sensorfw/CMakeLists.txt
 new file mode 100644
-index 0000000..6ad5cc2
+index 00000000..6ad5cc23
 --- /dev/null
 +++ b/overlay/asteroidos/sensorfw/CMakeLists.txt
 @@ -0,0 +1,264 @@
@@ -4882,7 +4882,7 @@ index 0000000..6ad5cc2
 +install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sensord-qt6.pc DESTINATION lib/pkgconfig)
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
 new file mode 100644
-index 0000000..fa31860
+index 00000000..fa31860e
 --- /dev/null
 +++ b/overlay/asteroidos/sensorfw/default.nix
 @@ -0,0 +1,71 @@
@@ -4959,7 +4959,7 @@ index 0000000..fa31860
 +})
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
 new file mode 100644
-index 0000000..e52b571
+index 00000000..e52b5713
 --- /dev/null
 +++ b/overlay/asteroidos/timed-qt6/default.nix
 @@ -0,0 +1,269 @@
@@ -5234,7 +5234,7 @@ index 0000000..e52b571
 +})
 diff --git a/overlay/asteroidos/usb-moded-dev/default.nix b/overlay/asteroidos/usb-moded-dev/default.nix
 new file mode 100644
-index 0000000..6f95751
+index 00000000..6f957515
 --- /dev/null
 +++ b/overlay/asteroidos/usb-moded-dev/default.nix
 @@ -0,0 +1,42 @@
@@ -5282,7 +5282,7 @@ index 0000000..6f95751
 +})
 diff --git a/overlay/asteroidos/usb-moded-qt6/default.nix b/overlay/asteroidos/usb-moded-qt6/default.nix
 new file mode 100644
-index 0000000..0e98563
+index 00000000..0e985634
 --- /dev/null
 +++ b/overlay/asteroidos/usb-moded-qt6/default.nix
 @@ -0,0 +1,90 @@
@@ -5378,7 +5378,7 @@ index 0000000..0e98563
 +})
 diff --git a/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch b/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
 deleted file mode 100644
-index 20e222d..0000000
+index 20e222dc..00000000
 --- a/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
 +++ /dev/null
 @@ -1,24 +0,0 @@
@@ -5407,7 +5407,7 @@ index 20e222d..0000000
 -2.23.0
 -
 diff --git a/overlay/libhybris/default.nix b/overlay/libhybris/default.nix
-index 37b0df7..3c1e853 100644
+index 37b0df7d..3c1e8538 100644
 --- a/overlay/libhybris/default.nix
 +++ b/overlay/libhybris/default.nix
 @@ -1,12 +1,16 @@

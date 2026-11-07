@@ -15,7 +15,7 @@ Multimedia for network playback.
  create mode 100644 overlay/asteroidos/apps/music-ytmusic-streaming.patch
 
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
-index ef93765..8d7c8a5 100644
+index ef937655..8d7c8a51 100644
 --- a/overlay/asteroidos/apps/default.nix
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -53,11 +53,18 @@
@@ -40,7 +40,7 @@ index ef93765..8d7c8a5 100644
    compass = mkAsteroidApp {
 diff --git a/overlay/asteroidos/apps/music-ytmusic-streaming.patch b/overlay/asteroidos/apps/music-ytmusic-streaming.patch
 new file mode 100644
-index 0000000..375a101
+index 00000000..375a101a
 --- /dev/null
 +++ b/overlay/asteroidos/apps/music-ytmusic-streaming.patch
 @@ -0,0 +1,306 @@

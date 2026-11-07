@@ -24,7 +24,7 @@ package set in the Mobile-NixOS overlay.
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 new file mode 100644
-index 0000000..f3735b0
+index 00000000..f3735b09
 --- /dev/null
 +++ b/overlay/asteroidos/default.nix
 @@ -0,0 +1,13 @@
@@ -43,7 +43,7 @@ index 0000000..f3735b0
 +}
 diff --git a/overlay/asteroidos/lib/mk-asteroid-app.nix b/overlay/asteroidos/lib/mk-asteroid-app.nix
 new file mode 100644
-index 0000000..fa05616
+index 00000000..fa056167
 --- /dev/null
 +++ b/overlay/asteroidos/lib/mk-asteroid-app.nix
 @@ -0,0 +1,115 @@
@@ -164,7 +164,7 @@ index 0000000..fa05616
 +})
 diff --git a/overlay/asteroidos/lib/no-usr-share-hook.nix b/overlay/asteroidos/lib/no-usr-share-hook.nix
 new file mode 100644
-index 0000000..8d7c707
+index 00000000..8d7c7073
 --- /dev/null
 +++ b/overlay/asteroidos/lib/no-usr-share-hook.nix
 @@ -0,0 +1,5 @@
@@ -175,7 +175,7 @@ index 0000000..8d7c707
 +} ./no-usr-share-hook.sh
 diff --git a/overlay/asteroidos/lib/no-usr-share-hook.sh b/overlay/asteroidos/lib/no-usr-share-hook.sh
 new file mode 100644
-index 0000000..afbe09c
+index 00000000..afbe09c5
 --- /dev/null
 +++ b/overlay/asteroidos/lib/no-usr-share-hook.sh
 @@ -0,0 +1,30 @@
@@ -211,7 +211,7 @@ index 0000000..afbe09c
 +postFixupHooks+=(auditNoUsrShare)
 diff --git a/overlay/asteroidos/qml-asteroid/default.nix b/overlay/asteroidos/qml-asteroid/default.nix
 new file mode 100644
-index 0000000..3e89bc8
+index 00000000..3e89bc8a
 --- /dev/null
 +++ b/overlay/asteroidos/qml-asteroid/default.nix
 @@ -0,0 +1,122 @@
@@ -339,7 +339,7 @@ index 0000000..3e89bc8
 +})
 diff --git a/overlay/oans/default.nix b/overlay/oans/default.nix
 new file mode 100644
-index 0000000..e6888d6
+index 00000000..e6888d6f
 --- /dev/null
 +++ b/overlay/oans/default.nix
 @@ -0,0 +1,61 @@
@@ -405,7 +405,7 @@ index 0000000..e6888d6
 +  };
 +})
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index 9598347..f60c231 100644
+index 9598347c..f60c2311 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
 @@ -8,10 +8,15 @@ in

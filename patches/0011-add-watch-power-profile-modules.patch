@@ -18,7 +18,7 @@ The journald storage uses the structured services.journald.settings.Journal attr
  create mode 100644 modules/watch-power.nix
 
 diff --git a/modules/module-list.nix b/modules/module-list.nix
-index e9d9a14..0a18885 100644
+index e9d9a143..0a18885d 100644
 --- a/modules/module-list.nix
 +++ b/modules/module-list.nix
 @@ -57,5 +57,6 @@
@@ -30,7 +30,7 @@ index e9d9a14..0a18885 100644
  ]
 diff --git a/modules/watch-power.nix b/modules/watch-power.nix
 new file mode 100644
-index 0000000..5b936f6
+index 00000000..5b936f61
 --- /dev/null
 +++ b/modules/watch-power.nix
 @@ -0,0 +1,61 @@

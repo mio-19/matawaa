@@ -36,7 +36,7 @@ This patch integrates the lightweight WPE WebKit rendering engine and browser:
 
 diff --git a/overlay/asteroidos/browser/CMakeLists.txt b/overlay/asteroidos/browser/CMakeLists.txt
 new file mode 100644
-index 0000000..cb9a969
+index 00000000..cb9a9691
 --- /dev/null
 +++ b/overlay/asteroidos/browser/CMakeLists.txt
 @@ -0,0 +1,54 @@
@@ -96,7 +96,7 @@ index 0000000..cb9a969
 +)
 diff --git a/overlay/asteroidos/browser/asteroid-browser.desktop b/overlay/asteroidos/browser/asteroid-browser.desktop
 new file mode 100644
-index 0000000..6e0de5d
+index 00000000..6e0de5d7
 --- /dev/null
 +++ b/overlay/asteroidos/browser/asteroid-browser.desktop
 @@ -0,0 +1,12 @@
@@ -114,7 +114,7 @@ index 0000000..6e0de5d
 +Keywords=web;browser;internet;
 diff --git a/overlay/asteroidos/browser/asteroid-browser.svg b/overlay/asteroidos/browser/asteroid-browser.svg
 new file mode 100644
-index 0000000..6ce8f57
+index 00000000..6ce8f579
 --- /dev/null
 +++ b/overlay/asteroidos/browser/asteroid-browser.svg
 @@ -0,0 +1,22 @@
@@ -142,7 +142,7 @@ index 0000000..6ce8f57
 +</svg>
 diff --git a/overlay/asteroidos/browser/default.nix b/overlay/asteroidos/browser/default.nix
 new file mode 100644
-index 0000000..fe875e7
+index 00000000..fe875e78
 --- /dev/null
 +++ b/overlay/asteroidos/browser/default.nix
 @@ -0,0 +1,52 @@
@@ -200,7 +200,7 @@ index 0000000..fe875e7
 +})
 diff --git a/overlay/asteroidos/browser/portal.html b/overlay/asteroidos/browser/portal.html
 new file mode 100644
-index 0000000..1924bbc
+index 00000000..1924bbc8
 --- /dev/null
 +++ b/overlay/asteroidos/browser/portal.html
 @@ -0,0 +1,237 @@
@@ -443,7 +443,7 @@ index 0000000..1924bbc
 +</html>
 diff --git a/overlay/asteroidos/browser/src/main.c b/overlay/asteroidos/browser/src/main.c
 new file mode 100644
-index 0000000..abd0522
+index 00000000..abd05227
 --- /dev/null
 +++ b/overlay/asteroidos/browser/src/main.c
 @@ -0,0 +1,388 @@
@@ -836,7 +836,7 @@ index 0000000..abd0522
 +    return status;
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index d04f4f3..a538ff4 100644
+index d04f4f34..a538ff4b 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -120,19 +120,53 @@ rec {
@@ -898,7 +898,7 @@ index d04f4f3..a538ff4 100644
      inherit mkAsteroidApp mlite noUsrShareHook;
 diff --git a/overlay/asteroidos/wpewebkit-qt/default.nix b/overlay/asteroidos/wpewebkit-qt/default.nix
 new file mode 100644
-index 0000000..e2a9aed
+index 00000000..e2a9aedc
 --- /dev/null
 +++ b/overlay/asteroidos/wpewebkit-qt/default.nix
 @@ -0,0 +1,70 @@
@@ -973,7 +973,7 @@ index 0000000..e2a9aed
 +  };
 +})
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index f60c231..78fdbdd 100644
+index f60c2311..78fdbdd7 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
 @@ -54,6 +54,8 @@ in
@@ -987,7 +987,7 @@ index f60c231..78fdbdd 100644
      #
 diff --git a/overlay/wpewebkit/default.nix b/overlay/wpewebkit/default.nix
 new file mode 100644
-index 0000000..bfc7ecb
+index 00000000..bfc7ecb0
 --- /dev/null
 +++ b/overlay/wpewebkit/default.nix
 @@ -0,0 +1,163 @@

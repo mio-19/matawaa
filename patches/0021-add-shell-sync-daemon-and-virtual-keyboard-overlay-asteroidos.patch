@@ -44,7 +44,7 @@ current nightly.
 
 diff --git a/overlay/asteroidos/asteroid-btsyncd/default.nix b/overlay/asteroidos/asteroid-btsyncd/default.nix
 new file mode 100644
-index 0000000..af76edf
+index 00000000..af76edf4
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/default.nix
 @@ -0,0 +1,68 @@
@@ -118,7 +118,7 @@ index 0000000..af76edf
 +})
 diff --git a/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
 new file mode 100644
-index 0000000..a856e19
+index 00000000..a856e19c
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
 @@ -0,0 +1,13 @@
@@ -137,7 +137,7 @@ index 0000000..a856e19
 +</busconfig>
 diff --git a/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
 new file mode 100644
-index 0000000..d8a0670
+index 00000000..d8a0670d
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
 @@ -0,0 +1,15 @@
@@ -158,7 +158,7 @@ index 0000000..d8a0670
 + }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
 new file mode 100644
-index 0000000..0d5e9b8
+index 00000000..0d5e9b8e
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -0,0 +1,144 @@
@@ -308,7 +308,7 @@ index 0000000..0d5e9b8
 +})
 diff --git a/overlay/asteroidos/asteroid-launcher/display-on-startup.patch b/overlay/asteroidos/asteroid-launcher/display-on-startup.patch
 new file mode 100644
-index 0000000..6d84268
+index 00000000..6d842685
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/display-on-startup.patch
 @@ -0,0 +1,44 @@
@@ -358,7 +358,7 @@ index 0000000..6d84268
 +         emit displayOff();
 diff --git a/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf b/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
 new file mode 100644
-index 0000000..b827166
+index 00000000..b8271665
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
 @@ -0,0 +1,28 @@
@@ -392,7 +392,7 @@ index 0000000..b827166
 +</busconfig>
 diff --git a/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
 new file mode 100644
-index 0000000..858ba58
+index 00000000..858ba581
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
 @@ -0,0 +1,58 @@
@@ -456,7 +456,7 @@ index 0000000..858ba58
 +                 // avoids a cross-process write that can clobber a concurrent
 diff --git a/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch b/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
 new file mode 100644
-index 0000000..c8fc889
+index 00000000..c8fc8896
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
 @@ -0,0 +1,54 @@
@@ -515,7 +515,7 @@ index 0000000..c8fc889
 +-    }
 + }
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 1daf957..8a63fff 100644
+index 1daf957d..8a63fff0 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -19,6 +19,30 @@ rec {
@@ -563,7 +563,7 @@ index 1daf957..8a63fff 100644
  }
 diff --git a/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
 new file mode 100644
-index 0000000..214fc9e
+index 00000000..214fc9e5
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
 @@ -0,0 +1,69 @@
@@ -638,7 +638,7 @@ index 0000000..214fc9e
 +})
 diff --git a/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
 new file mode 100644
-index 0000000..9cad05f
+index 00000000..9cad05fc
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
 @@ -0,0 +1,80 @@
@@ -724,7 +724,7 @@ index 0000000..9cad05f
 +})
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 new file mode 100644
-index 0000000..f426aea
+index 00000000..f426aead
 --- /dev/null
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 @@ -0,0 +1,201 @@
@@ -931,7 +931,7 @@ index 0000000..f426aea
 +})
 diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
 new file mode 100644
-index 0000000..13590e9
+index 00000000..13590e9b
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/default.nix
 @@ -0,0 +1,43 @@

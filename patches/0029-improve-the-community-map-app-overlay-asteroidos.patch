@@ -12,7 +12,7 @@ caching and compass heading orientation for wearable navigation.
  create mode 100644 overlay/asteroidos/community-apps/map-comaps-improvements.patch
 
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
-index 9ef2532..2bcc118 100644
+index 9ef25322..2bcc118b 100644
 --- a/overlay/asteroidos/community-apps/default.nix
 +++ b/overlay/asteroidos/community-apps/default.nix
 @@ -95,6 +95,9 @@ rec {
@@ -27,7 +27,7 @@ index 9ef2532..2bcc118 100644
        qt6.qtpositioning
 diff --git a/overlay/asteroidos/community-apps/map-comaps-improvements.patch b/overlay/asteroidos/community-apps/map-comaps-improvements.patch
 new file mode 100644
-index 0000000..ae5644a
+index 00000000..ae5644a8
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/map-comaps-improvements.patch
 @@ -0,0 +1,814 @@

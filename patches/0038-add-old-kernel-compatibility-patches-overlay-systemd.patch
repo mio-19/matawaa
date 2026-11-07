@@ -25,7 +25,7 @@ the old-kernel work is not split across unrelated commits.
  create mode 100644 overlay/patches/systemd-262-proc-credentials-old-kernel.patch
 
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index 61a3322..d3c47ce 100644
+index 61a3322e..d3c47ce6 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -22,6 +22,11 @@ else
@@ -55,7 +55,7 @@ index 61a3322..d3c47ce 100644
  
 diff --git a/overlay/patches/systemd-261-faccessat-old-kernel.patch b/overlay/patches/systemd-261-faccessat-old-kernel.patch
 new file mode 100644
-index 0000000..9fd1fd0
+index 00000000..9fd1fd0b
 --- /dev/null
 +++ b/overlay/patches/systemd-261-faccessat-old-kernel.patch
 @@ -0,0 +1,19 @@
@@ -80,7 +80,7 @@ index 0000000..9fd1fd0
 +                 return r;
 diff --git a/overlay/patches/systemd-261-mountpoint-old-kernel.patch b/overlay/patches/systemd-261-mountpoint-old-kernel.patch
 new file mode 100644
-index 0000000..cb5a10e
+index 00000000..cb5a10e2
 --- /dev/null
 +++ b/overlay/patches/systemd-261-mountpoint-old-kernel.patch
 @@ -0,0 +1,143 @@
@@ -229,7 +229,7 @@ index 0000000..cb5a10e
 + /* flags can be AT_SYMLINK_FOLLOW or 0 */
 diff --git a/overlay/patches/systemd-262-close-range-old-kernel.patch b/overlay/patches/systemd-262-close-range-old-kernel.patch
 new file mode 100644
-index 0000000..462eaa3
+index 00000000..462eaa31
 --- /dev/null
 +++ b/overlay/patches/systemd-262-close-range-old-kernel.patch
 @@ -0,0 +1,92 @@
@@ -327,7 +327,7 @@ index 0000000..462eaa3
 +                 return r;
 diff --git a/overlay/patches/systemd-262-epoll-pwait2-old-kernel.patch b/overlay/patches/systemd-262-epoll-pwait2-old-kernel.patch
 new file mode 100644
-index 0000000..fd54bbb
+index 00000000..fd54bbb1
 --- /dev/null
 +++ b/overlay/patches/systemd-262-epoll-pwait2-old-kernel.patch
 @@ -0,0 +1,19 @@
@@ -352,7 +352,7 @@ index 0000000..fd54bbb
 + 
 diff --git a/overlay/patches/systemd-262-pidfd-old-kernel.patch b/overlay/patches/systemd-262-pidfd-old-kernel.patch
 new file mode 100644
-index 0000000..f1a18f5
+index 00000000..f1a18f53
 --- /dev/null
 +++ b/overlay/patches/systemd-262-pidfd-old-kernel.patch
 @@ -0,0 +1,37 @@
@@ -395,7 +395,7 @@ index 0000000..f1a18f5
 +                         if (ret_si)
 diff --git a/overlay/patches/systemd-262-proc-credentials-old-kernel.patch b/overlay/patches/systemd-262-proc-credentials-old-kernel.patch
 new file mode 100644
-index 0000000..cf16aa5
+index 00000000..cf16aa51
 --- /dev/null
 +++ b/overlay/patches/systemd-262-proc-credentials-old-kernel.patch
 @@ -0,0 +1,41 @@

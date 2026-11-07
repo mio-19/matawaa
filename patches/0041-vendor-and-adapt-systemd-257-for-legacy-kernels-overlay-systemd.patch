@@ -73,7 +73,7 @@ systemd262oldkernel.
  create mode 100644 overlay/systemd.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 4417fb4..1081d08 100644
+index 4417fb4b..1081d085 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -12,6 +12,21 @@ let
@@ -99,7 +99,7 @@ index 4417fb4..1081d08 100644
    mobile.system.system = mkDefault "armv7l-linux";
  
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
-index 71f4b2d..e5050be 100644
+index 71f4b2d6..e5050bea 100644
 --- a/modules/hardware-watch.nix
 +++ b/modules/hardware-watch.nix
 @@ -136,6 +136,19 @@ in
@@ -123,7 +123,7 @@ index 71f4b2d..e5050be 100644
  
    config = mkIf (config.mobile.enable && watchCfg.enable) {
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
-index d3c47ce..02caaf5 100644
+index d3c47ce6..02caaf5e 100644
 --- a/overlay/cross-compile.nix
 +++ b/overlay/cross-compile.nix
 @@ -1,8 +1,8 @@
@@ -253,7 +253,7 @@ index d3c47ce..02caaf5 100644
 \ No newline at end of file
 +  }
 diff --git a/overlay/overlay.nix b/overlay/overlay.nix
-index 78fdbdd..085bea2 100644
+index 78fdbdd7..085bea2e 100644
 --- a/overlay/overlay.nix
 +++ b/overlay/overlay.nix
 @@ -2,8 +2,10 @@ final: super:
@@ -312,7 +312,7 @@ index 78fdbdd..085bea2 100644
      # Not necessarily internals, but they probably won't go into <nixpkgs>.
 diff --git a/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch b/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
 new file mode 100644
-index 0000000..1700696
+index 00000000..17006966
 --- /dev/null
 +++ b/overlay/patches/gcc-16.2.0-libgomp-uid-buffer.patch
 @@ -0,0 +1,13 @@
@@ -331,7 +331,7 @@ index 0000000..1700696
 +       snprintf (uid, ln, "%s%d", STR_OMP_DEV_PREFIX, device_num);
 diff --git a/overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch b/overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
 new file mode 100644
-index 0000000..d242ff7
+index 00000000..d242ff7c
 --- /dev/null
 +++ b/overlay/systemd-257/0001-Start-device-units-for-uninitialised-encrypted-devic.patch
 @@ -0,0 +1,29 @@
@@ -366,7 +366,7 @@ index 0000000..d242ff7
 + SUBSYSTEM=="block", ENV{ID_PART_GPT_AUTO_ROOT}=="1", ENV{ID_FS_TYPE}=="crypto_LUKS", SYMLINK+="gpt-auto-root-luks"
 diff --git a/overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch b/overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
 new file mode 100644
-index 0000000..9e34969
+index 00000000..9e349698
 --- /dev/null
 +++ b/overlay/systemd-257/0002-Don-t-try-to-unmount-nix-or-nix-store.patch
 @@ -0,0 +1,45 @@
@@ -417,7 +417,7 @@ index 0000000..9e34969
 + static void log_umount_blockers(const char *mnt) {
 diff --git a/overlay/systemd-257/0003-Fix-NixOS-containers.patch b/overlay/systemd-257/0003-Fix-NixOS-containers.patch
 new file mode 100644
-index 0000000..7cc2804
+index 00000000..7cc2804a
 --- /dev/null
 +++ b/overlay/systemd-257/0003-Fix-NixOS-containers.patch
 @@ -0,0 +1,31 @@
@@ -454,7 +454,7 @@ index 0000000..7cc2804
 +         } else {
 diff --git a/overlay/systemd-257/0004-Add-some-NixOS-specific-unit-directories.patch b/overlay/systemd-257/0004-Add-some-NixOS-specific-unit-directories.patch
 new file mode 100644
-index 0000000..2657eb9
+index 00000000..2657eb90
 --- /dev/null
 +++ b/overlay/systemd-257/0004-Add-some-NixOS-specific-unit-directories.patch
 @@ -0,0 +1,129 @@
@@ -589,7 +589,7 @@ index 0000000..2657eb9
 + };
 diff --git a/overlay/systemd-257/0005-Get-rid-of-a-useless-message-in-user-sessions.patch b/overlay/systemd-257/0005-Get-rid-of-a-useless-message-in-user-sessions.patch
 new file mode 100644
-index 0000000..6c4a41a
+index 00000000..6c4a41ab
 --- /dev/null
 +++ b/overlay/systemd-257/0005-Get-rid-of-a-useless-message-in-user-sessions.patch
 @@ -0,0 +1,28 @@
@@ -623,7 +623,7 @@ index 0000000..6c4a41a
 +                  * service being unnecessary after a while. */
 diff --git a/overlay/systemd-257/0006-hostnamed-localed-timedated-disable-methods-that-cha.patch b/overlay/systemd-257/0006-hostnamed-localed-timedated-disable-methods-that-cha.patch
 new file mode 100644
-index 0000000..44bd226
+index 00000000..44bd2263
 --- /dev/null
 +++ b/overlay/systemd-257/0006-hostnamed-localed-timedated-disable-methods-that-cha.patch
 @@ -0,0 +1,105 @@
@@ -734,7 +734,7 @@ index 0000000..44bd226
 +                 return r;
 diff --git a/overlay/systemd-257/0007-Change-usr-share-zoneinfo-to-etc-zoneinfo.patch b/overlay/systemd-257/0007-Change-usr-share-zoneinfo-to-etc-zoneinfo.patch
 new file mode 100644
-index 0000000..1f4184e
+index 00000000..1f4184e9
 --- /dev/null
 +++ b/overlay/systemd-257/0007-Change-usr-share-zoneinfo-to-etc-zoneinfo.patch
 @@ -0,0 +1,138 @@
@@ -878,7 +878,7 @@ index 0000000..1f4184e
 + 
 diff --git a/overlay/systemd-257/0008-localectl-use-etc-X11-xkb-for-list-x11.patch b/overlay/systemd-257/0008-localectl-use-etc-X11-xkb-for-list-x11.patch
 new file mode 100644
-index 0000000..c670f07
+index 00000000..c670f076
 --- /dev/null
 +++ b/overlay/systemd-257/0008-localectl-use-etc-X11-xkb-for-list-x11.patch
 @@ -0,0 +1,24 @@
@@ -908,7 +908,7 @@ index 0000000..c670f07
 + 
 diff --git a/overlay/systemd-257/0009-add-rootprefix-to-lookup-dir-paths.patch b/overlay/systemd-257/0009-add-rootprefix-to-lookup-dir-paths.patch
 new file mode 100644
-index 0000000..bf9f028
+index 00000000..bf9f028d
 --- /dev/null
 +++ b/overlay/systemd-257/0009-add-rootprefix-to-lookup-dir-paths.patch
 @@ -0,0 +1,35 @@
@@ -949,7 +949,7 @@ index 0000000..bf9f028
 +         STRV_MAKE(CONF_PATHS(n))
 diff --git a/overlay/systemd-257/0010-systemd-shutdown-execute-scripts-in-etc-systemd-syst.patch b/overlay/systemd-257/0010-systemd-shutdown-execute-scripts-in-etc-systemd-syst.patch
 new file mode 100644
-index 0000000..20b4641
+index 00000000..20b4641a
 --- /dev/null
 +++ b/overlay/systemd-257/0010-systemd-shutdown-execute-scripts-in-etc-systemd-syst.patch
 @@ -0,0 +1,23 @@
@@ -978,7 +978,7 @@ index 0000000..20b4641
 +         _cleanup_free_ char *cgroup = NULL;
 diff --git a/overlay/systemd-257/0011-systemd-sleep-execute-scripts-in-etc-systemd-system-.patch b/overlay/systemd-257/0011-systemd-sleep-execute-scripts-in-etc-systemd-system-.patch
 new file mode 100644
-index 0000000..1357811
+index 00000000..13578115
 --- /dev/null
 +++ b/overlay/systemd-257/0011-systemd-sleep-execute-scripts-in-etc-systemd-system-.patch
 @@ -0,0 +1,22 @@
@@ -1006,7 +1006,7 @@ index 0000000..1357811
 + 
 diff --git a/overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch b/overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch
 new file mode 100644
-index 0000000..9f7de37
+index 00000000..9f7de370
 --- /dev/null
 +++ b/overlay/systemd-257/0012-path-util.h-add-placeholder-for-DEFAULT_PATH_NORMAL.patch
 @@ -0,0 +1,28 @@
@@ -1040,7 +1040,7 @@ index 0000000..9f7de37
 + 
 diff --git a/overlay/systemd-257/0013-inherit-systemd-environment-when-calling-generators.patch b/overlay/systemd-257/0013-inherit-systemd-environment-when-calling-generators.patch
 new file mode 100644
-index 0000000..856fdee
+index 00000000..856fdee9
 --- /dev/null
 +++ b/overlay/systemd-257/0013-inherit-systemd-environment-when-calling-generators.patch
 @@ -0,0 +1,39 @@
@@ -1085,7 +1085,7 @@ index 0000000..856fdee
 +         if (r < 0)
 diff --git a/overlay/systemd-257/0014-core-don-t-taint-on-unmerged-usr.patch b/overlay/systemd-257/0014-core-don-t-taint-on-unmerged-usr.patch
 new file mode 100644
-index 0000000..fbaaed9
+index 00000000..fbaaed99
 --- /dev/null
 +++ b/overlay/systemd-257/0014-core-don-t-taint-on-unmerged-usr.patch
 @@ -0,0 +1,37 @@
@@ -1128,7 +1128,7 @@ index 0000000..fbaaed9
 + 
 diff --git a/overlay/systemd-257/0015-tpm2_context_init-fix-driver-name-checking.patch b/overlay/systemd-257/0015-tpm2_context_init-fix-driver-name-checking.patch
 new file mode 100644
-index 0000000..fe8ac0d
+index 00000000..fe8ac0dd
 --- /dev/null
 +++ b/overlay/systemd-257/0015-tpm2_context_init-fix-driver-name-checking.patch
 @@ -0,0 +1,41 @@
@@ -1175,7 +1175,7 @@ index 0000000..fe8ac0d
 +                 context->tcti_dl = dlopen(fn, RTLD_NOW|RTLD_NODELETE);
 diff --git a/overlay/systemd-257/0016-systemctl-edit-suggest-systemdctl-edit-runtime-on-sy.patch b/overlay/systemd-257/0016-systemctl-edit-suggest-systemdctl-edit-runtime-on-sy.patch
 new file mode 100644
-index 0000000..50dd842
+index 00000000..50dd842c
 --- /dev/null
 +++ b/overlay/systemd-257/0016-systemctl-edit-suggest-systemdctl-edit-runtime-on-sy.patch
 @@ -0,0 +1,45 @@
@@ -1226,7 +1226,7 @@ index 0000000..50dd842
 + 
 diff --git a/overlay/systemd-257/0017-meson.build-do-not-create-systemdstatedir.patch b/overlay/systemd-257/0017-meson.build-do-not-create-systemdstatedir.patch
 new file mode 100644
-index 0000000..65cd257
+index 00000000..65cd257a
 --- /dev/null
 +++ b/overlay/systemd-257/0017-meson.build-do-not-create-systemdstatedir.patch
 @@ -0,0 +1,21 @@
@@ -1253,7 +1253,7 @@ index 0000000..65cd257
 + 
 diff --git a/overlay/systemd-257/0018-meson-Don-t-link-ssh-dropins.patch b/overlay/systemd-257/0018-meson-Don-t-link-ssh-dropins.patch
 new file mode 100644
-index 0000000..da170d8
+index 00000000..da170d86
 --- /dev/null
 +++ b/overlay/systemd-257/0018-meson-Don-t-link-ssh-dropins.patch
 @@ -0,0 +1,29 @@
@@ -1288,7 +1288,7 @@ index 0000000..da170d8
 + conf.set10('CREATE_SSHDPRIVSEPDIR', sshdprivsepdir != 'no' and not sshdprivsepdir.startswith('/usr/'))
 diff --git a/overlay/systemd-257/0019-install-unit_file_exists_full-follow-symlinks.patch b/overlay/systemd-257/0019-install-unit_file_exists_full-follow-symlinks.patch
 new file mode 100644
-index 0000000..4d7ceed
+index 00000000..4d7ceedc
 --- /dev/null
 +++ b/overlay/systemd-257/0019-install-unit_file_exists_full-follow-symlinks.patch
 @@ -0,0 +1,22 @@
@@ -1316,7 +1316,7 @@ index 0000000..4d7ceed
 +                         /* n_changes= */ NULL);
 diff --git a/overlay/systemd-257/0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch b/overlay/systemd-257/0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
 new file mode 100644
-index 0000000..a1b1575
+index 00000000..a1b1575a
 --- /dev/null
 +++ b/overlay/systemd-257/0020-timesyncd-disable-NSCD-when-DNSSEC-validation-is-dis.patch
 @@ -0,0 +1,43 @@
@@ -1365,7 +1365,7 @@ index 0000000..a1b1575
 +         notify_message = notify_start("READY=1\n"
 diff --git a/overlay/systemd-257/default.nix b/overlay/systemd-257/default.nix
 new file mode 100644
-index 0000000..47e5f75
+index 00000000..47e5f750
 --- /dev/null
 +++ b/overlay/systemd-257/default.nix
 @@ -0,0 +1,1121 @@
@@ -2492,7 +2492,7 @@ index 0000000..47e5f75
 +})
 diff --git a/overlay/systemd-257/oe-Handle-missing-STATX_MNT_ID-on-older-kernels.patch b/overlay/systemd-257/oe-Handle-missing-STATX_MNT_ID-on-older-kernels.patch
 new file mode 100644
-index 0000000..7e96550
+index 00000000..7e96550d
 --- /dev/null
 +++ b/overlay/systemd-257/oe-Handle-missing-STATX_MNT_ID-on-older-kernels.patch
 @@ -0,0 +1,166 @@
@@ -2664,7 +2664,7 @@ index 0000000..7e96550
 + 
 diff --git a/overlay/systemd-257/systemd-search-path-revert.patch b/overlay/systemd-257/systemd-search-path-revert.patch
 new file mode 100644
-index 0000000..710ad7e
+index 00000000..710ad7e8
 --- /dev/null
 +++ b/overlay/systemd-257/systemd-search-path-revert.patch
 @@ -0,0 +1,21 @@
@@ -2691,7 +2691,7 @@ index 0000000..710ad7e
 +         STRV_MAKE(CONF_PATHS(n))
 diff --git a/overlay/systemd-257/systemd-udevd-varlink.socket b/overlay/systemd-257/systemd-udevd-varlink.socket
 new file mode 100644
-index 0000000..e2cc959
+index 00000000..e2cc9594
 --- /dev/null
 +++ b/overlay/systemd-257/systemd-udevd-varlink.socket
 @@ -0,0 +1,26 @@
@@ -2723,7 +2723,7 @@ index 0000000..e2cc959
 +XAttrListen=user.varlink=listen
 diff --git a/overlay/systemd.nix b/overlay/systemd.nix
 new file mode 100644
-index 0000000..277c5c5
+index 00000000..277c5c53
 --- /dev/null
 +++ b/overlay/systemd.nix
 @@ -0,0 +1,65 @@

@@ -19,7 +19,7 @@ Package the standard AsteroidOS application suite and its shared assets:
 
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
 new file mode 100644
-index 0000000..81812e7
+index 00000000..81812e72
 --- /dev/null
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -0,0 +1,122 @@
@@ -147,7 +147,7 @@ index 0000000..81812e7
 +}
 diff --git a/overlay/asteroidos/assets/default.nix b/overlay/asteroidos/assets/default.nix
 new file mode 100644
-index 0000000..703662c
+index 00000000..703662c4
 --- /dev/null
 +++ b/overlay/asteroidos/assets/default.nix
 @@ -0,0 +1,196 @@
@@ -348,7 +348,7 @@ index 0000000..703662c
 +    };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 8a63fff..0784d4b 100644
+index 8a63fff0..0784d4bb 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -120,6 +120,14 @@ rec {

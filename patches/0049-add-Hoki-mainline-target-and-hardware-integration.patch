@@ -19,7 +19,7 @@ The mainline display, touch, modem, WLAN and audio drivers are still missing, so
 
 diff --git a/devices/fossil-hoki-mainline/README.md b/devices/fossil-hoki-mainline/README.md
 new file mode 100644
-index 0000000..2c5ea43
+index 00000000..2c5ea433
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/README.md
 @@ -0,0 +1,46 @@
@@ -71,7 +71,7 @@ index 0000000..2c5ea43
 +   - When using `lk2nd` secondary bootloader, flash a dummy DTBO image (`dtbo-fossil-hoki.img`) to `dtbo`.
 diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
 new file mode 100644
-index 0000000..1195ba0
+index 00000000..1195ba0e
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/default.nix
 @@ -0,0 +1,127 @@
@@ -204,7 +204,7 @@ index 0000000..1195ba0
 +}
 diff --git a/devices/fossil-hoki-mainline/kernel/default.nix b/devices/fossil-hoki-mainline/kernel/default.nix
 new file mode 100644
-index 0000000..6fdb768
+index 00000000..6fdb768a
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/kernel/default.nix
 @@ -0,0 +1,21 @@
@@ -231,7 +231,7 @@ index 0000000..6fdb768
 +})
 diff --git a/devices/fossil-hoki-mainline/sda429-hoki.dts b/devices/fossil-hoki-mainline/sda429-hoki.dts
 new file mode 100644
-index 0000000..be2c4a0
+index 00000000..be2c4a05
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/sda429-hoki.dts
 @@ -0,0 +1,11753 @@

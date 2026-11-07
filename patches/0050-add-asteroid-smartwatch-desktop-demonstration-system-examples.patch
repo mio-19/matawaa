@@ -9,7 +9,7 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 864 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 878 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 +
  examples/asteroid/default.nix                 |  15 +
  .../scripted-installer/automated-installer.rb |   5 +-
@@ -24,7 +24,7 @@ Run the launcher the way upstream AsteroidOS does: start it as a user service wi
  overlay/asteroidos/ngfd/default.nix           | 111 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 16 files changed, 1796 insertions(+), 43 deletions(-)
+ 16 files changed, 1810 insertions(+), 43 deletions(-)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -40,7 +40,7 @@ Run the launcher the way upstream AsteroidOS does: start it as a user service wi
  create mode 100644 overlay/asteroidos/udev-droid-system/default.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index 1081d08..f0f0dec 100644
+index 1081d085..f0f0decc 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -152,6 +152,24 @@ in
@@ -70,10 +70,10 @@ index 1081d08..f0f0dec 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 0000000..8b6b586
+index 00000000..b83ae115
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,864 @@
+@@ -0,0 +1,878 @@
 +{
 +  config,
 +  lib,
@@ -178,6 +178,10 @@ index 0000000..8b6b586
 +        # Provides the D-Bus service used by GSettings and AsteroidOS mlite.
 +        dconf
 +        asteroid.qml-asteroid
++        # Sound and feedback pipelines
++        gst_all_1.gstreamer
++        gst_all_1.gst-plugins-base
++        gst_all_1.gst-plugins-good
 +        # Provides the invoker command used by AsteroidOS Qt app launchers.
 +        asteroid.mapplauncherd
 +        asteroid.asteroid-launcher
@@ -525,6 +529,7 @@ index 0000000..8b6b586
 +      serviceConfig = {
 +        Type = "oneshot";
 +        TimeoutSec = 0;
++        SuccessExitStatus = [ "0" "2" ];
 +        ExecStart = "${pkgs.asteroid.swclock-offset}/bin/swclock-offset-boot";
 +      };
 +    };
@@ -653,17 +658,23 @@ index 0000000..8b6b586
 +
 +    # Upstream asteroid-alarmclock installs share/systemd/user/alarmpresenter.service
 +    # plus the com.nokia.voland D-Bus activation file; expose the same user
-+    # service so Nemo.Alarms can present firing alarms.
++    # service so Nemo.Alarms can present firing alarms on demand when the
++    # Wayland compositor is ready.
 +    systemd.user.services.alarmpresenter = {
 +      description = "AsteroidOS alarm presenter";
-+      wantedBy = [ "default.target" ];
 +      requires = [ "dbus.socket" ];
-+      after = [ "dbus.socket" ];
++      after = [
++        "dbus.socket"
++        "asteroid-launcher.service"
++      ];
++      wants = [ "asteroid-launcher.service" ];
 +      serviceConfig = {
 +        Type = "dbus";
 +        BusName = "com.nokia.voland";
 +        ExecStart = "${pkgs.asteroid.apps.alarmclock}/bin/asteroid-alarmpresenter";
 +        Environment = "QT_WAYLAND_DISABLE_WINDOWDECORATION=1";
++        Restart = "on-failure";
++        RestartSec = "1s";
 +      };
 +    };
 +
@@ -690,6 +701,9 @@ index 0000000..8b6b586
 +      wantedBy = [ "default.target" ];
 +      requires = [ "dbus.socket" ];
 +      unitConfig.ConditionUser = "!root";
++      environment = {
++        GST_PLUGIN_SYSTEM_PATH_1_0 = "/run/current-system/sw/lib/gstreamer-1.0";
++      };
 +      serviceConfig = {
 +        Type = "simple";
 +        ExecStart = "${pkgs.asteroid.ngfd}/bin/ngfd";
@@ -940,7 +954,7 @@ index 0000000..8b6b586
 +}
 diff --git a/examples/asteroid/configuration.nix b/examples/asteroid/configuration.nix
 new file mode 100644
-index 0000000..d55911c
+index 00000000..d55911c0
 --- /dev/null
 +++ b/examples/asteroid/configuration.nix
 @@ -0,0 +1,43 @@
@@ -989,7 +1003,7 @@ index 0000000..d55911c
 +}
 diff --git a/examples/asteroid/default.nix b/examples/asteroid/default.nix
 new file mode 100644
-index 0000000..5eca754
+index 00000000..5eca754f
 --- /dev/null
 +++ b/examples/asteroid/default.nix
 @@ -0,0 +1,15 @@
@@ -1009,7 +1023,7 @@ index 0000000..5eca754
 +  }
 +)
 diff --git a/examples/installer/pkgs/scripted-installer/automated-installer.rb b/examples/installer/pkgs/scripted-installer/automated-installer.rb
-index b189c9b..10908c9 100644
+index b189c9bb..10908c9a 100644
 --- a/examples/installer/pkgs/scripted-installer/automated-installer.rb
 +++ b/examples/installer/pkgs/scripted-installer/automated-installer.rb
 @@ -103,10 +103,9 @@ end
@@ -1027,7 +1041,7 @@ index b189c9b..10908c9 100644
  File.write(File.join(MOUNT_POINT, "/root/.nix-channels"), channels)
 diff --git a/overlay/asteroidos/bluebinder/default.nix b/overlay/asteroidos/bluebinder/default.nix
 new file mode 100644
-index 0000000..e38bf0b
+index 00000000..e38bf0b5
 --- /dev/null
 +++ b/overlay/asteroidos/bluebinder/default.nix
 @@ -0,0 +1,81 @@
@@ -1113,7 +1127,7 @@ index 0000000..e38bf0b
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 775c9f7..77714b0 100644
+index 775c9f72..77714b02 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -19,6 +19,26 @@ rec {
@@ -1217,7 +1231,7 @@ index 775c9f7..77714b0 100644
      inherit mkAsteroidApp mlite noUsrShareHook;
 diff --git a/overlay/asteroidos/egl-probe/default.nix b/overlay/asteroidos/egl-probe/default.nix
 new file mode 100644
-index 0000000..81ca384
+index 00000000..81ca384f
 --- /dev/null
 +++ b/overlay/asteroidos/egl-probe/default.nix
 @@ -0,0 +1,35 @@
@@ -1258,7 +1272,7 @@ index 0000000..81ca384
 +}
 diff --git a/overlay/asteroidos/egl-probe/egl-probe.c b/overlay/asteroidos/egl-probe/egl-probe.c
 new file mode 100644
-index 0000000..20d8a19
+index 00000000..20d8a19c
 --- /dev/null
 +++ b/overlay/asteroidos/egl-probe/egl-probe.c
 @@ -0,0 +1,120 @@
@@ -1384,7 +1398,7 @@ index 0000000..20d8a19
 +}
 diff --git a/overlay/asteroidos/libncicore/default.nix b/overlay/asteroidos/libncicore/default.nix
 new file mode 100644
-index 0000000..180de45
+index 00000000..180de45a
 --- /dev/null
 +++ b/overlay/asteroidos/libncicore/default.nix
 @@ -0,0 +1,71 @@
@@ -1461,7 +1475,7 @@ index 0000000..180de45
 +}
 diff --git a/overlay/asteroidos/libnciplugin/default.nix b/overlay/asteroidos/libnciplugin/default.nix
 new file mode 100644
-index 0000000..6506319
+index 00000000..6506319e
 --- /dev/null
 +++ b/overlay/asteroidos/libnciplugin/default.nix
 @@ -0,0 +1,90 @@
@@ -1557,7 +1571,7 @@ index 0000000..6506319
 +}
 diff --git a/overlay/asteroidos/libnfcdef/default.nix b/overlay/asteroidos/libnfcdef/default.nix
 new file mode 100644
-index 0000000..b3eda16
+index 00000000..b3eda168
 --- /dev/null
 +++ b/overlay/asteroidos/libnfcdef/default.nix
 @@ -0,0 +1,71 @@
@@ -1634,7 +1648,7 @@ index 0000000..b3eda16
 +}
 diff --git a/overlay/asteroidos/nfcd/default.nix b/overlay/asteroidos/nfcd/default.nix
 new file mode 100644
-index 0000000..d12414a
+index 00000000..d12414ad
 --- /dev/null
 +++ b/overlay/asteroidos/nfcd/default.nix
 @@ -0,0 +1,197 @@
@@ -1837,7 +1851,7 @@ index 0000000..d12414a
 +}
 diff --git a/overlay/asteroidos/ngfd/default.nix b/overlay/asteroidos/ngfd/default.nix
 new file mode 100644
-index 0000000..e82464c
+index 00000000..e82464c0
 --- /dev/null
 +++ b/overlay/asteroidos/ngfd/default.nix
 @@ -0,0 +1,111 @@
@@ -1954,7 +1968,7 @@ index 0000000..e82464c
 +})
 diff --git a/overlay/asteroidos/swclock-offset/default.nix b/overlay/asteroidos/swclock-offset/default.nix
 new file mode 100644
-index 0000000..d7e9103
+index 00000000..d7e91032
 --- /dev/null
 +++ b/overlay/asteroidos/swclock-offset/default.nix
 @@ -0,0 +1,30 @@
@@ -1990,7 +2004,7 @@ index 0000000..d7e9103
 +})
 diff --git a/overlay/asteroidos/udev-droid-system/default.nix b/overlay/asteroidos/udev-droid-system/default.nix
 new file mode 100644
-index 0000000..a4170a6
+index 00000000..a4170a61
 --- /dev/null
 +++ b/overlay/asteroidos/udev-droid-system/default.nix
 @@ -0,0 +1,24 @@
