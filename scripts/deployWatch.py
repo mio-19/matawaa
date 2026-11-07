@@ -222,24 +222,9 @@ def flash_stage1_bootimg_remote(
 
     log(f"Stage-1 boot.img size: {img_size} bytes, sha256: {img_sha256[:16]}...")
 
-    # Copy boot.img to watch /tmp
-    remote_tmp_img = f"/tmp/new-stage1-{img_sha256[:16]}-{os.getpid()}.img"
-    log(f"Transferring stage-1 boot.img to watch at {remote_tmp_img}...")
-    scp_cmd = [
-        "scp",
-        "-P",
-        str(port),
-        "-o",
-        "StrictHostKeyChecking=accept-new",
-        str(bootimg_file),
-        f"{user}@{host}:{remote_tmp_img}",
-    ]
-    run_cmd(scp_cmd)
-
-    # Shell script to locate boot partition, compare hash, and dd flash if needed
-    remote_script = f"""
+    # Shell script to locate boot partition and compare checksum before transfer
+    check_script = f"""
 set -euo pipefail
-trap 'rm -f {remote_tmp_img}' EXIT
 BOOT_PART=""
 for cand in \\
     /dev/block/bootdevice/by-name/boot \\
@@ -267,37 +252,68 @@ if [ -z "$BOOT_PART" ]; then
     exit 1
 fi
 
-actual_sha=$(sha256sum {remote_tmp_img} | cut -d' ' -f1)
-if [ "$actual_sha" != "{img_sha256}" ]; then
-    echo "Transferred boot image checksum mismatch" >&2
-    exit 1
-fi
-
 part_size=$(blockdev --getsize64 "$BOOT_PART")
 if [ "$part_size" -lt {img_size} ]; then
     echo "Boot image exceeds $BOOT_PART ($part_size bytes)" >&2
     exit 1
 fi
 
-echo "[*] Found boot partition block device: $BOOT_PART"
-PART_SHA=$(head -c {img_size} "$BOOT_PART" | sha256sum | awk '{{print $1}}')
-NEW_SHA="{img_sha256}"
-
-if [ "$PART_SHA" = "$NEW_SHA" ]; then
-    echo "[+] Stage-1 boot partition already matches new boot.img ($NEW_SHA). Flashing not needed."
-else
-    echo "[*] Stage-1 hash mismatch ($PART_SHA != $NEW_SHA). Flashing new boot.img..."
-    dd if={remote_tmp_img} of="$BOOT_PART" bs=4M status=progress conv=fsync
-    sync
-    flashed_sha=$(head -c {img_size} "$BOOT_PART" | sha256sum | cut -d' ' -f1)
-    if [ "$flashed_sha" != "$NEW_SHA" ]; then
-        echo "Boot partition read-back checksum mismatch" >&2
-        exit 1
-    fi
-    echo "[+] Stage-1 successfully flashed to $BOOT_PART!"
-fi
+echo "$BOOT_PART"
+head -c {img_size} "$BOOT_PART" | sha256sum | awk '{{print $1}}'
 """
-    ssh_exec(host, port, user, f"bash -c {shlex.quote(remote_script)}", sudo=True)
+    check_res = ssh_exec(
+        host, port, user, f"bash -c {shlex.quote(check_script)}", sudo=True, capture_output=True
+    )
+    lines = [line.strip() for line in check_res.stdout.splitlines() if line.strip()]
+    if len(lines) < 2:
+        raise RuntimeError(f"Unexpected output checking boot partition: {check_res.stdout}")
+    boot_part = lines[0]
+    part_sha = lines[1]
+
+    log(f"Found boot partition block device: {boot_part}")
+    if part_sha == img_sha256:
+        log_success(
+            f"Stage-1 boot partition already matches new boot.img ({img_sha256}). Flashing not needed."
+        )
+        return
+
+    log(f"Stage-1 hash mismatch ({part_sha} != {img_sha256}). Flashing new boot.img...")
+
+    # Copy boot.img to watch /tmp
+    remote_tmp_img = f"/tmp/new-stage1-{img_sha256[:16]}-{os.getpid()}.img"
+    log(f"Transferring stage-1 boot.img to watch at {remote_tmp_img}...")
+    scp_cmd = [
+        "scp",
+        "-P",
+        str(port),
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        str(bootimg_file),
+        f"{user}@{host}:{remote_tmp_img}",
+    ]
+    run_cmd(scp_cmd)
+
+    # Shell script to flash boot partition and verify
+    flash_script = f"""
+set -euo pipefail
+trap 'rm -f {remote_tmp_img}' EXIT
+
+actual_sha=$(sha256sum {remote_tmp_img} | cut -d' ' -f1)
+if [ "$actual_sha" != "{img_sha256}" ]; then
+    echo "Transferred boot image checksum mismatch" >&2
+    exit 1
+fi
+
+dd if={remote_tmp_img} of="{boot_part}" bs=4M status=progress conv=fsync
+sync
+flashed_sha=$(head -c {img_size} "{boot_part}" | sha256sum | cut -d' ' -f1)
+if [ "$flashed_sha" != "{img_sha256}" ]; then
+    echo "Boot partition read-back checksum mismatch" >&2
+    exit 1
+fi
+echo "[+] Stage-1 successfully flashed to {boot_part}!"
+"""
+    ssh_exec(host, port, user, f"bash -c {shlex.quote(flash_script)}", sudo=True)
 
 
 def deploy_copy(
