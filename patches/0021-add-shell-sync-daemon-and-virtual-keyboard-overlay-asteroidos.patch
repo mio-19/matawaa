@@ -21,14 +21,14 @@ current nightly.
  .../asteroidos/asteroid-launcher/default.nix  | 144 +++++++++++++
  .../display-on-startup.patch                  |  44 ++++
  .../org.nemomobile.compositor.conf            |  28 +++
- .../qml-boot-diagnostics.patch                |  58 +++++
+ .../qml-boot-diagnostics.patch                |  81 +++++++
  .../splash-no-opacitymask.patch               |  54 +++++
  overlay/asteroidos/default.nix                |  30 +++
  .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
  .../nemo-qml-plugin-dbus/default.nix          |  80 +++++++
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 201 ++++++++++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  43 ++++
- 13 files changed, 847 insertions(+)
+ 13 files changed, 870 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
@@ -392,10 +392,10 @@ index 00000000..b8271665
 +</busconfig>
 diff --git a/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
 new file mode 100644
-index 00000000..858ba581
+index 00000000..cf1bce25
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,81 @@
 +# Bring-up diagnostics: report what actually made it into the compositor scene.
 +#
 +# A black screen with a live render loop (frames swapping while the renderer
@@ -444,12 +444,35 @@ index 00000000..858ba581
 +     }
 + 
 +     Splash {
-+@@ -396,6 +399,9 @@
++@@ -387,6 +390,14 @@
++                 anchors.fill: parent
++                 source: watchfaceNightstandSource.value
++                 Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InCirc } }
+++                onStatusChanged: {
+++                    if (status === Loader.Error) {
+++                        var defaultFace = "file:///run/current-system/sw/share/asteroid-launcher/watchfaces/000-default-digital.qml"
+++                        if (source.toString() !== defaultFace) {
+++                            source = defaultFace
+++                        }
+++                    }
+++                }
++             }
++             Loader {
++                 id: watchfaceLoader
++@@ -396,6 +407,17 @@
 +                 anchors.fill: parent
 +                 source: watchFaceSource.value
 + 
-++                onStatusChanged: console.info("launcher: watchface", source,
-++                                              "status:", status)
+++                onStatusChanged: {
+++                    console.info("launcher: watchface", source, "status:", status)
+++                    if (status === Loader.Error) {
+++                        var defaultFace = "file:///run/current-system/sw/share/asteroid-launcher/watchfaces/000-default-digital.qml"
+++                        if (source.toString() !== defaultFace) {
+++                            console.warn("launcher: watchface failed to load, falling back to default:", defaultFace)
+++                            source = defaultFace
+++                        }
+++                    }
+++                }
 ++
 +                 // Reinstantiate to re-read the source from disk. Toggling the
 +                 // Loader instead of rewriting the dconf-backed watchFaceSource

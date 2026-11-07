@@ -9,7 +9,7 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 878 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 888 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 +
  examples/asteroid/default.nix                 |  15 +
  .../scripted-installer/automated-installer.rb |   5 +-
@@ -24,7 +24,7 @@ Run the launcher the way upstream AsteroidOS does: start it as a user service wi
  overlay/asteroidos/ngfd/default.nix           | 111 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 16 files changed, 1810 insertions(+), 43 deletions(-)
+ 16 files changed, 1820 insertions(+), 43 deletions(-)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -70,10 +70,10 @@ index 1081d085..f0f0decc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..b83ae115
+index 00000000..8d6182a3
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,878 @@
+@@ -0,0 +1,888 @@
 +{
 +  config,
 +  lib,
@@ -800,6 +800,16 @@ index 00000000..b83ae115
 +            done
 +          ''}"
 +          "-${pkgs.bash}/bin/bash -c '(echo QUIT > /run/psplash_fifo) 2>/dev/null || true'"
++          "${pkgs.writeShellScript "asteroid-launcher-sanitize-dconf" ''
++            # Reset dconf watchface path if it points to a gc-ed /nix/store path that no longer exists on disk
++            for key in /desktop/asteroid/watchface /desktop/asteroid/nightstand/watchface; do
++              val=$(${pkgs.dconf}/bin/dconf read "$key" 2>/dev/null || true)
++              path=$(echo "$val" | ${pkgs.gnused}/bin/sed -e "s/^'//" -e "s/'$//" -e 's|^file://||')
++              if echo "$path" | ${pkgs.gnugrep}/bin/grep -q "^/nix/store/" && [ ! -e "$path" ]; then
++                ${pkgs.dconf}/bin/dconf reset "$key" 2>/dev/null || true
++              fi
++            done
++          ''}"
 +        ];
 +        # Upstream asteroid-launcher.service runs the launcher directly. The
 +        # capabilities upstream attaches with setcap are provided as ambient
