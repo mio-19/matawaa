@@ -1,27 +1,80 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Sat, 24 Oct 2026 17:18:23 +1100
-Subject: [PATCH] add a standalone mainline target
- (devices/fossil-hoki-mainline)
+Subject: [PATCH] add Hoki mainline target and hardware integration
 
 Add a standalone Fossil Gen 6 mainline device. It imports only the AsteroidOS watch family and declares its own hardware, Android fastboot geometry and Linux 6.18 mainline kernel with the vendor sda429-hoki DTS. It no longer imports the vendor fossil-hoki device or inherits its Android/libhybris services.
 
 The mainline display, touch, modem, WLAN and audio drivers are still missing, so the target remains best-effort and non-bootable.
 ---
- devices/fossil-hoki-mainline/default.nix      |   113 +
+ devices/fossil-hoki-mainline/README.md        |    46 +
+ devices/fossil-hoki-mainline/default.nix      |   127 +
  .../fossil-hoki-mainline/kernel/default.nix   |    21 +
- devices/fossil-hoki-mainline/sda429-hoki.dts  | 11748 ++++++++++++++++
- 3 files changed, 11882 insertions(+)
+ devices/fossil-hoki-mainline/sda429-hoki.dts  | 11753 ++++++++++++++++
+ 4 files changed, 11947 insertions(+)
+ create mode 100644 devices/fossil-hoki-mainline/README.md
  create mode 100644 devices/fossil-hoki-mainline/default.nix
  create mode 100644 devices/fossil-hoki-mainline/kernel/default.nix
  create mode 100644 devices/fossil-hoki-mainline/sda429-hoki.dts
 
+diff --git a/devices/fossil-hoki-mainline/README.md b/devices/fossil-hoki-mainline/README.md
+new file mode 100644
+index 00000000..2c5ea433
+--- /dev/null
++++ b/devices/fossil-hoki-mainline/README.md
+@@ -0,0 +1,46 @@
++# Fossil Gen 6 (fossil-hoki) Mainline Target
++
++## Device Specifications
++- **Manufacturer:** Fossil
++- **Model:** Gen 6
++- **Codename:** `fossil-hoki` / `hoki`
++- **SoC:** Qualcomm Snapdragon Wear 4100+ (`SDA429W` / `SDM429W`, 4x Cortex-A53)
++- **GPU:** Qualcomm Adreno 504
++- **Display:** 416 x 416 circular AMOLED (1.28")
++- **Memory / Storage:** 1GB RAM / 8GB eMMC
++
++## Mainline Bring-up References
++- **Nura / postmarketOS Wiki:** [Fossil Gen 6 (fossil-hoki)](https://wiki.nura.eco/wiki/Fossil_Gen_6_(fossil-hoki))
++- **Mainline Linux Kernel PR:** [msm89x7-mainline/linux#29 (arm64: dts: qcom: Add SDM429)](https://github.com/msm89x7-mainline/linux/pull/29)
++- **lk2nd Bootloader PR:** [msm8916-mainline/lk2nd#552 (dts: msm8952: add support for Fossil Gen 6)](https://github.com/msm8916-mainline/lk2nd/pull/552)
++- **postmarketOS Integration:** [pmaports!6809](https://gitlab.postmarketos.org/postmarketOS/pmaports/-/merge_requests/6809)
++
++## Hardware & Subsystem Details
++- **Display:** Handled via continuous splash `simple-framebuffer` at base `0x90001000`:
++  - Resolution: 416 x 416
++  - Pixel format: `r8g8b8` (24-bit RGB)
++  - Stride: 1248 bytes (`416 * 3`)
++  - Reserved memory: `0x90001000`, size `0x7ec00`, marked `no-map`.
++- **Buttons / Input:**
++  - Volume Up (`KEY_VOLUMEUP`): GPIO 35 (`TLMM 35`, active low with pull-up).
++  - Volume Down (`KEY_VOLUMEDOWN`): PMIC PON resin pin (`&pon_resin`).
++  - Power (`KEY_POWER`): PMIC PON pwrkey (`&pon_pwrkey`).
++- **Storage:** eMMC on SDHC1 (`7824900.sdhci`), powered by RPM PM660 regulators `pm660_l19` (`vmmc`) and `pm660_l13` (`vqmmc`).
++- **USB:** High-speed USB in peripheral mode (`dr_mode = "peripheral"`) with extcon dummy and PM660 regulators (`l6`, `l12`, `l16`).
++- **Haptics & Battery:** Managed by PM660 SPMI PMIC (`pm660_haptics`, `pm660_fg`, `pm660_charger`).
++
++## Fastboot & Flashing Instructions
++1. **Enter Fastboot mode:**
++   - Power off the watch completely.
++   - Hold down **all three physical buttons** simultaneously until the fastboot screen appears.
++2. **Flash Mainline Image:**
++   ```bash
++   fastboot flash boot boot.img
++   fastboot flash userdata system.img
++   fastboot reboot
++   ```
++3. **Dualbooting with AsteroidOS (from Nura Wiki):**
++   - AsteroidOS rootfs is placed on the `system` partition.
++   - AsteroidOS kernel is placed on the `recovery` partition.
++   - Mainline rootfs is placed on the `userdata` partition.
++   - When using `lk2nd` secondary bootloader, flash a dummy DTBO image (`dtbo-fossil-hoki.img`) to `dtbo`.
 diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
 new file mode 100644
-index 00000000..2c15ecd0
+index 00000000..1195ba0e
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/default.nix
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,127 @@
 +{
 +  config,
 +  lib,
@@ -30,6 +83,20 @@ index 00000000..2c15ecd0
 +}:
 +
 +# Fossil Gen 6 pure-mainline target.
++#
++# Hardware: Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W)
++# Codename: fossil-hoki / hoki
++#
++# Mainline and community references:
++# - Nura / postmarketOS Wiki: https://wiki.nura.eco/wiki/Fossil_Gen_6_(fossil-hoki)
++# - Mainline Linux kernel PR: https://github.com/msm89x7-mainline/linux/pull/29
++# - lk2nd bootloader PR:      https://github.com/msm8916-mainline/lk2nd/pull/552
++# - postmarketOS MR:          https://gitlab.postmarketos.org/postmarketOS/pmaports/-/merge_requests/6809
++#
++# Fastboot & Boot Notes:
++# - Entering Fastboot mode: Power off the device, then hold all three physical buttons.
++# - Display: simple-framebuffer at 0x90001000 (416x416, 24-bit RGB r8g8b8, stride 1248).
++# - Rootfs: Btrfs on userdata partition (mmcblk0p50).
 +#
 +# This target runs the modern upstream Linux 6.18 kernel without Android
 +# proprietary blobs or libhybris. It uses Freedreno Mesa graphics with DRM/KMS,
@@ -116,9 +183,9 @@ index 00000000..2c15ecd0
 +  };
 +
 +  environment.sessionVariables = {
-+    QT_QPA_PLATFORM = "eglfs";
-+    QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
-+    QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++    QT_QPA_PLATFORM = lib.mkDefault "eglfs";
++    QT_QPA_EGLFS_INTEGRATION = lib.mkDefault "eglfs_kms";
++    QT_QPA_EGLFS_ALWAYS_SET_MODE = lib.mkDefault "1";
 +  };
 +
 +  zramSwap.enable = true;
@@ -164,10 +231,10 @@ index 00000000..6fdb768a
 +})
 diff --git a/devices/fossil-hoki-mainline/sda429-hoki.dts b/devices/fossil-hoki-mainline/sda429-hoki.dts
 new file mode 100644
-index 00000000..52df28eb
+index 00000000..be2c4a05
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/sda429-hoki.dts
-@@ -0,0 +1,11748 @@
+@@ -0,0 +1,11753 @@
 +/dts-v1/;
 +
 +/ {
@@ -10972,13 +11039,13 @@ index 00000000..52df28eb
 +		#size-cells = <0x02>;
 +		ranges;
 +
-+		framebuffer0: framebuffer@90000000 {
++		framebuffer0: framebuffer@90001000 {
 +			compatible = "simple-framebuffer";
-+			reg = <0x00 0x90000000 0x00 0x6e0000>;
++			reg = <0x00 0x90001000 0x00 0x7ec00>;
 +			width = <416>;
 +			height = <416>;
-+			stride = <1664>;
-+			format = "a8r8g8b8";
++			stride = <1248>;
++			format = "r8g8b8";
 +			status = "okay";
 +		};
 +	};
@@ -11044,6 +11111,11 @@ index 00000000..52df28eb
 +		ranges;
 +		linux,phandle = <0x285>;
 +		phandle = <0x285>;
++
++		framebuffer_mem: memory@90001000 {
++			reg = <0x00 0x90001000 0x00 0x7ec00>;
++			no-map;
++		};
 +
 +		ramoops@9ff00000 {
 +			compatible = "ramoops";

@@ -1,8 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Fri, 30 Oct 2026 18:01:18 +1100
-Subject: [PATCH] Add timed daemon, alarms/notifications QML plugins, keymaps
- and locale
+Subject: [PATCH] integrate AsteroidOS runtime, assets, paths, and source pins
 
 Complete the remaining reasonix-alignment items: package the timed server
 and voland client library, add the Nemo.Alarms/Nemo.Notifications QML
@@ -12,19 +11,28 @@ into the asteroid desktop profile.
 ---
  devices/fossil-hoki/default.nix               |   2 +-
  examples/asteroid/asteroid-desktop.nix        | 124 ++++++++++-
- overlay/asteroidos/apps/default.nix           |   4 +-
+ npins/sources.json                            |   6 +-
+ overlay/asteroidos/apps/default.nix           |   8 +-
  overlay/asteroidos/assets/default.nix         |  84 ++++++++
- .../asteroidos/asteroid-launcher/default.nix  |  34 ++-
+ .../asteroidos/asteroid-launcher/default.nix  |  36 +++-
  .../qml-boot-diagnostics.patch                |  58 +++++
- overlay/asteroidos/default.nix                |   8 +-
+ overlay/asteroidos/community-apps/default.nix |  33 ++-
+ overlay/asteroidos/default.nix                |  31 +--
+ overlay/asteroidos/lib/mk-asteroid-app.nix    |  10 +-
+ overlay/asteroidos/lib/no-usr-share-hook.nix  |   5 +
+ overlay/asteroidos/lib/no-usr-share-hook.sh   |  30 +++
  overlay/asteroidos/libiodata/default.nix      |   7 +
  .../nemo-qml-plugin-alarms/default.nix        | 135 ++++++++++++
  .../nemo-qml-plugin-notifications/default.nix | 121 +++++++++++
+ overlay/asteroidos/qml-asteroid/default.nix   |  12 ++
  .../qt6-qpa-hwcomposer-plugin/default.nix     |   1 +
  .../hwc-present-diagnostics.patch             | 204 ++++++++++++++++++
  overlay/asteroidos/timed-qt6/default.nix      | 170 ++++++++++++++-
- 13 files changed, 930 insertions(+), 22 deletions(-)
+ .../asteroidos/virtualkeyboard/default.nix    |   2 +
+ 20 files changed, 1034 insertions(+), 45 deletions(-)
  create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+ create mode 100644 overlay/asteroidos/lib/no-usr-share-hook.nix
+ create mode 100644 overlay/asteroidos/lib/no-usr-share-hook.sh
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
  create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
@@ -288,8 +296,26 @@ index 38e08c4f..21b2a357 100644
        });
      '';
  
+diff --git a/npins/sources.json b/npins/sources.json
+index 574e5b3e..a1ecbbde 100644
+--- a/npins/sources.json
++++ b/npins/sources.json
+@@ -8,10 +8,10 @@
+         "repo": "nixpkgs"
+       },
+       "branch": "nixpkgs-unstable",
+-      "revision": "5c9de89ec55bff981cb8da1a4ee92b10f1438ffc",
+-      "url": "https://github.com/NixOS/nixpkgs/archive/5c9de89ec55bff981cb8da1a4ee92b10f1438ffc.tar.gz",
+       "submodules": false,
+-      "hash": "sha256-WDValiY9se78X2Wh7aWWaq/c7HN29U555+OKbHEzYrw="
++      "revision": "6dadaf4375be35033e1c84395adbd53ff5fded96",
++      "url": "https://github.com/NixOS/nixpkgs/archive/6dadaf4375be35033e1c84395adbd53ff5fded96.tar.gz",
++      "hash": "sha256-D5H7H+qMoTGI/jJtxKP4u7BdjkFnUyhOovTrf3pTOr0="
+     }
+   },
+   "version": 8
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
-index 02e19169..fcef9ac1 100644
+index 02e19169..3e84436a 100644
 --- a/overlay/asteroidos/apps/default.nix
 +++ b/overlay/asteroidos/apps/default.nix
 @@ -38,8 +38,8 @@
@@ -298,11 +324,22 @@ index 02e19169..fcef9ac1 100644
      desc = "Smartwatch preferences and configuration application";
 -    rev = "6e257e62524001d3438d3b161cbc0693afbee189";
 -    sha256 = "sha256-o/UYJmJ7xVFII2Y4B+9PPyVhJlWPsLJ3aPVNW79Cg+s=";
-+    rev = "56c917fd82aa5cb1f679f424f4c226fcffd89a12";
-+    sha256 = "1cbn5cg9q49ik7xwhsi4l6wph9mjxl8w5j4016rdwxq6w8y5ixx3";
++    rev = "9c65aaea9910e6133e79b3b6206a1a8d18b94c80";
++    sha256 = "0c1rcwwdkqhazn6xmmxhap4zrh6yqbhcqlw30ay0qywl206kciji";
      extraBuildInputs = [
        mce-dev
        ngf-qt6
+@@ -77,8 +77,8 @@
+   flashlight = mkAsteroidApp {
+     name = "flashlight";
+     desc = "Full-screen high-brightness torch utility";
+-    rev = "0cdd6068cc57f052d7b6d50576b332ca20ae2865";
+-    sha256 = "0byzy9fl8vm0fvi9i3pffck0b6nzn97dyzncrwfs4dihqww8vzzl";
++    rev = "6b8c805c49c3a5adfa345b17b5d03e40ee50275b";
++    sha256 = "0zbsh2fiv3ab1jipz141nb0qwx9vc7zlycwrnn49crf1kxs35sim";
+   };
+ 
+   calendar = mkAsteroidApp {
 diff --git a/overlay/asteroidos/assets/default.nix b/overlay/asteroidos/assets/default.nix
 index 5188043b..703662c4 100644
 --- a/overlay/asteroidos/assets/default.nix
@@ -404,24 +441,32 @@ index 5188043b..703662c4 100644
 +    };
  }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
-index 95bab117..f904b791 100644
+index 95bab117..34a7fd1e 100644
 --- a/overlay/asteroidos/asteroid-launcher/default.nix
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
-@@ -32,12 +32,32 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -20,6 +20,7 @@
+   kdePackages,
+   buildPackages,
+   libhybris,
++  noUsrShareHook,
+ }:
+ 
+ let
+@@ -32,12 +33,32 @@ stdenv.mkDerivation (finalAttrs: {
    src = fetchFromGitHub {
      owner = "AsteroidOS";
      repo = "asteroid-launcher";
 -    rev = "4bd3d281fe3a2ea9631c640e1f00871fa19bbd4c";
 -    sha256 = "194hn7pkq100339gnavvjmyib15m557bykkyqr77jrgz0wl07bpz";
-+    rev = "8fd1546de7d79da53194f62f650ed72acd306348";
-+    sha256 = "0hf6mgf1n0bw6hhng8avakp64c9gywiiqpww2w2qd3caaf99nwm1";
++    rev = "29f4257ec9835ead090c8157e46948c769081ed2";
++    sha256 = "1c7swnsqxsrfdhdim9rbq4d33ivxskkck4yz8hmridfwdzzpiv53";
    };
  
    strictDeps = true;
  
 +  postPatch = ''
 +    substituteInPlace src/qml/MainScreen.qml \
-+      --replace-fail "/usr/share/asteroid-launcher" "$out/share/asteroid-launcher"
++      --replace-fail "/usr/share/asteroid-launcher" "/run/current-system/sw/share/asteroid-launcher"
 +
 +    substituteInPlace lipstick/src/localemanager.cpp \
 +      --replace-fail '"/usr/share/translations"' "\"$out/share/translations\""
@@ -442,7 +487,7 @@ index 95bab117..f904b791 100644
    # AsteroidOS wayland compositor & shell
    # Upstream repository: https://github.com/AsteroidOS/asteroid-launcher
    patches = [
-@@ -49,6 +69,12 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -49,6 +70,12 @@ stdenv.mkDerivation (finalAttrs: {
        url = "https://github.com/AsteroidOS/asteroid-launcher/pull/310.patch";
        hash = "sha256-zFU7CbI4YqPSDWirkhUW5wxYwYLi0rft2AxwJ7TGqMg=";
      })
@@ -455,7 +500,7 @@ index 95bab117..f904b791 100644
      # Remove OpacityMask dependency from the 400ms initial splash animation
      ./splash-no-opacitymask.patch
      # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
-@@ -59,6 +85,10 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -59,6 +86,10 @@ stdenv.mkDerivation (finalAttrs: {
      # Upstream: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
      # Upstream CMake qt_add_shaders: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
      ./circlemask-qrc.patch
@@ -466,6 +511,14 @@ index 95bab117..f904b791 100644
    ];
  
    nativeBuildInputs = [
+@@ -66,6 +97,7 @@ stdenv.mkDerivation (finalAttrs: {
+     kdePackages.extra-cmake-modules
+     pkg-config
+     qt6.wrapQtAppsHook
++    noUsrShareHook
+   ];
+ 
+   cmakeFlags = [
 diff --git a/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
 new file mode 100644
 index 00000000..858ba581
@@ -530,25 +583,150 @@ index 00000000..858ba581
 +                 // Reinstantiate to re-read the source from disk. Toggling the
 +                 // Loader instead of rewriting the dconf-backed watchFaceSource
 +                 // avoids a cross-process write that can clobber a concurrent
+diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
+index b82d53bc..1c6b5f86 100644
+--- a/overlay/asteroidos/community-apps/default.nix
++++ b/overlay/asteroidos/community-apps/default.nix
+@@ -6,6 +6,7 @@
+   mkAsteroidApp,
+   mlite,
+   espeak-classic,
++  noUsrShareHook,
+ }:
+ 
+ rec {
+@@ -16,8 +17,8 @@ rec {
+     src = fetchFromGitHub {
+       owner = "AsteroidOS";
+       repo = "unofficial-watchfaces";
+-      rev = "e1b5a205b72f8a249a6d85c81493a933b5b5edcc";
+-      sha256 = "0ml8i4p5h6fv3d3x0xqlz6qngf2063scbm2mrr7ssbbv4q3vsf36";
++      rev = "7d1d2673922c1e6a8d8d0650032795ee2bd19683";
++      sha256 = "047jyapyc3h7vgi4apgkgw76116z76mb1n2z71j11mi9x8y3x72a";
+     };
+ 
+     installPhase = ''
+@@ -153,6 +154,10 @@ rec {
+     patches = [
+       ./beatfork-tack-improvements.patch
+     ];
++    postPatch = ''
++      substituteInPlace src/events.d/beatfork-tick.ini \
++        --replace-fail '/usr/share/sounds/tick.wav' "$out/share/sounds/tick.wav"
++    '';
+     extraBuildInputs = [
+       qt6.qtmultimedia
+     ];
+@@ -166,6 +171,12 @@ rec {
+     desc = "Benchmark tool for AsteroidOS smartwatches";
+     rev = "11e90920e76e6c62fe1076d4c3927b81b1154e96";
+     sha256 = "0x3c5rm2b8b8cfq7a1kl1699lmn88id70zmrsqzf53bxiv1ms8x4";
++    postPatch = ''
++      for phase in src/phases/CloudLight.qml src/phases/CloudHeavy.qml; do
++        substituteInPlace "$phase" \
++          --replace-fail 'file:///usr/share/benchymark/' "file://$out/share/benchymark/"
++      done
++    '';
+     extraBuildInputs = [
+       qt6.qtsensors
+     ];
+@@ -183,8 +194,20 @@ rec {
+       sha256 = "0g8x6v27ni3zqwir2sif7a0csb78adii47g4y4mnqm3vfklknnp1";
+     };
+ 
++    postPatch = ''
++      substituteInPlace asteroid_docking_bay/watchctl.py \
++        --replace-fail '/usr/share/locale' '/run/current-system/sw/share/locale' \
++        --replace-fail '/usr/share/sounds/notification.wav' '/run/current-system/sw/share/sounds/notification.wav'
++      substituteInPlace asteroid_docking_bay/wanze.py \
++        --replace-fail 'Path("/usr/share/wanze")' 'Path("/run/current-system/sw/share/wanze")'
++      substituteInPlace asteroid_docking_bay/rpcops.py \
++        --replace-fail '/usr/share/locale' '/run/current-system/sw/share/locale'
++    '';
++
+     dontBuild = true;
+ 
++    nativeBuildInputs = [ noUsrShareHook ];
++
+     installPhase = ''
+       runHook preInstall
+       mkdir -p $out/bin $out/share/asteroid-docking-bay
+@@ -339,7 +362,13 @@ rec {
+       rev = "ccd5d9f52609bbdcd5d8fa78c4fdb0f12954125f";
+       hash = "sha256-9MoX6ykqvd2iB0VrZCfhSyhtztMpBTukeKejfAWYW1w=";
+     };
++    postPatch = ''
++      substituteInPlace neofetch \
++        --replace-fail '/usr/share/gtk-2.0/gtkrc' '/run/current-system/sw/share/gtk-2.0/gtkrc' \
++        --replace-fail '/usr/share/gtk-3.0/settings.ini' '/run/current-system/sw/share/gtk-3.0/settings.ini'
++    '';
+     dontBuild = true;
++    nativeBuildInputs = [ noUsrShareHook ];
+     installPhase = ''
+       runHook preInstall
+       install -Dm755 neofetch $out/bin/neofetch
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 3c4eb08e..c1bbd18e 100644
+index 3c4eb08e..ecc7f68e 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -123,8 +123,12 @@ rec {
+@@ -1,27 +1,23 @@
+ { callPackage, pkgs }:
+ 
+ rec {
+-  metaAsteroidSrc = pkgs.fetchgit {
+-    url = "https://github.com/AsteroidOS/meta-asteroid";
+-    rev = "f1fce86f8d6488066ac266216b7e68be00d8499d";
+-    hash = "sha256-FZlt4YrN+y4dSXz8zbBsK+ulwKIaoSi4eDpTWLPiYvQ=";
+-  };
+-  meta-asteroid-src = metaAsteroidSrc;
++  noUsrShareHook = callPackage ./lib/no-usr-share-hook.nix { };
+ 
+   mkAsteroidApp = callPackage ./lib/mk-asteroid-app.nix {
+-    inherit qml-asteroid;
++    inherit qml-asteroid mapplauncherd noUsrShareHook;
+   };
+ 
+-  qml-asteroid = callPackage ./qml-asteroid { };
+-  mapplauncherd = callPackage ./mapplauncherd { };
++  qml-asteroid = callPackage ./qml-asteroid { inherit noUsrShareHook; };
++  mapplauncherd = callPackage ./mapplauncherd { inherit metaAsteroidSrc; };
+ 
+   # Upstream meta-asteroid checkout, used for unmodified recipe payloads
+   # (udev rules, unit files, patches) instead of vendoring them.
+   metaAsteroidSrc = pkgs.fetchgit {
+     url = "https://github.com/AsteroidOS/meta-asteroid";
+-    rev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-    hash = "sha256-Z9Hu9zOHodSioy6oqQqWMoD/0FUGHH9nnDv72F5GweI=";
++    rev = "c84c0bbd731f9dfa3b04295bac239dd7fa64c722";
++    hash = "sha256-AZF9IUTtSNTpgcu7kOL4OLIg/WJIGBI04Q9WIrnMQUA=";
+   };
++  meta-asteroid-src = metaAsteroidSrc;
+ 
+   # Device features shipped by upstream meta-hoki (IMAGE_INSTALL) and asteroid-image.
+   udev-droid-system = callPackage ./udev-droid-system { inherit metaAsteroidSrc; };
+@@ -63,6 +59,7 @@ rec {
+       usb-moded-qt6
+       keepalive
+       timed-qt6
++      noUsrShareHook
+       ;
+   };
+ 
+@@ -123,8 +120,12 @@ rec {
      inherit mce-dev libiphb;
    };
    timed-qt6 = callPackage ./timed-qt6 {
 -    inherit libiodata;
 +    inherit libiodata metaAsteroidSrc;
-   };
++  };
 +  nemo-qml-plugin-alarms = callPackage ./nemo-qml-plugin-alarms {
 +    inherit timed-qt6;
-+  };
+   };
 +  nemo-qml-plugin-notifications = callPackage ./nemo-qml-plugin-notifications { };
  
    # Calendar subsystem: accounts-qt, kcalendarcore, mkcal, and nemo-qml-plugin-calendar
    # Upstream repository: https://gitlab.com/accounts-sso/accounts-qt
-@@ -172,7 +176,7 @@ rec {
+@@ -172,14 +173,14 @@ rec {
        inherit browser telegram kiwix;
      };
  
@@ -557,6 +735,98 @@ index 3c4eb08e..c1bbd18e 100644
      inherit virtualkeyboard;
    };
  
+-  virtualkeyboard = callPackage ./virtualkeyboard { };
++  virtualkeyboard = callPackage ./virtualkeyboard { inherit noUsrShareHook; };
+ 
+   community-apps = callPackage ./community-apps {
+-    inherit mkAsteroidApp mlite;
++    inherit mkAsteroidApp mlite noUsrShareHook;
+     inherit (pkgs) espeak-classic;
+   };
+ 
+diff --git a/overlay/asteroidos/lib/mk-asteroid-app.nix b/overlay/asteroidos/lib/mk-asteroid-app.nix
+index 25094e27..fa056167 100644
+--- a/overlay/asteroidos/lib/mk-asteroid-app.nix
++++ b/overlay/asteroidos/lib/mk-asteroid-app.nix
+@@ -8,6 +8,7 @@
+   qt6,
+   qml-asteroid,
+   mapplauncherd,
++  noUsrShareHook,
+   kdePackages,
+   buildPackages,
+ }:
+@@ -51,10 +52,12 @@ stdenv.mkDerivation (finalAttrs: {
+   inherit patches;
+ 
+   postPatch = ''
+-    find . -name CMakeLists.txt -exec sed -i 's|/usr/share|share|g' {} +
+-    grep -IlR '/usr/share/asteroid-launcher' . | while IFS= read -r file; do
++    # CMake install destinations must stay relative to CMAKE_INSTALL_PREFIX.
++    find . -name CMakeLists.txt -exec sed -i 's|DESTINATION /usr/share|DESTINATION share|g' {} +
++    grep -IlRZ '/usr/share/asteroid-launcher' . > "$TMPDIR/asteroid-launcher-paths" || [ "$?" -eq 1 ]
++    while IFS= read -r -d "" file; do
+       sed -i 's|/usr/share/asteroid-launcher|/run/current-system/sw/share/asteroid-launcher|g' "$file"
+-    done
++    done < "$TMPDIR/asteroid-launcher-paths"
+   ''
+   + postPatch;
+ 
+@@ -64,6 +67,7 @@ stdenv.mkDerivation (finalAttrs: {
+     pkg-config
+     qt6.wrapQtAppsHook
+     qml-asteroid
++    noUsrShareHook
+   ]
+   ++ lib.optionals (!isCross) [
+     qt6.qtdeclarative
+diff --git a/overlay/asteroidos/lib/no-usr-share-hook.nix b/overlay/asteroidos/lib/no-usr-share-hook.nix
+new file mode 100644
+index 00000000..8d7c7073
+--- /dev/null
++++ b/overlay/asteroidos/lib/no-usr-share-hook.nix
+@@ -0,0 +1,5 @@
++{ makeSetupHook }:
++
++makeSetupHook {
++  name = "no-usr-share-hook";
++} ./no-usr-share-hook.sh
+diff --git a/overlay/asteroidos/lib/no-usr-share-hook.sh b/overlay/asteroidos/lib/no-usr-share-hook.sh
+new file mode 100644
+index 00000000..afbe09c5
+--- /dev/null
++++ b/overlay/asteroidos/lib/no-usr-share-hook.sh
+@@ -0,0 +1,30 @@
++# Check installed runtime files after package-specific fixups and wrappers.
++auditNoUsrShare() {
++    local output dir file found=0
++    local -a files=()
++
++    for output in $outputs; do
++        for dir in ${usrShareAuditDirs:-bin lib libexec share}; do
++            if [ -d "${!output}/$dir" ]; then
++                mapfile -d '' files < <(
++                    find "${!output}/$dir" \( -type f -o -type l \) \
++                        ! -path '*/share/doc/*' \
++                        ! -path '*/docs/*' \
++                        ! -path '*/tests/*' \
++                        ! -name '*.md' \
++                        -print0
++                )
++                for file in "${files[@]}"; do
++                    if { [ -L "$file" ] && [[ $(readlink "$file") == *'/usr/share'* ]]; } || \
++                       { [ -f "$file" ] && LC_ALL=C grep -aFq '/usr/share' "$file"; }; then
++                        echo "Unpatched /usr/share reference: $file" >&2
++                        found=1
++                    fi
++                done
++            fi
++        done
++    done
++    return "$found"
++}
++
++postFixupHooks+=(auditNoUsrShare)
 diff --git a/overlay/asteroidos/libiodata/default.nix b/overlay/asteroidos/libiodata/default.nix
 index 36607b9c..25646355 100644
 --- a/overlay/asteroidos/libiodata/default.nix
@@ -857,6 +1127,43 @@ index 00000000..3b6dc415
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/qml-asteroid/default.nix b/overlay/asteroidos/qml-asteroid/default.nix
+index c275fbde..3e89bc8a 100644
+--- a/overlay/asteroidos/qml-asteroid/default.nix
++++ b/overlay/asteroidos/qml-asteroid/default.nix
+@@ -7,6 +7,7 @@
+   qt6,
+   kdePackages,
+   buildPackages,
++  noUsrShareHook,
+ }:
+ 
+ stdenv.mkDerivation (finalAttrs: {
+@@ -27,6 +28,7 @@ stdenv.mkDerivation (finalAttrs: {
+     kdePackages.extra-cmake-modules
+     pkg-config
+     qt6.wrapQtAppsHook
++    noUsrShareHook
+   ];
+ 
+   buildInputs = [
+@@ -41,6 +43,16 @@ stdenv.mkDerivation (finalAttrs: {
+         substituteInPlace src/settings/src/languagemodel.cpp \
+           --replace-fail '"/usr/share/supported-languages"' '"/run/current-system/sw/share/supported-languages"'
+ 
++        substituteInPlace src/app/asteroidapp.cpp \
++          --replace-fail '"/usr/share/translations"' '"/run/current-system/sw/share/translations"' \
++          --replace-fail '"/usr/share/applications/"' '"/run/current-system/sw/share/applications/"'
++
++        substituteInPlace src/controls/src/icon.cpp \
++          --replace-fail '"/usr/share/icons/asteroid/"' '"/run/current-system/sw/share/icons/asteroid/"'
++
++        substituteInPlace src/controls/CMakeLists.txt \
++          --replace-fail '"-indexdir" "/usr/share/doc/qt5" ' ""
++
+         substituteInPlace CMakeLists.txt \
+           --replace-fail 'find_package(Mapplauncherd_qt6 MODULE REQUIRED)' ""
+         substituteInPlace src/app/CMakeLists.txt \
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 index 9b3ef899..b4cd0f72 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
@@ -1324,3 +1631,23 @@ index acffe994..e52b5713 100644
      homepage = "https://github.com/sailfishos/timed";
      license = licenses.lgpl21Plus;
      platforms = platforms.linux;
+diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
+index 54ce4ee1..12ef6cf7 100644
+--- a/overlay/asteroidos/virtualkeyboard/default.nix
++++ b/overlay/asteroidos/virtualkeyboard/default.nix
+@@ -8,6 +8,7 @@
+   librime,
+   rime-data,
+   buildPackages,
++  noUsrShareHook,
+ }:
+ 
+ stdenv.mkDerivation (finalAttrs: {
+@@ -41,6 +42,7 @@ stdenv.mkDerivation (finalAttrs: {
+     pkg-config
+     qt6.wrapQtAppsHook
+     buildPackages.librime
++    noUsrShareHook
+   ];
+ 
+   buildInputs = [
