@@ -5,19 +5,19 @@ Subject: [PATCH] add the AsteroidOS 4.9 vendor kernel and image
  (devices/oppo-beluga)
 
 ---
- devices/oppo-beluga/android-init.nix   | 113 +++++++++++++++++
+ devices/oppo-beluga/android-init.nix   | 122 ++++++++++++++++++
  devices/oppo-beluga/default.nix        | 168 +++++++++++++++++++++++--
  devices/oppo-beluga/kernel/default.nix | 112 +++++++++++++++++
- 3 files changed, 383 insertions(+), 10 deletions(-)
+ 3 files changed, 392 insertions(+), 10 deletions(-)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
 new file mode 100644
-index 00000000..ffc5fceb
+index 00000000..8c88b481
 --- /dev/null
 +++ b/devices/oppo-beluga/android-init.nix
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,122 @@
 +{
 +  lib,
 +  pkgs,
@@ -73,6 +73,15 @@ index 00000000..ffc5fceb
 +  '';
 +in
 +{
++  # Early boot setup for Android HAL and libhybris property contexts and init.rc.
++  # These files reside in the Nix store and are symlinked into / every boot
++  # during early sysinit by systemd-tmpfiles.
++  systemd.tmpfiles.rules = [
++    "L+ /init.rc - - - - ${patchedInitRc}"
++    "L+ /plat_property_contexts - - - - ${platPropertyContexts}"
++    "L+ /nonplat_property_contexts - - - - ${nonplatPropertyContexts}"
++  ];
++
 +  # AsteroidOS-style Pie stack: run the hal-droid Pie init (/usr/libexec/hal-droid/system/bin/init).
 +  # Matches upstream meta-beluga recipes-android/android-init/android-init/android-init.service.
 +  systemd.services.android-init = {
@@ -108,9 +117,9 @@ index 00000000..ffc5fceb
 +        elif [ -d /system_root/bin ] && [ ! -d /system/bin ]; then
 +          ${pkgs.util-linux}/bin/mount --bind /system_root /system || true
 +        fi
-+        ${pkgs.coreutils}/bin/cp -f ${patchedInitRc} /init.rc
-+        ${pkgs.coreutils}/bin/cp -f ${platPropertyContexts} /plat_property_contexts
-+        ${pkgs.coreutils}/bin/cp -f ${nonplatPropertyContexts} /nonplat_property_contexts
++        [ -e /init.rc ] || ${pkgs.coreutils}/bin/ln -sf ${patchedInitRc} /init.rc
++        [ -e /plat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${platPropertyContexts} /plat_property_contexts
++        [ -e /nonplat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${nonplatPropertyContexts} /nonplat_property_contexts
 +        if [ -f /system/etc/ld.config.28.txt ]; then
 +          ${pkgs.util-linux}/bin/mount --bind ${ldConfig} /system/etc/ld.config.28.txt || true
 +        fi
@@ -123,9 +132,9 @@ index 00000000..ffc5fceb
 +  # AsteroidOS installs root property contexts and init.rc into / at image build time
 +  # Reference: meta-smartwatch meta-beluga/recipes-android/android-init/android-init_1.0.bbappend
 +  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
-+    cp -f ${patchedInitRc} ./init.rc
-+    cp -f ${platPropertyContexts} ./plat_property_contexts
-+    cp -f ${nonplatPropertyContexts} ./nonplat_property_contexts
++    ln -sf ${patchedInitRc} ./init.rc
++    ln -sf ${platPropertyContexts} ./plat_property_contexts
++    ln -sf ${nonplatPropertyContexts} ./nonplat_property_contexts
 +    if [ -f ./system/etc/ld.config.28.txt ]; then
 +      cp -f ${ldConfig} ./system/etc/ld.config.28.txt
 +    fi

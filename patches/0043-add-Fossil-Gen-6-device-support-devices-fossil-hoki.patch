@@ -18,7 +18,7 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 ++
- devices/fossil-hoki/android-init.nix          | 148 +++++
+ devices/fossil-hoki/android-init.nix          | 160 ++++++
  devices/fossil-hoki/android-system-data.nix   |  26 +
  devices/fossil-hoki/audio-modules.nix         | 122 +++++
  devices/fossil-hoki/default.nix               | 510 ++++++++++++++++++
@@ -43,7 +43,7 @@ they cannot hold multi-user.target.
  overlay/asteroidos/default.nix                |   2 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  95 +++-
  .../hwc-present-diagnostics.patch             | 204 +++++++
- 26 files changed, 2522 insertions(+), 72 deletions(-)
+ 26 files changed, 2534 insertions(+), 72 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -132,10 +132,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..e9ba17d2
+index 00000000..ecaca223
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,160 @@
 +{
 +  lib,
 +  pkgs,
@@ -192,6 +192,18 @@ index 00000000..e9ba17d2
 +  '';
 +in
 +{
++  # Early boot setup for Android HAL and libhybris property contexts and init.rc.
++  # These files reside in the Nix store and are symlinked into / every boot
++  # during early sysinit by systemd-tmpfiles.
++  systemd.tmpfiles.rules = [
++    "L+ /init.rc - - - - ${patchedInitRc}"
++    "L+ /plat_property_contexts - - - - ${platPropertyContexts}"
++    "L+ /nonplat_property_contexts - - - - ${nonplatPropertyContexts}"
++    "L+ /plat_hwservice_contexts - - - - /system/etc/selinux/plat_hwservice_contexts"
++    "L+ /vendor_hwservice_contexts - - - - /vendor/etc/selinux/vendor_hwservice_contexts"
++    "L+ /vndservice_contexts - - - - /vendor/etc/selinux/vndservice_contexts"
++  ];
++
 +  # AsteroidOS-style Pie stack: /system is the hal-droid Android 9 tree from
 +  # the hybris tarball and /vendor is the stock Pie vendor, so run the matching
 +  # hal-droid Pie init. It parses the Pie system/vendor rc files (no apex or
@@ -226,20 +238,20 @@ index 00000000..e9ba17d2
 +            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/platform/soc/7824900.sdhci/by-name/"$name"
 +          done
 +        fi
-+        ${pkgs.coreutils}/bin/cp -f ${patchedInitRc} /init.rc
-+        ${pkgs.coreutils}/bin/cp -f ${platPropertyContexts} /plat_property_contexts
-+        ${pkgs.coreutils}/bin/cp -f ${nonplatPropertyContexts} /nonplat_property_contexts
++        [ -e /init.rc ] || ${pkgs.coreutils}/bin/ln -sf ${patchedInitRc} /init.rc
++        [ -e /plat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${platPropertyContexts} /plat_property_contexts
++        [ -e /nonplat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${nonplatPropertyContexts} /nonplat_property_contexts
 +        if [ -f /system/lib/libselinux.so ]; then
 +          ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so
-+          ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux_stubs.so
++          ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so
 +        fi
-+        if [ -f /system/etc/selinux/plat_hwservice_contexts ]; then
++        if [ -f /system/etc/selinux/plat_hwservice_contexts ] && [ ! -e /plat_hwservice_contexts ]; then
 +          ${pkgs.coreutils}/bin/ln -sf /system/etc/selinux/plat_hwservice_contexts /plat_hwservice_contexts
 +        fi
-+        if [ -f /vendor/etc/selinux/vendor_hwservice_contexts ]; then
++        if [ -f /vendor/etc/selinux/vendor_hwservice_contexts ] && [ ! -e /vendor_hwservice_contexts ]; then
 +          ${pkgs.coreutils}/bin/ln -sf /vendor/etc/selinux/vendor_hwservice_contexts /vendor_hwservice_contexts
 +        fi
-+        if [ -f /vendor/etc/selinux/vndservice_contexts ]; then
++        if [ -f /vendor/etc/selinux/vndservice_contexts ] && [ ! -e /vndservice_contexts ]; then
 +          ${pkgs.coreutils}/bin/ln -sf /vendor/etc/selinux/vndservice_contexts /vndservice_contexts
 +        fi
 +        if [ -f /system/etc/ld.config.28.txt ]; then
@@ -276,9 +288,9 @@ index 00000000..e9ba17d2
 +  # AsteroidOS installs root property contexts and init.rc into / at image build time
 +  # Reference: meta-smartwatch meta-hoki/recipes-android/android-init/android-init_1.0.bbappend
 +  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
-+    cp -f ${patchedInitRc} ./init.rc
-+    cp -f ${platPropertyContexts} ./plat_property_contexts
-+    cp -f ${nonplatPropertyContexts} ./nonplat_property_contexts
++    ln -sf ${patchedInitRc} ./init.rc
++    ln -sf ${platPropertyContexts} ./plat_property_contexts
++    ln -sf ${nonplatPropertyContexts} ./nonplat_property_contexts
 +    if [ -f ./system/etc/ld.config.28.txt ]; then
 +      cp -f ${ldConfig} ./system/etc/ld.config.28.txt
 +    fi

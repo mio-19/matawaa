@@ -49,7 +49,7 @@ libraries, without wrapping the Qt apps.
  ...owerkey-Also-suspend-on-palm-reports.patch | 161 +++++
  overlay/asteroidos/mkcal/default.nix          |  60 ++
  overlay/asteroidos/mlite/CMakeLists.txt       | 122 ++++
- overlay/asteroidos/mlite/default.nix          |  52 ++
+ overlay/asteroidos/mlite/default.nix          |  62 ++
  .../nemo-qml-plugin-alarms/default.nix        | 135 ++++
  .../nemo-qml-plugin-calendar/default.nix      |  94 +++
  .../nemo-qml-plugin-notifications/default.nix | 121 ++++
@@ -61,7 +61,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
  overlay/libhybris/default.nix                 |  53 +-
- 44 files changed, 5050 insertions(+), 37 deletions(-)
+ 44 files changed, 5060 insertions(+), 37 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -4084,10 +4084,10 @@ index 00000000..b82207f8
 +)
 diff --git a/overlay/asteroidos/mlite/default.nix b/overlay/asteroidos/mlite/default.nix
 new file mode 100644
-index 00000000..87a963eb
+index 00000000..f856fb47
 --- /dev/null
 +++ b/overlay/asteroidos/mlite/default.nix
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,62 @@
 +# Lightweight desktop integration library providing MDConfItem / dconf bindings for Qt
 +# Upstream repository: https://github.com/sailfishos/mlite
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/mlite
@@ -4114,6 +4114,16 @@ index 00000000..87a963eb
 +  };
 +
 +  strictDeps = true;
++
++  postPatch = ''
++    substituteInPlace src/mdesktopentry.cpp \
++      --replace-fail '"/usr/share/translations"' '"/run/current-system/sw/share/translations"' \
++      --replace-fail '!translator->load(QLocale(), catalog, "-", "/run/current-system/sw/share/translations")' \
++                     '(!translator->load(QLocale(), catalog, "-", "/run/current-system/sw/share/translations") && !translator->load(QLocale("en_GB"), catalog, "-", "/run/current-system/sw/share/translations"))'
++
++    substituteInPlace src/mpermission.cpp \
++      --replace-fail '"/usr/share/translations"' '"/run/current-system/sw/share/translations"'
++  '';
 +
 +  preConfigure = ''
 +    cp ${./CMakeLists.txt} CMakeLists.txt

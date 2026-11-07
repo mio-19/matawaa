@@ -21,14 +21,14 @@ current nightly.
  .../asteroidos/asteroid-launcher/default.nix  | 144 +++++++++++++
  .../display-on-startup.patch                  |  44 ++++
  .../org.nemomobile.compositor.conf            |  28 +++
- .../qml-boot-diagnostics.patch                |  81 +++++++
+ .../qml-boot-diagnostics.patch                | 109 ++++++++++
  .../splash-no-opacitymask.patch               |  54 +++++
  overlay/asteroidos/default.nix                |  30 +++
  .../nemo-qml-plugin-configuration/default.nix |  69 ++++++
  .../nemo-qml-plugin-dbus/default.nix          |  80 +++++++
  .../qt6-qpa-hwcomposer-plugin/default.nix     | 201 ++++++++++++++++++
  .../asteroidos/virtualkeyboard/default.nix    |  43 ++++
- 13 files changed, 870 insertions(+)
+ 13 files changed, 898 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
  create mode 100644 overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
@@ -392,10 +392,10 @@ index 00000000..b8271665
 +</busconfig>
 diff --git a/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
 new file mode 100644
-index 00000000..cf1bce25
+index 00000000..7720139e
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,109 @@
 +# Bring-up diagnostics: report what actually made it into the compositor scene.
 +#
 +# A black screen with a live render loop (frames swapping while the renderer
@@ -477,6 +477,34 @@ index 00000000..cf1bce25
 +                 // Reinstantiate to re-read the source from disk. Toggling the
 +                 // Loader instead of rewriting the dconf-backed watchFaceSource
 +                 // avoids a cross-process write that can clobber a concurrent
++@@ -433,6 +455,12 @@
++             onStatusChanged: {
++                 if (appLauncher.status == Loader.Ready) {
++                     Desktop.appLauncher = appLauncher.item
+++                } else if (appLauncher.status == Loader.Error) {
+++                    var defaultLauncher = "file:///run/current-system/sw/share/asteroid-launcher/applauncher/000-default-horizontal.qml"
+++                    if (source.toString() !== defaultLauncher) {
+++                        console.warn("launcher: appLauncher failed to load, falling back to default:", defaultLauncher)
+++                        source = defaultLauncher
+++                    }
++                 }
++             }
++         }
++@@ -528,6 +556,15 @@
++         Loader {
++             id: wallpaperLoader
++             anchors.fill: parent
+++            onStatusChanged: {
+++                if (status === Loader.Error) {
+++                    var defaultWallpaper = "file:///run/current-system/sw/share/asteroid-launcher/wallpapers/full/000-flatmesh.qml"
+++                    if (source.toString() !== defaultWallpaper) {
+++                        console.warn("launcher: wallpaper failed to load, falling back to default:", defaultWallpaper)
+++                        source = defaultWallpaper
+++                    }
+++                }
+++            }
++         }
++     }
 diff --git a/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch b/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
 new file mode 100644
 index 00000000..c8fc8896

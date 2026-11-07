@@ -11,10 +11,10 @@ package set in the Mobile-NixOS overlay.
  overlay/asteroidos/lib/mk-asteroid-app.nix   | 115 +++++++++++++++++
  overlay/asteroidos/lib/no-usr-share-hook.nix |   5 +
  overlay/asteroidos/lib/no-usr-share-hook.sh  |  30 +++++
- overlay/asteroidos/qml-asteroid/default.nix  | 122 +++++++++++++++++++
- overlay/oans/default.nix                     |  61 ++++++++++
+ overlay/asteroidos/qml-asteroid/default.nix  | 124 +++++++++++++++++++
+ overlay/oans/default.nix                     |  61 +++++++++
  overlay/overlay.nix                          |   5 +
- 7 files changed, 351 insertions(+)
+ 7 files changed, 353 insertions(+)
  create mode 100644 overlay/asteroidos/default.nix
  create mode 100644 overlay/asteroidos/lib/mk-asteroid-app.nix
  create mode 100644 overlay/asteroidos/lib/no-usr-share-hook.nix
@@ -211,10 +211,10 @@ index 00000000..afbe09c5
 +postFixupHooks+=(auditNoUsrShare)
 diff --git a/overlay/asteroidos/qml-asteroid/default.nix b/overlay/asteroidos/qml-asteroid/default.nix
 new file mode 100644
-index 00000000..3e89bc8a
+index 00000000..db13a9a2
 --- /dev/null
 +++ b/overlay/asteroidos/qml-asteroid/default.nix
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,124 @@
 +{
 +  lib,
 +  stdenv,
@@ -262,7 +262,9 @@ index 00000000..3e89bc8a
 +
 +        substituteInPlace src/app/asteroidapp.cpp \
 +          --replace-fail '"/usr/share/translations"' '"/run/current-system/sw/share/translations"' \
-+          --replace-fail '"/usr/share/applications/"' '"/run/current-system/sw/share/applications/"'
++          --replace-fail '"/usr/share/applications/"' '"/run/current-system/sw/share/applications/"' \
++          --replace-fail 'if (!translator->load(QLocale(), appName(), ".", "/run/current-system/sw/share/translations", ".qm")) {' \
++                         'if (!translator->load(QLocale(), appName(), ".", "/run/current-system/sw/share/translations", ".qm") && !translator->load(QLocale("en_GB"), appName(), ".", "/run/current-system/sw/share/translations", ".qm")) {'
 +
 +        substituteInPlace src/controls/src/icon.cpp \
 +          --replace-fail '"/usr/share/icons/asteroid/"' '"/run/current-system/sw/share/icons/asteroid/"'
