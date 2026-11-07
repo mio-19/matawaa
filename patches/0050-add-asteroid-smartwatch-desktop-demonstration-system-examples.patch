@@ -9,14 +9,14 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 899 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 896 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 +
  examples/asteroid/default.nix                 |  15 +
  .../scripted-installer/automated-installer.rb |   5 +-
  overlay/asteroidos/bluebinder/default.nix     |  81 ++
  overlay/asteroidos/default.nix                |  64 +-
  overlay/asteroidos/egl-probe/default.nix      |  35 +
- overlay/asteroidos/egl-probe/egl-probe.c      | 120 +++
+ overlay/asteroidos/egl-probe/egl-probe.c      | 123 +++
  overlay/asteroidos/libncicore/default.nix     |  71 ++
  overlay/asteroidos/libnciplugin/default.nix   |  90 ++
  overlay/asteroidos/libnfcdef/default.nix      |  71 ++
@@ -70,10 +70,10 @@ index 1081d085..f0f0decc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..82503b11
+index 00000000..225241e3
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,899 @@
+@@ -0,0 +1,896 @@
 +{
 +  config,
 +  lib,
@@ -796,9 +796,6 @@ index 00000000..82503b11
 +          "-/var/lib/environment/compositor/qt6-hidpi.conf"
 +        ];
 +        ExecStartPre = [
-+          # Debug builds: dump the EGL display/config inventory from this exact
-+          # environment (libhybris EGL, EGL_PLATFORM=hwcomposer) into launcher.log.
-+          "-${pkgs.asteroid.egl-probe}/bin/egl-probe"
 +          "${pkgs.writeShellScript "asteroid-launcher-precondition" ''
 +            # android-init.service touches this marker once the property
 +            # service and the vendor HALs are up; wait for it with a bound.
@@ -1293,15 +1290,16 @@ index 00000000..81ca384f
 +}
 diff --git a/overlay/asteroidos/egl-probe/egl-probe.c b/overlay/asteroidos/egl-probe/egl-probe.c
 new file mode 100644
-index 00000000..20d8a19c
+index 00000000..c8c7f189
 --- /dev/null
 +++ b/overlay/asteroidos/egl-probe/egl-probe.c
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,123 @@
 +/* Diagnostic: dump the EGL display/config inventory from the launcher's
 + * environment (libhybris EGL, EGL_PLATFORM=hwcomposer). Run as an
 + * ExecStartPre of asteroid-launcher so the output lands in launcher.log. */
 +#include <EGL/egl.h>
 +#include <stdio.h>
++#include <unistd.h>
 +
 +static const char *errname(EGLint e)
 +{
@@ -1414,8 +1412,10 @@ index 00000000..20d8a19c
 +               ok, m, e, errname(e));
 +    }
 +
-+    eglTerminate(d);
-+    return 0;
++    /* Note: Calling eglTerminate(d) under libhybris hwcomposer can hang or deadlock
++     * in the Android HWC teardown/vsync worker thread. Flush and exit immediately. */
++    fflush(stdout);
++    _exit(0);
 +}
 diff --git a/overlay/asteroidos/libncicore/default.nix b/overlay/asteroidos/libncicore/default.nix
 new file mode 100644
