@@ -11,11 +11,11 @@ Add the development-only stage debugging modes:
 - devices/fossil-hoki/default.nix: opt hoki into stage1-pause-debug and stage2-save-logs for the current bring-up, and keep verbose systemd logging gated by the stage1 debug mode.
 ---
  boot/init/tasks/switch_root.rb  |  19 +++++
- devices/families/asteroidos.nix | 134 ++++++++++++++++++++++++++++++++
+ devices/families/asteroidos.nix | 140 ++++++++++++++++++++++++++++++++
  devices/fossil-hoki/default.nix |  21 +++--
- modules/hardware-watch.nix      |  18 +++++
- modules/initrd-ssh.nix          |  72 +++++++++++++----
- 5 files changed, 244 insertions(+), 20 deletions(-)
+ modules/hardware-watch.nix      |  18 ++++
+ modules/initrd-ssh.nix          |  72 ++++++++++++----
+ 5 files changed, 250 insertions(+), 20 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
 index b3a6045b..0644044c 100644
@@ -55,7 +55,7 @@ index b3a6045b..0644044c 100644
  
      Tasks::UDev.instance.teardown()
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
-index f0f0decc..893e57a6 100644
+index f0f0decc..f1e3d863 100644
 --- a/devices/families/asteroidos.nix
 +++ b/devices/families/asteroidos.nix
 @@ -1,5 +1,6 @@
@@ -99,7 +99,20 @@ index f0f0decc..893e57a6 100644
    # AsteroidOS credits the saved random seed as entropy to avoid slow boots on
    # pre-5.4 watch kernels.
    # Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
-@@ -177,4 +191,124 @@ in
+@@ -168,6 +182,12 @@ in
+     ACTION=="add", KERNEL=="MTK_SMI", MODE="0664", GROUP="video"
+     ACTION=="add", KERNEL=="mali", MODE="0664", GROUP="video"
+     ACTION=="add", KERNEL=="vboxguest", MODE="0664", GROUP="video"
++
++    # Export power_supply capacity and status to udev database for MCE battery-udev plugin
++    SUBSYSTEM=="power_supply", ATTR{type}=="Battery", ATTR{capacity}=="?*", ENV{POWER_SUPPLY_CAPACITY}="$attr{capacity}"
++    SUBSYSTEM=="power_supply", ATTR{type}=="Battery", ATTR{status}=="?*", ENV{POWER_SUPPLY_STATUS}="$attr{status}"
++    SUBSYSTEM=="power_supply", KERNEL=="battery", ATTR{capacity}=="?*", ENV{POWER_SUPPLY_CAPACITY}="$attr{capacity}"
++    SUBSYSTEM=="power_supply", KERNEL=="battery", ATTR{status}=="?*", ENV{POWER_SUPPLY_STATUS}="$attr{status}"
+   '';
+ 
+   # Default to ext4 root filesystem for compatibility across vendor kernels
+@@ -177,4 +197,124 @@ in
    boot.kernelParams = [
      "loop.max_part=7"
    ];

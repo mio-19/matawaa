@@ -10,26 +10,31 @@ and wire the resulting user services, D-Bus policies and locale drop-in
 into the asteroid desktop profile.
 ---
  devices/fossil-hoki/default.nix               |   2 +-
- examples/asteroid/asteroid-desktop.nix        | 124 ++++++++++-
+ examples/asteroid/asteroid-desktop.nix        | 301 +++++++++++++-----
+ .../scripted-installer/automated-installer.rb |   5 +-
  npins/sources.json                            |   6 +-
  overlay/asteroidos/apps/default.nix           |   8 +-
- overlay/asteroidos/assets/default.nix         |  84 ++++++++
- .../asteroidos/asteroid-launcher/default.nix  |  36 +++-
- .../qml-boot-diagnostics.patch                |  58 +++++
- overlay/asteroidos/community-apps/default.nix |  33 ++-
- overlay/asteroidos/default.nix                |  31 +--
+ overlay/asteroidos/assets/default.nix         |  84 +++++
+ .../asteroidos/asteroid-launcher/default.nix  |  36 ++-
+ .../qml-boot-diagnostics.patch                |  58 ++++
+ overlay/asteroidos/community-apps/default.nix |  33 +-
+ overlay/asteroidos/default.nix                |  36 ++-
  overlay/asteroidos/lib/mk-asteroid-app.nix    |  10 +-
  overlay/asteroidos/lib/no-usr-share-hook.nix  |   5 +
- overlay/asteroidos/lib/no-usr-share-hook.sh   |  30 +++
+ overlay/asteroidos/lib/no-usr-share-hook.sh   |  30 ++
  overlay/asteroidos/libiodata/default.nix      |   7 +
- .../nemo-qml-plugin-alarms/default.nix        | 135 ++++++++++++
- .../nemo-qml-plugin-notifications/default.nix | 121 +++++++++++
- overlay/asteroidos/qml-asteroid/default.nix   |  12 ++
- .../qt6-qpa-hwcomposer-plugin/default.nix     |   1 +
- .../hwc-present-diagnostics.patch             | 204 ++++++++++++++++++
- overlay/asteroidos/timed-qt6/default.nix      | 170 ++++++++++++++-
+ .../mce-plugin-libhybris/default.nix          |   9 +-
+ .../nemo-qml-plugin-alarms/default.nix        | 135 ++++++++
+ .../nemo-qml-plugin-notifications/default.nix | 121 +++++++
+ overlay/asteroidos/qml-asteroid/default.nix   |  12 +
+ .../qt6-qpa-hwcomposer-plugin/default.nix     |  34 +-
+ .../hwc-present-diagnostics.patch             | 204 ++++++++++++
+ overlay/asteroidos/sensorfw/default.nix       |  31 +-
+ overlay/asteroidos/timed-qt6/default.nix      | 170 +++++++++-
  .../asteroidos/virtualkeyboard/default.nix    |   2 +
- 20 files changed, 1034 insertions(+), 45 deletions(-)
+ overlay/cross-compile.nix                     |  46 ++-
+ overlay/libhybris/default.nix                 |  23 +-
+ 25 files changed, 1211 insertions(+), 197 deletions(-)
  create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
  create mode 100644 overlay/asteroidos/lib/no-usr-share-hook.nix
  create mode 100644 overlay/asteroidos/lib/no-usr-share-hook.sh
@@ -51,10 +56,102 @@ index f5979e50..191ff280 100644
        QPA_HWC2_FORCE_DOZE_UPDATE=1
        QT_OPENGL_NO_BGRA=1
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
-index 38e08c4f..21b2a357 100644
+index 38e08c4f..8b6b586d 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -83,6 +83,8 @@ in
+@@ -16,40 +16,19 @@ let
+     || config.mobile.hardware.watch.stage2-save-logs.enable
+     || config.mobile.hardware.watch.stage2-ssh.enable;
+ 
+-  # Pinned AsteroidOS meta-asteroid revision, used to fetch upstream units and
+-  # policies at build time instead of vendoring copies in this repository.
+-  # https://github.com/AsteroidOS/meta-asteroid
+-  asteroidOSRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
++  isLegacy = config.mobile.hardware.watch.kernel == "legacy";
+ 
+   # Upstream asteroid-launcher_git.bb installs a seeded notification database
+   # into the ceres user's privileged data directory.
+   # https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications
+-  launcherNotifications = pkgs.fetchurl {
+-    name = "notifications.db";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db";
+-    hash = "sha256-QK2tngW8h/K/IcYaTXs61RdfKb8NshS4n7AtK41K6aM=";
+-  };
+-  launcherNotificationsWal = pkgs.fetchurl {
+-    name = "notifications.db-wal";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-wal";
+-    hash = "sha256-gRtpUBYYtNI3tKDw3/2If5nFyiTLfKPLNUC1gF83qm4=";
+-  };
+-  launcherNotificationsShm = pkgs.fetchurl {
+-    name = "notifications.db-shm";
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-shm";
+-    hash = "sha256-lZXfg4awjBp0HSRIpdqyyFrtRXWv5HUst9u5tha/ZVo=";
+-  };
++  launcherNotifications = "${pkgs.asteroid.meta-asteroid-src}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db";
++  launcherNotificationsWal = "${pkgs.asteroid.meta-asteroid-src}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-wal";
++  launcherNotificationsShm = "${pkgs.asteroid.meta-asteroid-src}/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications/notifications.db-shm";
+ 
+   # Upstream connman_%.bbappend replaces connman's D-Bus policy with one that
+   # also admits the ceres user; expose it through services.dbus.packages.
+   connmanDbusPolicy = pkgs.runCommand "asteroid-connman-dbus-policy" { } ''
+-    install -Dm644 ${
+-      pkgs.fetchurl {
+-        name = "connman-dbus.conf";
+-        url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${asteroidOSRev}/recipes-connectivity/connman/connman/connman-dbus.conf";
+-        hash = "sha256-iC4/pjt6UB/fcUqukFX/nEavNuETNmAvVW0T8T0ody0=";
+-      }
+-    } $out/share/dbus-1/system.d/connman.conf
++    install -Dm644 ${pkgs.asteroid.meta-asteroid-src}/recipes-connectivity/connman/connman/connman-dbus.conf $out/share/dbus-1/system.d/connman.conf
+   '';
+ in
+ {
+@@ -65,7 +44,44 @@ in
+     };
+   };
+ 
+-  config = mkIf cfg.enable {
++  config = mkIf cfg.enable (
++    let
++      qmlImportPath = lib.concatStringsSep ":" [
++        "/run/current-system/sw/lib/qt-6/qml"
++        "${pkgs.qt6.qtdeclarative}/lib/qt-6/qml"
++        "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml"
++        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml"
++        "${pkgs.qt6.qt5compat}/lib/qt-6/qml"
++        "${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml"
++        "${pkgs.asteroid.mce-qt6}/lib/qt-6/qml"
++        "${pkgs.asteroid.mlite}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-dbus}/lib/qt-6/qml"
++        "${pkgs.asteroid.libconnman-qt}/lib/qt-6/qml"
++        "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
++        "${pkgs.asteroid.keepalive}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-calendar}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-alarms}/lib/qt-6/qml"
++        "${pkgs.asteroid.nemo-qml-plugin-notifications}/lib/qt-6/qml"
++        "${pkgs.asteroid.amber-mpris}/lib/qt-6/qml"
++        "${pkgs.qt6.qtsensors}/lib/qt-6/qml"
++        "${pkgs.qt6.qtmultimedia}/lib/qt-6/qml"
++        "${pkgs.qt6.qtpositioning}/lib/qt-6/qml"
++      ];
++      qtPluginPath = lib.concatStringsSep ":" [
++        "/run/current-system/sw/lib/qt-6/plugins"
++        "${pkgs.qt6.qtbase}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtdeclarative}/lib/qt-6/plugins"
++        "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtsensors}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtmultimedia}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtpositioning}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtsvg}/lib/qt-6/plugins"
++        "${pkgs.qt6.qtwayland}/lib/qt-6/plugins"
++      ];
++    in
++    {
+ 
+     # Watch system beautification and boot visibility
+     mobile.beautification = {
+@@ -83,6 +99,8 @@ in
      environment.systemPackages =
        with pkgs;
        [
@@ -63,17 +160,20 @@ index 38e08c4f..21b2a357 100644
          asteroid.qml-asteroid
          # Provides the invoker command used by AsteroidOS Qt app launchers.
          asteroid.mapplauncherd
-@@ -95,6 +97,9 @@ in
+@@ -95,13 +113,19 @@ in
          asteroid.nfcd
          asteroid.keepalive
          asteroid.nemo-qml-plugin-calendar
+-        # QML module the launcher imports; the cross qt5compat lacks it.
+-        qt5compatQml
 +        asteroid.nemo-qml-plugin-alarms
 +        asteroid.nemo-qml-plugin-notifications
 +        asteroid.timed-qt6
-         # QML module the launcher imports; the cross qt5compat lacks it.
-         qt5compatQml
++        # Qt modules used by apps and the launcher.
++        qt6.qtdeclarative
++        qt6.qt5compat
          # Asset suite
-@@ -102,6 +107,8 @@ in
+         asteroid.assets.wallpapers
          asteroid.assets.sounds
          asteroid.assets.icons
          asteroid.assets.fonts
@@ -82,14 +182,30 @@ index 38e08c4f..21b2a357 100644
          asteroid.virtualkeyboard
          # Complete application suite
          asteroid.apps.stopwatch
-@@ -179,6 +186,19 @@ in
+@@ -146,11 +170,13 @@ in
+         asteroid.community-apps.shopper
+         asteroid.community-apps.toolwatch
+         asteroid.community-apps.touchdown
++        asteroid.community-apps.hackwatch
++        asteroid.community-apps.neofetch
++        tree
+       ]);
+ 
+     systemd.tmpfiles.rules = [
+       "d /var/lib/kiwix 0775 ceres users -"
+-      "L+ /usr/share - - - - /run/current-system/sw/share"
+       # MCE runtime/config directories; upstream mce_git.bb installs
+       # builtin-gconf.values into /var/lib/mce.
+       "d /run/mce 0755 root root -"
+@@ -179,6 +205,20 @@ in
        }"
        # Upstream nfcd state storage directory.
        "d /var/lib/nfcd 0700 root root -"
 +      # Upstream timed_git.bb creates /var/lib/timed for shared events/settings.
-+      "d /var/lib/timed 0775 root root -"
-+      "d /var/lib/timed/shared_events 0775 root root -"
-+      "d /var/lib/timed/shared_settings 0775 root root -"
++      # timed runs in user session (ceres), so shared events/settings must be owned by ceres.
++      "d /var/lib/timed 0775 ceres users -"
++      "d /var/lib/timed/shared_events 0775 ceres users -"
++      "d /var/lib/timed/shared_settings 0775 ceres users -"
 +      # Upstream supported-languages_git.bb seeds the ceres locale drop-in that
 +      # user@.service.d/locale.conf reads (installed via environment.etc below).
 +      "d /home/.system/var/lib/environment/1000 0755 ceres users -"
@@ -102,7 +218,7 @@ index 38e08c4f..21b2a357 100644
        # Upstream asteroid-launcher_git.bb seeds the privileged notification DB.
        # mkcal (used by nemo-qml-plugin-calendar) creates its database under
        # ~/.local/share/system/Calendar, so that tree must belong to ceres.
-@@ -199,6 +219,7 @@ in
+@@ -199,6 +239,7 @@ in
        "/share/fonts"
        "/share/lipstick"
        "/share/ngfd"
@@ -110,7 +226,20 @@ index 38e08c4f..21b2a357 100644
        "/share/translations"
        "/share/rime-data"
        "/share/supported-languages"
-@@ -315,7 +336,7 @@ in
+@@ -210,12 +251,6 @@ in
+       pkgs.asteroid.assets.fonts
+     ];
+ 
+-    # Create /usr/share early in activation for AsteroidOS apps and shell
+-    system.activationScripts.usrshare = ''
+-      mkdir -p /usr
+-      ln -sfn /run/current-system/sw/share /usr/share
+-    '';
+-
+     # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
+     # Reference: https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/src/main.conf
+     hardware.bluetooth.settings = {
+@@ -315,7 +350,7 @@ in
          ExecStartPre = [
            "${pkgs.writeShellScript "asteroid-wait-for-lipstick" ''
              i=0
@@ -119,7 +248,7 @@ index 38e08c4f..21b2a357 100644
                if ${pkgs.dbus}/bin/dbus-send --system --print-reply \
                     --dest=org.freedesktop.DBus /org/freedesktop/DBus \
                     org.freedesktop.DBus.NameHasOwner \
-@@ -324,7 +345,7 @@ in
+@@ -324,7 +359,7 @@ in
                  exit 0
                fi
                i=$((i + 1))
@@ -128,7 +257,7 @@ index 38e08c4f..21b2a357 100644
              done
              exit 0
            ''}"
-@@ -488,14 +509,19 @@ in
+@@ -488,14 +523,19 @@ in
      # environment.etc entries. The MCE package ships com.nokia.mce.conf; the
      # upstream AsteroidOS connman policy replaces connman's own one.
      services.dbus.packages = [
@@ -148,31 +277,41 @@ index 38e08c4f..21b2a357 100644
      # users.users.ceres.linger generates NixOS's linger-users.service, which
      # calls loginctl enable-linger after logind starts. Let the normal systemd
      # linger mechanism own the marker; do not pre-seed it or override the unit.
-@@ -532,12 +558,58 @@ in
-         "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
-         "${pkgs.asteroid.keepalive}/lib/qt-6/qml"
-         "${pkgs.asteroid.nemo-qml-plugin-calendar}/lib/qt-6/qml"
-+        "${pkgs.asteroid.nemo-qml-plugin-alarms}/lib/qt-6/qml"
-+        "${pkgs.asteroid.nemo-qml-plugin-notifications}/lib/qt-6/qml"
-+        "${pkgs.asteroid.amber-mpris}/lib/qt-6/qml"
-+        "${pkgs.qt6.qtsensors}/lib/qt-6/qml"
-+        "${pkgs.qt6.qtmultimedia}/lib/qt-6/qml"
-+        "${pkgs.qt6.qtpositioning}/lib/qt-6/qml"
-+      ];
-+      QT_PLUGIN_PATH = lib.concatStringsSep ":" [
-+        "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins"
-+        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins"
-+        "${pkgs.qt6.qtsensors}/lib/qt-6/plugins"
-+        "${pkgs.qt6.qtmultimedia}/lib/qt-6/plugins"
-+        "${pkgs.qt6.qtpositioning}/lib/qt-6/plugins"
-+        "${pkgs.qt6.qtsvg}/lib/qt-6/plugins"
-+        "${pkgs.qt6.qtwayland}/lib/qt-6/plugins"
-       ];
+@@ -519,23 +559,52 @@ in
+       QT_VIRTUALKEYBOARD_STYLE = "watch";
+       QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+       RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
+-      QML2_IMPORT_PATH = lib.concatStringsSep ":" [
+-        "${pkgs.asteroid.virtualkeyboard}/lib/qt-6/qml"
+-        "${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/qml"
+-        "${pkgs.qt5compatQml}/lib/qt-6/qml"
+-        "${pkgs.asteroid.qml-asteroid}/lib/qt-6/qml"
+-        "${pkgs.asteroid.mce-qt6}/lib/qt-6/qml"
+-        "${pkgs.asteroid.mlite}/lib/qt-6/qml"
+-        "${pkgs.asteroid.nemo-qml-plugin-configuration}/lib/qt-6/qml"
+-        "${pkgs.asteroid.nemo-qml-plugin-dbus}/lib/qt-6/qml"
+-        "${pkgs.asteroid.libconnman-qt}/lib/qt-6/qml"
+-        "${pkgs.asteroid.ngf-qt6}/lib/qt-6/qml"
+-        "${pkgs.asteroid.keepalive}/lib/qt-6/qml"
+-        "${pkgs.asteroid.nemo-qml-plugin-calendar}/lib/qt-6/qml"
+-      ];
 -      QT_PLUGIN_PATH = "${pkgs.asteroid.qt6-qpa-hwcomposer-plugin}/lib/qt-6/plugins:${pkgs.qt6.qtvirtualkeyboard}/lib/qt-6/plugins";
++      # Default platform for client apps running under the Wayland compositor
++      QT_QPA_PLATFORM = lib.mkForce "wayland";
++      EGL_PLATFORM = "wayland";
++      WAYLAND_DISPLAY = "wayland-0";
++      XDG_RUNTIME_DIR = "/run/user/1000";
++      QML2_IMPORT_PATH = qmlImportPath;
++      QML_IMPORT_PATH = qmlImportPath;
++      NIXPKGS_QT6_QML_IMPORT_PATH = qmlImportPath;
++      QT_PLUGIN_PATH = qtPluginPath;
        # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
        QT_ENABLE_HIGHDPI_SCALING = "0";
-     };
- 
++    } // lib.optionalAttrs isLegacy {
++      LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++      LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
++    };
++
 +    # Upstream asteroid-alarmclock installs share/systemd/user/alarmpresenter.service
 +    # plus the com.nokia.voland D-Bus activation file; expose the same user
 +    # service so Nemo.Alarms can present firing alarms.
@@ -203,13 +342,64 @@ index 38e08c4f..21b2a357 100644
 +        Restart = "always";
 +        RestartSec = "1";
 +      };
-+    };
-+
+     };
+ 
      # Upstream meta-asteroid: ngfd, the non graphical feedback daemon.
-     # Haptics/sounds are requested through D-Bus by the launcher and apps.
-     systemd.user.services.ngfd = {
-@@ -582,10 +654,23 @@ in
-       // lib.optionalAttrs debugBuild {
+@@ -558,34 +627,55 @@ in
+       wantedBy = [ "default.target" ];
+       requires = [ "dbus.socket" ];
+       unitConfig.ConditionUser = "!root";
+-      environment = {
+-        QT_IM_MODULE = "qtvirtualkeyboard";
+-        QT_VIRTUALKEYBOARD_STYLE = "watch";
+-        QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
+-        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
+-        # The launcher is the compositor: use the hwcomposer QPA, not xcb.
+-        EGL_PLATFORM = "hwcomposer";
+-        QT_QPA_PLATFORM = "hwcomposer";
+-        # Upstream Qt selects the libhybris EGL server buffer integration
+-        # automatically; Qt 6.12's loadServerBufferIntegration() only loads a
+-        # key named in this variable, so name the same upstream integration.
+-        QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "libhybris-egl-server";
+-        LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
+-        LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
+-        QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
+-        QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
+-        # Direct Qt diagnostic logs to stderr/launcher.log instead of hidden journal
+-        QT_FORCE_STDERR_LOGGING = "1";
+-        QT_ASSUME_STDERR_HAS_CONSOLE = "1";
+-      }
+-      // config.environment.variables
+-      // lib.optionalAttrs debugBuild {
++      environment =
++        config.environment.variables
++        // {
++          PATH = lib.mkForce "/run/wrappers/bin:/run/current-system/sw/bin";
++          QT_IM_MODULE = "qtvirtualkeyboard";
++          QT_VIRTUALKEYBOARD_STYLE = "watch";
++          QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
++          RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
++          # The launcher is the compositor.
++          # On legacy targets with Android kernels, use hwcomposer and libhybris.
++          # On modern mainline targets, use eglfs on DRM/KMS.
++          EGL_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
++          QT_QPA_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
++          QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
++          QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
++          # Direct Qt diagnostic logs to stderr/launcher.log instead of hidden journal
++          QT_FORCE_STDERR_LOGGING = "1";
++          QT_ASSUME_STDERR_HAS_CONSOLE = "1";
++        }
++        // lib.optionalAttrs isLegacy {
++          QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "libhybris-egl-server";
++          LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++          LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
++        }
++        // lib.optionalAttrs (!isLegacy) {
++          QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
++          QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++        }
++        // lib.optionalAttrs debugBuild {
          # Debug builds: turn on every trace the graphics stack can emit.
          # These are runtime switches only; the upstream code path is unchanged.
 -        # Keep the graphics/EGL diagnostics, drop the QML import flood so the
@@ -231,11 +421,12 @@ index 38e08c4f..21b2a357 100644
 +        # failing import line even before any component error is printed.
 +        QML_IMPORT_TRACE = "1";
 +        QPA_HWC_DEBUG = "1";
++        HYBRIS_HWC_DEBUG = "1";
 +        QSG_INFO = "1";
          EGL_LOG_LEVEL = "debug";
          LIBGL_DEBUG = "verbose";
          MESA_DEBUG = "1";
-@@ -614,8 +699,8 @@ in
+@@ -614,8 +704,8 @@ in
              # android-init.service touches this marker once the property
              # service and the vendor HALs are up; wait for it with a bound.
              i=0
@@ -246,28 +437,55 @@ index 38e08c4f..21b2a357 100644
                i=$((i + 1))
              done
            ''}"
-@@ -648,11 +733,19 @@ in
-       unitConfig.ConditionUser = "!root";
+@@ -645,14 +735,44 @@ in
+       description = "Tells the Android init system that the boot has been completed";
+       wantedBy = [ "default.target" ];
+       after = [ "asteroid-launcher.service" ];
+-      unitConfig.ConditionUser = "!root";
++      unitConfig = {
++        ConditionUser = "!root";
++        ConditionPathExists = "/system/bin/getprop";
++      };
        serviceConfig = {
          Type = "simple";
 -        ExecStartPre = "-${pkgs.coreutils}/bin/sleep 10";
+-        ExecStart = "${pkgs.bash}/bin/bash -ec 'if [ \"$(/system/bin/getprop sys.boot_completed)\" != 1 ]; then /system/bin/setprop sys.boot_completed 1; fi'";
 +        ExecStartPre = "-${pkgs.coreutils}/bin/sleep 1";
-         ExecStart = "${pkgs.bash}/bin/bash -ec 'if [ \"$(/system/bin/getprop sys.boot_completed)\" != 1 ]; then /system/bin/setprop sys.boot_completed 1; fi'";
++        ExecStart = "${pkgs.bash}/bin/bash -ec 'if [ \"$(env -u LD_PRELOAD -u LD_LIBRARY_PATH /system/bin/getprop sys.boot_completed)\" != 1 ]; then env -u LD_PRELOAD -u LD_LIBRARY_PATH /system/bin/setprop sys.boot_completed 1; fi'";
        };
      };
  
 +    # AsteroidOS desktop entries and service wrappers invoke apps through
-+    # `invoker`. Expose the system profile to all systemd user services so
-+    # AsteroidOS apps and service wrappers can find `invoker`, core utilities,
-+    # and wrappers without conflicting with the system-level user manager service.
++    # `invoker`. Expose the system profile and Wayland client environment to
++    # all systemd user services so AsteroidOS apps and service wrappers can find
++    # `invoker`, core utilities, QML modules, and libhybris EGL.
 +    systemd.user.settings.Manager = {
-+      DefaultEnvironment = "PATH=/run/wrappers/bin:/run/current-system/sw/bin";
++      DefaultEnvironment = lib.concatStringsSep " " ([
++        "\"PATH=/run/wrappers/bin:/run/current-system/sw/bin\""
++        "\"WAYLAND_DISPLAY=wayland-0\""
++        "\"XDG_RUNTIME_DIR=/run/user/1000\""
++        "\"QT_QPA_PLATFORM=wayland\""
++        "\"EGL_PLATFORM=wayland\""
++      ] ++ lib.optionals isLegacy [
++        "\"LD_PRELOAD=${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2\""
++        "\"LD_LIBRARY_PATH=${pkgs.libhybris}/lib\""
++      ] ++ [
++        "\"QML2_IMPORT_PATH=${qmlImportPath}\""
++        "\"QML_IMPORT_PATH=${qmlImportPath}\""
++        "\"NIXPKGS_QT6_QML_IMPORT_PATH=${qmlImportPath}\""
++        "\"QT_PLUGIN_PATH=${qtPluginPath}\""
++        "\"QT_IM_MODULE=qtvirtualkeyboard\""
++        "\"QT_VIRTUALKEYBOARD_STYLE=watch\""
++        "\"QT_VIRTUALKEYBOARD_LAYOUT_PATH=${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts\""
++        "\"RIME_SHARED_DATA_DIR=${pkgs.asteroid.virtualkeyboard}/share/rime-data\""
++        "\"QT_ENABLE_HIGHDPI_SCALING=0\""
++      ]);
 +    };
 +
      # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
      # cap_block_suspend for always-on-display ticks. File capabilities make the
      # kernel set AT_SECURE, and glibc then discards LD_PRELOAD/LD_LIBRARY_PATH —
-@@ -660,8 +753,14 @@ in
+@@ -660,8 +780,14 @@ in
      # Grant the same capabilities to the user manager as ambient capabilities
      # instead: they are inherited by the launcher and do not set AT_SECURE.
      # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
@@ -282,7 +500,7 @@ index 38e08c4f..21b2a357 100644
        serviceConfig.AmbientCapabilities = [
          "CAP_WAKE_ALARM"
          "CAP_BLOCK_SUSPEND"
-@@ -711,6 +810,13 @@ in
+@@ -711,6 +837,13 @@ in
              subject.user == "ceres") {
            return polkit.Result.YES;
          }
@@ -296,6 +514,30 @@ index 38e08c4f..21b2a357 100644
        });
      '';
  
+@@ -727,5 +860,5 @@ in
+         RestartSec = "5s";
+       };
+     };
+-  };
++  });
+ }
+diff --git a/examples/installer/pkgs/scripted-installer/automated-installer.rb b/examples/installer/pkgs/scripted-installer/automated-installer.rb
+index b189c9bb..10908c9a 100644
+--- a/examples/installer/pkgs/scripted-installer/automated-installer.rb
++++ b/examples/installer/pkgs/scripted-installer/automated-installer.rb
+@@ -103,10 +103,9 @@ end
+ 
+ # Override work that would be done by <nixpkgs/nixos/modules/services/misc/nix-daemon.nix>
+ # See also `nix.nixPath` option, which uses `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos`
+-# We only support `nixos-unstable`.
+-# We don't publish "known good" channel releases yet for Mobile NixOS.
++# Keep installed systems on the same nixpkgs branch as the image builds.
+ channels = [
+-  ["https://nixos.org/channels/nixos-unstable", "nixos"],
++  ["https://github.com/NixOS/nixpkgs/archive/refs/heads/nixpkgs-unstable.tar.gz", "nixos"],
+   ["https://github.com/mobile-nixos/mobile-nixos/archive/refs/heads/development.tar.gz", "mobile-nixos"],
+ ].map{|pair| pair.join(" ") }.join("\n")
+ File.write(File.join(MOUNT_POINT, "/root/.nix-channels"), channels)
 diff --git a/npins/sources.json b/npins/sources.json
 index 574e5b3e..a1ecbbde 100644
 --- a/npins/sources.json
@@ -666,7 +908,7 @@ index b82d53bc..1c6b5f86 100644
        runHook preInstall
        install -Dm755 neofetch $out/bin/neofetch
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 3c4eb08e..ecc7f68e 100644
+index 3c4eb08e..77714b02 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -1,27 +1,23 @@
@@ -704,6 +946,18 @@ index 3c4eb08e..ecc7f68e 100644
  
    # Device features shipped by upstream meta-hoki (IMAGE_INSTALL) and asteroid-image.
    udev-droid-system = callPackage ./udev-droid-system { inherit metaAsteroidSrc; };
+@@ -46,10 +42,10 @@ rec {
+   qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
+     inherit (pkgs)
+       libhybris
+-      android-headers
+       glib
+       mtdev
+       ;
++    inherit metaAsteroidSrc;
+     libudev = pkgs.udev;
+   };
+ 
 @@ -63,6 +59,7 @@ rec {
        usb-moded-qt6
        keepalive
@@ -712,7 +966,17 @@ index 3c4eb08e..ecc7f68e 100644
        ;
    };
  
-@@ -123,8 +120,12 @@ rec {
+@@ -102,7 +99,8 @@ rec {
+   # Nemomobile SensorFW daemon and client API (qtsensors sensorfw backend).
+   # Upstream: https://github.com/sailfishos/sensorfw
+   sensorfw = callPackage ./sensorfw {
+-    inherit (pkgs) libhybris android-headers;
++    inherit metaAsteroidSrc;
++    inherit (pkgs) libhybris;
+   };
+ 
+   # Device state machine daemon MCE talks to.
+@@ -123,8 +121,12 @@ rec {
      inherit mce-dev libiphb;
    };
    timed-qt6 = callPackage ./timed-qt6 {
@@ -726,7 +990,7 @@ index 3c4eb08e..ecc7f68e 100644
  
    # Calendar subsystem: accounts-qt, kcalendarcore, mkcal, and nemo-qml-plugin-calendar
    # Upstream repository: https://gitlab.com/accounts-sso/accounts-qt
-@@ -172,14 +173,14 @@ rec {
+@@ -172,14 +174,14 @@ rec {
        inherit browser telegram kiwix;
      };
  
@@ -859,6 +1123,33 @@ index 36607b9c..25646355 100644
  install(FILES
    src/iodata.h
    src/validator.h
+diff --git a/overlay/asteroidos/mce-plugin-libhybris/default.nix b/overlay/asteroidos/mce-plugin-libhybris/default.nix
+index b8e68a89..6066dc34 100644
+--- a/overlay/asteroidos/mce-plugin-libhybris/default.nix
++++ b/overlay/asteroidos/mce-plugin-libhybris/default.nix
+@@ -11,10 +11,6 @@
+   pkg-config,
+   glib,
+   libhybris,
+-  # The plugin includes <android-config.h>, <system/window.h> and
+-  # <hardware/lights.h>, which must match the headers libhybris was built
+-  # against.
+-  android-headers ? libhybris.passthru.androidHeaders,
+ }:
+ 
+ stdenv.mkDerivation {
+@@ -43,8 +39,9 @@ stdenv.mkDerivation {
+     "-I${glib.dev}/lib/glib-2.0/include"
+     # glibconfig.h is arch-specific and lives in the main output.
+     "-I${glib}/lib/glib-2.0/include"
+-    "-I${android-headers}/include"
+-    "-I${android-headers}/include/android"
++    # Use libhybris's device headers directly. A defaulted android-headers
++    # argument would still be filled with the generic package by callPackage.
++    "-I${libhybris.androidHeadersInclude}"
+     "-I${libhybris}/include"
+   ];
+ 
 diff --git a/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
 new file mode 100644
 index 00000000..261c3149
@@ -1165,17 +1456,85 @@ index c275fbde..3e89bc8a 100644
            --replace-fail 'find_package(Mapplauncherd_qt6 MODULE REQUIRED)' ""
          substituteInPlace src/app/CMakeLists.txt \
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-index 9b3ef899..b4cd0f72 100644
+index 9b3ef899..8aebcdd9 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-@@ -75,6 +75,7 @@ stdenv.mkDerivation (finalAttrs: {
-     (patch "0005-Explicitly-make-hwcomposer-a-shared-library.patch" "sha256-Z/zjAhKm6XRQ8zVuSYPiD+rDh7KqZuKzTiUAzmsu+ZE=")
-     (patch "0006-v10-Fix-refresh-rate-fallback-unit.patch" "sha256-XOplqx7zKgbjPWIwlJ82O1qFDXXNkj2PDO/TdaP/ync=")
-     (patch "0007-v10-Make-updates-request-driven-and-vsync-paced.patch" "sha256-EQhs66R9Vc2a2yH5zVmo8xtC+oVQHjMlKyNAIGrEsbA=")
+@@ -9,24 +9,17 @@
+   qt6,
+   buildPackages,
+   libhybris,
+-  android-headers,
+   libudev,
+   glib,
+   mtdev,
++  metaAsteroidSrc,
+ }:
+ 
+ let
+-  metaAsteroid = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-  patch =
+-    name: hash:
+-    fetchurl {
+-      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroid}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/${name}";
+-      inherit hash;
+-    };
+-
+   # HWC2 was introduced after the Android 6 headers in android-headers 23.
+-  # Keep the old headers for HWC1/libhybris and use the Android 10 HWC2
+-  # headers for this plugin.
++  # Supplement the device headers with HWC2 declarations. Native window and
++  # gralloc types must still come from the exact headers used by libhybris:
++  # mixing Android 6 and Pie changes the C++ buffer base offset on ARM.
+   hwc2Headers = runCommand "android-hwc2-headers" { } ''
+     mkdir -p $out/include/hardware
+     cp ${
+@@ -70,11 +63,12 @@ stdenv.mkDerivation (finalAttrs: {
+   patchFlags = [ "-p2" ];
+ 
+   patches = [
+-    (patch "0001-Add-ambient-mode-display-support.patch" "sha256-dkORtCZzlhuIv8TxATysSsnK7fHwi+TsOdQzxwdhMoc=")
+-    (patch "0003-Support-Qt-6.10.patch" "sha256-HbMYiIgzilhqQtCmr73RkX8V+aEvV8wJae6tfDB0CvQ=")
+-    (patch "0005-Explicitly-make-hwcomposer-a-shared-library.patch" "sha256-Z/zjAhKm6XRQ8zVuSYPiD+rDh7KqZuKzTiUAzmsu+ZE=")
+-    (patch "0006-v10-Fix-refresh-rate-fallback-unit.patch" "sha256-XOplqx7zKgbjPWIwlJ82O1qFDXXNkj2PDO/TdaP/ync=")
+-    (patch "0007-v10-Make-updates-request-driven-and-vsync-paced.patch" "sha256-EQhs66R9Vc2a2yH5zVmo8xtC+oVQHjMlKyNAIGrEsbA=")
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0001-Add-ambient-mode-display-support.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0003-Support-Qt-6.10.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0005-Explicitly-make-hwcomposer-a-shared-library.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0006-v10-Fix-refresh-rate-fallback-unit.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0007-v10-Make-updates-request-driven-and-vsync-paced.patch"
 +    ./hwc-present-diagnostics.patch
    ];
  
    strictDeps = true;
+@@ -90,7 +84,7 @@ stdenv.mkDerivation (finalAttrs: {
+     qt6.qtdeclarative
+     qt6.qtwayland
+     libhybris
+-    android-headers
++    libhybris.androidHeaders
+     hwc2Headers
+     libudev
+     glib
+@@ -118,7 +112,7 @@ stdenv.mkDerivation (finalAttrs: {
+     # Embed precompiled Qt 6 GraphicalEffects shaders (.qsb) into the QPA plugin
+     # so they are registered in memory (qrc:/qt-project.org/imports/Qt5Compat/GraphicalEffects/shaders_ng/*)
+     # when asteroid-launcher loads the hwcomposer QPA platform plugin.
+-    tar -xf ${qt6.qt5compat.src} --strip-components=4 "qt5compat-everywhere-src-6.12.0/src/imports/graphicaleffects5/shaders_ng"
++    tar -xf ${qt6.qt5compat.src} --strip-components=4 "qt5compat-everywhere-src-${qt6.qt5compat.version}/src/imports/graphicaleffects5/shaders_ng"
+     cat > shaders.qrc << 'QRC'
+ <RCC>
+     <qresource prefix="/qt-project.org/imports/Qt5Compat/GraphicalEffects">
+@@ -189,8 +183,8 @@ QRC
+     target_include_directories(hwcomposer PRIVATE
+       .
+       ${hwc2Headers}/include
+-      ${android-headers}/include/android
+-      ${android-headers}/include/android/hardware
++      ${libhybris.androidHeadersInclude}
++      ${libhybris.androidHeadersInclude}/hardware
+       ${libhybris}/include
+       ${libhybris}/include/hybris/eglplatformcommon
+       ${libhybris}/include/hybris/platformcommon
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
 new file mode 100644
 index 00000000..fb5f9bd6
@@ -1386,6 +1745,77 @@ index 00000000..fb5f9bd6
 + 
 + #ifdef QPA_HWC_TIMING
 +     qDebug("HWComposerBackend::swap(), present=%.3f, sync=%.3f, prepare=%.3f, set=%.3f, total=%.3f",
+diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
+index 6cab054d..fa31860e 100644
+--- a/overlay/asteroidos/sensorfw/default.nix
++++ b/overlay/asteroidos/sensorfw/default.nix
+@@ -5,26 +5,15 @@
+   lib,
+   stdenv,
+   fetchFromGitHub,
+-  fetchpatch,
+   cmake,
+   pkg-config,
+   qt6,
+   systemd,
+   libhybris,
+-  android-headers,
+   udev,
++  metaAsteroidSrc,
+ }:
+ 
+-let
+-  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-
+-  upstreamPatch =
+-    name: hash:
+-    fetchpatch {
+-      inherit name hash;
+-      url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-nemomobile/sensorfw/files/${name}";
+-    };
+-in
+ stdenv.mkDerivation (finalAttrs: {
+   pname = "sensorfw";
+   version = "0.15.1";
+@@ -37,13 +26,13 @@ stdenv.mkDerivation (finalAttrs: {
+   };
+ 
+   patches = [
+-    (upstreamPatch "0001-Do-not-hide-stepcounter-by-default.patch" "sha256-7eFjofMXAkQSvZf6RwkINBwLYSe+u3kJ8lCnOkoFhBE=")
+-    (upstreamPatch "0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch" "sha256-qRXs9vrszoG1bVnjkIVtRaXEvaLtNKs7Z1PsR759VQo=")
+-    (upstreamPatch "0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch" "sha256-WyVwM0KEtADQhAeZTGy6we9BSyITchcClT+phNTdhuc=")
+-    (upstreamPatch "0004-Fix-compilation-when-autohybris-is-used.patch" "sha256-RJ711Knze6feQOPfa/UD6r9jG870H//hOnbFPzhoS5s=")
+-    (upstreamPatch "0005-Fix-compilation-when-hybris-is-used.patch" "sha256-evbbTXcBF/a6Y998373+p2vv7PnYWX71Ei9GFH+BaA8=")
+-    (upstreamPatch "0006-hybrisadaptor-Queue-erroneous-events-too.patch" "sha256-6kLVFeEXnpldLWw976ckEMYaM1jBXYAepvBKLKP62/c=")
+-    (upstreamPatch "0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch" "sha256-qH3mMqgPPNq9oqGOmP1xdc/EQ7f95ia8HFcmuBD2oMs=")
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0001-Do-not-hide-stepcounter-by-default.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0002-Add-heart-rate-monitor-sensor-with-hybris-adaptor.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0003-Add-Wrist-gesture-sensor-via-libhybris-adaptor.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0004-Fix-compilation-when-autohybris-is-used.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0005-Fix-compilation-when-hybris-is-used.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0006-hybrisadaptor-Queue-erroneous-events-too.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/sensorfw/files/0007-qt-api-Fix-synchronous-D-Bus-calls-on-Qt-6.patch"
+   ];
+ 
+   strictDeps = true;
+@@ -58,7 +47,7 @@ stdenv.mkDerivation (finalAttrs: {
+     qt6.qtbase
+     systemd
+     libhybris
+-    android-headers
++    libhybris.androidHeaders
+     udev
+   ];
+ 
+@@ -70,7 +59,7 @@ stdenv.mkDerivation (finalAttrs: {
+   cmakeFlags = [
+     "-DENABLE_HYBRIS=ON"
+     "-DHYBRIS_LIB=${libhybris}"
+-    "-DANDROID_INCLUDE=${android-headers}/include/android"
++    "-DANDROID_INCLUDE=${libhybris.androidHeadersInclude}"
+   ];
+ 
+   meta = with lib; {
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
 index acffe994..e52b5713 100644
 --- a/overlay/asteroidos/timed-qt6/default.nix
@@ -1651,3 +2081,135 @@ index 54ce4ee1..12ef6cf7 100644
    ];
  
    buildInputs = [
+diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
+index 5af7a518..02caaf5e 100644
+--- a/overlay/cross-compile.nix
++++ b/overlay/cross-compile.nix
+@@ -1,8 +1,8 @@
+ # Overlays and package workarounds that only make sense during cross-compilation.
+ #
+-# When building natively (buildPlatform == hostPlatform), this overlay returns empty {}.
+-# When cross-compiling, it provides upstream fixes for Qt 6, 32-bit ARM toolchains,
+-# NetSurf host build tools, Skia, systemd, and libkiwix.
++# When building natively, this overlay selects vendored Qt 6.11 for matching
++# Qt host tools. When cross-compiling, it also provides upstream fixes for Qt 6,
++# 32-bit ARM toolchains, NetSurf host build tools, Skia, systemd, and libkiwix.
+ final: super:
+ 
+ let
+@@ -11,7 +11,12 @@ let
+     superStdenv != null && superStdenv.buildPlatform.system != superStdenv.hostPlatform.system;
+ in
+ if !isCross then
+-  { }
++  {
++    # Use the same vendored Qt package definitions for host tools as for the
++    # target Qt libraries during cross compilation. Their dependencies and
++    # toolchains still come from the current Nixpkgs package set.
++    qt6 = final.callPackage ./vendor/qt-6.11 { };
++  }
+ else
+   let
+     addCrossQuickTools =
+@@ -44,8 +49,22 @@ else
+ 
+     # Upstream nixpkgs Qt6 modules skip QtQuick integration during cross-compilation
+     # because cross Qt6QuickTools, Qt6QmlTools, and Qt6ShaderToolsTools cmake flags are missing.
+-    qt6 = super.qt6.overrideScope (
++    qt6 = (final.callPackage ./vendor/qt-6.11 { }).overrideScope (
+       qfinal: qsuper: {
++        # Upstream AsteroidOS builds Qt without desktop GL on hybris machines:
++        # meta-asteroid/recipes-qt/qt6/qtbase_git.bbappend does
++        #   PACKAGECONFIG:append = " gles2 "
++        #   PACKAGECONFIG:remove:hybris-machine = " ... gl ... "
++        # i.e. `-opengl es2`. With the nixpkgs default (desktop GL only),
++        # QOpenGLContext::openGLModuleType() returns LibGL, so
++        # QEGLConfigChooser asks for EGL_OPENGL_BIT; the vendor EGL only
++        # exposes ES configs (renderable=0x45 in the egl-probe dump), so
++        # eglChooseConfig() returns no config and eglCreateWindowSurface()
++        # fails with EGL_BAD_CONFIG. `-opengl es2` makes Qt request
++        # EGL_OPENGL_ES2_BIT, which the vendor EGL does provide.
++        qtbase = qsuper.qtbase.overrideAttrs (old: {
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DINPUT_opengl=es2" ];
++        });
+         qtdeclarative = qsuper.qtdeclarative.overrideAttrs (old: {
+           cmakeFlags =
+             (map (
+@@ -61,7 +80,22 @@ else
+               "-DQt6QuickTools_DIR=${final.pkgsBuildBuild.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
+             ];
+         });
+-        qtwayland = addCrossQuickTools qsuper.qtwayland;
++        # Upstream AsteroidOS builds qtwayland's libhybris-egl-server buffer
++        # integration (meta-asteroid recipes-qt/qt6/qtwayland_%.bbappend +
++        # 0001-Fix-libhybris-egl-server-compilation.patch). Qt 6.12 no longer
++        # defines the feature, but it still ships the plugin sources and the
++        # guard is a plain CMake variable, so enable it explicitly and apply
++        # the same upstream patch. Selected at runtime through
++        # QT_WAYLAND_SERVER_BUFFER_INTEGRATION=libhybris-egl-server.
++        qtwayland = (addCrossQuickTools qsuper.qtwayland).overrideAttrs (old: {
++          patches = (old.patches or [ ]) ++ [
++            "${final.meta-asteroid-src}/recipes-qt/qt6/qtwayland/0001-Fix-libhybris-egl-server-compilation.patch"
++          ];
++          cmakeFlags = (old.cmakeFlags or [ ]) ++ [
++            "-DQT_FEATURE_wayland_libhybris_egl_server_buffer=ON"
++          ];
++          buildInputs = (old.buildInputs or [ ]) ++ [ final.libhybris ];
++        });
+         qtvirtualkeyboard = addCrossQuickTools qsuper.qtvirtualkeyboard;
+         qtmultimedia = (addCrossQuickTools qsuper.qtmultimedia).overrideAttrs (old: {
+           buildInputs = final.lib.filter (
+diff --git a/overlay/libhybris/default.nix b/overlay/libhybris/default.nix
+index 807ec78e..3c1e8538 100644
+--- a/overlay/libhybris/default.nix
++++ b/overlay/libhybris/default.nix
+@@ -10,6 +10,7 @@
+ , file
+ , wayland
+ , buildPackages
++, meta-asteroid-src ? null
+ , useLegacyProperties ? false
+ }:
+ 
+@@ -17,17 +18,6 @@ let
+   inherit (stdenv) targetPlatform buildPlatform;
+   libPrefix = if targetPlatform == buildPlatform then ""
+     else stdenv.targetPlatform.config;
+-
+-  # Upstream AsteroidOS pins libhybris to this revision and layers two patches
+-  # on top of it. Keep this package identical to upstream instead of carrying
+-  # local fork patches: the newer libhybris contains the EGL display reference
+-  # counting that the hwcomposer QPA plugin relies on.
+-  # https://github.com/AsteroidOS/meta-asteroid/blob/5021f282a286a4825b6314264f0a7ff62cbe72d1/recipes-core/libhybris/libhybris_git.bbappend
+-  metaAsteroidRev = "5021f282a286a4825b6314264f0a7ff62cbe72d1";
+-  upstreamPatch = name: hash: fetchurl {
+-    url = "https://raw.githubusercontent.com/AsteroidOS/meta-asteroid/${metaAsteroidRev}/recipes-core/libhybris/libhybris/${name}";
+-    inherit hash;
+-  };
+ in
+ stdenv.mkDerivation {
+   pname = "libhybris";
+@@ -45,14 +35,8 @@ stdenv.mkDerivation {
+   postPatch = ''
+     # These upstream patches are generated from the repository root, while
+     # sourceRoot points at hybris/.
+-    patch -p2 -i ${
+-      upstreamPatch "0001-Remove-references-to-host-path-in-package-config-fil.patch"
+-        "sha256-9JtlPyiqN8CrMikCBOwUDZ8+BShDCDefiiZZ5KPeVg8="
+-    }
+-    patch -p2 -i ${
+-      upstreamPatch "0002-tests-workaround-Wimplicit-function-declaration-in-s.patch"
+-        "sha256-B3ffNEfjJf8Xz7Wv+pK84Dk3jY6FvgAE3otf158+oLo="
+-    }
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0001-Remove-references-to-host-path-in-package-config-fil.patch
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0002-tests-workaround-Wimplicit-function-declaration-in-s.patch
+   '';
+ 
+   postAutoreconf = ''
+@@ -106,5 +90,6 @@ stdenv.mkDerivation {
+     # Android headers this libhybris was configured against. Out-of-tree
+     # libhybris plugins must compile against the same set.
+     androidHeaders = android-headers;
++    androidHeadersInclude = "${android-headers}/include/android";
+   };
+ }

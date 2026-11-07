@@ -23,8 +23,9 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/audio-modules.nix         | 122 +++++
  devices/fossil-hoki/default.nix               | 506 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
+ .../hwcomposer-allocation-diagnostics.patch   |  31 ++
  devices/fossil-hoki/hybris-android.nix        |  30 ++
- devices/fossil-hoki/hybris.nix                |  45 ++
+ devices/fossil-hoki/hybris.nix                |  47 ++
  devices/fossil-hoki/kernel/default.nix        | 342 ++++++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 +
@@ -40,13 +41,14 @@ they cannot hold multi-user.target.
  devices/fossil-triggerfish/default.nix        |  56 ++
  modules/rootfs.nix                            | 120 +++--
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  65 ++-
- 23 files changed, 2268 insertions(+), 53 deletions(-)
+ 24 files changed, 2301 insertions(+), 53 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
  create mode 100644 devices/fossil-hoki/audio-modules.nix
  create mode 100644 devices/fossil-hoki/default.nix
  create mode 100644 devices/fossil-hoki/gps_xtra.ini
+ create mode 100644 devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
  create mode 100644 devices/fossil-hoki/hybris-android.nix
  create mode 100644 devices/fossil-hoki/hybris.nix
  create mode 100644 devices/fossil-hoki/kernel/default.nix
@@ -959,6 +961,43 @@ index 00000000..594fc6c1
 @@ -0,0 +1,2 @@
 +[ntp]
 +NTP_FORCE_INJECT=true
+diff --git a/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch b/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
+new file mode 100644
+index 00000000..cb9ddd4b
+--- /dev/null
++++ b/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
+@@ -0,0 +1,31 @@
++--- a/egl/platforms/hwcomposer/hwcomposer_window.cpp
+++++ b/egl/platforms/hwcomposer/hwcomposer_window.cpp
++@@ -106,7 +106,27 @@
++     busy = 0;
++     status = 0;
++ 
++-    hybris_gralloc_allocate(width, height, format, (uint32_t)usage, &handle, (uint32_t*)&stride);
+++    const int allocationResult =
+++        hybris_gralloc_allocate(width, height, format, (uint32_t)usage,
+++                                &handle, (uint32_t*)&stride);
+++
+++    if (getenv("HYBRIS_HWC_DEBUG")) {
+++        const native_handle_t *nativeHandle = handle;
+++        fprintf(stderr,
+++                "hybris-hwc: allocate this=%p native=%p requested=%ux%u "
+++                "format=0x%x usage=0x%" PRIx64 " result=%d "
+++                "buffer=%ux%u stride=%d format=0x%x usage=0x%" PRIx64 " "
+++                "handle=%p numFds=%d numInts=%d fd0=%d\n",
+++                this, static_cast<ANativeWindowBuffer *>(this),
+++                width, height, format, usage, allocationResult,
+++                ANativeWindowBuffer::width, ANativeWindowBuffer::height,
+++                ANativeWindowBuffer::stride, ANativeWindowBuffer::format,
+++                ANativeWindowBuffer::usage, nativeHandle,
+++                nativeHandle ? nativeHandle->numFds : -1,
+++                nativeHandle ? nativeHandle->numInts : -1,
+++                (nativeHandle && nativeHandle->numFds > 0)
+++                    ? nativeHandle->data[0] : -1);
+++    }
++ 
++     TRACE("width=%d height=%d stride=%d format=x%x usage=x%x status=%s this=%p",
++         width, height, stride, format, usage, strerror(-status), this);
 diff --git a/devices/fossil-hoki/hybris-android.nix b/devices/fossil-hoki/hybris-android.nix
 new file mode 100644
 index 00000000..49b976fc
@@ -997,10 +1036,10 @@ index 00000000..49b976fc
 +''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
-index 00000000..4dcaa20c
+index 00000000..6c9f6620
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris.nix
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,47 @@
 +{
 +  lib,
 +  pkgs,
@@ -1018,6 +1057,7 @@ index 00000000..4dcaa20c
 +  nixpkgs.overlays = lib.mkAfter [
 +    (final: super: {
 +      libhybris = super.libhybris.overrideAttrs (old: {
++        patches = (old.patches or [ ]) ++ [ ./hwcomposer-allocation-diagnostics.patch ];
 +        configureFlags =
 +          (lib.filter (
 +            flag:
@@ -1034,6 +1074,7 @@ index 00000000..4dcaa20c
 +        # the device's pie headers.
 +        passthru = (old.passthru or { }) // {
 +          androidHeaders = hybrisAndroid;
++          androidHeadersInclude = "${hybrisAndroid}/include";
 +        };
 +      });
 +
