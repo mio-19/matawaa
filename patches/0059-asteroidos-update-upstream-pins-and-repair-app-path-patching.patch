@@ -1,0 +1,120 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sat, 7 Nov 2026 14:59:06 +1100
+Subject: [PATCH] asteroidos: update upstream pins and repair app path patching
+
+---
+ npins/sources.json                               | 6 +++---
+ overlay/asteroidos/apps/default.nix              | 8 ++++----
+ overlay/asteroidos/asteroid-launcher/default.nix | 4 ++--
+ overlay/asteroidos/community-apps/default.nix    | 4 ++--
+ overlay/asteroidos/default.nix                   | 4 ++--
+ overlay/asteroidos/lib/mk-asteroid-app.nix       | 5 +++--
+ 6 files changed, 16 insertions(+), 15 deletions(-)
+
+diff --git a/npins/sources.json b/npins/sources.json
+index 574e5b3e..a1ecbbde 100644
+--- a/npins/sources.json
++++ b/npins/sources.json
+@@ -8,10 +8,10 @@
+         "repo": "nixpkgs"
+       },
+       "branch": "nixpkgs-unstable",
+-      "revision": "5c9de89ec55bff981cb8da1a4ee92b10f1438ffc",
+-      "url": "https://github.com/NixOS/nixpkgs/archive/5c9de89ec55bff981cb8da1a4ee92b10f1438ffc.tar.gz",
+       "submodules": false,
+-      "hash": "sha256-WDValiY9se78X2Wh7aWWaq/c7HN29U555+OKbHEzYrw="
++      "revision": "6dadaf4375be35033e1c84395adbd53ff5fded96",
++      "url": "https://github.com/NixOS/nixpkgs/archive/6dadaf4375be35033e1c84395adbd53ff5fded96.tar.gz",
++      "hash": "sha256-D5H7H+qMoTGI/jJtxKP4u7BdjkFnUyhOovTrf3pTOr0="
+     }
+   },
+   "version": 8
+diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
+index fcef9ac1..3e84436a 100644
+--- a/overlay/asteroidos/apps/default.nix
++++ b/overlay/asteroidos/apps/default.nix
+@@ -38,8 +38,8 @@
+   settings = mkAsteroidApp {
+     name = "settings";
+     desc = "Smartwatch preferences and configuration application";
+-    rev = "56c917fd82aa5cb1f679f424f4c226fcffd89a12";
+-    sha256 = "1cbn5cg9q49ik7xwhsi4l6wph9mjxl8w5j4016rdwxq6w8y5ixx3";
++    rev = "9c65aaea9910e6133e79b3b6206a1a8d18b94c80";
++    sha256 = "0c1rcwwdkqhazn6xmmxhap4zrh6yqbhcqlw30ay0qywl206kciji";
+     extraBuildInputs = [
+       mce-dev
+       ngf-qt6
+@@ -77,8 +77,8 @@
+   flashlight = mkAsteroidApp {
+     name = "flashlight";
+     desc = "Full-screen high-brightness torch utility";
+-    rev = "0cdd6068cc57f052d7b6d50576b332ca20ae2865";
+-    sha256 = "0byzy9fl8vm0fvi9i3pffck0b6nzn97dyzncrwfs4dihqww8vzzl";
++    rev = "6b8c805c49c3a5adfa345b17b5d03e40ee50275b";
++    sha256 = "0zbsh2fiv3ab1jipz141nb0qwx9vc7zlycwrnn49crf1kxs35sim";
+   };
+ 
+   calendar = mkAsteroidApp {
+diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
+index b83026a5..34a7fd1e 100644
+--- a/overlay/asteroidos/asteroid-launcher/default.nix
++++ b/overlay/asteroidos/asteroid-launcher/default.nix
+@@ -33,8 +33,8 @@ stdenv.mkDerivation (finalAttrs: {
+   src = fetchFromGitHub {
+     owner = "AsteroidOS";
+     repo = "asteroid-launcher";
+-    rev = "8fd1546de7d79da53194f62f650ed72acd306348";
+-    sha256 = "0hf6mgf1n0bw6hhng8avakp64c9gywiiqpww2w2qd3caaf99nwm1";
++    rev = "29f4257ec9835ead090c8157e46948c769081ed2";
++    sha256 = "1c7swnsqxsrfdhdim9rbq4d33ivxskkck4yz8hmridfwdzzpiv53";
+   };
+ 
+   strictDeps = true;
+diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
+index 9ada2387..1c6b5f86 100644
+--- a/overlay/asteroidos/community-apps/default.nix
++++ b/overlay/asteroidos/community-apps/default.nix
+@@ -17,8 +17,8 @@ rec {
+     src = fetchFromGitHub {
+       owner = "AsteroidOS";
+       repo = "unofficial-watchfaces";
+-      rev = "e1b5a205b72f8a249a6d85c81493a933b5b5edcc";
+-      sha256 = "0ml8i4p5h6fv3d3x0xqlz6qngf2063scbm2mrr7ssbbv4q3vsf36";
++      rev = "7d1d2673922c1e6a8d8d0650032795ee2bd19683";
++      sha256 = "047jyapyc3h7vgi4apgkgw76116z76mb1n2z71j11mi9x8y3x72a";
+     };
+ 
+     installPhase = ''
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index b1d7ac17..77714b02 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -14,8 +14,8 @@ rec {
+   # (udev rules, unit files, patches) instead of vendoring them.
+   metaAsteroidSrc = pkgs.fetchgit {
+     url = "https://github.com/AsteroidOS/meta-asteroid";
+-    rev = "f1fce86f8d6488066ac266216b7e68be00d8499d";
+-    hash = "sha256-FZlt4YrN+y4dSXz8zbBsK+ulwKIaoSi4eDpTWLPiYvQ=";
++    rev = "c84c0bbd731f9dfa3b04295bac239dd7fa64c722";
++    hash = "sha256-AZF9IUTtSNTpgcu7kOL4OLIg/WJIGBI04Q9WIrnMQUA=";
+   };
+   meta-asteroid-src = metaAsteroidSrc;
+ 
+diff --git a/overlay/asteroidos/lib/mk-asteroid-app.nix b/overlay/asteroidos/lib/mk-asteroid-app.nix
+index 2b7c084d..fa056167 100644
+--- a/overlay/asteroidos/lib/mk-asteroid-app.nix
++++ b/overlay/asteroidos/lib/mk-asteroid-app.nix
+@@ -54,9 +54,10 @@ stdenv.mkDerivation (finalAttrs: {
+   postPatch = ''
+     # CMake install destinations must stay relative to CMAKE_INSTALL_PREFIX.
+     find . -name CMakeLists.txt -exec sed -i 's|DESTINATION /usr/share|DESTINATION share|g' {} +
+-    grep -IlR '/usr/share/asteroid-launcher' . | while IFS= read -r file; do
++    grep -IlRZ '/usr/share/asteroid-launcher' . > "$TMPDIR/asteroid-launcher-paths" || [ "$?" -eq 1 ]
++    while IFS= read -r -d "" file; do
+       sed -i 's|/usr/share/asteroid-launcher|/run/current-system/sw/share/asteroid-launcher|g' "$file"
+-    done
++    done < "$TMPDIR/asteroid-launcher-paths"
+   ''
+   + postPatch;
+ 
