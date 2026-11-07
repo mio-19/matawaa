@@ -78,7 +78,7 @@ def check_ssh_connectivity(host: str, port: int, user: str) -> bool:
         f"{user}@{host}",
         "true",
     ]
-    res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    res = subprocess.run(cmd)
     if res.returncode != 0:
         log_warn("Non-interactive SSH is unavailable; subsequent commands may prompt for authentication.")
         return False
@@ -287,7 +287,7 @@ if [ "$PART_SHA" = "$NEW_SHA" ]; then
     echo "[+] Stage-1 boot partition already matches new boot.img ($NEW_SHA). Flashing not needed."
 else
     echo "[*] Stage-1 hash mismatch ($PART_SHA != $NEW_SHA). Flashing new boot.img..."
-    dd if={remote_tmp_img} of="$BOOT_PART" bs=4M status=none conv=fsync
+    dd if={remote_tmp_img} of="$BOOT_PART" bs=4M status=progress conv=fsync
     sync
     flashed_sha=$(head -c {img_size} "$BOOT_PART" | sha256sum | cut -d' ' -f1)
     if [ "$flashed_sha" != "$NEW_SHA" ]; then
@@ -325,7 +325,7 @@ def deploy_copy(
     log(f"Copying system closure to {user}@{host} via nix-copy-closure...")
     env = os.environ.copy()
     env["NIX_SSHOPTS"] = f"-p {port} -o StrictHostKeyChecking=accept-new"
-    cmd = ["nix-copy-closure", "--to", f"{user}@{host}", toplevel]
+    cmd = ["nix-copy-closure", "-v", "--to", f"{user}@{host}", toplevel]
     run_cmd(cmd, env=env)
 
     if bootimg:
