@@ -1,0 +1,207 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 00:31:13 +1100
+Subject: [PATCH] bootloader, activation, fossil-hoki: install boot partition
+ via activation script and unmute DAC
+
+---
+ devices/fossil-hoki/default.nix |   1 +
+ modules/bootloader.nix          | 125 +++++++++++++++++++++++++++++---
+ modules/system-build.nix        |  15 +++-
+ 3 files changed, 127 insertions(+), 14 deletions(-)
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 397277f4..8db1b268 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -219,6 +219,7 @@ in
+         if [ -e /dev/snd/controlC0 ]; then
+           # QUAT_MI2S_RX connects MultiMedia1 frontend to TFA98xx speaker amplifier DAI link
+           tinymix -D 0 set "QUAT_MI2S_RX Audio Mixer MultiMedia1" 1 || true
++          tinymix -D 0 set "Playback 0 Volume" 8192 || true
+           tinymix -D 0 set "mono Profile" "Music" || true
+           tinymix -D 0 set "mono Music Playback Volume" 3 || true
+           # TERT_MI2S_TX connects digital microphone to MultiMedia1 capture frontend
+diff --git a/modules/bootloader.nix b/modules/bootloader.nix
+index be91b7cd..1227f2b8 100644
+--- a/modules/bootloader.nix
++++ b/modules/bootloader.nix
+@@ -1,7 +1,97 @@
+-{ config, lib, pkgs, ... }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
+ 
+ let
+-  inherit (lib) mkIf mkOption types;
++  inherit (lib)
++    mkIf
++    mkOption
++    types
++    optionalString
++    ;
++
++  isAndroid = config.mobile.enable && config.mobile.system.type == "android";
++
++  androidBootloaderInstaller = pkgs.writeShellScript "install-mobile-bootloader" ''
++    set -euo pipefail
++
++    export PATH="${
++      lib.makeBinPath [
++        pkgs.coreutils
++        pkgs.util-linux
++        pkgs.gnugrep
++        pkgs.gnused
++      ]
++    }:$PATH"
++
++    target_profile="''${1:-}"
++    if [ -z "$target_profile" ]; then
++      target_profile="/nix/var/nix/profiles/system"
++    fi
++
++    # Read boot image path from target profile or current system
++    boot_img=""
++    for cand in "$target_profile/mobile-nixos/boot.img" "$target_profile/boot.img"; do
++      if [ -e "$cand" ]; then
++        boot_img="$(readlink -f "$cand")"
++        break
++      fi
++    done
++
++    if [ -z "$boot_img" ] || [ ! -f "$boot_img" ]; then
++      echo "Mobile NixOS: no boot.img found in $target_profile, skipping boot partition update."
++      exit 0
++    fi
++
++    # Locate the active Android boot partition block device
++    BOOT_PART=""
++    slot=$(sed -n 's/.*androidboot.slot_suffix=\(_[ab]\).*/\1/p' /proc/cmdline 2>/dev/null || true)
++    if [ -n "$slot" ]; then
++      for cand in /dev/block/bootdevice/by-name/boot"$slot" /dev/block/by-name/boot"$slot" /dev/disk/by-partlabel/boot"$slot"; do
++        if [ -b "$cand" ]; then BOOT_PART="$cand"; break; fi
++      done
++    fi
++    if [ -z "$BOOT_PART" ]; then
++      for cand in /dev/block/bootdevice/by-name/boot /dev/block/by-name/boot /dev/disk/by-partlabel/boot; do
++        if [ -b "$cand" ]; then BOOT_PART="$cand"; break; fi
++      done
++    fi
++
++    if [ -z "$BOOT_PART" ]; then
++      echo "Mobile NixOS: no active boot partition block device found, skipping boot flashing."
++      exit 0
++    fi
++
++    img_size=$(stat -c '%s' "$boot_img")
++    new_sha=$(sha256sum "$boot_img" | cut -d' ' -f1)
++
++    part_size=$(blockdev --getsize64 "$BOOT_PART" 2>/dev/null || true)
++    if [ -n "$part_size" ] && [ "$part_size" -lt "$img_size" ]; then
++      echo "Mobile NixOS: ERROR: boot.img ($img_size bytes) exceeds partition $BOOT_PART ($part_size bytes)!" >&2
++      exit 1
++    fi
++
++    current_sha=$(head -c "$img_size" "$BOOT_PART" | sha256sum | cut -d' ' -f1)
++    if [ "$current_sha" = "$new_sha" ]; then
++      echo "Mobile NixOS: stage-1 boot partition $BOOT_PART is up to date ($new_sha)."
++      exit 0
++    fi
++
++    echo "Mobile NixOS: updating stage-1 boot partition $BOOT_PART ($current_sha -> $new_sha)..."
++    dd if="$boot_img" of="$BOOT_PART" bs=4M conv=fsync status=none
++    sync
++
++    flashed_sha=$(head -c "$img_size" "$BOOT_PART" | sha256sum | cut -d' ' -f1)
++    if [ "$flashed_sha" != "$new_sha" ]; then
++      echo "Mobile NixOS: ERROR: checksum mismatch after flashing $BOOT_PART ($flashed_sha != $new_sha)!" >&2
++      exit 1
++    fi
++
++    echo "Mobile NixOS: successfully updated stage-1 boot partition $BOOT_PART."
++  '';
+ in
+ {
+   options = {
+@@ -11,21 +101,32 @@ in
+           type = types.bool;
+           default = config.mobile.enable;
+           description = ''
+-            Whether the bootloader **configuration** for Mobile NixOS
++            Whether the bootloader configuration for Mobile NixOS
+             is enabled.
+-
+-            Installation and management of the Mobile NixOS bootloading
+-            components is not implemented at this point in time.
+-            (e.g. flashing boot.img on android, boot partition on other systems.)
+           '';
+         };
+       };
+     };
+   };
+ 
+-  config = mkIf (config.mobile.bootloader.enable) {
+-    boot.loader.grub.enable = false;
+-    boot.loader.generic-extlinux-compatible.enable = false;
+-  };
+-}
++  config = mkIf (config.mobile.bootloader.enable) (
++    lib.mkMerge [
++      {
++        boot.loader.grub.enable = false;
++        boot.loader.generic-extlinux-compatible.enable = false;
++      }
+ 
++      (mkIf isAndroid {
++        system.build.installBootLoader = androidBootloaderInstaller;
++        system.activationScripts.mobileBootloader = {
++          supportsDryActivation = true;
++          text = ''
++            if [ -z "''${NIXOS_ACTION:-}" ] || [ "''${NIXOS_ACTION:-}" != "dry-activate" ]; then
++              ${androidBootloaderInstaller}
++            fi
++          '';
++        };
++      })
++    ]
++  );
++}
+diff --git a/modules/system-build.nix b/modules/system-build.nix
+index 064cc218..94e1320d 100644
+--- a/modules/system-build.nix
++++ b/modules/system-build.nix
+@@ -1,11 +1,16 @@
+-{ config, lib, pkgs, ... }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
+ 
+ let
+   inherit (lib) mkIf optionalString;
+ 
+   deviceName = config.mobile.device.name;
+ 
+-  dtbMapping = pkgs.runCommand "dtb-mapping.json" {} ''
++  dtbMapping = pkgs.runCommand "dtb-mapping.json" { } ''
+     (
+       PS4=" $ "; set -x
+       ${pkgs.buildPackages.mobile-nixos.map-dtbs}/bin/map-dtbs $(find ${config.hardware.deviceTree.package} -name '*.dtb' | sort) > $out
+@@ -24,6 +29,12 @@ in
+         ${optionalString (config.hardware.deviceTree.package != null) ''
+           ln -s ${dtbMapping} dtb-mapping.json
+         ''}
++        ${optionalString
++          (config.mobile.system.type == "android" && config.mobile.outputs.android ? android-bootimg)
++          ''
++            ln -s ${config.mobile.outputs.android.android-bootimg} boot.img
++          ''
++        }
+       )
+     '';
+   };

@@ -343,9 +343,6 @@ def deploy_copy(
     reboot: bool,
 ) -> None:
     toplevel = build_asteroid_toplevel(repo_root, device)
-    # Test and dry-activate must not change the device's boot partition.
-    should_flash = flash_boot and action in ("boot", "switch")
-    bootimg = build_stage1_bootimg(repo_root, device) if should_flash else None
 
     if dry_run:
         log("Dry run requested. Closures built successfully; skipping transmission and activation.")
@@ -362,16 +359,11 @@ def deploy_copy(
     cmd = ["nix-copy-closure", "--gzip", "-v", "--to", f"{user}@{host}", toplevel]
     run_cmd(cmd, env=env)
 
-    if bootimg:
-        flash_stage1_bootimg_remote(host, port, user, bootimg)
-
     log(f"Activating configuration (action: {action}) on target watch...")
     if action == "boot":
-        # Mobile NixOS stage-1 selects the system profile directly. There is
-        # no conventional NixOS boot loader for switch-to-configuration to edit.
         remote_activate = (
             f"nix-env -p /nix/var/nix/profiles/system --set {shlex.quote(toplevel)} && "
-            f"test \"$(readlink -f /nix/var/nix/profiles/system)\" = {shlex.quote(toplevel)}"
+            f"{shlex.quote(toplevel)}/bin/switch-to-configuration boot"
         )
     elif action == "switch":
         remote_activate = (
