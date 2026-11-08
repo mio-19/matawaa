@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sun, 8 Nov 2026 19:56:28 +1100
+Subject: [PATCH] fossil-hoki: start vendor.audio-hal-2-0 and enable
+ QUAT_MI2S_RX_DL_HL downlink switch
+
+---
+ devices/fossil-hoki/android-init.nix | 2 +-
+ devices/fossil-hoki/default.nix      | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
+index 0f2e864b..471fe087 100644
+--- a/devices/fossil-hoki/android-init.nix
++++ b/devices/fossil-hoki/android-init.nix
+@@ -36,7 +36,7 @@ let
+   # Matches AsteroidOS meta-skipjack, meta-koi, meta-narwhal, meta-pike, meta-ray.
+   patchedInitRc = pkgs.runCommand "init.rc" { } ''
+     ${pkgs.gnused}/bin/sed \
+-      -e '/start vndservicemanager/a \    start vendor.gralloc-2-0\n    start vendor.configstore-hal' \
++      -e '/start vndservicemanager/a \    start vendor.gralloc-2-0\n    start vendor.configstore-hal\n    start vendor.audio-hal-2-0' \
+       -e '/setprop sys.hwc.gpu_perf_mode 1/a \    setprop vendor.gralloc.enable_fb_ubwc 0\n    setprop vendor.gralloc.disable_ubwc 1' \
+       ${initRc} > $out
+     cat >> $out <<'EOF'
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 9f1552a0..ba41941c 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -216,6 +216,8 @@ in
+         done
+ 
+         if [ -e /dev/snd/controlC0 ]; then
++          # QUAT_MI2S_RX_DL_HL enables speaker downlink audio flow
++          tinymix -D 0 set "QUAT_MI2S_RX_DL_HL Switch" 1 || true
+           # QUAT_MI2S_RX connects MultiMedia1 frontend to TFA98xx speaker amplifier DAI link
+           tinymix -D 0 set "QUAT_MI2S_RX Audio Mixer MultiMedia1" 1 1 || true
+           # TERT_MI2S_TX connects digital microphone to MultiMedia1 capture frontend
