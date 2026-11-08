@@ -238,10 +238,10 @@ index f0f0decc..f1e3d863 100644
 +  };
  }
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 95a65e32..3351d70d 100644
+index 5e37f83f..25766a5e 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -54,6 +54,10 @@ in
+@@ -57,6 +57,10 @@ in
  
    mobile.device.supportLevel = "supported";
  
@@ -252,7 +252,7 @@ index 95a65e32..3351d70d 100644
    # Linux 4.14 btrfs supports compress=zstd (without a level), noatime and
    # space_cache=v2. It rejects compress=zstd:3 / zstd3 and space_cache v1.
    # The image builder disables block-group-tree for this kernel.
-@@ -78,6 +82,9 @@ in
+@@ -81,6 +85,9 @@ in
        hasCrown = true;
        hasHaptics = true;
        aodSupport = true;

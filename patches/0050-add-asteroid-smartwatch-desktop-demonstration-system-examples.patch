@@ -9,7 +9,7 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 896 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 901 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 +
  examples/asteroid/default.nix                 |  15 +
  .../scripted-installer/automated-installer.rb |   5 +-
@@ -21,10 +21,10 @@ Run the launcher the way upstream AsteroidOS does: start it as a user service wi
  overlay/asteroidos/libnciplugin/default.nix   |  90 ++
  overlay/asteroidos/libnfcdef/default.nix      |  71 ++
  overlay/asteroidos/nfcd/default.nix           | 197 ++++
- overlay/asteroidos/ngfd/default.nix           | 111 +++
+ overlay/asteroidos/ngfd/default.nix           | 112 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 16 files changed, 1831 insertions(+), 43 deletions(-)
+ 16 files changed, 1837 insertions(+), 43 deletions(-)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -70,10 +70,10 @@ index 1081d085..f0f0decc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..225241e3
+index 00000000..9da31ced
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,896 @@
+@@ -0,0 +1,901 @@
 +{
 +  config,
 +  lib,
@@ -712,10 +712,15 @@ index 00000000..225241e3
 +      unitConfig.ConditionUser = "!root";
 +      environment = {
 +        GST_PLUGIN_SYSTEM_PATH_1_0 = "/run/current-system/sw/lib/gstreamer-1.0";
++        NGF_CONF_PATH = "/run/current-system/sw/share/ngfd";
++        NGF_PLUGIN_PATH = "${pkgs.asteroid.ngfd}/lib/ngf";
++        NGF_USER_CONF_PATH = "/etc/ngfd";
 +      };
 +      serviceConfig = {
 +        Type = "simple";
 +        ExecStart = "${pkgs.asteroid.ngfd}/bin/ngfd";
++        Restart = "on-failure";
++        RestartSec = "2";
 +      };
 +    };
 +
@@ -1872,10 +1877,10 @@ index 00000000..d12414ad
 +}
 diff --git a/overlay/asteroidos/ngfd/default.nix b/overlay/asteroidos/ngfd/default.nix
 new file mode 100644
-index 00000000..e82464c0
+index 00000000..8d854190
 --- /dev/null
 +++ b/overlay/asteroidos/ngfd/default.nix
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,112 @@
 +# Upstream: meta-asteroid/recipes-nemomobile/ngfd/ngfd_git.bb
 +# Nemomobile's non graphical feedback daemon (haptics / system sounds).
 +{
@@ -1966,8 +1971,9 @@ index 00000000..e82464c0
 +
 +  postInstall = ''
 +    # Upstream ships its own configuration instead of the source tree's.
-+    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/ngfd.ini \
-+      $out/share/ngfd/ngfd.ini
++    mkdir -p $out/share/ngfd
++    sed 's/droid-vibrator;//g' ${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/ngfd.ini \
++      > $out/share/ngfd/ngfd.ini
 +    install -d $out/share/ngfd/events.d
 +    cp -r ${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/events.d/. \
 +      $out/share/ngfd/events.d/

@@ -11,7 +11,9 @@ The mainline display, touch, modem, WLAN and audio drivers are still missing, so
  devices/fossil-hoki-mainline/default.nix      |   127 +
  .../fossil-hoki-mainline/kernel/default.nix   |    21 +
  devices/fossil-hoki-mainline/sda429-hoki.dts  | 11753 ++++++++++++++++
- 4 files changed, 11947 insertions(+)
+ devices/fossil-hoki/android-init.nix          |     3 +
+ devices/fossil-hoki/default.nix               |    40 +-
+ 6 files changed, 11981 insertions(+), 9 deletions(-)
  create mode 100644 devices/fossil-hoki-mainline/README.md
  create mode 100644 devices/fossil-hoki-mainline/default.nix
  create mode 100644 devices/fossil-hoki-mainline/kernel/default.nix
@@ -11988,3 +11990,110 @@ index 00000000..be2c4a05
 +		hoki_batterydata = "/qcom,battery-data";
 +	};
 +};
+diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
+index 0dc31172..df590d0d 100644
+--- a/devices/fossil-hoki/android-init.nix
++++ b/devices/fossil-hoki/android-init.nix
+@@ -155,6 +155,9 @@ in
+             done
+           fi
+         done
++        # Ensure TFA98xx amplifier container firmware is linked under both names expected by kernel
++        [ -e /lib/firmware/tfa98xx.cnt ] || ${pkgs.coreutils}/bin/ln -sf /system/etc/firmware/tfa98xx.cnt /lib/firmware/tfa98xx.cnt
++        [ -e /lib/firmware/tfa9890.cnt ] || ${pkgs.coreutils}/bin/ln -sf /system/etc/firmware/tfa98xx.cnt /lib/firmware/tfa9890.cnt
+ 
+         ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
+       '';
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 95a65e32..5e37f83f 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -16,6 +16,9 @@ let
+     if [ -d ${androidSystemData}/system/etc/firmware ]; then
+       cp -a ${androidSystemData}/system/etc/firmware/* $out/lib/firmware/
+     fi
++    if [ -e $out/lib/firmware/tfa98xx.cnt ]; then
++      ln -sf tfa98xx.cnt $out/lib/firmware/tfa9890.cnt
++    fi
+   '';
+ 
+   # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
+@@ -146,6 +149,7 @@ in
+     pkgs.alsa-utils
+     pkgs.btrfs-progs
+     pkgs.qrtr
++    pkgs.tinyalsa
+     hokiNgfdConfig
+   ];
+ 
+@@ -163,16 +167,18 @@ in
+     path = with pkgs; [
+       alsa-utils
+       coreutils
++      tinyalsa
+     ];
+     serviceConfig = {
+       Type = "oneshot";
+       RemainAfterExit = true;
+       ExecStart = pkgs.writeShellScript "audio-routing-hoki" ''
+-        # Symlink TFA98xx amplifier DSP container firmware into /lib/firmware
++        # Ensure TFA98xx amplifier DSP container firmware is linked under both names in /lib/firmware
+         mkdir -p /lib/firmware
+         for p in /system/etc/firmware/tfa98xx.cnt /vendor/firmware/tfa98xx.cnt /etc/firmware/tfa98xx.cnt; do
+-          if [ -e "$p" ] && [ ! -e /lib/firmware/tfa98xx.cnt ]; then
+-            ln -sf "$p" /lib/firmware/tfa98xx.cnt
++          if [ -e "$p" ]; then
++            [ -e /lib/firmware/tfa98xx.cnt ] || ln -sf "$p" /lib/firmware/tfa98xx.cnt
++            [ -e /lib/firmware/tfa9890.cnt ] || ln -sf "$p" /lib/firmware/tfa9890.cnt
+           fi
+         done
+ 
+@@ -186,11 +192,11 @@ in
+ 
+         if [ -e /proc/asound/card0 ]; then
+           # QUAT_MI2S_RX connects MultiMedia1 frontend to TFA98xx speaker amplifier DAI link
+-          amixer -c 0 sset 'QUAT_MI2S_RX Audio Mixer MultiMedia1' 1 2>/dev/null || true
++          tinymix -D 0 "QUAT_MI2S_RX Audio Mixer MultiMedia1" 1 || true
+           # TERT_MI2S_TX connects digital microphone to MultiMedia1 capture frontend
+-          amixer -c 0 sset 'MultiMedia1 Mixer TERT_MI2S_TX' 1 2>/dev/null || true
++          tinymix -D 0 "MultiMedia1 Mixer TERT_MI2S_TX" 1 || true
+           # Route digital mic 1 to DEC1
+-          amixer -c 0 sset 'DEC1 MUX' 'DMIC1' 2>/dev/null || true
++          tinymix -D 0 "DEC1 MUX" "DMIC1" || true
+         fi
+       '';
+     };
+@@ -304,6 +310,7 @@ in
+     if [ -d ${androidSystemData}/system/etc/firmware ]; then
+       cp -a ${androidSystemData}/system/etc/firmware/* ./lib/firmware/ 2>/dev/null || true
+     fi
++    [ -e ./lib/firmware/tfa98xx.cnt ] && ln -sf tfa98xx.cnt ./lib/firmware/tfa9890.cnt || true
+     ln -sfn /vendor/firmware ./etc/firmware
+ 
+     # Replace stock Android libselinux.so with AsteroidOS libselinux_stubs.so
+@@ -505,7 +512,22 @@ in
+     sha256 = "12zg3n0jysy7lczqwh0kl5ccg1ljgidkqazj6i8v2j9k0nckkx29";
+   };
+ 
+-  # Audio support on Fossil Gen 6 (hoki) is handled natively via Android Audio HAL (audio.primary.sdm429w.so)
+-  # and pulseaudio-modules-droid with `source_channel_map=mono rate=48000` (48 kHz DSP frontend clock).
+-  # Upstream PR (Merged): https://github.com/AsteroidOS/meta-smartwatch/pull/357 ("hoki: Fix microphone and speaker")
++  # Qualcomm MSM8909W / SDM429W DSP frontend (MultiMedia1 / hw:0,0) only accepts 48,000 Hz.
++  # Configure ALSA plug with rate 48000 so all apps (including 44.1 kHz beatfork tick.wav)
++  # are transparently resampled and play properly.
++  environment.etc."asound.conf".text = ''
++    pcm.!default {
++      type plug
++      slave {
++        pcm "hw:0,0"
++        rate 48000
++        format S16_LE
++      }
++    }
++
++    ctl.!default {
++      type hw
++      card 0
++    }
++  '';
+ }
