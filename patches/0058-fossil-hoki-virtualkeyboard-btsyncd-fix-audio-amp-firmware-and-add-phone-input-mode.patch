@@ -1,0 +1,1218 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sun, 8 Nov 2026 23:24:07 +1100
+Subject: [PATCH] fossil-hoki, virtualkeyboard, btsyncd: fix audio amp firmware
+ and add phone input mode
+
+---
+ devices/fossil-hoki/default.nix               |  17 +--
+ devices/fossil-hoki/tfa9890.cnt               | Bin 0 -> 5246 bytes
+ .../asteroid-btsyncd/appbridgeservice.cpp     |  39 ++++++
+ .../0001-add-rime-plugin-and-layouts.patch    |   7 +-
+ .../asteroidos/virtualkeyboard/default.nix    |   2 +
+ .../virtualkeyboard/layouts/en_GB/main.qml    | 128 ++++++++++++++++++
+ .../virtualkeyboard/layouts/en_GB/symbols.qml |  54 ++++++++
+ .../virtualkeyboard/layouts/en_US/main.qml    | 128 ++++++++++++++++++
+ .../virtualkeyboard/layouts/en_US/symbols.qml |  54 ++++++++
+ .../virtualkeyboard/layouts/phone/main.qml    |  82 +++++++++++
+ .../virtualkeyboard/layouts/zh_CN/main.qml    |  79 ++++++++++-
+ .../virtualkeyboard/layouts/zh_HK/main.qml    |  80 ++++++++++-
+ .../virtualkeyboard/layouts/zh_TW/main.qml    |  80 ++++++++++-
+ .../virtualkeyboard/phoneinputbridge.cpp      |  86 ++++++++++++
+ .../virtualkeyboard/phoneinputbridge.h        |  46 +++++++
+ 15 files changed, 860 insertions(+), 22 deletions(-)
+ create mode 100644 devices/fossil-hoki/tfa9890.cnt
+ create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_GB/main.qml
+ create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_GB/symbols.qml
+ create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_US/main.qml
+ create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_US/symbols.qml
+ create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/phone/main.qml
+ create mode 100644 overlay/asteroidos/virtualkeyboard/phoneinputbridge.cpp
+ create mode 100644 overlay/asteroidos/virtualkeyboard/phoneinputbridge.h
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index ba41941c..397277f4 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -16,9 +16,7 @@ let
+     if [ -d ${androidSystemData}/system/etc/firmware ]; then
+       cp -a ${androidSystemData}/system/etc/firmware/* $out/lib/firmware/
+     fi
+-    if [ -e $out/lib/firmware/tfa98xx.cnt ]; then
+-      ln -sf tfa98xx.cnt $out/lib/firmware/tfa9890.cnt
+-    fi
++    cp -f ${./tfa9890.cnt} $out/lib/firmware/tfa9890.cnt
+   '';
+ 
+   # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
+@@ -176,7 +174,10 @@ in
+     description = "Fossil Gen 6 TFA98xx audio amplifier and microphone mixer routing";
+     wantedBy = [ "multi-user.target" ];
+     wants = [ "dev-snd-controlC0.device" ];
+-    after = [ "dev-snd-controlC0.device" "sound.target" ];
++    after = [
++      "dev-snd-controlC0.device"
++      "sound.target"
++    ];
+     path = with pkgs; [
+       alsa-utils
+       coreutils
+@@ -199,10 +200,10 @@ in
+ 
+         # Ensure TFA98xx amplifier DSP container firmware is linked under both names in /lib/firmware
+         mkdir -p /lib/firmware
++        ln_force "${./tfa9890.cnt}" /lib/firmware/tfa9890.cnt
+         for p in /system/etc/firmware/tfa98xx.cnt /vendor/firmware/tfa98xx.cnt /etc/firmware/tfa98xx.cnt; do
+           if [ -e "$p" ]; then
+             ln_force "$p" /lib/firmware/tfa98xx.cnt
+-            ln_force "$p" /lib/firmware/tfa9890.cnt
+             break
+           fi
+         done
+@@ -216,10 +217,10 @@ in
+         done
+ 
+         if [ -e /dev/snd/controlC0 ]; then
+-          # QUAT_MI2S_RX_DL_HL enables speaker downlink audio flow
+-          tinymix -D 0 set "QUAT_MI2S_RX_DL_HL Switch" 1 || true
+           # QUAT_MI2S_RX connects MultiMedia1 frontend to TFA98xx speaker amplifier DAI link
+-          tinymix -D 0 set "QUAT_MI2S_RX Audio Mixer MultiMedia1" 1 1 || true
++          tinymix -D 0 set "QUAT_MI2S_RX Audio Mixer MultiMedia1" 1 || true
++          tinymix -D 0 set "mono Profile" "Music" || true
++          tinymix -D 0 set "mono Music Playback Volume" 3 || true
+           # TERT_MI2S_TX connects digital microphone to MultiMedia1 capture frontend
+           tinymix -D 0 set "MultiMedia1 Mixer TERT_MI2S_TX" 1 || true
+           # Route digital mic 1 to DEC1
+diff --git a/devices/fossil-hoki/tfa9890.cnt b/devices/fossil-hoki/tfa9890.cnt
+new file mode 100644
+index 0000000000000000000000000000000000000000..21bff2e0072dbac46339069a4b4207625b66c86f
+GIT binary patch
+literal 5246
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
+index 8802310f..e73d496f 100644
+--- a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
++++ b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
+@@ -77,6 +77,7 @@ namespace {
+ 
+ const QString kCameraId = QStringLiteral("org.asteroidos.camera");
+ const QString kSpo2Id = QStringLiteral("org.asteroidos.spo2");
++const QString kKeyboardId = QStringLiteral("org.asteroidos.keyboard");
+ 
+ // Wire alias -> canonical app id. Anything else is rejected.
+ QString normalizeAppId(const QString &id)
+@@ -87,6 +88,9 @@ QString normalizeAppId(const QString &id)
+     if (id == QStringLiteral("spo2") || id == kSpo2Id) {
+         return kSpo2Id;
+     }
++    if (id == QStringLiteral("kbd") || id == kKeyboardId) {
++        return kKeyboardId;
++    }
+     return QString();
+ }
+ 
+@@ -95,6 +99,9 @@ QByteArray compactAppId(const QString &canonical)
+     if (canonical == kCameraId) {
+         return QByteArrayLiteral("cam");
+     }
++    if (canonical == kKeyboardId) {
++        return QByteArrayLiteral("kbd");
++    }
+     return QByteArrayLiteral("spo2");
+ }
+ 
+@@ -127,6 +134,30 @@ bool isCameraTxAction(const QString &action)
+     return allowed.contains(action);
+ }
+ 
++// Phone -> watch keyboard actions.
++bool isKeyboardRxAction(const QString &action)
++{
++    static const QSet<QString> allowed = {
++        QStringLiteral("commit"),
++        QStringLiteral("text"),
++        QStringLiteral("backspace"),
++        QStringLiteral("enter"),
++        QStringLiteral("close"),
++    };
++    return allowed.contains(action);
++}
++
++// Watch -> phone keyboard actions.
++bool isKeyboardTxAction(const QString &action)
++{
++    static const QSet<QString> allowed = {
++        QStringLiteral("request_input"),
++        QStringLiteral("open"),
++        QStringLiteral("close"),
++    };
++    return allowed.contains(action);
++}
++
+ // Generic action syntax for apps without a fixed action list (spo2).
+ bool isPlainToken(const QByteArray &token)
+ {
+@@ -173,6 +204,10 @@ void AppBridgeService::sendBytes(const QString &appId, const QString &action, co
+         qWarning() << "AppBridge: rejecting send, camera action not allowed:" << action;
+         return;
+     }
++    if (canonical == kKeyboardId && !isKeyboardTxAction(action)) {
++        qWarning() << "AppBridge: rejecting send, keyboard action not allowed:" << action;
++        return;
++    }
+ 
+     QByteArray body = payload;
+     if (canonical == kCameraId) {
+@@ -255,6 +290,10 @@ void AppBridgeService::handleRxPacket(const QByteArray &packet)
+         qWarning() << "AppBridge: dropping unexpected camera action from phone:" << action;
+         return;
+     }
++    if (appId == kKeyboardId && !isKeyboardRxAction(action)) {
++        qWarning() << "AppBridge: dropping unexpected keyboard action from phone:" << action;
++        return;
++    }
+ 
+     qDebug() << "AppBridge: Received message for" << appId << "action:" << action;
+     emit messageReceived(appId, action, QString::fromUtf8(payloadBytes));
+diff --git a/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch b/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
+index b08fcd8e..8bb79c6b 100644
+--- a/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
++++ b/overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
+@@ -1,10 +1,10 @@
+ --- a/CMakeLists.txt
+ +++ b/CMakeLists.txt
+-@@ -9,6 +9,36 @@
++@@ -9,6 +9,39 @@
+  include(FeatureSummary)
+  include(GNUInstallDirs)
+  
+-+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick VirtualKeyboard)
+++find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick VirtualKeyboard DBus)
+ +find_package(PkgConfig REQUIRED)
+ +pkg_check_modules(RIME REQUIRED rime)
+ +
+@@ -17,6 +17,8 @@
+ +    SOURCES
+ +        rimeinputmethod.h
+ +        rimeinputmethod.cpp
+++        phoneinputbridge.h
+++        phoneinputbridge.cpp
+ +)
+ +
+ +target_include_directories(qtvkbrimeplugin PRIVATE ${RIME_INCLUDE_DIRS})
+@@ -25,6 +27,7 @@
+ +    Qt6::Gui
+ +    Qt6::Qml
+ +    Qt6::VirtualKeyboard
+++    Qt6::DBus
+ +    ${RIME_LIBRARIES}
+ +)
+ +
+diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
+index 12ef6cf7..315cdafe 100644
+--- a/overlay/asteroidos/virtualkeyboard/default.nix
++++ b/overlay/asteroidos/virtualkeyboard/default.nix
+@@ -29,6 +29,8 @@ stdenv.mkDerivation (finalAttrs: {
+   postPatch = ''
+     cp ${./rimeinputmethod.cpp} rimeinputmethod.cpp
+     cp ${./rimeinputmethod.h} rimeinputmethod.h
++    cp ${./phoneinputbridge.cpp} phoneinputbridge.cpp
++    cp ${./phoneinputbridge.h} phoneinputbridge.h
+     substituteInPlace rimeinputmethod.cpp \
+       --replace-fail '"/usr/share/rime-data"' '"${rime-data}/share/rime-data"'
+     mkdir -p layouts
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/en_GB/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/en_GB/main.qml
+new file mode 100644
+index 00000000..586df724
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/layouts/en_GB/main.qml
+@@ -0,0 +1,128 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++import QtQuick.VirtualKeyboard.Plugins.Rime
++
++KeyboardLayout {
++    id: enGBLayout
++    inputMode: InputEngine.InputMode.Latin
++
++    PhoneInputBridge {
++        id: phoneBridge
++        onTextCommitted: function(text) {
++            InputContext.commit(text)
++        }
++    }
++
++    keyWeight: 160
++    KeyboardRow {
++        Key { key: Qt.Key_Q; text: "q" }
++        Key { key: Qt.Key_W; text: "w" }
++        Key { key: Qt.Key_E; text: "e" }
++        Key { key: Qt.Key_R; text: "r" }
++        Key { key: Qt.Key_T; text: "t" }
++        Key { key: Qt.Key_Y; text: "y" }
++        Key { key: Qt.Key_U; text: "u" }
++        Key { key: Qt.Key_I; text: "i" }
++        Key { key: Qt.Key_O; text: "o" }
++        Key { key: Qt.Key_P; text: "p" }
++        BackspaceKey {}
++    }
++    KeyboardRow {
++        FillerKey { weight: 56 }
++        Key { key: Qt.Key_A; text: "a" }
++        Key { key: Qt.Key_S; text: "s" }
++        Key { key: Qt.Key_D; text: "d" }
++        Key { key: Qt.Key_F; text: "f" }
++        Key { key: Qt.Key_G; text: "g" }
++        Key { key: Qt.Key_H; text: "h" }
++        Key { key: Qt.Key_J; text: "j" }
++        Key { key: Qt.Key_K; text: "k" }
++        Key { key: Qt.Key_L; text: "l" }
++        EnterKey { weight: 283 }
++    }
++    KeyboardRow {
++        keyWeight: 156
++        ShiftKey {}
++        Key { key: Qt.Key_Z; text: "z" }
++        Key { key: Qt.Key_X; text: "x" }
++        Key { key: Qt.Key_C; text: "c" }
++        Key { key: Qt.Key_V; text: "v" }
++        Key { key: Qt.Key_B; text: "b" }
++        Key { key: Qt.Key_N; text: "n" }
++        Key { key: Qt.Key_M; text: "m" }
++        Key { key: Qt.Key_Apostrophe; text: "'"; alternativeKeys: "\"`" }
++        Key { key: Qt.Key_Comma; text: "," }
++        Key { key: Qt.Key_Period; text: "." }
++    }
++    KeyboardRow {
++        keyWeight: 154
++        SymbolModeKey { weight: 200 }
++        ChangeLanguageKey { weight: 140 }
++        Key {
++            weight: 140
++            text: "📱"
++            functionKey: true
++            onClicked: {
++                phoneOverlay.visible = true
++                phoneBridge.requestInput()
++            }
++        }
++        SpaceKey { weight: 740 }
++        HideKeyboardKey { weight: 180 }
++    }
++
++    Rectangle {
++        id: phoneOverlay
++        anchors.fill: parent
++        visible: false
++        color: "#1c1c1e"
++        z: 999
++
++        Column {
++            anchors.centerIn: parent
++            spacing: 12
++            width: parent.width * 0.9
++
++            Text {
++                text: "📱 Input on Phone"
++                color: "#ffffff"
++                font.bold: true
++                font.pixelSize: 18
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Text {
++                text: phoneBridge.statusText
++                color: "#a0a0a0"
++                font.pixelSize: 13
++                wrapMode: Text.WordWrap
++                horizontalAlignment: Text.AlignHCenter
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Rectangle {
++                width: parent.width * 0.7
++                height: 38
++                radius: 19
++                color: "#3a3a3c"
++                anchors.horizontalCenter: parent.horizontalCenter
++
++                Text {
++                    anchors.centerIn: parent
++                    text: "⌨️ Return"
++                    color: "#ffffff"
++                    font.bold: true
++                    font.pixelSize: 14
++                }
++
++                MouseArea {
++                    anchors.fill: parent
++                    onClicked: {
++                        phoneBridge.closeInput()
++                        phoneOverlay.visible = false
++                    }
++                }
++            }
++        }
++    }
++}
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/en_GB/symbols.qml b/overlay/asteroidos/virtualkeyboard/layouts/en_GB/symbols.qml
+new file mode 100644
+index 00000000..3619eaf0
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/layouts/en_GB/symbols.qml
+@@ -0,0 +1,54 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++
++KeyboardLayout {
++    id: enGBSymbolsLayout
++    inputMode: InputEngine.InputMode.Latin
++
++    keyWeight: 160
++    KeyboardRow {
++        Key { key: Qt.Key_1; text: "1" }
++        Key { key: Qt.Key_2; text: "2" }
++        Key { key: Qt.Key_3; text: "3" }
++        Key { key: Qt.Key_4; text: "4" }
++        Key { key: Qt.Key_5; text: "5" }
++        Key { key: Qt.Key_6; text: "6" }
++        Key { key: Qt.Key_7; text: "7" }
++        Key { key: Qt.Key_8; text: "8" }
++        Key { key: Qt.Key_9; text: "9" }
++        Key { key: Qt.Key_0; text: "0" }
++        BackspaceKey {}
++    }
++    KeyboardRow {
++        FillerKey { weight: 56 }
++        Key { key: Qt.Key_At; text: "@" }
++        Key { key: Qt.Key_NumberSign; text: "#" }
++        Key { key: Qt.Key_Dollar; text: "£"; alternativeKeys: "$€¥" }
++        Key { key: Qt.Key_Percent; text: "%" }
++        Key { key: Qt.Key_Ampersand; text: "&" }
++        Key { key: Qt.Key_Minus; text: "-" }
++        Key { key: Qt.Key_Plus; text: "+" }
++        Key { key: Qt.Key_ParenLeft; text: "(" }
++        Key { key: Qt.Key_ParenRight; text: ")" }
++        EnterKey { weight: 283 }
++    }
++    KeyboardRow {
++        keyWeight: 156
++        Key { key: Qt.Key_Asterisk; text: "*" }
++        Key { key: Qt.Key_QuoteDbl; text: "\"" }
++        Key { key: Qt.Key_Apostrophe; text: "'" }
++        Key { key: Qt.Key_Colon; text: ":" }
++        Key { key: Qt.Key_Semicolon; text: ";" }
++        Key { key: Qt.Key_Exclam; text: "!" }
++        Key { key: Qt.Key_Question; text: "?" }
++        Key { key: Qt.Key_Slash; text: "/" }
++        Key { key: Qt.Key_Underscore; text: "_" }
++    }
++    KeyboardRow {
++        keyWeight: 154
++        SymbolModeKey { weight: 217 }
++        ChangeLanguageKey { weight: 154 }
++        SpaceKey { weight: 864 }
++        HideKeyboardKey { weight: 204 }
++    }
++}
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/en_US/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/en_US/main.qml
+new file mode 100644
+index 00000000..c51b1e18
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/layouts/en_US/main.qml
+@@ -0,0 +1,128 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++import QtQuick.VirtualKeyboard.Plugins.Rime
++
++KeyboardLayout {
++    id: enUSLayout
++    inputMode: InputEngine.InputMode.Latin
++
++    PhoneInputBridge {
++        id: phoneBridge
++        onTextCommitted: function(text) {
++            InputContext.commit(text)
++        }
++    }
++
++    keyWeight: 160
++    KeyboardRow {
++        Key { key: Qt.Key_Q; text: "q" }
++        Key { key: Qt.Key_W; text: "w" }
++        Key { key: Qt.Key_E; text: "e" }
++        Key { key: Qt.Key_R; text: "r" }
++        Key { key: Qt.Key_T; text: "t" }
++        Key { key: Qt.Key_Y; text: "y" }
++        Key { key: Qt.Key_U; text: "u" }
++        Key { key: Qt.Key_I; text: "i" }
++        Key { key: Qt.Key_O; text: "o" }
++        Key { key: Qt.Key_P; text: "p" }
++        BackspaceKey {}
++    }
++    KeyboardRow {
++        FillerKey { weight: 56 }
++        Key { key: Qt.Key_A; text: "a" }
++        Key { key: Qt.Key_S; text: "s" }
++        Key { key: Qt.Key_D; text: "d" }
++        Key { key: Qt.Key_F; text: "f" }
++        Key { key: Qt.Key_G; text: "g" }
++        Key { key: Qt.Key_H; text: "h" }
++        Key { key: Qt.Key_J; text: "j" }
++        Key { key: Qt.Key_K; text: "k" }
++        Key { key: Qt.Key_L; text: "l" }
++        EnterKey { weight: 283 }
++    }
++    KeyboardRow {
++        keyWeight: 156
++        ShiftKey {}
++        Key { key: Qt.Key_Z; text: "z" }
++        Key { key: Qt.Key_X; text: "x" }
++        Key { key: Qt.Key_C; text: "c" }
++        Key { key: Qt.Key_V; text: "v" }
++        Key { key: Qt.Key_B; text: "b" }
++        Key { key: Qt.Key_N; text: "n" }
++        Key { key: Qt.Key_M; text: "m" }
++        Key { key: Qt.Key_Apostrophe; text: "'"; alternativeKeys: "\"`" }
++        Key { key: Qt.Key_Comma; text: "," }
++        Key { key: Qt.Key_Period; text: "." }
++    }
++    KeyboardRow {
++        keyWeight: 154
++        SymbolModeKey { weight: 200 }
++        ChangeLanguageKey { weight: 140 }
++        Key {
++            weight: 140
++            text: "📱"
++            functionKey: true
++            onClicked: {
++                phoneOverlay.visible = true
++                phoneBridge.requestInput()
++            }
++        }
++        SpaceKey { weight: 740 }
++        HideKeyboardKey { weight: 180 }
++    }
++
++    Rectangle {
++        id: phoneOverlay
++        anchors.fill: parent
++        visible: false
++        color: "#1c1c1e"
++        z: 999
++
++        Column {
++            anchors.centerIn: parent
++            spacing: 12
++            width: parent.width * 0.9
++
++            Text {
++                text: "📱 Input on Phone"
++                color: "#ffffff"
++                font.bold: true
++                font.pixelSize: 18
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Text {
++                text: phoneBridge.statusText
++                color: "#a0a0a0"
++                font.pixelSize: 13
++                wrapMode: Text.WordWrap
++                horizontalAlignment: Text.AlignHCenter
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Rectangle {
++                width: parent.width * 0.7
++                height: 38
++                radius: 19
++                color: "#3a3a3c"
++                anchors.horizontalCenter: parent.horizontalCenter
++
++                Text {
++                    anchors.centerIn: parent
++                    text: "⌨️ Return"
++                    color: "#ffffff"
++                    font.bold: true
++                    font.pixelSize: 14
++                }
++
++                MouseArea {
++                    anchors.fill: parent
++                    onClicked: {
++                        phoneBridge.closeInput()
++                        phoneOverlay.visible = false
++                    }
++                }
++            }
++        }
++    }
++}
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/en_US/symbols.qml b/overlay/asteroidos/virtualkeyboard/layouts/en_US/symbols.qml
+new file mode 100644
+index 00000000..28c40310
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/layouts/en_US/symbols.qml
+@@ -0,0 +1,54 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++
++KeyboardLayout {
++    id: enUSSymbolsLayout
++    inputMode: InputEngine.InputMode.Latin
++
++    keyWeight: 160
++    KeyboardRow {
++        Key { key: Qt.Key_1; text: "1" }
++        Key { key: Qt.Key_2; text: "2" }
++        Key { key: Qt.Key_3; text: "3" }
++        Key { key: Qt.Key_4; text: "4" }
++        Key { key: Qt.Key_5; text: "5" }
++        Key { key: Qt.Key_6; text: "6" }
++        Key { key: Qt.Key_7; text: "7" }
++        Key { key: Qt.Key_8; text: "8" }
++        Key { key: Qt.Key_9; text: "9" }
++        Key { key: Qt.Key_0; text: "0" }
++        BackspaceKey {}
++    }
++    KeyboardRow {
++        FillerKey { weight: 56 }
++        Key { key: Qt.Key_At; text: "@" }
++        Key { key: Qt.Key_NumberSign; text: "#" }
++        Key { key: Qt.Key_Dollar; text: "$"; alternativeKeys: "€£¥" }
++        Key { key: Qt.Key_Percent; text: "%" }
++        Key { key: Qt.Key_Ampersand; text: "&" }
++        Key { key: Qt.Key_Minus; text: "-" }
++        Key { key: Qt.Key_Plus; text: "+" }
++        Key { key: Qt.Key_ParenLeft; text: "(" }
++        Key { key: Qt.Key_ParenRight; text: ")" }
++        EnterKey { weight: 283 }
++    }
++    KeyboardRow {
++        keyWeight: 156
++        Key { key: Qt.Key_Asterisk; text: "*" }
++        Key { key: Qt.Key_QuoteDbl; text: "\"" }
++        Key { key: Qt.Key_Apostrophe; text: "'" }
++        Key { key: Qt.Key_Colon; text: ":" }
++        Key { key: Qt.Key_Semicolon; text: ";" }
++        Key { key: Qt.Key_Exclam; text: "!" }
++        Key { key: Qt.Key_Question; text: "?" }
++        Key { key: Qt.Key_Slash; text: "/" }
++        Key { key: Qt.Key_Underscore; text: "_" }
++    }
++    KeyboardRow {
++        keyWeight: 154
++        SymbolModeKey { weight: 217 }
++        ChangeLanguageKey { weight: 154 }
++        SpaceKey { weight: 864 }
++        HideKeyboardKey { weight: 204 }
++    }
++}
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/phone/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/phone/main.qml
+new file mode 100644
+index 00000000..22253838
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/layouts/phone/main.qml
+@@ -0,0 +1,82 @@
++import QtQuick
++import QtQuick.VirtualKeyboard
++import QtQuick.VirtualKeyboard.Plugins.Rime
++
++KeyboardLayout {
++    id: phoneLayout
++
++    PhoneInputBridge {
++        id: phoneBridge
++        onTextCommitted: function(text) {
++            InputContext.commit(text)
++        }
++    }
++
++    Component.onCompleted: {
++        phoneBridge.requestInput()
++    }
++
++    Component.onDestruction: {
++        phoneBridge.closeInput()
++    }
++
++    Rectangle {
++        anchors.fill: parent
++        color: "#1c1c1e"
++        z: 10
++
++        Column {
++            anchors.centerIn: parent
++            spacing: 12
++            width: parent.width * 0.9
++
++            Text {
++                text: "📱 Input on Phone"
++                color: "#ffffff"
++                font.bold: true
++                font.pixelSize: 18
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Text {
++                text: phoneBridge.statusText
++                color: "#a0a0a0"
++                font.pixelSize: 13
++                wrapMode: Text.WordWrap
++                horizontalAlignment: Text.AlignHCenter
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Rectangle {
++                width: parent.width * 0.7
++                height: 38
++                radius: 19
++                color: "#3a3a3c"
++                anchors.horizontalCenter: parent.horizontalCenter
++
++                Text {
++                    anchors.centerIn: parent
++                    text: "⌨️ Return"
++                    color: "#ffffff"
++                    font.bold: true
++                    font.pixelSize: 14
++                }
++
++                MouseArea {
++                    anchors.fill: parent
++                    onClicked: {
++                        phoneBridge.closeInput()
++                    }
++                }
++            }
++        }
++    }
++
++    KeyboardRow {
++        keyWeight: 154
++        SymbolModeKey { weight: 200 }
++        ChangeLanguageKey { weight: 140 }
++        SpaceKey { weight: 880 }
++        HideKeyboardKey { weight: 180 }
++    }
++}
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
+index 911c2dc6..bed111e2 100644
+--- a/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
++++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
+@@ -9,6 +9,13 @@ KeyboardLayout {
+         return Qt.createQmlObject('import QtQuick; import QtQuick.VirtualKeyboard.Plugins.Rime; RimeInputMethod {}', parent, "inputMethod.qml")
+     }
+ 
++    PhoneInputBridge {
++        id: phoneBridge
++        onTextCommitted: function(text) {
++            InputContext.commit(text)
++        }
++    }
++
+     keyWeight: 160
+     KeyboardRow {
+         Key { key: Qt.Key_Q; text: "q" }
+@@ -52,9 +59,73 @@ KeyboardLayout {
+     }
+     KeyboardRow {
+         keyWeight: 154
+-        SymbolModeKey { weight: 217 }
+-        ChangeLanguageKey { weight: 154 }
+-        SpaceKey { weight: 864 }
+-        HideKeyboardKey { weight: 204 }
++        SymbolModeKey { weight: 200 }
++        ChangeLanguageKey { weight: 140 }
++        Key {
++            weight: 140
++            text: "📱"
++            functionKey: true
++            onClicked: {
++                phoneOverlay.visible = true
++                phoneBridge.requestInput()
++            }
++        }
++        SpaceKey { weight: 740 }
++        HideKeyboardKey { weight: 180 }
++    }
++
++    Rectangle {
++        id: phoneOverlay
++        anchors.fill: parent
++        visible: false
++        color: "#1c1c1e"
++        z: 999
++
++        Column {
++            anchors.centerIn: parent
++            spacing: 12
++            width: parent.width * 0.9
++
++            Text {
++                text: "📱 Input on Phone"
++                color: "#ffffff"
++                font.bold: true
++                font.pixelSize: 18
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Text {
++                text: phoneBridge.statusText
++                color: "#a0a0a0"
++                font.pixelSize: 13
++                wrapMode: Text.WordWrap
++                horizontalAlignment: Text.AlignHCenter
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Rectangle {
++                width: parent.width * 0.7
++                height: 38
++                radius: 19
++                color: "#3a3a3c"
++                anchors.horizontalCenter: parent.horizontalCenter
++
++                Text {
++                    anchors.centerIn: parent
++                    text: "⌨️ Return"
++                    color: "#ffffff"
++                    font.bold: true
++                    font.pixelSize: 14
++                }
++
++                MouseArea {
++                    anchors.fill: parent
++                    onClicked: {
++                        phoneBridge.closeInput()
++                        phoneOverlay.visible = false
++                    }
++                }
++            }
++        }
+     }
+ }
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml
+index 815ca8a1..8a89fc1c 100644
+--- a/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml
++++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml
+@@ -1,5 +1,6 @@
+ import QtQuick
+ import QtQuick.VirtualKeyboard
++import QtQuick.VirtualKeyboard.Plugins.Rime
+ 
+ KeyboardLayout {
+     id: zhHKLayout
+@@ -9,6 +10,13 @@ KeyboardLayout {
+         return Qt.createQmlObject('import QtQuick; import QtQuick.VirtualKeyboard.Plugins.Rime; RimeInputMethod { Component.onCompleted: selectSchema("jyutping") }', parent, "inputMethod.qml")
+     }
+ 
++    PhoneInputBridge {
++        id: phoneBridge
++        onTextCommitted: function(text) {
++            InputContext.commit(text)
++        }
++    }
++
+     keyWeight: 160
+     KeyboardRow {
+         Key { key: Qt.Key_Q; text: "q" }
+@@ -52,9 +60,73 @@ KeyboardLayout {
+     }
+     KeyboardRow {
+         keyWeight: 154
+-        SymbolModeKey { weight: 217 }
+-        ChangeLanguageKey { weight: 154 }
+-        SpaceKey { weight: 864 }
+-        HideKeyboardKey { weight: 204 }
++        SymbolModeKey { weight: 200 }
++        ChangeLanguageKey { weight: 140 }
++        Key {
++            weight: 140
++            text: "📱"
++            functionKey: true
++            onClicked: {
++                phoneOverlay.visible = true
++                phoneBridge.requestInput()
++            }
++        }
++        SpaceKey { weight: 740 }
++        HideKeyboardKey { weight: 180 }
++    }
++
++    Rectangle {
++        id: phoneOverlay
++        anchors.fill: parent
++        visible: false
++        color: "#1c1c1e"
++        z: 999
++
++        Column {
++            anchors.centerIn: parent
++            spacing: 12
++            width: parent.width * 0.9
++
++            Text {
++                text: "📱 Input on Phone"
++                color: "#ffffff"
++                font.bold: true
++                font.pixelSize: 18
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Text {
++                text: phoneBridge.statusText
++                color: "#a0a0a0"
++                font.pixelSize: 13
++                wrapMode: Text.WordWrap
++                horizontalAlignment: Text.AlignHCenter
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Rectangle {
++                width: parent.width * 0.7
++                height: 38
++                radius: 19
++                color: "#3a3a3c"
++                anchors.horizontalCenter: parent.horizontalCenter
++
++                Text {
++                    anchors.centerIn: parent
++                    text: "⌨️ Return"
++                    color: "#ffffff"
++                    font.bold: true
++                    font.pixelSize: 14
++                }
++
++                MouseArea {
++                    anchors.fill: parent
++                    onClicked: {
++                        phoneBridge.closeInput()
++                        phoneOverlay.visible = false
++                    }
++                }
++            }
++        }
+     }
+ }
+diff --git a/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml
+index 8231897a..2f6fa586 100644
+--- a/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml
++++ b/overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml
+@@ -1,5 +1,6 @@
+ import QtQuick
+ import QtQuick.VirtualKeyboard
++import QtQuick.VirtualKeyboard.Plugins.Rime
+ 
+ KeyboardLayout {
+     id: zhTWLayout
+@@ -9,6 +10,13 @@ KeyboardLayout {
+         return Qt.createQmlObject('import QtQuick; import QtQuick.VirtualKeyboard.Plugins.Rime; RimeInputMethod { Component.onCompleted: selectSchema("bopomofo") }', parent, "inputMethod.qml")
+     }
+ 
++    PhoneInputBridge {
++        id: phoneBridge
++        onTextCommitted: function(text) {
++            InputContext.commit(text)
++        }
++    }
++
+     keyWeight: 160
+     KeyboardRow {
+         Key { key: Qt.Key_Q; text: "q" }
+@@ -52,9 +60,73 @@ KeyboardLayout {
+     }
+     KeyboardRow {
+         keyWeight: 154
+-        SymbolModeKey { weight: 217 }
+-        ChangeLanguageKey { weight: 154 }
+-        SpaceKey { weight: 864 }
+-        HideKeyboardKey { weight: 204 }
++        SymbolModeKey { weight: 200 }
++        ChangeLanguageKey { weight: 140 }
++        Key {
++            weight: 140
++            text: "📱"
++            functionKey: true
++            onClicked: {
++                phoneOverlay.visible = true
++                phoneBridge.requestInput()
++            }
++        }
++        SpaceKey { weight: 740 }
++        HideKeyboardKey { weight: 180 }
++    }
++
++    Rectangle {
++        id: phoneOverlay
++        anchors.fill: parent
++        visible: false
++        color: "#1c1c1e"
++        z: 999
++
++        Column {
++            anchors.centerIn: parent
++            spacing: 12
++            width: parent.width * 0.9
++
++            Text {
++                text: "📱 Input on Phone"
++                color: "#ffffff"
++                font.bold: true
++                font.pixelSize: 18
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Text {
++                text: phoneBridge.statusText
++                color: "#a0a0a0"
++                font.pixelSize: 13
++                wrapMode: Text.WordWrap
++                horizontalAlignment: Text.AlignHCenter
++                anchors.horizontalCenter: parent.horizontalCenter
++            }
++
++            Rectangle {
++                width: parent.width * 0.7
++                height: 38
++                radius: 19
++                color: "#3a3a3c"
++                anchors.horizontalCenter: parent.horizontalCenter
++
++                Text {
++                    anchors.centerIn: parent
++                    text: "⌨️ Return"
++                    color: "#ffffff"
++                    font.bold: true
++                    font.pixelSize: 14
++                }
++
++                MouseArea {
++                    anchors.fill: parent
++                    onClicked: {
++                        phoneBridge.closeInput()
++                        phoneOverlay.visible = false
++                    }
++                }
++            }
++        }
+     }
+ }
+diff --git a/overlay/asteroidos/virtualkeyboard/phoneinputbridge.cpp b/overlay/asteroidos/virtualkeyboard/phoneinputbridge.cpp
+new file mode 100644
+index 00000000..a0a040d0
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/phoneinputbridge.cpp
+@@ -0,0 +1,86 @@
++/*
++ * AsteroidOS Virtual Keyboard - Phone Input Bridge
++ *
++ * Copyright (C) 2026 AsteroidOS
++ */
++
++#include "phoneinputbridge.h"
++
++#include <QDBusConnection>
++#include <QDBusMessage>
++#include <QDBusPendingCall>
++#include <QDebug>
++
++namespace {
++const QString kService = QStringLiteral("org.asteroidos.btsyncd");
++const QString kPath = QStringLiteral("/org/asteroidos/btsyncd/appbridge");
++const QString kInterface = QStringLiteral("org.asteroidos.btsyncd.AppBridge");
++const QString kAppId = QStringLiteral("org.asteroidos.keyboard");
++const QString kWireAppId = QStringLiteral("kbd");
++} // namespace
++
++namespace QtVirtualKeyboard {
++
++PhoneInputBridge::PhoneInputBridge(QObject *parent)
++    : QObject(parent)
++    , m_statusText(QStringLiteral("Type on phone..."))
++{
++    QDBusConnection::systemBus().connect(
++        kService, kPath, kInterface, QStringLiteral("messageReceived"),
++        this, SLOT(onMessageReceived(QString, QString, QString)));
++}
++
++PhoneInputBridge::~PhoneInputBridge()
++{
++    if (m_active) {
++        closeInput();
++    }
++}
++
++void PhoneInputBridge::requestInput(const QString &hint)
++{
++    m_active = true;
++    m_statusText = QStringLiteral("Waiting for phone...");
++    emit activeChanged();
++    emit statusTextChanged();
++
++    QDBusMessage msg = QDBusMessage::createMethodCall(kService, kPath, kInterface,
++                                                      QStringLiteral("sendMessage"));
++    msg << kWireAppId << QStringLiteral("request_input") << hint;
++    QDBusConnection::systemBus().asyncCall(msg);
++    qDebug() << "PhoneInputBridge: requested input on phone";
++}
++
++void PhoneInputBridge::closeInput()
++{
++    if (!m_active) return;
++    m_active = false;
++    emit activeChanged();
++
++    QDBusMessage msg = QDBusMessage::createMethodCall(kService, kPath, kInterface,
++                                                      QStringLiteral("sendMessage"));
++    msg << kWireAppId << QStringLiteral("close") << QString();
++    QDBusConnection::systemBus().asyncCall(msg);
++    qDebug() << "PhoneInputBridge: closed phone input";
++}
++
++void PhoneInputBridge::onMessageReceived(const QString &appId, const QString &action, const QString &payload)
++{
++    if (appId != kAppId && appId != kWireAppId) {
++        return;
++    }
++
++    qDebug() << "PhoneInputBridge: received" << appId << action << payload;
++    if (action == QStringLiteral("commit") || action == QStringLiteral("text")) {
++        if (!payload.isEmpty()) {
++            emit textCommitted(payload);
++            m_statusText = QStringLiteral("Text received!");
++            emit statusTextChanged();
++        }
++    } else if (action == QStringLiteral("close")) {
++        m_active = false;
++        emit activeChanged();
++    }
++}
++
++} // namespace QtVirtualKeyboard
+diff --git a/overlay/asteroidos/virtualkeyboard/phoneinputbridge.h b/overlay/asteroidos/virtualkeyboard/phoneinputbridge.h
+new file mode 100644
+index 00000000..d8eb7d07
+--- /dev/null
++++ b/overlay/asteroidos/virtualkeyboard/phoneinputbridge.h
+@@ -0,0 +1,46 @@
++/*
++ * AsteroidOS Virtual Keyboard - Phone Input Bridge
++ *
++ * Copyright (C) 2026 AsteroidOS
++ */
++
++#pragma once
++
++#include <QObject>
++#include <QString>
++#include <QtQml/qqml.h>
++
++namespace QtVirtualKeyboard {
++
++class PhoneInputBridge : public QObject
++{
++    Q_OBJECT
++    QML_ELEMENT
++    QML_ADDED_IN_VERSION(1, 0)
++    Q_PROPERTY(bool active READ isActive NOTIFY activeChanged)
++    Q_PROPERTY(QString statusText READ statusText NOTIFY statusTextChanged)
++
++public:
++    explicit PhoneInputBridge(QObject *parent = nullptr);
++    ~PhoneInputBridge() override;
++
++    bool isActive() const { return m_active; }
++    QString statusText() const { return m_statusText; }
++
++    Q_INVOKABLE void requestInput(const QString &hint = QString());
++    Q_INVOKABLE void closeInput();
++
++Q_SIGNALS:
++    void activeChanged();
++    void statusTextChanged();
++    void textCommitted(const QString &text);
++
++private Q_SLOTS:
++    void onMessageReceived(const QString &appId, const QString &action, const QString &payload);
++
++private:
++    bool m_active = false;
++    QString m_statusText;
++};
++
++} // namespace QtVirtualKeyboard
