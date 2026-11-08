@@ -1,0 +1,68 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sun, 8 Nov 2026 20:48:19 +1100
+Subject: [PATCH] asteroid-desktop: enable CAP_WAKE_ALARM on launcher, seed
+ writable MCE defaults, silence scenegraph logs
+
+---
+ examples/asteroid/asteroid-desktop.nix      | 16 +++++++++++-----
+ overlay/asteroidos/mce/builtin-gconf.values |  7 ++++++-
+ 2 files changed, 17 insertions(+), 6 deletions(-)
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index de27dd0a..64ffe707 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -183,10 +183,10 @@ in
+     systemd.tmpfiles.rules = [
+       "d /var/lib/kiwix 0775 ceres users -"
+       # MCE runtime/config directories; upstream mce_git.bb installs
+-      # builtin-gconf.values into /var/lib/mce.
++      # builtin-gconf.values into /var/lib/mce. Use "C" to seed writable defaults.
+       "d /run/mce 0755 root root -"
+       "d /var/lib/mce 0755 root root -"
+-      "L+ /var/lib/mce/builtin-gconf.values - - - - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
++      "C /var/lib/mce/builtin-gconf.values 0644 root root - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
+       # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
+       "d /var/lib/connman 0755 root root -"
+       "C+ /var/lib/connman/settings 0644 root root - ${
+@@ -695,7 +695,8 @@ in
+         # plain `qml` category, so `*=false` silences them as well: the
+         # diagnostics below would never reach launcher.log without enabling that
+         # category explicitly. `qt.qml.*` only covers its subcategories.
+-        QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
++        # Silence verbose scene graph render loop frame chatter to prevent log explosion.
++        QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.core.plugin.*=true";
+         QT_DEBUG_PLUGINS = "1";
+         # Log every QML import attempt (module, version, and the directory each
+         # candidate was looked up in) plus the scene graph the renderer picked.
+@@ -749,9 +750,14 @@ in
+         ];
+         # Upstream asteroid-launcher.service runs the launcher directly. The
+         # capabilities upstream attaches with setcap are provided as ambient
+-        # capabilities on the user manager instead (see below), so the real
+-        # binary runs without the AT_SECURE side effects of file capabilities.
++        # capabilities on the user manager and explicitly declared on this service,
++        # so the real binary runs with CAP_WAKE_ALARM and CAP_BLOCK_SUSPEND without
++        # the AT_SECURE side effects of file capabilities.
+         ExecStart = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher -plugin evdevtouch $LIPSTICK_OPTIONS --systemd";
++        AmbientCapabilities = [
++          "CAP_WAKE_ALARM"
++          "CAP_BLOCK_SUSPEND"
++        ];
+         TimeoutStartSec = "180s";
+         TimeoutStopSec = "3s";
+         Restart = "always";
+diff --git a/overlay/asteroidos/mce/builtin-gconf.values b/overlay/asteroidos/mce/builtin-gconf.values
+index 617c1bc5..abd88e6d 100644
+--- a/overlay/asteroidos/mce/builtin-gconf.values
++++ b/overlay/asteroidos/mce/builtin-gconf.values
+@@ -1 +1,6 @@
+-/system/osso/dsm/display/display_brightness=5
+\ No newline at end of file
++/system/osso/dsm/display/color_profile=hardcoded
++/system/osso/dsm/display/display_blank_timeout=15
++/system/osso/dsm/display/display_brightness=30
++/system/osso/dsm/display/display_never_blank=0
++/system/osso/dsm/display/max_display_brightness_levels=100
++/system/osso/dsm/display/wrist_sensor_available=0
