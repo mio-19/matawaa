@@ -10,19 +10,19 @@ Package the standard AsteroidOS application suite and its shared assets:
   and 2048
 - assets: wallpapers, system sounds, icons, and official watchfaces
 ---
- overlay/asteroidos/apps/default.nix   | 122 ++++++++++++++++
+ overlay/asteroidos/apps/default.nix   | 111 +++++++++++++++
  overlay/asteroidos/assets/default.nix | 196 ++++++++++++++++++++++++++
  overlay/asteroidos/default.nix        |   8 ++
- 3 files changed, 326 insertions(+)
+ 3 files changed, 315 insertions(+)
  create mode 100644 overlay/asteroidos/apps/default.nix
  create mode 100644 overlay/asteroidos/assets/default.nix
 
 diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
 new file mode 100644
-index 00000000..81812e72
+index 00000000..87516c1d
 --- /dev/null
 +++ b/overlay/asteroidos/apps/default.nix
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,111 @@
 +{
 +  lib,
 +  qt6,
@@ -63,8 +63,8 @@ index 00000000..81812e72
 +  settings = mkAsteroidApp {
 +    name = "settings";
 +    desc = "Smartwatch preferences and configuration application";
-+    rev = "9c65aaea9910e6133e79b3b6206a1a8d18b94c80";
-+    sha256 = "0c1rcwwdkqhazn6xmmxhap4zrh6yqbhcqlw30ay0qywl206kciji";
++    rev = "8f2ece787facf056c28bb94936d3a28ac31815f7";
++    sha256 = "0zz8p8c3ixkx9vhh01gdcv2ddi45d4glqah433g47xf8l4l79f0j";
 +    extraBuildInputs = [
 +      mce-dev
 +      ngf-qt6
@@ -132,17 +132,6 @@ index 00000000..81812e72
 +    desc = "GNSS satellite fix, location coordinates, and velocity tester";
 +    rev = "991329e453854593094cea018f6412f7e2e654bd";
 +    sha256 = "0k40pvvd9nhsj228zydajk97vasfkn3cjvn1xp2j86j7y9ica2pc";
-+  };
-+
-+  # Sliding-tile 2048 puzzle game: https://github.com/MagneFire/asteroid-2048
-+  twenty48 = mkAsteroidApp {
-+    name = "2048";
-+    pname = "asteroid-2048";
-+    owner = "MagneFire";
-+    repo = "asteroid-2048";
-+    desc = "Sliding-tile 2048 puzzle game for AsteroidOS smartwatches";
-+    rev = "99e7f00228c269069b41c4a27a0a60d2ed2ac7cf";
-+    sha256 = "16xzqx0ry4y8hx6gqigafqx6izjahjlz5jc5s12fg0rjk5ylxjx0";
 +  };
 +}
 diff --git a/overlay/asteroidos/assets/default.nix b/overlay/asteroidos/assets/default.nix

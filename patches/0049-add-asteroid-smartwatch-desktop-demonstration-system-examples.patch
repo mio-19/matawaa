@@ -9,7 +9,7 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 899 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 906 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 +
  examples/asteroid/default.nix                 |  15 +
  .../scripted-installer/automated-installer.rb |   5 +-
@@ -21,10 +21,10 @@ Run the launcher the way upstream AsteroidOS does: start it as a user service wi
  overlay/asteroidos/libnciplugin/default.nix   |  90 ++
  overlay/asteroidos/libnfcdef/default.nix      |  71 ++
  overlay/asteroidos/nfcd/default.nix           | 197 ++++
- overlay/asteroidos/ngfd/default.nix           | 112 +++
+ overlay/asteroidos/ngfd/default.nix           | 113 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 16 files changed, 1835 insertions(+), 43 deletions(-)
+ 16 files changed, 1843 insertions(+), 43 deletions(-)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -70,10 +70,10 @@ index 1081d085..f0f0decc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..ae813782
+index 00000000..7e4faafc
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,899 @@
+@@ -0,0 +1,906 @@
 +{
 +  config,
 +  lib,
@@ -180,6 +180,7 @@ index 00000000..ae813782
 +        asteroid.qml-asteroid
 +        # Sound and feedback pipelines
 +        gst_all_1.gstreamer
++        gst_all_1.gstreamer.out
 +        gst_all_1.gst-plugins-base
 +        gst_all_1.gst-plugins-good
 +        # Provides the invoker command used by AsteroidOS Qt app launchers.
@@ -224,7 +225,6 @@ index 00000000..ae813782
 +        asteroid.apps.gps-test
 +        asteroid.apps.telegram
 +        asteroid.apps.kiwix
-+        asteroid.apps.twenty48
 +      ]
 +      ++ lib.optionals cfg.browser.enable [
 +        asteroid.apps.browser
@@ -258,10 +258,10 @@ index 00000000..ae813782
 +    systemd.tmpfiles.rules = [
 +      "d /var/lib/kiwix 0775 ceres users -"
 +      # MCE runtime/config directories; upstream mce_git.bb installs
-+      # builtin-gconf.values into /var/lib/mce.
++      # builtin-gconf.values into /var/lib/mce. Use "C" to seed writable defaults.
 +      "d /run/mce 0755 root root -"
 +      "d /var/lib/mce 0755 root root -"
-+      "L+ /var/lib/mce/builtin-gconf.values - - - - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
++      "C /var/lib/mce/builtin-gconf.values 0644 root root - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
 +      # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
 +      "d /var/lib/connman 0755 root root -"
 +      "C+ /var/lib/connman/settings 0644 root root - ${
@@ -292,8 +292,9 @@ index 00000000..ae813782
 +      "d /var/lib/timed/shared_settings 0775 ceres users -"
 +      # Upstream supported-languages_git.bb seeds the ceres locale drop-in that
 +      # user@.service.d/locale.conf reads (installed via environment.etc below).
++      # Use "C" (create only if non-existent) to allow user locale selections to persist across reboots.
 +      "d /home/.system/var/lib/environment/1000 0755 ceres users -"
-+      "C+ /home/.system/var/lib/environment/1000/locale.conf 0644 ceres users - ${
++      "C /home/.system/var/lib/environment/1000/locale.conf 0644 ceres users - ${
 +        pkgs.writeText "asteroid-locale.conf" ''
 +          # Default locale generated dynamically from config.i18n.defaultLocale
 +          LANG=${config.i18n.defaultLocale}
@@ -769,7 +770,8 @@ index 00000000..ae813782
 +        # plain `qml` category, so `*=false` silences them as well: the
 +        # diagnostics below would never reach launcher.log without enabling that
 +        # category explicitly. `qt.qml.*` only covers its subcategories.
-+        QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.scenegraph.*=true;qt.core.plugin.*=true";
++        # Silence verbose scene graph render loop frame chatter to prevent log explosion.
++        QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.core.plugin.*=true";
 +        QT_DEBUG_PLUGINS = "1";
 +        # Log every QML import attempt (module, version, and the directory each
 +        # candidate was looked up in) plus the scene graph the renderer picked.
@@ -823,9 +825,14 @@ index 00000000..ae813782
 +        ];
 +        # Upstream asteroid-launcher.service runs the launcher directly. The
 +        # capabilities upstream attaches with setcap are provided as ambient
-+        # capabilities on the user manager instead (see below), so the real
-+        # binary runs without the AT_SECURE side effects of file capabilities.
++        # capabilities on the user manager and explicitly declared on this service,
++        # so the real binary runs with CAP_WAKE_ALARM and CAP_BLOCK_SUSPEND without
++        # the AT_SECURE side effects of file capabilities.
 +        ExecStart = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher -plugin evdevtouch $LIPSTICK_OPTIONS --systemd";
++        AmbientCapabilities = [
++          "CAP_WAKE_ALARM"
++          "CAP_BLOCK_SUSPEND"
++        ];
 +        TimeoutStartSec = "180s";
 +        TimeoutStopSec = "3s";
 +        Restart = "always";
@@ -1875,10 +1882,10 @@ index 00000000..d12414ad
 +}
 diff --git a/overlay/asteroidos/ngfd/default.nix b/overlay/asteroidos/ngfd/default.nix
 new file mode 100644
-index 00000000..8d854190
+index 00000000..44b0f80f
 --- /dev/null
 +++ b/overlay/asteroidos/ngfd/default.nix
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,113 @@
 +# Upstream: meta-asteroid/recipes-nemomobile/ngfd/ngfd_git.bb
 +# Nemomobile's non graphical feedback daemon (haptics / system sounds).
 +{
@@ -1929,6 +1936,7 @@ index 00000000..8d854190
 +    "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0002-ffmemless-Reserve-enough-space-for-sprintf.patch"
 +    "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0003-ffmemless-support-FF_PERIODIC-only-haptic-drivers.patch"
 +    "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0004-profile-source-vibration-gate-from-dconf.patch"
++    ./0005-gst-sink-fallback-to-alsasink.patch
 +  ];
 +
 +  nativeBuildInputs = [

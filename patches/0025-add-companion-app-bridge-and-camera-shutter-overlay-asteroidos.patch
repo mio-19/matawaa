@@ -12,13 +12,13 @@ bidirectional companion-phone communication:
 - camera-shutter.sh: small helper that triggers the companion camera
   shutter through the new bridge.
 ---
- .../asteroid-btsyncd/app-bridge.patch         |  85 ++++++
- .../asteroid-btsyncd/appbridgeservice.cpp     | 261 ++++++++++++++++++
- .../asteroid-btsyncd/appbridgeservice.h       |  86 ++++++
+ .../asteroid-btsyncd/app-bridge.patch         |  85 +++++
+ .../asteroid-btsyncd/appbridgeservice.cpp     | 300 ++++++++++++++++++
+ .../asteroid-btsyncd/appbridgeservice.h       |  86 +++++
  .../asteroid-btsyncd/camera-shutter.sh        |  19 ++
  .../asteroidos/asteroid-btsyncd/default.nix   |   8 +
  .../org.asteroidos.btsyncd.conf               |   5 +-
- 6 files changed, 463 insertions(+), 1 deletion(-)
+ 6 files changed, 502 insertions(+), 1 deletion(-)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
@@ -117,10 +117,10 @@ index 00000000..a0117d6c
 +     Advertisement advert;
 diff --git a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
 new file mode 100644
-index 00000000..8802310f
+index 00000000..e73d496f
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
-@@ -0,0 +1,261 @@
+@@ -0,0 +1,300 @@
 +/*
 + * Copyright (C) 2026 AsteroidOS
 + *
@@ -200,6 +200,7 @@ index 00000000..8802310f
 +
 +const QString kCameraId = QStringLiteral("org.asteroidos.camera");
 +const QString kSpo2Id = QStringLiteral("org.asteroidos.spo2");
++const QString kKeyboardId = QStringLiteral("org.asteroidos.keyboard");
 +
 +// Wire alias -> canonical app id. Anything else is rejected.
 +QString normalizeAppId(const QString &id)
@@ -210,6 +211,9 @@ index 00000000..8802310f
 +    if (id == QStringLiteral("spo2") || id == kSpo2Id) {
 +        return kSpo2Id;
 +    }
++    if (id == QStringLiteral("kbd") || id == kKeyboardId) {
++        return kKeyboardId;
++    }
 +    return QString();
 +}
 +
@@ -217,6 +221,9 @@ index 00000000..8802310f
 +{
 +    if (canonical == kCameraId) {
 +        return QByteArrayLiteral("cam");
++    }
++    if (canonical == kKeyboardId) {
++        return QByteArrayLiteral("kbd");
 +    }
 +    return QByteArrayLiteral("spo2");
 +}
@@ -246,6 +253,30 @@ index 00000000..8802310f
 +        QStringLiteral("mode_photo"),
 +        QStringLiteral("mode_video"),
 +        QStringLiteral("status_query"),
++    };
++    return allowed.contains(action);
++}
++
++// Phone -> watch keyboard actions.
++bool isKeyboardRxAction(const QString &action)
++{
++    static const QSet<QString> allowed = {
++        QStringLiteral("commit"),
++        QStringLiteral("text"),
++        QStringLiteral("backspace"),
++        QStringLiteral("enter"),
++        QStringLiteral("close"),
++    };
++    return allowed.contains(action);
++}
++
++// Watch -> phone keyboard actions.
++bool isKeyboardTxAction(const QString &action)
++{
++    static const QSet<QString> allowed = {
++        QStringLiteral("request_input"),
++        QStringLiteral("open"),
++        QStringLiteral("close"),
 +    };
 +    return allowed.contains(action);
 +}
@@ -294,6 +325,10 @@ index 00000000..8802310f
 +    }
 +    if (canonical == kCameraId && !isCameraTxAction(action)) {
 +        qWarning() << "AppBridge: rejecting send, camera action not allowed:" << action;
++        return;
++    }
++    if (canonical == kKeyboardId && !isKeyboardTxAction(action)) {
++        qWarning() << "AppBridge: rejecting send, keyboard action not allowed:" << action;
 +        return;
 +    }
 +
@@ -376,6 +411,10 @@ index 00000000..8802310f
 +
 +    if (appId == kCameraId && !isCameraRxAction(action)) {
 +        qWarning() << "AppBridge: dropping unexpected camera action from phone:" << action;
++        return;
++    }
++    if (appId == kKeyboardId && !isKeyboardRxAction(action)) {
++        qWarning() << "AppBridge: dropping unexpected keyboard action from phone:" << action;
 +        return;
 +    }
 +

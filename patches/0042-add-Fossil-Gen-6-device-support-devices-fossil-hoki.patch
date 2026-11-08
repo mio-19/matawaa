@@ -32,18 +32,21 @@ they cannot hold multi-user.target.
  .../kernel/linux-4.14.211-212.patch.patch     | 152 ++++++
  .../kernel/linux-4.14.212-213.patch.patch     |  99 ++++
  .../kernel/linux-4.14.213-214.patch.patch     |  40 ++
- devices/fossil-hoki/wlan-firmware-hoki.sh     |  30 +
+ devices/fossil-hoki/tfa9890.cnt.base64        |  93 ++++
+ devices/fossil-hoki/wlan-firmware-hoki.sh     |  42 ++
  devices/fossil-hoki/wlan.nix                  | 112 ++++
  ...co_profile-fix-use-of-adapter-before.patch |  30 +
  ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 +
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 ++
  devices/fossil-triggerfish/default.nix        |  56 ++
+ modules/bootloader.nix                        | 125 ++++-
  modules/rootfs.nix                            | 120 ++--
+ modules/system-build.nix                      |  15 +-
  overlay/asteroidos/default.nix                |   2 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  95 +++-
  .../hwc-present-diagnostics.patch             | 204 +++++++
- 26 files changed, 2578 insertions(+), 72 deletions(-)
+ 29 files changed, 2809 insertions(+), 86 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -59,6 +62,7 @@ they cannot hold multi-user.target.
  create mode 100644 devices/fossil-hoki/kernel/linux-4.14.211-212.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/linux-4.14.212-213.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/linux-4.14.213-214.patch.patch
+ create mode 100644 devices/fossil-hoki/tfa9890.cnt.base64
  create mode 100644 devices/fossil-hoki/wlan-firmware-hoki.sh
  create mode 100644 devices/fossil-hoki/wlan.nix
  create mode 100644 devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
@@ -2075,12 +2079,111 @@ index 00000000..3a081d63
 + index d08d77b9674ff..419ecdd914f4c 100644
 + --- a/drivers/md/raid10.c
 + +++ b/drivers/md/raid10.c
+diff --git a/devices/fossil-hoki/tfa9890.cnt.base64 b/devices/fossil-hoki/tfa9890.cnt.base64
+new file mode 100644
+index 00000000..8aed5309
+--- /dev/null
++++ b/devices/fossil-hoki/tfa9890.cnt.base64
+@@ -0,0 +1,93 @@
++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
++ZmlnAKwMAAPwAQAAU1AxXzAw8AFEjCCoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
++AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//MP//BP//U///Jf//oP//S///kv//K///Rv//
++P///RP/+zv//Hf/+1///Yv//Bv//Qv//Jf//X///Dv//C//+6f/+lf/+xf/+Xf/+s//+4//+q//+
++Xf/+Kv//D//9yf/+9f/+y//+Dv/+w//+aP/+ff/+Pf/+Qv/+Yf/+RP/+Ff/+Rv/+F//9vP/93v/9
++4P/9IP/+U//9Wv/9///9R//9l//9k//9af/88P/+M//9Of/9ZP/9l//85v/9Cf/87f/87f/8mP/8
++vf/8f//8lv/8S//79//84v/7h//9B//70v/78v/7f//7pv/7uv/7l//7fv/66P/7YP/7Bv/7DP/6
++VP/7gP/7A//5+f/7ZP/47P/8YP/35P//CP/1xAABuv/xHAAA6f/qpAAC2f/r0AAN/f/1MwAVqv/u
++uf//nf/PFf/hVP/WdQAPAAA4igBiQwBfQP/tM//SnAi61v/oUwAAAAAAAAAAAAAAAAAAAAAAAAAA
++AAAAAAAAAAAAAAAAAAAAAEAAAFCj1yAAACAAACAAABo9cQADogAD4AIAAABHrg8AAAB9LEVGVDFf
++OTAxLnNwZWFrZXIATXVzaWMuNDgwMDAACADDBAIAYQSaDgADwQEAAFZQMl8wMcEB+otlX05YUAAA
++AAAAZGV2a2l0AAB2ZXIgMS4wAAEIAAAAAAAAAQABcgAAAgCAAAALuAAAAAABLAFHrgArsAAA0gAQ
++YgEAAAKAAAKzMweFHwgAAAHmZgEzMwAMzQBAAAABSAABSAEAAAABSAABSAeuFAeFHwAHrgAAFAAA
++AcSc0ns35A98c+EHGQ98cwEDAADIQzMzMz8AAEDBAAABwlNQfYCYPTHkgn9oQHrMAAdHAchD1wW1
++P9gAQEAAAADqqqsAAAAlVVVKqqolVVUBAgCAO0YzMzM/AAAAAAAAAJ5++3KJZWqugY12m3bShAEH
++AND3RQAAAEEAAADBAAABzKpiQBOONavov+xyPam2AQcAYOpFAADAQAAAgMAAAAHVactk7iIokYub
++Ed5CBKoBBwBAHEXNzEw/AADAPwAAAQAAAAAAAAAAAAAAAEAAAAABAAB6RPMEtT8AAAAAAAABAAAA
++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
++cAA=
 diff --git a/devices/fossil-hoki/wlan-firmware-hoki.sh b/devices/fossil-hoki/wlan-firmware-hoki.sh
 new file mode 100644
-index 00000000..f1682bdf
+index 00000000..95d80bb2
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan-firmware-hoki.sh
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,42 @@
 +#!/bin/sh
 +# SPDX-License-Identifier: MIT
 +# Symlink stock vendor WCNSS firmware/calibration data into the path the
@@ -2088,11 +2191,22 @@ index 00000000..f1682bdf
 +# opening (not writing) /dev/wcnss_wlan, then load the driver.
 +# See https://github.com/AsteroidOS/meta-smartwatch/issues/224
 +
++ln_force() {
++	target="$1"
++	link="$2"
++	if [ -L "$link" ] && [ "$(readlink "$link")" = "$target" ]; then
++		return 0
++	fi
++	rm -rf "$link"
++	mkdir -p "$(dirname "$link")"
++	ln -sfn "$target" "$link"
++}
++
 +mkdir -p /lib/firmware/wlan/prima
 +
 +for f in WCNSS_qcom_cfg.ini WCNSS_qcom_wlan_nv.bin WCNSS_wlan_dictionary.dat; do
-+	if [ ! -e "/lib/firmware/wlan/prima/$f" ]; then
-+		ln -s "/vendor/firmware/wlan/prima/$f" "/lib/firmware/wlan/prima/$f"
++	if [ -e "/vendor/firmware/wlan/prima/$f" ]; then
++		ln_force "/vendor/firmware/wlan/prima/$f" "/lib/firmware/wlan/prima/$f"
 +	fi
 +done
 +
@@ -2101,7 +2215,8 @@ index 00000000..f1682bdf
 +for dir in /vendor/firmware /vendor/firmware_mnt/image /vendor/firmware_mnt; do
 +	if [ -d "$dir" ]; then
 +		for f in "$dir"/wcnss.*; do
-+			[ -e "$f" ] && [ ! -e "/lib/firmware/${f##*/}" ] && ln -sf "$f" "/lib/firmware/${f##*/}"
++			[ -e "$f" ] || continue
++			ln_force "$f" "/lib/firmware/${f##*/}"
 +		done
 +	fi
 +done
@@ -2429,6 +2544,153 @@ index 00000000..b29f7d73
 +    "vmalloc=300M"
 +  ];
 +}
+diff --git a/modules/bootloader.nix b/modules/bootloader.nix
+index be91b7cd..1227f2b8 100644
+--- a/modules/bootloader.nix
++++ b/modules/bootloader.nix
+@@ -1,7 +1,97 @@
+-{ config, lib, pkgs, ... }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
+ 
+ let
+-  inherit (lib) mkIf mkOption types;
++  inherit (lib)
++    mkIf
++    mkOption
++    types
++    optionalString
++    ;
++
++  isAndroid = config.mobile.enable && config.mobile.system.type == "android";
++
++  androidBootloaderInstaller = pkgs.writeShellScript "install-mobile-bootloader" ''
++    set -euo pipefail
++
++    export PATH="${
++      lib.makeBinPath [
++        pkgs.coreutils
++        pkgs.util-linux
++        pkgs.gnugrep
++        pkgs.gnused
++      ]
++    }:$PATH"
++
++    target_profile="''${1:-}"
++    if [ -z "$target_profile" ]; then
++      target_profile="/nix/var/nix/profiles/system"
++    fi
++
++    # Read boot image path from target profile or current system
++    boot_img=""
++    for cand in "$target_profile/mobile-nixos/boot.img" "$target_profile/boot.img"; do
++      if [ -e "$cand" ]; then
++        boot_img="$(readlink -f "$cand")"
++        break
++      fi
++    done
++
++    if [ -z "$boot_img" ] || [ ! -f "$boot_img" ]; then
++      echo "Mobile NixOS: no boot.img found in $target_profile, skipping boot partition update."
++      exit 0
++    fi
++
++    # Locate the active Android boot partition block device
++    BOOT_PART=""
++    slot=$(sed -n 's/.*androidboot.slot_suffix=\(_[ab]\).*/\1/p' /proc/cmdline 2>/dev/null || true)
++    if [ -n "$slot" ]; then
++      for cand in /dev/block/bootdevice/by-name/boot"$slot" /dev/block/by-name/boot"$slot" /dev/disk/by-partlabel/boot"$slot"; do
++        if [ -b "$cand" ]; then BOOT_PART="$cand"; break; fi
++      done
++    fi
++    if [ -z "$BOOT_PART" ]; then
++      for cand in /dev/block/bootdevice/by-name/boot /dev/block/by-name/boot /dev/disk/by-partlabel/boot; do
++        if [ -b "$cand" ]; then BOOT_PART="$cand"; break; fi
++      done
++    fi
++
++    if [ -z "$BOOT_PART" ]; then
++      echo "Mobile NixOS: no active boot partition block device found, skipping boot flashing."
++      exit 0
++    fi
++
++    img_size=$(stat -c '%s' "$boot_img")
++    new_sha=$(sha256sum "$boot_img" | cut -d' ' -f1)
++
++    part_size=$(blockdev --getsize64 "$BOOT_PART" 2>/dev/null || true)
++    if [ -n "$part_size" ] && [ "$part_size" -lt "$img_size" ]; then
++      echo "Mobile NixOS: ERROR: boot.img ($img_size bytes) exceeds partition $BOOT_PART ($part_size bytes)!" >&2
++      exit 1
++    fi
++
++    current_sha=$(head -c "$img_size" "$BOOT_PART" | sha256sum | cut -d' ' -f1)
++    if [ "$current_sha" = "$new_sha" ]; then
++      echo "Mobile NixOS: stage-1 boot partition $BOOT_PART is up to date ($new_sha)."
++      exit 0
++    fi
++
++    echo "Mobile NixOS: updating stage-1 boot partition $BOOT_PART ($current_sha -> $new_sha)..."
++    dd if="$boot_img" of="$BOOT_PART" bs=4M conv=fsync status=none
++    sync
++
++    flashed_sha=$(head -c "$img_size" "$BOOT_PART" | sha256sum | cut -d' ' -f1)
++    if [ "$flashed_sha" != "$new_sha" ]; then
++      echo "Mobile NixOS: ERROR: checksum mismatch after flashing $BOOT_PART ($flashed_sha != $new_sha)!" >&2
++      exit 1
++    fi
++
++    echo "Mobile NixOS: successfully updated stage-1 boot partition $BOOT_PART."
++  '';
+ in
+ {
+   options = {
+@@ -11,21 +101,32 @@ in
+           type = types.bool;
+           default = config.mobile.enable;
+           description = ''
+-            Whether the bootloader **configuration** for Mobile NixOS
++            Whether the bootloader configuration for Mobile NixOS
+             is enabled.
+-
+-            Installation and management of the Mobile NixOS bootloading
+-            components is not implemented at this point in time.
+-            (e.g. flashing boot.img on android, boot partition on other systems.)
+           '';
+         };
+       };
+     };
+   };
+ 
+-  config = mkIf (config.mobile.bootloader.enable) {
+-    boot.loader.grub.enable = false;
+-    boot.loader.generic-extlinux-compatible.enable = false;
+-  };
+-}
++  config = mkIf (config.mobile.bootloader.enable) (
++    lib.mkMerge [
++      {
++        boot.loader.grub.enable = false;
++        boot.loader.generic-extlinux-compatible.enable = false;
++      }
+ 
++      (mkIf isAndroid {
++        system.build.installBootLoader = androidBootloaderInstaller;
++        system.activationScripts.mobileBootloader = {
++          supportsDryActivation = true;
++          text = ''
++            if [ -z "''${NIXOS_ACTION:-}" ] || [ "''${NIXOS_ACTION:-}" != "dry-activate" ]; then
++              ${androidBootloaderInstaller}
++            fi
++          '';
++        };
++      })
++    ]
++  );
++}
 diff --git a/modules/rootfs.nix b/modules/rootfs.nix
 index 6c49de0b..246aca44 100644
 --- a/modules/rootfs.nix
@@ -2586,6 +2848,42 @@ index 6c49de0b..246aca44 100644
                "noatime"
                "space_cache=v2"
              ]
+diff --git a/modules/system-build.nix b/modules/system-build.nix
+index 064cc218..94e1320d 100644
+--- a/modules/system-build.nix
++++ b/modules/system-build.nix
+@@ -1,11 +1,16 @@
+-{ config, lib, pkgs, ... }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
+ 
+ let
+   inherit (lib) mkIf optionalString;
+ 
+   deviceName = config.mobile.device.name;
+ 
+-  dtbMapping = pkgs.runCommand "dtb-mapping.json" {} ''
++  dtbMapping = pkgs.runCommand "dtb-mapping.json" { } ''
+     (
+       PS4=" $ "; set -x
+       ${pkgs.buildPackages.mobile-nixos.map-dtbs}/bin/map-dtbs $(find ${config.hardware.deviceTree.package} -name '*.dtb' | sort) > $out
+@@ -24,6 +29,12 @@ in
+         ${optionalString (config.hardware.deviceTree.package != null) ''
+           ln -s ${dtbMapping} dtb-mapping.json
+         ''}
++        ${optionalString
++          (config.mobile.system.type == "android" && config.mobile.outputs.android ? android-bootimg)
++          ''
++            ln -s ${config.mobile.outputs.android.android-bootimg} boot.img
++          ''
++        }
+       )
+     '';
+   };
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index d4faeb61..775c9f72 100644
 --- a/overlay/asteroidos/default.nix

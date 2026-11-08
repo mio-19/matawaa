@@ -37,7 +37,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/mce-dev/default.nix        |  41 ++
  .../mce-plugin-libhybris/default.nix          |  69 ++
  overlay/asteroidos/mce-qt6/default.nix        | 100 +++
- overlay/asteroidos/mce/builtin-gconf.values   |   1 +
+ overlay/asteroidos/mce/builtin-gconf.values   |   6 +
  overlay/asteroidos/mce/default.nix            | 107 ++++
  overlay/asteroidos/mce/mce.service            |  17 +
  ...tion-Adapts-the-state-machine-to-a-s.patch | 421 ++++++++++++
@@ -54,6 +54,7 @@ libraries, without wrapping the Qt apps.
  .../nemo-qml-plugin-calendar/default.nix      |  94 +++
  .../nemo-qml-plugin-notifications/default.nix | 121 ++++
  overlay/asteroidos/ngf-qt6/default.nix        |  96 +++
+ .../0005-gst-sink-fallback-to-alsasink.patch  |  22 +
  overlay/asteroidos/sensorfw/CMakeLists.txt    | 264 ++++++++
  overlay/asteroidos/sensorfw/default.nix       |  71 ++
  overlay/asteroidos/timed-qt6/default.nix      | 269 ++++++++
@@ -61,7 +62,7 @@ libraries, without wrapping the Qt apps.
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
  ...failing-test-for-wayland-less-builds.patch |  24 -
  overlay/libhybris/default.nix                 |  53 +-
- 44 files changed, 5060 insertions(+), 37 deletions(-)
+ 45 files changed, 5087 insertions(+), 37 deletions(-)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -98,6 +99,7 @@ libraries, without wrapping the Qt apps.
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
  create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
  create mode 100644 overlay/asteroidos/ngf-qt6/default.nix
+ create mode 100644 overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch
  create mode 100644 overlay/asteroidos/sensorfw/CMakeLists.txt
  create mode 100644 overlay/asteroidos/sensorfw/default.nix
  create mode 100644 overlay/asteroidos/timed-qt6/default.nix
@@ -1750,12 +1752,16 @@ index 00000000..3e1c5c4d
 +})
 diff --git a/overlay/asteroidos/mce/builtin-gconf.values b/overlay/asteroidos/mce/builtin-gconf.values
 new file mode 100644
-index 00000000..617c1bc5
+index 00000000..abd88e6d
 --- /dev/null
 +++ b/overlay/asteroidos/mce/builtin-gconf.values
-@@ -0,0 +1 @@
-+/system/osso/dsm/display/display_brightness=5
-\ No newline at end of file
+@@ -0,0 +1,6 @@
++/system/osso/dsm/display/color_profile=hardcoded
++/system/osso/dsm/display/display_blank_timeout=15
++/system/osso/dsm/display/display_brightness=30
++/system/osso/dsm/display/display_never_blank=0
++/system/osso/dsm/display/max_display_brightness_levels=100
++/system/osso/dsm/display/wrist_sensor_available=0
 diff --git a/overlay/asteroidos/mce/default.nix b/overlay/asteroidos/mce/default.nix
 new file mode 100644
 index 00000000..8ce4a485
@@ -4620,6 +4626,34 @@ index 00000000..d16b452f
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch b/overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch
+new file mode 100644
+index 00000000..a4f4f863
+--- /dev/null
++++ b/overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch
+@@ -0,0 +1,22 @@
++--- a/src/plugins/gst/plugin.c	2026-11-09 01:08:19.958950297 +1100
+++++ b/src/plugins/gst/plugin.c	2026-11-09 01:08:19.958950297 +1100
++@@ -606,7 +606,18 @@
++     decoder = gst_element_factory_make ("decodebin", NULL);
++     audioconv = gst_element_factory_make ("audioconvert", NULL);
++     volume = gst_element_factory_make ("volume", NULL);
++-    sink = gst_element_factory_make ("pulsesink", NULL);
+++    /* Prefer pulsesink if a PulseAudio server is active, otherwise fall back to alsasink */
+++    if (g_getenv ("PULSE_SERVER") != NULL ||
+++        g_file_test ("/run/user/1000/pulse/native", G_FILE_TEST_EXISTS) ||
+++        g_file_test ("/var/run/pulse/native", G_FILE_TEST_EXISTS)) {
+++        sink = gst_element_factory_make ("pulsesink", NULL);
+++    }
+++    if (!sink) {
+++        sink = gst_element_factory_make ("alsasink", NULL);
+++    }
+++    if (!sink) {
+++        sink = gst_element_factory_make ("pulsesink", NULL);
+++    }
++ 
++     if (!pipeline || !source || !decoder || !audioconv || !volume || !sink) {
++         N_ERROR (LOG_CAT "failed to create required elements.");
 diff --git a/overlay/asteroidos/sensorfw/CMakeLists.txt b/overlay/asteroidos/sensorfw/CMakeLists.txt
 new file mode 100644
 index 00000000..6ad5cc23

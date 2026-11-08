@@ -5,19 +5,19 @@ Subject: [PATCH] add the AsteroidOS 4.9 vendor kernel and image
  (devices/oppo-beluga)
 
 ---
- devices/oppo-beluga/android-init.nix   | 161 +++++++++++++++++++++++
- devices/oppo-beluga/default.nix        | 169 +++++++++++++++++++++++--
+ devices/oppo-beluga/android-init.nix   | 172 +++++++++++++++++++++++++
+ devices/oppo-beluga/default.nix        | 169 ++++++++++++++++++++++--
  devices/oppo-beluga/kernel/default.nix | 112 ++++++++++++++++
- 3 files changed, 432 insertions(+), 10 deletions(-)
+ 3 files changed, 443 insertions(+), 10 deletions(-)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
 new file mode 100644
-index 00000000..704b52ca
+index 00000000..a57f9ed8
 --- /dev/null
 +++ b/devices/oppo-beluga/android-init.nix
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,172 @@
 +{
 +  lib,
 +  pkgs,
@@ -117,14 +117,25 @@ index 00000000..704b52ca
 +    serviceConfig = {
 +      Type = "simple";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
 +        # Ensure Qualcomm bootdevice and platform by-name symlinks exist for rmt_storage
 +        ${pkgs.coreutils}/bin/mkdir -p /dev/block/bootdevice/by-name /dev/block/platform/msm_sdcc.1/by-name
 +        if [ -d /dev/disk/by-partlabel ]; then
 +          for p in /dev/disk/by-partlabel/*; do
 +            [ -e "$p" ] || continue
 +            name=$(${pkgs.coreutils}/bin/basename "$p")
-+            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/bootdevice/by-name/"$name"
-+            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/platform/msm_sdcc.1/by-name/"$name"
++            ln_force "$p" /dev/block/bootdevice/by-name/"$name"
++            ln_force "$p" /dev/block/platform/msm_sdcc.1/by-name/"$name"
 +          done
 +        fi
 +        if [ -d /system_root/system ] && [ ! -d /system/bin ]; then
@@ -132,9 +143,9 @@ index 00000000..704b52ca
 +        elif [ -d /system_root/bin ] && [ ! -d /system/bin ]; then
 +          ${pkgs.util-linux}/bin/mount --bind /system_root /system || true
 +        fi
-+        [ -e /init.rc ] || ${pkgs.coreutils}/bin/ln -sf ${patchedInitRc} /init.rc
-+        [ -e /plat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${platPropertyContexts} /plat_property_contexts
-+        [ -e /nonplat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${nonplatPropertyContexts} /nonplat_property_contexts
++        ln_force ${patchedInitRc} /init.rc
++        ln_force ${platPropertyContexts} /plat_property_contexts
++        ln_force ${nonplatPropertyContexts} /nonplat_property_contexts
 +        if [ -f /system/etc/ld.config.28.txt ]; then
 +          ${pkgs.util-linux}/bin/mount --bind ${ldConfig} /system/etc/ld.config.28.txt || true
 +        fi
