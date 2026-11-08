@@ -9,7 +9,7 @@ Add examples/asteroid/, a complete example system demonstrating the AsteroidOS W
 Run the launcher the way upstream AsteroidOS does: start it as a user service with the hwcomposer QPA, expose its file capabilities through the NixOS wrapper, install the upstream logind polkit rule, and provide the Nemo QML plugins and qt5compat the shell imports.
 ---
  devices/families/asteroidos.nix               |  18 +
- examples/asteroid/asteroid-desktop.nix        | 901 ++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix        | 899 ++++++++++++++++++
  examples/asteroid/configuration.nix           |  43 +
  examples/asteroid/default.nix                 |  15 +
  .../scripted-installer/automated-installer.rb |   5 +-
@@ -24,7 +24,7 @@ Run the launcher the way upstream AsteroidOS does: start it as a user service wi
  overlay/asteroidos/ngfd/default.nix           | 112 +++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
  .../asteroidos/udev-droid-system/default.nix  |  24 +
- 16 files changed, 1837 insertions(+), 43 deletions(-)
+ 16 files changed, 1835 insertions(+), 43 deletions(-)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
@@ -70,10 +70,10 @@ index 1081d085..f0f0decc 100644
  
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..9da31ced
+index 00000000..ae813782
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,901 @@
+@@ -0,0 +1,899 @@
 +{
 +  config,
 +  lib,
@@ -295,9 +295,8 @@ index 00000000..9da31ced
 +      "d /home/.system/var/lib/environment/1000 0755 ceres users -"
 +      "C+ /home/.system/var/lib/environment/1000/locale.conf 0644 ceres users - ${
 +        pkgs.writeText "asteroid-locale.conf" ''
-+          # This is the default locale
-+          LANG=en_GB.utf8
-+          LC_ALL=en_GB.utf8
++          # Default locale generated dynamically from config.i18n.defaultLocale
++          LANG=${config.i18n.defaultLocale}
 +          LOCALE_ARCHIVE=/run/current-system/sw/lib/locale/locale-archive
 +        ''
 +      }"
@@ -865,7 +864,6 @@ index 00000000..9da31ced
 +      DefaultEnvironment = lib.concatStringsSep " " ([
 +        "\"PATH=/run/wrappers/bin:/run/current-system/sw/bin\""
 +        "\"LOCALE_ARCHIVE=/run/current-system/sw/lib/locale/locale-archive\""
-+        "\"LANG=en_GB.utf8\""
 +        "\"WAYLAND_DISPLAY=wayland-0\""
 +        "\"XDG_RUNTIME_DIR=/run/user/1000\""
 +        "\"QT_QPA_PLATFORM=wayland\""
