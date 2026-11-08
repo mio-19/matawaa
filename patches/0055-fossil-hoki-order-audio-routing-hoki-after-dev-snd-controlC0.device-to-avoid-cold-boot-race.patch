@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sun, 8 Nov 2026 19:39:29 +1100
+Subject: [PATCH] fossil-hoki: order audio-routing-hoki after
+ dev-snd-controlC0.device to avoid cold boot race
+
+---
+ devices/fossil-hoki/default.nix | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 3d9fa2be..9f1552a0 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -175,7 +175,8 @@ in
+   systemd.services.audio-routing-hoki = {
+     description = "Fossil Gen 6 TFA98xx audio amplifier and microphone mixer routing";
+     wantedBy = [ "multi-user.target" ];
+-    after = [ "sound.target" ];
++    wants = [ "dev-snd-controlC0.device" ];
++    after = [ "dev-snd-controlC0.device" "sound.target" ];
+     path = with pkgs; [
+       alsa-utils
+       coreutils
+@@ -206,15 +207,15 @@ in
+           fi
+         done
+ 
+-        # Bounded poll for ALSA sound card 0 enumeration (up to 15 seconds) to avoid cold boot race
+-        for i in $(seq 1 30); do
+-          if [ -e /proc/asound/card0 ]; then
++        # Bounded poll for ALSA mixer control node (up to 30 seconds) to avoid cold boot race
++        for i in $(seq 1 60); do
++          if [ -e /dev/snd/controlC0 ]; then
+             break
+           fi
+           sleep 0.5
+         done
+ 
+-        if [ -e /proc/asound/card0 ]; then
++        if [ -e /dev/snd/controlC0 ]; then
+           # QUAT_MI2S_RX connects MultiMedia1 frontend to TFA98xx speaker amplifier DAI link
+           tinymix -D 0 set "QUAT_MI2S_RX Audio Mixer MultiMedia1" 1 1 || true
+           # TERT_MI2S_TX connects digital microphone to MultiMedia1 capture frontend
