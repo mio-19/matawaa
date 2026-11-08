@@ -317,6 +317,20 @@ echo "[+] Stage-1 successfully flashed to {boot_part}!"
     ssh_exec(host, port, user, f"bash -c {shlex.quote(flash_script)}", sudo=True)
 
 
+def reboot_remote_target(host: str, port: int, user: str) -> None:
+    log("Rebooting watch now...")
+    try:
+        ssh_exec(
+            host,
+            port,
+            user,
+            "systemctl reboot --no-block 2>/dev/null || (sleep 1; reboot) >/dev/null 2>&1 &",
+            sudo=True,
+        )
+    except Exception as error:
+        log_warn(f"Reboot command dispatched (SSH session closed: {error})")
+
+
 def deploy_copy(
     repo_root: Path,
     device: str,
@@ -369,8 +383,7 @@ def deploy_copy(
     if action == "boot":
         log("New system profile staged for Mobile NixOS stage-1 on next startup.")
         if reboot:
-            log("Rebooting watch now...")
-            ssh_exec(host, port, user, "reboot", sudo=True)
+            reboot_remote_target(host, port, user)
         else:
             log(f"Reboot the watch when ready: ssh -p {port} {user}@{host} 'sudo reboot'")
 
@@ -411,7 +424,7 @@ def deploy_nixos_rebuild(
     log_success(f"nixos-rebuild {action} completed for {device}!")
     if action == "boot":
         if reboot:
-            ssh_exec(host, port, user, "reboot", sudo=True)
+            reboot_remote_target(host, port, user)
         else:
             log(f"Reboot the watch when ready: ssh -p {port} {user}@{host} 'sudo reboot'")
 
@@ -445,7 +458,7 @@ def deploy_deploy_rs(
     log_success(f"deploy-rs completed for {device}!")
     if action == "boot":
         if reboot:
-            ssh_exec(host, port, user, "reboot", sudo=True)
+            reboot_remote_target(host, port, user)
         else:
             log(f"Reboot the watch when ready: ssh -p {port} {user}@{host} 'sudo reboot'")
 
