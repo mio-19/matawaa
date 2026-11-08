@@ -284,6 +284,7 @@ head -c {img_size} "$BOOT_PART" | sha256sum | awk '{{print $1}}'
     log(f"Transferring stage-1 boot.img to watch at {remote_tmp_img}...")
     scp_cmd = [
         "scp",
+        "-O",
         "-P",
         str(port),
         "-o",
