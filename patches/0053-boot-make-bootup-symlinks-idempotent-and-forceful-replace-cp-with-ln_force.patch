@@ -5,17 +5,17 @@ Subject: [PATCH] boot: make bootup symlinks idempotent and forceful, replace
  cp with ln_force
 
 ---
- devices/fossil-hoki/android-init.nix      | 51 ++++++++++++++---------
- devices/fossil-hoki/default.nix           | 46 +++++++++++++++++---
- devices/fossil-hoki/wlan-firmware-hoki.sh | 18 ++++++--
- devices/oppo-beluga/android-init.nix      | 21 +++++++---
- 4 files changed, 103 insertions(+), 33 deletions(-)
+ devices/fossil-hoki/android-init.nix      | 60 ++++++++++++++++-------
+ devices/fossil-hoki/default.nix           | 46 ++++++++++++++---
+ devices/fossil-hoki/wlan-firmware-hoki.sh | 18 +++++--
+ devices/oppo-beluga/android-init.nix      | 21 ++++++--
+ 4 files changed, 112 insertions(+), 33 deletions(-)
 
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
-index df590d0d..64b511a3 100644
+index df590d0d..0f2e864b 100644
 --- a/devices/fossil-hoki/android-init.nix
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -104,32 +104,43 @@ in
+@@ -104,32 +104,52 @@ in
      serviceConfig = {
        Type = "simple";
        ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
@@ -54,8 +54,17 @@ index df590d0d..64b511a3 100644
 +        ln_force ${platPropertyContexts} /plat_property_contexts
 +        ln_force ${nonplatPropertyContexts} /nonplat_property_contexts
 +        if [ -d /system/lib ]; then
-+          ln_force ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so
-+          ln_force ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux_stubs.so
++          # Android Bionic linker namespace isolation requires libraries in /system/lib
++          # to be regular files (not symlinks to /nix/store, which fail namespace checks).
++          # Use cmp -s to skip copying when already identical, avoiding redundant writes.
++          if [ -L /system/lib/libselinux.so ] || ! ${pkgs.diffutils}/bin/cmp -s ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so; then
++            ${pkgs.coreutils}/bin/rm -f /system/lib/libselinux.so
++            ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so
++          fi
++          if [ -L /system/lib/libselinux_stubs.so ] || ! ${pkgs.diffutils}/bin/cmp -s ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux_stubs.so; then
++            ${pkgs.coreutils}/bin/rm -f /system/lib/libselinux_stubs.so
++            ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux_stubs.so
++          fi
          fi
 -        if [ -f /system/etc/selinux/plat_hwservice_contexts ] && [ ! -e /plat_hwservice_contexts ]; then
 -          ${pkgs.coreutils}/bin/ln -sf /system/etc/selinux/plat_hwservice_contexts /plat_hwservice_contexts
@@ -74,7 +83,7 @@ index df590d0d..64b511a3 100644
          fi
          if [ -f /system/etc/ld.config.28.txt ]; then
            ${pkgs.util-linux}/bin/mount --bind ${ldConfig} /system/etc/ld.config.28.txt || true
-@@ -142,7 +153,7 @@ in
+@@ -142,7 +162,7 @@ in
              for f in "$dir"/*; do
                [ -e "$f" ] || continue
                name=$(${pkgs.coreutils}/bin/basename "$f")
@@ -83,7 +92,7 @@ index df590d0d..64b511a3 100644
              done
            fi
          done
-@@ -151,13 +162,15 @@ in
+@@ -151,13 +171,15 @@ in
              for f in "$dir"/*; do
                [ -e "$f" ] || continue
                name=$(${pkgs.coreutils}/bin/basename "$f")
