@@ -5,19 +5,19 @@ Subject: [PATCH] add the AsteroidOS 4.9 vendor kernel and image
  (devices/oppo-beluga)
 
 ---
- devices/oppo-beluga/android-init.nix   | 122 ++++++++++++++++++
- devices/oppo-beluga/default.nix        | 168 +++++++++++++++++++++++--
- devices/oppo-beluga/kernel/default.nix | 112 +++++++++++++++++
- 3 files changed, 392 insertions(+), 10 deletions(-)
+ devices/oppo-beluga/android-init.nix   | 143 +++++++++++++++++++++
+ devices/oppo-beluga/default.nix        | 169 +++++++++++++++++++++++--
+ devices/oppo-beluga/kernel/default.nix | 112 ++++++++++++++++
+ 3 files changed, 414 insertions(+), 10 deletions(-)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
 new file mode 100644
-index 00000000..e734b3dd
+index 00000000..ec6e949a
 --- /dev/null
 +++ b/devices/oppo-beluga/android-init.nix
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,143 @@
 +{
 +  lib,
 +  pkgs,
@@ -54,7 +54,10 @@ index 00000000..e734b3dd
 +  # AsteroidOS SELinux stub integration for core service managers.
 +  # Matches AsteroidOS meta-skipjack, meta-koi, meta-narwhal, meta-pike, meta-ray.
 +  patchedInitRc = pkgs.runCommand "init.rc" { } ''
-+    cat ${initRc} > $out
++    ${pkgs.gnused}/bin/sed \
++      -e '/start vndservicemanager/a \    start vendor.hwcomposer-2-1\n    start vendor.gralloc-2-0\n    start vendor.configstore-hal' \
++      -e '/setprop sys.hwc.gpu_perf_mode 1/a \    setprop vendor.gralloc.enable_fb_ubwc 0\n    setprop vendor.gralloc.disable_ubwc 1' \
++      ${initRc} > $out
 +    cat >> $out <<'EOF'
 +
 +# AsteroidOS SELinux stub integration for core service managers
@@ -69,6 +72,24 @@ index 00000000..e734b3dd
 +service vndservicemanager /vendor/bin/vndservicemanager /dev/vndbinder
 +    setenv LD_PRELOAD /usr/libexec/hal-droid/system/lib/libselinux_stubs.so
 +    class core
++
++# Hardware Composer and Graphics Allocator services for Qualcomm Treble HIDL
++service vendor.hwcomposer-2-1 /vendor/bin/hw/android.hardware.graphics.composer@2.1-service
++    class hal
++    user system
++    group graphics drmrpc
++    capabilities SYS_NICE
++
++service vendor.gralloc-2-0 /vendor/bin/hw/android.hardware.graphics.allocator@2.0-service
++    class hal
++    user system
++    group graphics drmrpc
++    capabilities SYS_NICE
++
++service vendor.configstore-hal /vendor/bin/hw/android.hardware.configstore@1.1-service
++    class hal
++    user system
++    group system
 +EOF
 +  '';
 +in
@@ -141,7 +162,7 @@ index 00000000..e734b3dd
 +  '';
 +}
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
-index c2cef490..fbb7a582 100644
+index c2cef490..3b27c639 100644
 --- a/devices/oppo-beluga/default.nix
 +++ b/devices/oppo-beluga/default.nix
 @@ -5,9 +5,14 @@
@@ -174,7 +195,7 @@ index c2cef490..fbb7a582 100644
      ram = 1024 * 1;
      screen = {
        width = 402;
-@@ -34,24 +39,167 @@
+@@ -34,24 +39,168 @@
      };
    };
  
@@ -212,9 +233,10 @@ index c2cef490..fbb7a582 100644
 +    "audit=0"
    ];
 +
-+  # The stage-2 msm-fb-refresher pans /dev/fb0 continuously; it fights the Qt
-+  # linuxfb fallback's own panning. Keep it for stage 1 (splash) only.
++  # Upstream AsteroidOS uses hwcomposer and direct MDP overlays; msm-fb-refresher
++  # pans /dev/fb0 continuously which exhausts MDSS hardware pipes (no 2 type pipes available).
 +  mobile.quirks.fb-refresher.enable = lib.mkForce false;
++  mobile.quirks.fb-refresher.stage-1.enable = lib.mkForce false;
 +
 +  # Hardware node permissions for Android HAL / libhybris
 +  # Reference: AsteroidOS meta-beluga/recipes-android/android-init/android-init/init.rc

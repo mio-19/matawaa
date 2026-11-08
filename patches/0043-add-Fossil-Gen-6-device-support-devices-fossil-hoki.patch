@@ -18,13 +18,13 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 ++
- devices/fossil-hoki/android-init.nix          | 160 ++++++
+ devices/fossil-hoki/android-init.nix          | 181 +++++++
  devices/fossil-hoki/android-system-data.nix   |  26 +
  devices/fossil-hoki/audio-modules.nix         | 122 +++++
- devices/fossil-hoki/default.nix               | 510 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 511 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  .../hwcomposer-allocation-diagnostics.patch   |  31 ++
- devices/fossil-hoki/hybris-android.nix        |  30 ++
+ devices/fossil-hoki/hybris-android.nix        |  30 +
  devices/fossil-hoki/hybris.nix                |  47 ++
  devices/fossil-hoki/kernel/default.nix        | 342 ++++++++++++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++++
@@ -32,18 +32,18 @@ they cannot hold multi-user.target.
  .../kernel/linux-4.14.211-212.patch.patch     | 152 ++++++
  .../kernel/linux-4.14.212-213.patch.patch     |  99 ++++
  .../kernel/linux-4.14.213-214.patch.patch     |  40 ++
- devices/fossil-hoki/wlan-firmware-hoki.sh     |  30 ++
+ devices/fossil-hoki/wlan-firmware-hoki.sh     |  30 +
  devices/fossil-hoki/wlan.nix                  | 112 ++++
- ...co_profile-fix-use-of-adapter-before.patch |  30 ++
+ ...co_profile-fix-use-of-adapter-before.patch |  30 +
  ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 +
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 ++
  devices/fossil-triggerfish/default.nix        |  56 ++
- modules/rootfs.nix                            | 120 +++--
+ modules/rootfs.nix                            | 120 ++--
  overlay/asteroidos/default.nix                |   2 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  95 +++-
  .../hwc-present-diagnostics.patch             | 204 +++++++
- 26 files changed, 2534 insertions(+), 72 deletions(-)
+ 26 files changed, 2556 insertions(+), 72 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -132,10 +132,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..206dc17f
+index 00000000..92122a96
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,181 @@
 +{
 +  lib,
 +  pkgs,
@@ -173,7 +173,10 @@ index 00000000..206dc17f
 +  # AsteroidOS SELinux stub integration for core service managers.
 +  # Matches AsteroidOS meta-skipjack, meta-koi, meta-narwhal, meta-pike, meta-ray.
 +  patchedInitRc = pkgs.runCommand "init.rc" { } ''
-+    cat ${initRc} > $out
++    ${pkgs.gnused}/bin/sed \
++      -e '/start vndservicemanager/a \    start vendor.hwcomposer-2-1\n    start vendor.gralloc-2-0\n    start vendor.configstore-hal' \
++      -e '/setprop sys.hwc.gpu_perf_mode 1/a \    setprop vendor.gralloc.enable_fb_ubwc 0\n    setprop vendor.gralloc.disable_ubwc 1' \
++      ${initRc} > $out
 +    cat >> $out <<'EOF'
 +
 +# AsteroidOS SELinux stub integration for core service managers
@@ -188,6 +191,24 @@ index 00000000..206dc17f
 +service vndservicemanager /vendor/bin/vndservicemanager /dev/vndbinder
 +    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
 +    class core
++
++# Hardware Composer and Graphics Allocator services for Qualcomm Treble HIDL
++service vendor.hwcomposer-2-1 /vendor/bin/hw/android.hardware.graphics.composer@2.1-service
++    class hal
++    user system
++    group graphics drmrpc
++    capabilities SYS_NICE
++
++service vendor.gralloc-2-0 /vendor/bin/hw/android.hardware.graphics.allocator@2.0-service
++    class hal
++    user system
++    group graphics drmrpc
++    capabilities SYS_NICE
++
++service vendor.configstore-hal /vendor/bin/hw/android.hardware.configstore@1.1-service
++    class hal
++    user system
++    group system
 +EOF
 +  '';
 +in
@@ -458,10 +479,10 @@ index 00000000..4bcf1878
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..05284e22
+index 00000000..95a65e32
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,510 @@
+@@ -0,0 +1,511 @@
 +{
 +  config,
 +  lib,
@@ -682,9 +703,10 @@ index 00000000..05284e22
 +
 +  # Persistent hardware partition mounts on Fossil Gen 6 eMMC
 +  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-core/base-files/base-files/fstab
-+  # The stage-2 msm-fb-refresher pans /dev/fb0 continuously; it fights the Qt
-+  # linuxfb fallback's own panning. Keep it for stage 1 (splash) only.
++  # Upstream AsteroidOS uses hwcomposer and direct MDP overlays; msm-fb-refresher
++  # pans /dev/fb0 continuously which exhausts MDSS hardware pipes (no 2 type pipes available).
 +  mobile.quirks.fb-refresher.enable = lib.mkForce false;
++  mobile.quirks.fb-refresher.stage-1.enable = lib.mkForce false;
 +
 +  fileSystems = {
 +    # Upstream AsteroidOS installs /system and /vendor directly into the rootfs
