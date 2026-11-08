@@ -8,11 +8,11 @@ udev settles. This handles vendor kernels and bootloaders that do not
 expose stable by-partlabel or by-label links early enough for the
 rootfs mount.
 ---
- boot/init/tasks/udev.rb | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ boot/init/tasks/udev.rb | 56 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
 diff --git a/boot/init/tasks/udev.rb b/boot/init/tasks/udev.rb
-index 3d9d98c0..fa99eba2 100644
+index 3d9d98c0..4549e782 100644
 --- a/boot/init/tasks/udev.rb
 +++ b/boot/init/tasks/udev.rb
 @@ -23,6 +23,8 @@ class Tasks::UDev < SingletonTask
@@ -24,7 +24,7 @@ index 3d9d98c0..fa99eba2 100644
      begin
        udevadm("trigger", "--action=add", "--subsystem-match=platform", "--subsystem-match=mmc", "--subsystem-match=block", "--subsystem-match=input", "--subsystem-match=graphics")
      rescue System::CommandError => e
-@@ -40,6 +42,43 @@ class Tasks::UDev < SingletonTask
+@@ -40,6 +42,60 @@ class Tasks::UDev < SingletonTask
        rescue System::CommandError => e
          $logger.warn("udevadm settle non-fatal timeout (proceeding): #{e.message}")
        end
@@ -36,7 +36,24 @@ index 3d9d98c0..fa99eba2 100644
 +    FileUtils.mkdir_p("/dev/disk/by-partlabel")
 +    FileUtils.mkdir_p("/dev/disk/by-label")
 +
-+    ["/dev/mmcblk0p50", "/dev/block/mmcblk0p50", "/dev/block/bootdevice/by-name/userdata"].each do |candidate|
++    cmdline_candidates = []
++    System.cmdline.each do |arg|
++      if arg.start_with?("datapart=")
++        cmdline_candidates << arg.split("=", 2).last
++      elsif arg.start_with?("userdata=")
++        cmdline_candidates << arg.split("=", 2).last
++      end
++    end
++
++    config_candidate = Configuration["partitions"] && Configuration["partitions"]["userdata"]
++
++    candidates = cmdline_candidates + [
++      config_candidate,
++      "/dev/block/bootdevice/by-name/userdata",
++      "/dev/block/by-name/userdata",
++    ].compact
++
++    candidates.each do |candidate|
 +      if File.exist?(candidate)
 +        unless File.exist?("/dev/disk/by-partlabel/userdata")
 +          System.symlink(candidate, "/dev/disk/by-partlabel/userdata")
@@ -50,7 +67,7 @@ index 3d9d98c0..fa99eba2 100644
 +
 +    Dir.glob("/sys/class/block/*/uevent").each do |uevent|
 +      content = File.read(uevent) rescue ""
-+      if content.include?("PARTNAME=userdata")
++      if content.include?("PARTNAME=userdata") || content.include?("PARTNAME=USERDATA")
 +        devname = content[/DEVNAME=(\S+)/, 1]
 +        if devname && File.exist?("/dev/#{devname}")
 +          unless File.exist?("/dev/disk/by-partlabel/userdata")

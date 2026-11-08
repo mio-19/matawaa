@@ -21,7 +21,7 @@ they cannot hold multi-user.target.
  devices/fossil-hoki/android-init.nix          | 199 +++++++
  devices/fossil-hoki/android-system-data.nix   |  26 +
  devices/fossil-hoki/audio-modules.nix         | 122 +++++
- devices/fossil-hoki/default.nix               | 511 ++++++++++++++++++
+ devices/fossil-hoki/default.nix               | 515 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  .../hwcomposer-allocation-diagnostics.patch   |  31 ++
  devices/fossil-hoki/hybris-android.nix        |  30 +
@@ -43,7 +43,7 @@ they cannot hold multi-user.target.
  overlay/asteroidos/default.nix                |   2 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  95 +++-
  .../hwc-present-diagnostics.patch             | 204 +++++++
- 26 files changed, 2574 insertions(+), 72 deletions(-)
+ 26 files changed, 2578 insertions(+), 72 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -497,10 +497,10 @@ index 00000000..4bcf1878
 +}
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 new file mode 100644
-index 00000000..95a65e32
+index 00000000..0c6d2518
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,511 @@
+@@ -0,0 +1,515 @@
 +{
 +  config,
 +  lib,
@@ -625,6 +625,7 @@ index 00000000..95a65e32
 +    "androidboot.usbconfigfs=true"
 +    "loop.max_part=7"
 +    "cgroup.memory=nokmem,nosocket"
++    "datapart=/dev/mmcblk0p50"
 +  ]
 +  ++ lib.optionals config.mobile.hardware.watch.stage1-pause-debug.enable [
 +    # Verbose systemd logging for early stage-2 debugging.
@@ -637,6 +638,9 @@ index 00000000..95a65e32
 +  # The hoki vendor kernel does not provide a zram module; avoid the
 +  # dev-zram0.device boot timeout.
 +  zramSwap.enable = lib.mkForce false;
++
++  # Device-specific userdata partition for stage-1 boot discovery
++  mobile.boot.stage-1.bootConfig.partitions.userdata = "/dev/mmcblk0p50";
 +
 +  # Ensure stage-1 udev immediately links userdata to /dev/disk/by-label/NIXOS_SYSTEM and /dev/disk/by-partlabel/userdata
 +  mobile.boot.stage-1.extraUdevRules = ''

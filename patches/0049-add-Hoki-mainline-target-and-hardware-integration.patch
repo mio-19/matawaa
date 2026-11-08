@@ -8,12 +8,12 @@ Add a standalone Fossil Gen 6 mainline device. It imports only the AsteroidOS wa
 The mainline display, touch, modem, WLAN and audio drivers are still missing, so the target remains best-effort and non-bootable.
 ---
  devices/fossil-hoki-mainline/README.md        |    46 +
- devices/fossil-hoki-mainline/default.nix      |   127 +
+ devices/fossil-hoki-mainline/default.nix      |   131 +
  .../fossil-hoki-mainline/kernel/default.nix   |    21 +
  devices/fossil-hoki-mainline/sda429-hoki.dts  | 11753 ++++++++++++++++
  devices/fossil-hoki/android-init.nix          |     3 +
  devices/fossil-hoki/default.nix               |    40 +-
- 6 files changed, 11981 insertions(+), 9 deletions(-)
+ 6 files changed, 11985 insertions(+), 9 deletions(-)
  create mode 100644 devices/fossil-hoki-mainline/README.md
  create mode 100644 devices/fossil-hoki-mainline/default.nix
  create mode 100644 devices/fossil-hoki-mainline/kernel/default.nix
@@ -73,10 +73,10 @@ index 00000000..2c5ea433
 +   - When using `lk2nd` secondary bootloader, flash a dummy DTBO image (`dtbo-fossil-hoki.img`) to `dtbo`.
 diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
 new file mode 100644
-index 00000000..1195ba0e
+index 00000000..5fe70d70
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/default.nix
-@@ -0,0 +1,127 @@
+@@ -0,0 +1,131 @@
 +{
 +  config,
 +  lib,
@@ -174,9 +174,13 @@ index 00000000..1195ba0e
 +    "androidboot.bootdevice=7824900.sdhci"
 +    "androidboot.usbconfigfs=true"
 +    "loop.max_part=7"
++    "datapart=/dev/mmcblk0p50"
 +    "systemd.log_level=debug"
 +    "systemd.log_target=kmsg"
 +  ];
++
++  # Device-specific userdata partition for stage-1 boot discovery
++  mobile.boot.stage-1.bootConfig.partitions.userdata = "/dev/mmcblk0p50";
 +
 +  # Graphics: Open-source Freedreno Mesa on DRM/KMS
 +  hardware.graphics = {
@@ -12005,7 +12009,7 @@ index 0dc31172..df590d0d 100644
          ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
        '';
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 95a65e32..5e37f83f 100644
+index 0c6d2518..79605e21 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
 @@ -16,6 +16,9 @@ let
@@ -12018,7 +12022,7 @@ index 95a65e32..5e37f83f 100644
    '';
  
    # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
-@@ -146,6 +149,7 @@ in
+@@ -150,6 +153,7 @@ in
      pkgs.alsa-utils
      pkgs.btrfs-progs
      pkgs.qrtr
@@ -12026,7 +12030,7 @@ index 95a65e32..5e37f83f 100644
      hokiNgfdConfig
    ];
  
-@@ -163,16 +167,18 @@ in
+@@ -167,16 +171,18 @@ in
      path = with pkgs; [
        alsa-utils
        coreutils
@@ -12048,7 +12052,7 @@ index 95a65e32..5e37f83f 100644
            fi
          done
  
-@@ -186,11 +192,11 @@ in
+@@ -190,11 +196,11 @@ in
  
          if [ -e /proc/asound/card0 ]; then
            # QUAT_MI2S_RX connects MultiMedia1 frontend to TFA98xx speaker amplifier DAI link
@@ -12063,7 +12067,7 @@ index 95a65e32..5e37f83f 100644
          fi
        '';
      };
-@@ -304,6 +310,7 @@ in
+@@ -308,6 +314,7 @@ in
      if [ -d ${androidSystemData}/system/etc/firmware ]; then
        cp -a ${androidSystemData}/system/etc/firmware/* ./lib/firmware/ 2>/dev/null || true
      fi
@@ -12071,7 +12075,7 @@ index 95a65e32..5e37f83f 100644
      ln -sfn /vendor/firmware ./etc/firmware
  
      # Replace stock Android libselinux.so with AsteroidOS libselinux_stubs.so
-@@ -505,7 +512,22 @@ in
+@@ -509,7 +516,22 @@ in
      sha256 = "12zg3n0jysy7lczqwh0kl5ccg1ljgidkqazj6i8v2j9k0nckkx29";
    };
  

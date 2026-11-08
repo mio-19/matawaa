@@ -5,20 +5,20 @@ Subject: [PATCH] devices/oppo-beluga-mainline: add standalone experimental
  mainline target
 
 ---
- devices/oppo-beluga-mainline/default.nix      |   111 +
+ devices/oppo-beluga-mainline/default.nix      |   115 +
  .../oppo-beluga-mainline/kernel/default.nix   |    19 +
  .../oppo-beluga-mainline/msm8909w-beluga.dts  | 10257 ++++++++++++++++
- 3 files changed, 10387 insertions(+)
+ 3 files changed, 10391 insertions(+)
  create mode 100644 devices/oppo-beluga-mainline/default.nix
  create mode 100644 devices/oppo-beluga-mainline/kernel/default.nix
  create mode 100644 devices/oppo-beluga-mainline/msm8909w-beluga.dts
 
 diff --git a/devices/oppo-beluga-mainline/default.nix b/devices/oppo-beluga-mainline/default.nix
 new file mode 100644
-index 00000000..6ed487dd
+index 00000000..3f12cc13
 --- /dev/null
 +++ b/devices/oppo-beluga-mainline/default.nix
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,115 @@
 +{
 +  config,
 +  lib,
@@ -100,9 +100,13 @@ index 00000000..6ed487dd
 +    "androidboot.selinux=permissive"
 +    "audit=0"
 +    "loop.max_part=7"
++    "datapart=/dev/mmcblk0p40"
 +    "systemd.log_level=debug"
 +    "systemd.log_target=kmsg"
 +  ];
++
++  # Device-specific userdata partition for stage-1 boot discovery
++  mobile.boot.stage-1.bootConfig.partitions.userdata = "/dev/mmcblk0p40";
 +
 +  # Graphics: Open-source Freedreno Mesa on DRM/KMS
 +  hardware.graphics = {
