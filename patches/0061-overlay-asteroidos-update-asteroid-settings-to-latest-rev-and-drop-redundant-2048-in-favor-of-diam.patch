@@ -1,0 +1,199 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:01:30 +1100
+Subject: [PATCH] overlay/asteroidos: update asteroid-settings to latest rev
+ and drop redundant 2048 in favor of diamonds
+
+---
+ examples/asteroid/asteroid-desktop.nix     |   1 -
+ overlay/asteroidos/apps/default.nix        |  18 +--
+ overlay/asteroidos/apps/twenty48-qt6.patch | 134 ---------------------
+ 3 files changed, 2 insertions(+), 151 deletions(-)
+ delete mode 100644 overlay/asteroidos/apps/twenty48-qt6.patch
+
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 64ffe707..7e4faafc 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -149,7 +149,6 @@ in
+         asteroid.apps.gps-test
+         asteroid.apps.telegram
+         asteroid.apps.kiwix
+-        asteroid.apps.twenty48
+       ]
+       ++ lib.optionals cfg.browser.enable [
+         asteroid.apps.browser
+diff --git a/overlay/asteroidos/apps/default.nix b/overlay/asteroidos/apps/default.nix
+index 3e84436a..b76ed24f 100644
+--- a/overlay/asteroidos/apps/default.nix
++++ b/overlay/asteroidos/apps/default.nix
+@@ -38,8 +38,8 @@
+   settings = mkAsteroidApp {
+     name = "settings";
+     desc = "Smartwatch preferences and configuration application";
+-    rev = "9c65aaea9910e6133e79b3b6206a1a8d18b94c80";
+-    sha256 = "0c1rcwwdkqhazn6xmmxhap4zrh6yqbhcqlw30ay0qywl206kciji";
++    rev = "8f2ece787facf056c28bb94936d3a28ac31815f7";
++    sha256 = "0zz8p8c3ixkx9vhh01gdcv2ddi45d4glqah433g47xf8l4l79f0j";
+     extraBuildInputs = [
+       mce-dev
+       ngf-qt6
+@@ -126,18 +126,4 @@
+     rev = "991329e453854593094cea018f6412f7e2e654bd";
+     sha256 = "0k40pvvd9nhsj228zydajk97vasfkn3cjvn1xp2j86j7y9ica2pc";
+   };
+-
+-  # Sliding-tile 2048 puzzle game: https://github.com/MagneFire/asteroid-2048
+-  twenty48 = mkAsteroidApp {
+-    name = "2048";
+-    pname = "asteroid-2048";
+-    owner = "MagneFire";
+-    repo = "asteroid-2048";
+-    desc = "Sliding-tile 2048 puzzle game for AsteroidOS smartwatches";
+-    rev = "99e7f00228c269069b41c4a27a0a60d2ed2ac7cf";
+-    sha256 = "16xzqx0ry4y8hx6gqigafqx6izjahjlz5jc5s12fg0rjk5ylxjx0";
+-    patches = [
+-      ./twenty48-qt6.patch
+-    ];
+-  };
+ }
+diff --git a/overlay/asteroidos/apps/twenty48-qt6.patch b/overlay/asteroidos/apps/twenty48-qt6.patch
+deleted file mode 100644
+index cc32a582..00000000
+--- a/overlay/asteroidos/apps/twenty48-qt6.patch
++++ /dev/null
+@@ -1,134 +0,0 @@
+-diff -Naur a/asteroid-2048.desktop.template b/asteroid-2048.desktop.template
+---- a/asteroid-2048.desktop.template	2026-10-18 16:11:39.862790321 +1100
+-+++ b/asteroid-2048.desktop.template	2026-10-18 16:11:50.761792981 +1100
+-@@ -1,7 +1,8 @@
+- [Desktop Entry]
+- Type=Application
+- Categories=Applications;
+--Exec=invoker --single-instance --type=qtcomponents-qt5 /usr/bin/asteroid-2048
+-+Exec=asteroid-2048
+- Icon=2048
+--X-Asteroid-Center-Color=#b04d1c
+--X-Asteroid-Outer-Color=#421c0a
+-+Name=2048
+-+X-Asteroid-Center-Color=#4b45b9
+-+X-Asteroid-Outer-Color=#161537
+-diff -Naur a/CMakeLists.txt b/CMakeLists.txt
+---- a/CMakeLists.txt	2026-10-18 16:11:39.862790321 +1100
+-+++ b/CMakeLists.txt	2026-10-18 16:11:50.753792979 +1100
+-@@ -1,22 +1,33 @@
+--cmake_minimum_required(VERSION 3.6.0)
+-+cmake_minimum_required(VERSION 3.20)
+- 
+- project(asteroid-2048
+--	VERSION 0.0.1
+-+	VERSION 1.0.0
+- 	DESCRIPTION "A 2048 game clone for AsteroidOS")
+- 
+- find_package(ECM REQUIRED NO_MODULE)
+--find_package(AsteroidApp REQUIRED)
+-+find_package(AsteroidApp6 REQUIRED)
+-+find_package(Qt6 REQUIRED COMPONENTS Quick)
+- 
+- set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH} ${ASTEROID_MODULE_PATH})
+- 
+- include(FeatureSummary)
+- include(GNUInstallDirs)
+--include(ECMQMLModules)
+--include(AsteroidCMakeSettings)
+--include(AsteroidTranslations)
+-+include(Asteroid6CMakeSettings)
+-+include(Asteroid6Translations)
+- 
+- add_subdirectory(src)
+- 
+-+configure_file(
+-+	${CMAKE_CURRENT_SOURCE_DIR}/runscript.in
+-+	${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}
+-+	@ONLY
+-+)
+-+
+-+install(
+-+	PROGRAMS ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}
+-+	DESTINATION ${CMAKE_INSTALL_BINDIR}
+-+)
+-+
+- build_translations(i18n)
+- generate_desktop(${CMAKE_SOURCE_DIR} asteroid-2048)
+- 
+-diff -Naur a/runscript.in b/runscript.in
+---- a/runscript.in	1970-01-01 10:00:00.000000000 +1000
+-+++ b/runscript.in	2026-10-18 16:11:50.755792979 +1100
+-@@ -0,0 +1,3 @@
+-+#!/bin/sh
+-+
+-+exec invoker --single-instance --type=asteroid-qt6 @CMAKE_INSTALL_FULL_LIBDIR@/asteroid-2048.so
+-diff -Naur a/src/CMakeLists.txt b/src/CMakeLists.txt
+---- a/src/CMakeLists.txt	2026-10-18 16:11:39.876790324 +1100
+-+++ b/src/CMakeLists.txt	2026-10-18 16:11:50.757792980 +1100
+-@@ -1,8 +1,24 @@
+--add_library(asteroid-2048 main.cpp resources.qrc)
+--set_target_properties(asteroid-2048 PROPERTIES PREFIX "" SUFFIX "")
+-+add_library(${CMAKE_PROJECT_NAME}
+-+	main.cpp
+-+)
+-+set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES PREFIX "")
+- 
+--target_link_libraries(asteroid-2048 PUBLIC
+--	AsteroidApp)
+-+qt6_add_qml_module(${CMAKE_PROJECT_NAME}
+-+	URI Twenty48
+-+	VERSION 1.0
+-+	RESOURCE_PREFIX "/"
+-+	NO_PLUGIN
+-+	QML_FILES
+-+		main.qml
+-+		Game.qml
+-+)
+- 
+--install(TARGETS asteroid-2048
+--	DESTINATION ${CMAKE_INSTALL_BINDIR})
+-\ No newline at end of file
+-+target_link_libraries(${CMAKE_PROJECT_NAME}
+-+	PUBLIC
+-+	Asteroid::AsteroidApp6
+-+	Qt6::Quick
+-+)
+-+
+-+install(TARGETS ${CMAKE_PROJECT_NAME}
+-+	DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-+)
+-diff -Naur a/src/main.cpp b/src/main.cpp
+---- a/src/main.cpp	2026-10-18 16:11:39.875790324 +1100
+-+++ b/src/main.cpp	2026-10-18 16:11:50.759792980 +1100
+-@@ -16,8 +16,19 @@
+-  */
+- 
+- #include <asteroidapp.h>
+-+#include <QGuiApplication>
+-+#include <QQmlContext>
+-+#include <QQuickView>
+-+#include <QScopedPointer>
+-+#include <QScreen>
+-+#include <QUrl>
+- 
+- int main(int argc, char *argv[])
+- {
+--    return AsteroidApp::main(argc, argv);
+-+    QScopedPointer<QGuiApplication> app(AsteroidApp::application(argc, argv));
+-+    QScopedPointer<QQuickView> view(AsteroidApp::createView());
+-+    view->setSource(QUrl(QStringLiteral("qrc:/Twenty48/main.qml")));
+-+    view->resize(app->primaryScreen()->size());
+-+    view->show();
+-+    return app->exec();
+- }
+-diff -Naur a/src/Game.qml b/src/Game.qml
+---- a/src/Game.qml	2026-10-18 16:11:39.875790324 +1100
+-+++ b/src/Game.qml	2026-10-18 16:11:50.759792980 +1100
+-@@ -1,6 +1,5 @@
+- import QtQuick 2.9
+- import Nemo.Configuration 1.0
+--import org.nemomobile.lipstick 0.1
+- 
+- Item {
+-     id: main
