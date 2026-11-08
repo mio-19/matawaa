@@ -1,0 +1,277 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Sun, 8 Nov 2026 18:00:47 +1100
+Subject: [PATCH] boot: make bootup symlinks idempotent and forceful, replace
+ cp with ln_force
+
+---
+ devices/fossil-hoki/android-init.nix      | 51 ++++++++++++++---------
+ devices/fossil-hoki/default.nix           | 46 +++++++++++++++++---
+ devices/fossil-hoki/wlan-firmware-hoki.sh | 18 ++++++--
+ devices/oppo-beluga/android-init.nix      | 21 +++++++---
+ 4 files changed, 103 insertions(+), 33 deletions(-)
+
+diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
+index df590d0d..64b511a3 100644
+--- a/devices/fossil-hoki/android-init.nix
++++ b/devices/fossil-hoki/android-init.nix
+@@ -104,32 +104,43 @@ in
+     serviceConfig = {
+       Type = "simple";
+       ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
+         # Ensure Qualcomm bootdevice and platform by-name symlinks exist for rmt_storage
+         ${pkgs.coreutils}/bin/mkdir -p /dev/block/bootdevice/by-name /dev/block/platform/msm_sdcc.1/by-name /dev/block/platform/soc/7824900.sdhci/by-name
+         if [ -d /dev/disk/by-partlabel ]; then
+           for p in /dev/disk/by-partlabel/*; do
+             [ -e "$p" ] || continue
+             name=$(${pkgs.coreutils}/bin/basename "$p")
+-            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/bootdevice/by-name/"$name"
+-            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/platform/msm_sdcc.1/by-name/"$name"
+-            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/platform/soc/7824900.sdhci/by-name/"$name"
++            ln_force "$p" /dev/block/bootdevice/by-name/"$name"
++            ln_force "$p" /dev/block/platform/msm_sdcc.1/by-name/"$name"
++            ln_force "$p" /dev/block/platform/soc/7824900.sdhci/by-name/"$name"
+           done
+         fi
+-        [ -e /init.rc ] || ${pkgs.coreutils}/bin/ln -sf ${patchedInitRc} /init.rc
+-        [ -e /plat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${platPropertyContexts} /plat_property_contexts
+-        [ -e /nonplat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${nonplatPropertyContexts} /nonplat_property_contexts
+-        if [ -f /system/lib/libselinux.so ]; then
+-          ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so
+-          ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so
++        ln_force ${patchedInitRc} /init.rc
++        ln_force ${platPropertyContexts} /plat_property_contexts
++        ln_force ${nonplatPropertyContexts} /nonplat_property_contexts
++        if [ -d /system/lib ]; then
++          ln_force ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so
++          ln_force ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux_stubs.so
+         fi
+-        if [ -f /system/etc/selinux/plat_hwservice_contexts ] && [ ! -e /plat_hwservice_contexts ]; then
+-          ${pkgs.coreutils}/bin/ln -sf /system/etc/selinux/plat_hwservice_contexts /plat_hwservice_contexts
++        if [ -f /system/etc/selinux/plat_hwservice_contexts ]; then
++          ln_force /system/etc/selinux/plat_hwservice_contexts /plat_hwservice_contexts
+         fi
+-        if [ -f /vendor/etc/selinux/vendor_hwservice_contexts ] && [ ! -e /vendor_hwservice_contexts ]; then
+-          ${pkgs.coreutils}/bin/ln -sf /vendor/etc/selinux/vendor_hwservice_contexts /vendor_hwservice_contexts
++        if [ -f /vendor/etc/selinux/vendor_hwservice_contexts ]; then
++          ln_force /vendor/etc/selinux/vendor_hwservice_contexts /vendor_hwservice_contexts
+         fi
+-        if [ -f /vendor/etc/selinux/vndservice_contexts ] && [ ! -e /vndservice_contexts ]; then
+-          ${pkgs.coreutils}/bin/ln -sf /vendor/etc/selinux/vndservice_contexts /vndservice_contexts
++        if [ -f /vendor/etc/selinux/vndservice_contexts ]; then
++          ln_force /vendor/etc/selinux/vndservice_contexts /vndservice_contexts
+         fi
+         if [ -f /system/etc/ld.config.28.txt ]; then
+           ${pkgs.util-linux}/bin/mount --bind ${ldConfig} /system/etc/ld.config.28.txt || true
+@@ -142,7 +153,7 @@ in
+             for f in "$dir"/*; do
+               [ -e "$f" ] || continue
+               name=$(${pkgs.coreutils}/bin/basename "$f")
+-              [ -e "/lib/firmware/$name" ] || ${pkgs.coreutils}/bin/ln -sf "$f" /lib/firmware/"$name"
++              ln_force "$f" /lib/firmware/"$name"
+             done
+           fi
+         done
+@@ -151,13 +162,15 @@ in
+             for f in "$dir"/*; do
+               [ -e "$f" ] || continue
+               name=$(${pkgs.coreutils}/bin/basename "$f")
+-              [ -e "/lib/firmware/$name" ] || ${pkgs.coreutils}/bin/ln -sf "$f" /lib/firmware/"$name"
++              ln_force "$f" /lib/firmware/"$name"
+             done
+           fi
+         done
+         # Ensure TFA98xx amplifier container firmware is linked under both names expected by kernel
+-        [ -e /lib/firmware/tfa98xx.cnt ] || ${pkgs.coreutils}/bin/ln -sf /system/etc/firmware/tfa98xx.cnt /lib/firmware/tfa98xx.cnt
+-        [ -e /lib/firmware/tfa9890.cnt ] || ${pkgs.coreutils}/bin/ln -sf /system/etc/firmware/tfa98xx.cnt /lib/firmware/tfa9890.cnt
++        if [ -e /system/etc/firmware/tfa98xx.cnt ]; then
++          ln_force /system/etc/firmware/tfa98xx.cnt /lib/firmware/tfa98xx.cnt
++          ln_force /system/etc/firmware/tfa98xx.cnt /lib/firmware/tfa9890.cnt
++        fi
+ 
+         ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
+       '';
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 63e6708f..11bf6c15 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -184,12 +184,24 @@ in
+       Type = "oneshot";
+       RemainAfterExit = true;
+       ExecStart = pkgs.writeShellScript "audio-routing-hoki" ''
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
+         # Ensure TFA98xx amplifier DSP container firmware is linked under both names in /lib/firmware
+         mkdir -p /lib/firmware
+         for p in /system/etc/firmware/tfa98xx.cnt /vendor/firmware/tfa98xx.cnt /etc/firmware/tfa98xx.cnt; do
+           if [ -e "$p" ]; then
+-            [ -e /lib/firmware/tfa98xx.cnt ] || ln -sf "$p" /lib/firmware/tfa98xx.cnt
+-            [ -e /lib/firmware/tfa9890.cnt ] || ln -sf "$p" /lib/firmware/tfa9890.cnt
++            ln_force "$p" /lib/firmware/tfa98xx.cnt
++            ln_force "$p" /lib/firmware/tfa9890.cnt
++            break
+           fi
+         done
+ 
+@@ -388,6 +400,17 @@ in
+       Type = "oneshot";
+       RemainAfterExit = true;
+       ExecStart = pkgs.writeShellScript "firmware-mount-links-hoki" ''
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
+         mkdir -p /lib/firmware
+         # Link modem partition PIL firmware (wcnss, venus, modem, adsp, etc.)
+         for dir in /vendor/firmware_mnt/image /vendor/firmware_mnt; do
+@@ -395,7 +418,7 @@ in
+             for f in "$dir"/*; do
+               [ -e "$f" ] || continue
+               base=$(${pkgs.coreutils}/bin/basename "$f")
+-              [ -e "/lib/firmware/$base" ] || ln -sf "$f" "/lib/firmware/$base"
++              ln_force "$f" "/lib/firmware/$base"
+             done
+           fi
+         done
+@@ -405,7 +428,7 @@ in
+             for f in "$dir"/*; do
+               [ -e "$f" ] || continue
+               base=$(${pkgs.coreutils}/bin/basename "$f")
+-              [ -e "/lib/firmware/$base" ] || ln -sf "$f" "/lib/firmware/$base"
++              ln_force "$f" "/lib/firmware/$base"
+             done
+           fi
+         done
+@@ -493,8 +516,19 @@ in
+       Type = "oneshot";
+       RemainAfterExit = true;
+       ExecStart = pkgs.writeShellScript "gnss-hoki" ''
+-        if [ -d /persist ]; then
+-          ${pkgs.coreutils}/bin/cp -f /etc/gps_xtra.ini /persist/gps_xtra.ini || true
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
++        if [ -d /persist ] && [ -e /etc/gps_xtra.ini ]; then
++          ln_force /etc/gps_xtra.ini /persist/gps_xtra.ini
+         fi
+       '';
+     };
+diff --git a/devices/fossil-hoki/wlan-firmware-hoki.sh b/devices/fossil-hoki/wlan-firmware-hoki.sh
+index f1682bdf..95d80bb2 100644
+--- a/devices/fossil-hoki/wlan-firmware-hoki.sh
++++ b/devices/fossil-hoki/wlan-firmware-hoki.sh
+@@ -5,11 +5,22 @@
+ # opening (not writing) /dev/wcnss_wlan, then load the driver.
+ # See https://github.com/AsteroidOS/meta-smartwatch/issues/224
+ 
++ln_force() {
++	target="$1"
++	link="$2"
++	if [ -L "$link" ] && [ "$(readlink "$link")" = "$target" ]; then
++		return 0
++	fi
++	rm -rf "$link"
++	mkdir -p "$(dirname "$link")"
++	ln -sfn "$target" "$link"
++}
++
+ mkdir -p /lib/firmware/wlan/prima
+ 
+ for f in WCNSS_qcom_cfg.ini WCNSS_qcom_wlan_nv.bin WCNSS_wlan_dictionary.dat; do
+-	if [ ! -e "/lib/firmware/wlan/prima/$f" ]; then
+-		ln -s "/vendor/firmware/wlan/prima/$f" "/lib/firmware/wlan/prima/$f"
++	if [ -e "/vendor/firmware/wlan/prima/$f" ]; then
++		ln_force "/vendor/firmware/wlan/prima/$f" "/lib/firmware/wlan/prima/$f"
+ 	fi
+ done
+ 
+@@ -18,7 +29,8 @@ done
+ for dir in /vendor/firmware /vendor/firmware_mnt/image /vendor/firmware_mnt; do
+ 	if [ -d "$dir" ]; then
+ 		for f in "$dir"/wcnss.*; do
+-			[ -e "$f" ] && [ ! -e "/lib/firmware/${f##*/}" ] && ln -sf "$f" "/lib/firmware/${f##*/}"
++			[ -e "$f" ] || continue
++			ln_force "$f" "/lib/firmware/${f##*/}"
+ 		done
+ 	fi
+ done
+diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
+index 704b52ca..a57f9ed8 100644
+--- a/devices/oppo-beluga/android-init.nix
++++ b/devices/oppo-beluga/android-init.nix
+@@ -97,14 +97,25 @@ in
+     serviceConfig = {
+       Type = "simple";
+       ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
+         # Ensure Qualcomm bootdevice and platform by-name symlinks exist for rmt_storage
+         ${pkgs.coreutils}/bin/mkdir -p /dev/block/bootdevice/by-name /dev/block/platform/msm_sdcc.1/by-name
+         if [ -d /dev/disk/by-partlabel ]; then
+           for p in /dev/disk/by-partlabel/*; do
+             [ -e "$p" ] || continue
+             name=$(${pkgs.coreutils}/bin/basename "$p")
+-            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/bootdevice/by-name/"$name"
+-            ${pkgs.coreutils}/bin/ln -sf "$p" /dev/block/platform/msm_sdcc.1/by-name/"$name"
++            ln_force "$p" /dev/block/bootdevice/by-name/"$name"
++            ln_force "$p" /dev/block/platform/msm_sdcc.1/by-name/"$name"
+           done
+         fi
+         if [ -d /system_root/system ] && [ ! -d /system/bin ]; then
+@@ -112,9 +123,9 @@ in
+         elif [ -d /system_root/bin ] && [ ! -d /system/bin ]; then
+           ${pkgs.util-linux}/bin/mount --bind /system_root /system || true
+         fi
+-        [ -e /init.rc ] || ${pkgs.coreutils}/bin/ln -sf ${patchedInitRc} /init.rc
+-        [ -e /plat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${platPropertyContexts} /plat_property_contexts
+-        [ -e /nonplat_property_contexts ] || ${pkgs.coreutils}/bin/ln -sf ${nonplatPropertyContexts} /nonplat_property_contexts
++        ln_force ${patchedInitRc} /init.rc
++        ln_force ${platPropertyContexts} /plat_property_contexts
++        ln_force ${nonplatPropertyContexts} /nonplat_property_contexts
+         if [ -f /system/etc/ld.config.28.txt ]; then
+           ${pkgs.util-linux}/bin/mount --bind ${ldConfig} /system/etc/ld.config.28.txt || true
+         fi
