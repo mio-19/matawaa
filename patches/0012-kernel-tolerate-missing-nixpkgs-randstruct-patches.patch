@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:55:47 +1100
+Subject: [PATCH] kernel: tolerate missing nixpkgs randstruct patches
+
+---
+ overlay/mobile-nixos/kernel/builder.nix | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/overlay/mobile-nixos/kernel/builder.nix b/overlay/mobile-nixos/kernel/builder.nix
+index 7fd32f28..a4588661 100644
+--- a/overlay/mobile-nixos/kernel/builder.nix
++++ b/overlay/mobile-nixos/kernel/builder.nix
+@@ -244,8 +244,8 @@ stdenv.mkDerivation (inputArgs // {
+   patches =
+     map (p: p.patch) kernelPatches
+     # Required for deterministic builds along with some postPatch magic.
+-    ++ optional ((lib.versionAtLeast version "4.13" && lib.versionOlder version "5.19")) (nixosKernelPath + "/randstruct-provide-seed.patch")
+-    ++ optional ((lib.versionAtLeast version "5.19")) (nixosKernelPath + "/randstruct-provide-seed-5.19.patch")
++    ++ optional (lib.versionAtLeast version "4.13" && lib.versionOlder version "5.19" && builtins.pathExists (nixosKernelPath + "/randstruct-provide-seed.patch")) (nixosKernelPath + "/randstruct-provide-seed.patch")
++    ++ optional (lib.versionAtLeast version "5.19" && builtins.pathExists (nixosKernelPath + "/randstruct-provide-seed-5.19.patch")) (nixosKernelPath + "/randstruct-provide-seed-5.19.patch")
+     ++ optional (enableDefaultYYLOCPatch && lib.versionOlder version "4.0") ./gcc10-extern_YYLOC_global_declaration.patch
+     ++ optional (enableForceLogoPatch && lib.versionAtLeast version "5.4")
+       (fetchpatch {

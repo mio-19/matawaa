@@ -1,0 +1,722 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:55:51 +1100
+Subject: [PATCH] asteroid: package launcher and Nemo QML plugins
+
+---
+ .../asteroid-launcher/circlemask-qrc.patch    |  15 ++
+ .../asteroidos/asteroid-launcher/default.nix  | 151 ++++++++++++++++++
+ .../display-on-startup.patch                  |  44 +++++
+ .../asteroid-launcher/find-phone.patch        |  60 +++++++
+ .../org.nemomobile.compositor.conf            |  28 ++++
+ .../qml-boot-diagnostics.patch                | 109 +++++++++++++
+ .../splash-no-opacitymask.patch               |  54 +++++++
+ overlay/asteroidos/default.nix                |  18 +++
+ .../nemo-qml-plugin-configuration/default.nix |  69 ++++++++
+ .../nemo-qml-plugin-dbus/default.nix          |  80 ++++++++++
+ 10 files changed, 628 insertions(+)
+ create mode 100644 overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
+ create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
+ create mode 100644 overlay/asteroidos/asteroid-launcher/display-on-startup.patch
+ create mode 100644 overlay/asteroidos/asteroid-launcher/find-phone.patch
+ create mode 100644 overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
+ create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+ create mode 100644 overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
+ create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
+ create mode 100644 overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
+
+diff --git a/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
+new file mode 100644
+index 00000000..d8a0670d
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
+@@ -0,0 +1,15 @@
++# Upstream AsteroidOS asteroid-launcher:
++# https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
++# Commit 960a48d2 ("speed-dial: Fix cut-off launcher items") ported shaders to Qt 6 via qt_add_shaders(),
++# but CircleMaskShader.qml omitted the "qrc:" scheme, resolving against the Linux root fs and crashing QRhi.
++# See also upstream CMakeLists.txt:
++# https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
++--- a/src/qml/compositor/CircleMaskShader.qml
+++++ b/src/qml/compositor/CircleMaskShader.qml
++@@ -40,5 +40,5 @@ ShaderEffect {
++     property real end: 0.25
++     property real beginning: 0.25 - smoothness
++ 
++-    fragmentShader: "/qml/compositor/circlemaskshader.frag.qsb"
+++    fragmentShader: "qrc:/qml/compositor/circlemaskshader.frag.qsb"
++ }
+diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
+new file mode 100644
+index 00000000..34a7fd1e
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/default.nix
+@@ -0,0 +1,151 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  fetchpatch,
++  cmake,
++  pkg-config,
++  qt6,
++  qml-asteroid,
++  mlite,
++  mce-dev,
++  mce-qt6,
++  ngf-qt6,
++  usb-moded-qt6,
++  keepalive,
++  timed-qt6,
++  dbus,
++  dbus-glib,
++  systemd,
++  kdePackages,
++  buildPackages,
++  libhybris,
++  noUsrShareHook,
++}:
++
++let
++  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
++in
++stdenv.mkDerivation (finalAttrs: {
++  pname = "asteroid-launcher";
++  version = "nightly";
++
++  src = fetchFromGitHub {
++    owner = "AsteroidOS";
++    repo = "asteroid-launcher";
++    rev = "29f4257ec9835ead090c8157e46948c769081ed2";
++    sha256 = "1c7swnsqxsrfdhdim9rbq4d33ivxskkck4yz8hmridfwdzzpiv53";
++  };
++
++  strictDeps = true;
++
++  postPatch = ''
++    substituteInPlace src/qml/MainScreen.qml \
++      --replace-fail "/usr/share/asteroid-launcher" "/run/current-system/sw/share/asteroid-launcher"
++
++    substituteInPlace lipstick/src/localemanager.cpp \
++      --replace-fail '"/usr/share/translations"' "\"$out/share/translations\""
++
++    substituteInPlace lipstick/src/components/launchermodel.cpp \
++      --replace-fail '"/usr/share/lipstick/lipstick.conf"' "\"$out/share/lipstick/lipstick.conf\"" \
++      --replace-fail '#define LAUNCHER_APPS_PATH "/usr/share/applications/"' '#define LAUNCHER_APPS_PATH "/run/current-system/sw/share/applications/"' \
++      --replace-fail '#define LAUNCHER_ICONS_PATH "/usr/share/icons/hicolor/86x86/apps/"' '#define LAUNCHER_ICONS_PATH "/run/current-system/sw/share/icons/hicolor/86x86/apps/"'
++
++    substituteInPlace lipstick/src/notifications/notificationmanager.cpp \
++      --replace-fail '"/usr/share/lipstick/notificationcategories"' "\"$out/share/lipstick/notificationcategories\"" \
++      --replace-fail 'DESKTOP_ENTRY_PATH= "/usr/share/applications/"' 'DESKTOP_ENTRY_PATH= "/run/current-system/sw/share/applications/"'
++
++    substituteInPlace src/notificationsnoozer.cpp \
++      --replace-fail "/usr/bin/notificationtool" "/run/current-system/sw/bin/notificationtool"
++  '';
++
++  # AsteroidOS wayland compositor & shell
++  # Upstream repository: https://github.com/AsteroidOS/asteroid-launcher
++  patches = [
++    # QuickPanel quick-toggle button to trigger the find-phone alarm on the companion phone
++    ./find-phone.patch
++    # Tip for first-time tutorial indicating long press skips the guide
++    # Upstream PR: https://github.com/AsteroidOS/asteroid-launcher/pull/310
++    (fetchpatch {
++      url = "https://github.com/AsteroidOS/asteroid-launcher/pull/310.patch";
++      hash = "sha256-zFU7CbI4YqPSDWirkhUW5wxYwYLi0rft2AxwJ7TGqMg=";
++    })
++    # App-branded notification preview and view improvements
++    # Upstream PR: https://github.com/AsteroidOS/asteroid-launcher/pull/308
++    (fetchpatch {
++      url = "https://github.com/AsteroidOS/asteroid-launcher/pull/308.diff";
++      hash = "sha256-QzBzGPIk9khM8Q5b7ZHMhxd/TVI6UrDIthZMzn7el1I=";
++    })
++    # Remove OpacityMask dependency from the 400ms initial splash animation
++    ./splash-no-opacitymask.patch
++    # Proactively show and activate compositor window on startup (matching upstream AsteroidOS DisplayOn)
++    # Upstream Lipstick compositor display lifecycle:
++    # https://github.com/AsteroidOS/asteroid-launcher/blob/master/lipstick/src/compositor/lipstickcompositor.cpp#L364-L375
++    ./display-on-startup.patch
++    # Fix CircleMaskShader QSB fragment shader URI to use qrc scheme for round screen masking
++    # Upstream: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/qml/compositor/CircleMaskShader.qml#L43
++    # Upstream CMake qt_add_shaders: https://github.com/AsteroidOS/asteroid-launcher/blob/master/src/CMakeLists.txt#L69-L75
++    ./circlemask-qrc.patch
++    # Log which stage of the compositor scene came up, so an empty scene (black
++    # screen with a live render loop) names the failing Loader instead of
++    # leaving only "update from item" chatter in the log.
++    ./qml-boot-diagnostics.patch
++  ];
++
++  nativeBuildInputs = [
++    cmake
++    kdePackages.extra-cmake-modules
++    pkg-config
++    qt6.wrapQtAppsHook
++    noUsrShareHook
++  ];
++
++  cmakeFlags = [
++    "-DECM_DIR=${kdePackages.extra-cmake-modules}/share/ECM/cmake"
++  ]
++  ++ lib.optionals isCross [
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++    "-DQt6QuickTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
++    "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
++    "-DQt6LinguistTools_DIR=${buildPackages.qt6.qttools}/lib/cmake/Qt6LinguistTools"
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    qt6.qtwayland
++    qt6.qtsensors
++    qt6.qtshadertools
++    qml-asteroid
++    mlite
++    mce-dev
++    mce-qt6
++    ngf-qt6
++    usb-moded-qt6
++    keepalive
++    timed-qt6
++    dbus
++    dbus-glib
++    systemd
++    libhybris
++  ];
++
++  qtWrapperArgs = [
++    "--prefix"
++    "LD_LIBRARY_PATH"
++    ":"
++    "${libhybris}/lib"
++  ];
++
++  postInstall = ''
++    install -Dm644 ${./org.nemomobile.compositor.conf} $out/share/dbus-1/system.d/org.nemomobile.compositor.conf
++  '';
++
++  meta = with lib; {
++    description = "AsteroidOS Wayland compositor and smartwatch home shell";
++    homepage = "https://asteroidos.org/";
++    license = licenses.gpl3Plus;
++    mainProgram = "asteroid-launcher";
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/asteroid-launcher/display-on-startup.patch b/overlay/asteroidos/asteroid-launcher/display-on-startup.patch
+new file mode 100644
+index 00000000..6d842685
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/display-on-startup.patch
+@@ -0,0 +1,44 @@
++# Upstream reference:
++# https://github.com/AsteroidOS/asteroid-launcher/blob/master/lipstick/src/compositor/lipstickcompositor.cpp#L364-L375
++# LipstickCompositor requires DisplayOn to show and activate the compositor window.
++--- a/lipstick/src/compositor/lipstickcompositor.cpp
+++++ b/lipstick/src/compositor/lipstickcompositor.cpp
++@@ -364,7 +364,13 @@
++ void LipstickCompositor::initialize()
++ {
++     m_displayState = new QMceDisplay(this);
++-    reactOnDisplayStateChanges(m_displayState->state());
+++    QMceDisplay::State initialState = m_displayState->valid()
+++        ? m_displayState->state()
+++        : QMceDisplay::DisplayOn;
+++    m_currentDisplayState = QMceDisplay::DisplayOff;
+++    m_updatesEnabled = false;
+++    setUpdatesEnabled(initialState != QMceDisplay::DisplayOff);
+++    reactOnDisplayStateChanges(initialState);
++     connect(m_displayState, &QMceDisplay::stateChanged,
++             this, &LipstickCompositor::onDisplayStateChanged);
++ 
++@@ -588,13 +594,20 @@
++ 
++ void LipstickCompositor::reactOnDisplayStateChanges(QMceDisplay::State state)
++ {
++-    if (m_currentDisplayState == state) {
+++    if (m_currentDisplayState == state && m_window->isVisible()) {
++         return;
++     }
++ 
++-    if (state == QMceDisplay::DisplayOn) {
+++    if (state == QMceDisplay::DisplayOn || state == QMceDisplay::DisplayDim) {
+++        m_window->showFullScreen();
+++        if (m_window->handle()) {
+++            QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("DisplayOn");
+++        }
+++        emit displayAboutToBeOn();
++         m_window->setVisible(true);
++-        emit displayOn();
+++        if (state == QMceDisplay::DisplayOn) {
+++            emit displayOn();
+++        }
++     } else if (state == QMceDisplay::DisplayOff) {
++         QCoreApplication::postEvent(this, new QTouchEvent(QEvent::TouchCancel));
++         emit displayOff();
+diff --git a/overlay/asteroidos/asteroid-launcher/find-phone.patch b/overlay/asteroidos/asteroid-launcher/find-phone.patch
+new file mode 100644
+index 00000000..cb025507
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/find-phone.patch
+@@ -0,0 +1,60 @@
++--- a/src/qml/quickpanel/QuickPanel.qml
+++++ b/src/qml/quickpanel/QuickPanel.qml
++@@ -191,7 +191,7 @@
++     ConfigurationValue {
++         id: sliderToggles
++         key: "/desktop/asteroid/quickpanel/slider"
++-        defaultValue: ["brightnessToggle", "bluetoothToggle", "hapticsToggle", "wifiToggle", "soundToggle", "cinemaToggle", "aodToggle", "powerOffToggle", "rebootToggle", "musicButton", "flashlightButton"]
+++        defaultValue: ["brightnessToggle", "bluetoothToggle", "findPhoneToggle", "hapticsToggle", "wifiToggle", "soundToggle", "cinemaToggle", "aodToggle", "powerOffToggle", "rebootToggle", "musicButton", "flashlightButton"]
++     }
++ 
++     ConfigurationValue {
++@@ -207,6 +207,7 @@
++             "soundToggle": true,
++             "cinemaToggle": true,
++             "aodToggle": true,
+++            "findPhoneToggle": true,
++             "powerOffToggle": true,
++             "rebootToggle": true,
++             "musicButton": false,
++@@ -368,6 +369,7 @@
++             "cinemaToggle": cinemaToggleComponent,
++             "aodToggle": aodToggleComponent,
++             "powerOffToggle": powerOffToggleComponent,
+++            "findPhoneToggle": findPhoneToggleComponent,
++             "rebootToggle": rebootToggleComponent,
++             "musicButton": musicButtonComponent,
++             "flashlightButton": flashlightButtonComponent
++@@ -971,6 +973,32 @@
++             }
++         }
++     }
+++
+++    Component {
+++        id: findPhoneToggleComponent
+++        QuickPanelToggle {
+++            id: findPhoneToggle
+++            icon: "ios-phone-portrait"
+++            checkable: true
+++            checked: findPhoneDbus.isRinging
+++
+++            DBusInterface {
+++                id: findPhoneDbus
+++                service: "org.asteroidos.btsyncd"
+++                path: "/org/asteroidos/btsyncd/findphone"
+++                iface: "org.asteroidos.btsyncd.FindPhone"
+++                bus: DBus.SystemBus
+++                property bool isRinging: false
+++            }
+++
+++            onClicked: {
+++                findPhoneDbus.call("toggleRing", undefined)
+++                findPhoneDbus.call("isRinging", undefined, function(res) {
+++                    findPhoneDbus.isRinging = res
+++                })
+++            }
+++        }
+++    }
++ 
++     Component {
++         id: powerOffToggleComponent
+diff --git a/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf b/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
+new file mode 100644
+index 00000000..b8271665
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
+@@ -0,0 +1,28 @@
++<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
++ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
++<busconfig>
++  <!-- Allow root and the unprivileged session user (ceres) to own the compositor
++       and lipstick service names on the D-Bus system bus. -->
++  <policy user="root">
++    <allow own="org.nemomobile.lipstick"/>
++    <allow own="org.nemomobile.compositor"/>
++    <allow send_destination="org.nemomobile.lipstick"/>
++    <allow send_destination="org.nemomobile.compositor"/>
++    <allow receive_sender="org.nemomobile.lipstick"/>
++    <allow receive_sender="org.nemomobile.compositor"/>
++  </policy>
++  <policy user="ceres">
++    <allow own="org.nemomobile.lipstick"/>
++    <allow own="org.nemomobile.compositor"/>
++    <allow send_destination="org.nemomobile.lipstick"/>
++    <allow send_destination="org.nemomobile.compositor"/>
++    <allow receive_sender="org.nemomobile.lipstick"/>
++    <allow receive_sender="org.nemomobile.compositor"/>
++  </policy>
++  <policy context="default">
++    <allow send_destination="org.nemomobile.lipstick"/>
++    <allow send_destination="org.nemomobile.compositor"/>
++    <allow receive_sender="org.nemomobile.lipstick"/>
++    <allow receive_sender="org.nemomobile.compositor"/>
++  </policy>
++</busconfig>
+diff --git a/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+new file mode 100644
+index 00000000..7720139e
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
+@@ -0,0 +1,109 @@
++# Bring-up diagnostics: report what actually made it into the compositor scene.
++#
++# A black screen with a live render loop (frames swapping while the renderer
++# reports no geometry) means the QML tree came up empty, and lipstick's own
++# loader only reports that through the default logging category. These lines
++# make the three stages observable in launcher.log: the compositor root and its
++# scene size, the home screen Loader, and the watchface Loader.
++--- a/src/qml/compositor/compositor.qml
+++++ b/src/qml/compositor/compositor.qml
++@@ -44,6 +44,10 @@
++     height: Dims.h(100)
++     rotation: Screen.angleBetween(Screen.primaryScreen, Lipstick.compositor.screenOrientation)
++ 
+++    Component.onCompleted: console.info("compositor: scene root", width, "x", height,
+++                                        "round screen:", DeviceSpecs.hasRoundScreen,
+++                                        "orientation:", rotation)
+++
++     // The home screen is a persistent item at the bottom of the z-stack, not
++     // an in-process "window". Its z follows MainScreen's own z (raised while
++     // the splash is up) so it can sit above running apps when needed.
++@@ -57,6 +61,15 @@
++             anchors.fill: parent
++             source: "MainScreen.qml"
++             onLoaded: item.aboutToOpen = Qt.binding(function() { return !comp.homeActive && !appLayer.ready })
+++
+++            // A failing Loader leaves the scene empty and the screen black with
+++            // no further trace, so name the stage that failed.
+++            onStatusChanged: {
+++                if (status === Loader.Ready)
+++                    console.info("compositor: home screen loaded,", width, "x", height)
+++                else if (status === Loader.Error)
+++                    console.warn("compositor: home screen failed to load (see the QML error above)")
+++            }
++         }
++     }
++ 
++--- a/src/qml/MainScreen.qml
+++++ b/src/qml/MainScreen.qml
++@@ -113,6 +113,9 @@
++         lipstickSettings.lockScreen(true)
++         if(firstRun.isFirstRun())
++             firstRunComponent.createObject(desktop)
+++        console.info("launcher: home screen", width, "x", height, "visible:", visible,
+++                     "dims:", Dims.w(100), "x", Dims.h(100),
+++                     "first run:", firstRun.isFirstRun())
++     }
++ 
++     Splash {
++@@ -387,6 +390,14 @@
++                 anchors.fill: parent
++                 source: watchfaceNightstandSource.value
++                 Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InCirc } }
+++                onStatusChanged: {
+++                    if (status === Loader.Error) {
+++                        var defaultFace = "file:///run/current-system/sw/share/asteroid-launcher/watchfaces/000-default-digital.qml"
+++                        if (source.toString() !== defaultFace) {
+++                            source = defaultFace
+++                        }
+++                    }
+++                }
++             }
++             Loader {
++                 id: watchfaceLoader
++@@ -396,6 +407,17 @@
++                 anchors.fill: parent
++                 source: watchFaceSource.value
++ 
+++                onStatusChanged: {
+++                    console.info("launcher: watchface", source, "status:", status)
+++                    if (status === Loader.Error) {
+++                        var defaultFace = "file:///run/current-system/sw/share/asteroid-launcher/watchfaces/000-default-digital.qml"
+++                        if (source.toString() !== defaultFace) {
+++                            console.warn("launcher: watchface failed to load, falling back to default:", defaultFace)
+++                            source = defaultFace
+++                        }
+++                    }
+++                }
+++
++                 // Reinstantiate to re-read the source from disk. Toggling the
++                 // Loader instead of rewriting the dconf-backed watchFaceSource
++                 // avoids a cross-process write that can clobber a concurrent
++@@ -433,6 +455,12 @@
++             onStatusChanged: {
++                 if (appLauncher.status == Loader.Ready) {
++                     Desktop.appLauncher = appLauncher.item
+++                } else if (appLauncher.status == Loader.Error) {
+++                    var defaultLauncher = "file:///run/current-system/sw/share/asteroid-launcher/applauncher/000-default-horizontal.qml"
+++                    if (source.toString() !== defaultLauncher) {
+++                        console.warn("launcher: appLauncher failed to load, falling back to default:", defaultLauncher)
+++                        source = defaultLauncher
+++                    }
++                 }
++             }
++         }
++@@ -528,6 +556,15 @@
++         Loader {
++             id: wallpaperLoader
++             anchors.fill: parent
+++            onStatusChanged: {
+++                if (status === Loader.Error) {
+++                    var defaultWallpaper = "file:///run/current-system/sw/share/asteroid-launcher/wallpapers/full/000-flatmesh.qml"
+++                    if (source.toString() !== defaultWallpaper) {
+++                        console.warn("launcher: wallpaper failed to load, falling back to default:", defaultWallpaper)
+++                        source = defaultWallpaper
+++                    }
+++                }
+++            }
++         }
++     }
+diff --git a/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch b/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
+new file mode 100644
+index 00000000..c8fc8896
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
+@@ -0,0 +1,54 @@
++--- a/src/qml/misc/Splash.qml
+++++ b/src/qml/misc/Splash.qml
++@@ -30,7 +30,6 @@
++ 
++ import QtQuick
++ import org.asteroid.controls
++-import Qt5Compat.GraphicalEffects
++ 
++ Item {
++     anchors.fill: parent
++@@ -42,7 +41,6 @@
++         onTriggered: {
++             background.opacity = 0
++             logoTransform.scale = 14
++-            cutout.width = Dims.w(150)
++         }
++     }
++     Rectangle {
++@@ -60,8 +58,8 @@
++     Rectangle {
++         id: logo
++         anchors.fill: parent
++-        color: "black"
++-        visible: false
+++        color: "transparent"
+++        visible: true
++         Image {
++             property var logoSize: (parent.width > parent.height ? parent.height : parent.width) * 0.55
++             id: logoSvg
++@@ -80,24 +78,4 @@
++             }
++         }
++     }
++-    Item {
++-        id: mask
++-        anchors.fill: parent
++-        visible: false
++-        Rectangle {
++-            id: cutout
++-            width: 1
++-            height: width
++-            anchors.centerIn: parent
++-            anchors.verticalCenterOffset: -Dims.h(5)
++-            radius: parent.width / 2
++-            Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.InQuint } }
++-        }
++-    }
++-    OpacityMask {
++-        anchors.fill: logo
++-        source: logo
++-        maskSource: mask
++-        invert: true
++-    }
++ }
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index b38652d7..2901c4b7 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -49,8 +49,26 @@ rec {
+     libudev = pkgs.udev;
+   };
+ 
++  asteroid-launcher = callPackage ./asteroid-launcher {
++    inherit
++      qml-asteroid
++      mlite
++      mce-dev
++      mce-qt6
++      ngf-qt6
++      usb-moded-qt6
++      keepalive
++      timed-qt6
++      noUsrShareHook
++      ;
++  };
++
+   amber-mpris = callPackage ./amber-mpris { };
+   mlite = callPackage ./mlite { };
++  nemo-qml-plugin-configuration = callPackage ./nemo-qml-plugin-configuration {
++    inherit mlite;
++  };
++  nemo-qml-plugin-dbus = callPackage ./nemo-qml-plugin-dbus { };
+   libconnman-qt = callPackage ./libconnman-qt { };
+   libiodata = callPackage ./libiodata { };
+   mce-dev = callPackage ./mce-dev { };
+diff --git a/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
+new file mode 100644
+index 00000000..214fc9e5
+--- /dev/null
++++ b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
+@@ -0,0 +1,69 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++  mlite,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "nemo-qml-plugin-configuration";
++  version = "nightly";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-qml-plugin-configuration";
++    rev = "b8ff8957f7ed9d2e3fceffc782434f2609768686";
++    hash = "sha256-KYmzafNLN+lhX45qazzZEjrEK251lOi4o6Qlas6/11g=";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    mlite
++  ];
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  postPatch = ''
++    cat > CMakeLists.txt <<'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(nemo-qml-plugin-configuration LANGUAGES CXX)
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_AUTOMOC ON)
++    find_package(Qt6 REQUIRED COMPONENTS Core Qml)
++    find_package(PkgConfig REQUIRED)
++    pkg_check_modules(MLITE REQUIRED IMPORTED_TARGET mlite6)
++    add_library(nemoconfiguration MODULE
++      src/plugin.cpp
++      src/configurationgroup.cpp
++      src/configurationvalue.cpp
++    )
++    target_include_directories(nemoconfiguration PRIVATE src ''${MLITE_INCLUDE_DIRS})
++    target_link_libraries(nemoconfiguration PRIVATE Qt6::Core Qt6::Qml PkgConfig::MLITE)
++    install(TARGETS nemoconfiguration LIBRARY DESTINATION lib/qt-6/qml/Nemo/Configuration)
++    install(FILES src/qmldir src/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/Configuration)
++    EOF
++  '';
++
++  meta = with lib; {
++    description = "Nemo configuration QML plugin";
++    homepage = "https://github.com/sailfishos/nemo-qml-plugin-configuration";
++    license = licenses.bsd3;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
+new file mode 100644
+index 00000000..9cad05fc
+--- /dev/null
++++ b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
+@@ -0,0 +1,80 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "nemo-qml-plugin-dbus";
++  version = "2.1.39";
++
++  src = fetchFromGitHub {
++    owner = "sailfishos";
++    repo = "nemo-qml-plugin-dbus";
++    rev = "df6e2415fe70e1844067f93b3216ca0442f17c8e";
++    sha256 = "0s7v5v4jixl07psb0y9wkq2zj168pr29v1g7fwyj5wjn9m76xrjc";
++  };
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++  ];
++
++  cmakeFlags = [
++    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++  ];
++
++  postPatch = ''
++    cat > CMakeLists.txt <<'EOF'
++    cmake_minimum_required(VERSION 3.16)
++    project(nemo-qml-plugin-dbus LANGUAGES CXX)
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_AUTOMOC ON)
++    find_package(Qt6 REQUIRED COMPONENTS Core DBus Qml)
++
++    file(GLOB CORE_HEADERS src/nemo-dbus/*.h src/nemo-dbus/private/*.h)
++    file(GLOB CORE_SOURCES src/nemo-dbus/*.cpp src/nemo-dbus/private/*.cpp)
++
++    add_library(nemodbus-core STATIC
++      ''${CORE_SOURCES}
++      ''${CORE_HEADERS}
++    )
++    target_include_directories(nemodbus-core PUBLIC src src/nemo-dbus src/nemo-dbus/private)
++    target_link_libraries(nemodbus-core PUBLIC Qt6::Core Qt6::DBus)
++    set_target_properties(nemodbus-core PROPERTIES POSITION_INDEPENDENT_CODE ON)
++
++    file(GLOB PLUGIN_HEADERS src/plugin/*.h)
++    file(GLOB PLUGIN_SOURCES src/plugin/*.cpp)
++
++    add_library(nemodbus MODULE
++      ''${PLUGIN_SOURCES}
++      ''${PLUGIN_HEADERS}
++    )
++    target_include_directories(nemodbus PRIVATE src src/plugin src/nemo-dbus src/nemo-dbus/private)
++    target_link_libraries(nemodbus PRIVATE Qt6::Core Qt6::DBus Qt6::Qml nemodbus-core)
++    target_link_options(nemodbus PRIVATE -Wl,--no-undefined)
++    install(TARGETS nemodbus LIBRARY DESTINATION lib/qt-6/qml/Nemo/DBus)
++    install(FILES src/plugin/qmldir src/plugin/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/DBus)
++    EOF
++  '';
++
++  meta = with lib; {
++    description = "Nemo D-Bus QML plugin";
++    homepage = "https://github.com/sailfishos/nemo-qml-plugin-dbus";
++    license = licenses.lgpl21Plus;
++    platforms = platforms.linux;
++  };
++})

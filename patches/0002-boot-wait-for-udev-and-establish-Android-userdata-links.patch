@@ -1,0 +1,115 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:55:45 +1100
+Subject: [PATCH] boot: wait for udev and establish Android userdata links
+
+---
+ boot/init/tasks/udev.rb | 83 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 81 insertions(+), 2 deletions(-)
+
+diff --git a/boot/init/tasks/udev.rb b/boot/init/tasks/udev.rb
+index ff0f068a..4549e782 100644
+--- a/boot/init/tasks/udev.rb
++++ b/boot/init/tasks/udev.rb
+@@ -22,14 +22,91 @@ class Tasks::UDev < SingletonTask
+ 
+   def run()
+     udevd
+-    udevadm("trigger", "--action=add")
+-    udevadm("settle")
++
++    ensure_partition_links
++
++    begin
++      udevadm("trigger", "--action=add", "--subsystem-match=platform", "--subsystem-match=mmc", "--subsystem-match=block", "--subsystem-match=input", "--subsystem-match=graphics")
++    rescue System::CommandError => e
++      $logger.warn("udevadm trigger non-fatal warning (proceeding): #{e.message}")
++    end
++
++    if File.exist?("/dev/disk/by-label/NIXOS_SYSTEM")
++      begin
++        udevadm("settle", "--timeout=1")
++      rescue System::CommandError
++      end
++    else
++      begin
++        udevadm("settle", "--timeout=5")
++      rescue System::CommandError => e
++        $logger.warn("udevadm settle non-fatal timeout (proceeding): #{e.message}")
++      end
++      ensure_partition_links
++    end
++  end
++
++  def ensure_partition_links()
++    FileUtils.mkdir_p("/dev/disk/by-partlabel")
++    FileUtils.mkdir_p("/dev/disk/by-label")
++
++    cmdline_candidates = []
++    System.cmdline.each do |arg|
++      if arg.start_with?("datapart=")
++        cmdline_candidates << arg.split("=", 2).last
++      elsif arg.start_with?("userdata=")
++        cmdline_candidates << arg.split("=", 2).last
++      end
++    end
++
++    config_candidate = Configuration["partitions"] && Configuration["partitions"]["userdata"]
++
++    candidates = cmdline_candidates + [
++      config_candidate,
++      "/dev/block/bootdevice/by-name/userdata",
++      "/dev/block/by-name/userdata",
++    ].compact
++
++    candidates.each do |candidate|
++      if File.exist?(candidate)
++        unless File.exist?("/dev/disk/by-partlabel/userdata")
++          System.symlink(candidate, "/dev/disk/by-partlabel/userdata")
++        end
++        unless File.exist?("/dev/disk/by-label/NIXOS_SYSTEM")
++          System.symlink(candidate, "/dev/disk/by-label/NIXOS_SYSTEM")
++        end
++        break
++      end
++    end
++
++    Dir.glob("/sys/class/block/*/uevent").each do |uevent|
++      content = File.read(uevent) rescue ""
++      if content.include?("PARTNAME=userdata") || content.include?("PARTNAME=USERDATA")
++        devname = content[/DEVNAME=(\S+)/, 1]
++        if devname && File.exist?("/dev/#{devname}")
++          unless File.exist?("/dev/disk/by-partlabel/userdata")
++            System.symlink("/dev/#{devname}", "/dev/disk/by-partlabel/userdata")
++          end
++          unless File.exist?("/dev/disk/by-label/NIXOS_SYSTEM")
++            System.symlink("/dev/#{devname}", "/dev/disk/by-label/NIXOS_SYSTEM")
++          end
++        end
++      end
++    end
++
++    if File.exist?("/dev/disk/by-partlabel/userdata") && !File.exist?("/dev/disk/by-label/NIXOS_SYSTEM")
++      System.symlink("/dev/disk/by-partlabel/userdata", "/dev/disk/by-label/NIXOS_SYSTEM")
++    end
+   end
+ 
+   def udevd()
+     *args = []
+     args << "--debug" if debug?
+     System.run("systemd-udevd", "--daemon", *args)
++    20.times do
++      break if File.exist?("/run/udev/control")
++      sleep(0.1)
++    end
+   end
+ 
+   # TODO: Allow configuring its debug state
+@@ -39,5 +116,7 @@ class Tasks::UDev < SingletonTask
+ 
+   def teardown()
+     udevadm("control", "--exit")
++  rescue System::CommandError => e
++    $logger.warn("udevadm control --exit failed; udevd may already be stopped: #{e.message}")
+   end
+ end

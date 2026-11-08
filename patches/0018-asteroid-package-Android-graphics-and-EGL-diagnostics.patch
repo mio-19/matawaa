@@ -1,0 +1,896 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:55:51 +1100
+Subject: [PATCH] asteroid: package Android graphics and EGL diagnostics
+
+---
+ overlay/asteroidos/default.nix                |  12 +
+ overlay/asteroidos/egl-probe/default.nix      |  35 +++
+ overlay/asteroidos/egl-probe/egl-probe.c      | 123 +++++++++
+ .../qt6-qpa-hwcomposer-plugin/default.nix     | 256 ++++++++++++++++++
+ .../hwc-present-diagnostics.patch             | 204 ++++++++++++++
+ ...failing-test-for-wayland-less-builds.patch |  24 --
+ overlay/libhybris/default.nix                 |  53 +++-
+ overlay/oans/default.nix                      |  61 +++++
+ 8 files changed, 732 insertions(+), 36 deletions(-)
+ create mode 100644 overlay/asteroidos/egl-probe/default.nix
+ create mode 100644 overlay/asteroidos/egl-probe/egl-probe.c
+ create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+ create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
+ delete mode 100644 overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
+ create mode 100644 overlay/oans/default.nix
+
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index 5af72dfb..b38652d7 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -39,6 +39,16 @@ rec {
+       ;
+   };
+ 
++  qt6-qpa-hwcomposer-plugin = callPackage ./qt6-qpa-hwcomposer-plugin {
++    inherit (pkgs)
++      libhybris
++      glib
++      mtdev
++      ;
++    inherit metaAsteroidSrc;
++    libudev = pkgs.udev;
++  };
++
+   amber-mpris = callPackage ./amber-mpris { };
+   mlite = callPackage ./mlite { };
+   libconnman-qt = callPackage ./libconnman-qt { };
+@@ -77,6 +87,8 @@ rec {
+ 
+   # Device state machine daemon MCE talks to.
+   # Upstream: https://github.com/sailfishos/dsme
++  egl-probe = callPackage ./egl-probe { };
++
+   dsme = callPackage ./dsme {
+     inherit
+       metaAsteroidSrc
+diff --git a/overlay/asteroidos/egl-probe/default.nix b/overlay/asteroidos/egl-probe/default.nix
+new file mode 100644
+index 00000000..81ca384f
+--- /dev/null
++++ b/overlay/asteroidos/egl-probe/default.nix
+@@ -0,0 +1,35 @@
++# Diagnostic binary used by the debug launcher service to report the EGL
++# config inventory of libhybris' hwcomposer platform.
++{
++  lib,
++  stdenv,
++  libhybris,
++}:
++
++stdenv.mkDerivation {
++  pname = "egl-probe";
++  version = "0";
++
++  src = ./.;
++
++  buildPhase = ''
++    runHook preBuild
++    $CC -O2 -Wall -o egl-probe egl-probe.c \
++      -I${libhybris}/include \
++      -L${libhybris}/lib \
++      -Wl,-rpath,${libhybris}/lib \
++      -lEGL
++    runHook postBuild
++  '';
++
++  installPhase = ''
++    runHook preInstall
++    install -Dm755 egl-probe $out/bin/egl-probe
++    runHook postInstall
++  '';
++
++  meta = with lib; {
++    description = "EGL config inventory probe for libhybris hwcomposer";
++    platforms = platforms.linux;
++  };
++}
+diff --git a/overlay/asteroidos/egl-probe/egl-probe.c b/overlay/asteroidos/egl-probe/egl-probe.c
+new file mode 100644
+index 00000000..c8c7f189
+--- /dev/null
++++ b/overlay/asteroidos/egl-probe/egl-probe.c
+@@ -0,0 +1,123 @@
++/* Diagnostic: dump the EGL display/config inventory from the launcher's
++ * environment (libhybris EGL, EGL_PLATFORM=hwcomposer). Run as an
++ * ExecStartPre of asteroid-launcher so the output lands in launcher.log. */
++#include <EGL/egl.h>
++#include <stdio.h>
++#include <unistd.h>
++
++static const char *errname(EGLint e)
++{
++    switch (e) {
++    case EGL_SUCCESS: return "SUCCESS";
++    case EGL_NOT_INITIALIZED: return "NOT_INITIALIZED";
++    case EGL_BAD_ACCESS: return "BAD_ACCESS";
++    case EGL_BAD_ALLOC: return "BAD_ALLOC";
++    case EGL_BAD_ATTRIBUTE: return "BAD_ATTRIBUTE";
++    case EGL_BAD_CONFIG: return "BAD_CONFIG";
++    case EGL_BAD_CONTEXT: return "BAD_CONTEXT";
++    case EGL_BAD_CURRENT_SURFACE: return "BAD_CURRENT_SURFACE";
++    case EGL_BAD_DISPLAY: return "BAD_DISPLAY";
++    case EGL_BAD_MATCH: return "BAD_MATCH";
++    case EGL_BAD_NATIVE_PIXMAP: return "BAD_NATIVE_PIXMAP";
++    case EGL_BAD_NATIVE_WINDOW: return "BAD_NATIVE_WINDOW";
++    case EGL_BAD_PARAMETER: return "BAD_PARAMETER";
++    case EGL_BAD_SURFACE: return "BAD_SURFACE";
++    case EGL_CONTEXT_LOST: return "CONTEXT_LOST";
++    default: return "?";
++    }
++}
++
++static int get(EGLDisplay d, EGLConfig c, EGLint attr)
++{
++    EGLint v = -1;
++    eglGetConfigAttrib(d, c, attr, &v);
++    return v;
++}
++
++int main(void)
++{
++    EGLDisplay d = eglGetDisplay(EGL_DEFAULT_DISPLAY);
++    printf("egl-probe: display=%p\n", (void *)d);
++    if (d == EGL_NO_DISPLAY) {
++        EGLint e = eglGetError();
++        printf("egl-probe: eglGetDisplay failed 0x%x (%s)\n", e, errname(e));
++        return 1;
++    }
++
++    EGLint maj = 0, min = 0;
++    if (!eglInitialize(d, &maj, &min)) {
++        EGLint e = eglGetError();
++        printf("egl-probe: eglInitialize failed 0x%x (%s)\n", e, errname(e));
++        return 1;
++    }
++    printf("egl-probe: EGL %d.%d vendor=%s version=%s apis=%s\n",
++           maj, min,
++           eglQueryString(d, EGL_VENDOR),
++           eglQueryString(d, EGL_VERSION),
++           eglQueryString(d, EGL_CLIENT_APIS));
++
++    EGLint n = 0;
++    eglGetConfigs(d, NULL, 0, &n);
++    printf("egl-probe: configs=%d\n", n);
++    if (n > 0 && n <= 4096) {
++        static EGLConfig cfgs[4096];
++        eglGetConfigs(d, cfgs, n, &n);
++        for (EGLint i = 0; i < n; i++) {
++            printf("egl-probe: cfg id=%d rgba=%d/%d/%d/%d depth=%d stencil=%d samples=%d surface=0x%x renderable=0x%x caveat=0x%x\n",
++                   get(d, cfgs[i], EGL_CONFIG_ID),
++                   get(d, cfgs[i], EGL_RED_SIZE),
++                   get(d, cfgs[i], EGL_GREEN_SIZE),
++                   get(d, cfgs[i], EGL_BLUE_SIZE),
++                   get(d, cfgs[i], EGL_ALPHA_SIZE),
++                   get(d, cfgs[i], EGL_DEPTH_SIZE),
++                   get(d, cfgs[i], EGL_STENCIL_SIZE),
++                   get(d, cfgs[i], EGL_SAMPLES),
++                   get(d, cfgs[i], EGL_SURFACE_TYPE),
++                   get(d, cfgs[i], EGL_RENDERABLE_TYPE),
++                   get(d, cfgs[i], EGL_CONFIG_CAVEAT));
++        }
++    }
++
++    /* Exactly what qt6-qpa-hwcomposer-plugin's HwComposerContext forces for a
++     * 32-bit screen: RGBA8888 + depth 24 + stencil 8, ES2, window surface. */
++    EGLint strict[] = {
++        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
++        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
++        EGL_RED_SIZE, 8,
++        EGL_GREEN_SIZE, 8,
++        EGL_BLUE_SIZE, 8,
++        EGL_ALPHA_SIZE, 8,
++        EGL_DEPTH_SIZE, 24,
++        EGL_STENCIL_SIZE, 8,
++        EGL_SAMPLES, 0,
++        EGL_NONE
++    };
++    EGLConfig c = NULL;
++    EGLint m = 0;
++    EGLBoolean ok = eglChooseConfig(d, strict, &c, 1, &m);
++    {
++        EGLint e = eglGetError();
++        printf("egl-probe: chooseConfig(strict rgba8888/stencil8)=%d matched=%d err=0x%x (%s)\n",
++               ok, m, e, errname(e));
++    }
++
++    EGLint relaxed[] = {
++        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
++        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
++        EGL_RED_SIZE, 8,
++        EGL_GREEN_SIZE, 8,
++        EGL_BLUE_SIZE, 8,
++        EGL_NONE
++    };
++    ok = eglChooseConfig(d, relaxed, &c, 1, &m);
++    {
++        EGLint e = eglGetError();
++        printf("egl-probe: chooseConfig(relaxed rgb888)=%d matched=%d err=0x%x (%s)\n",
++               ok, m, e, errname(e));
++    }
++
++    /* Note: Calling eglTerminate(d) under libhybris hwcomposer can hang or deadlock
++     * in the Android HWC teardown/vsync worker thread. Flush and exit immediately. */
++    fflush(stdout);
++    _exit(0);
++}
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+new file mode 100644
+index 00000000..8aebcdd9
+--- /dev/null
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+@@ -0,0 +1,256 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  fetchurl,
++  runCommand,
++  cmake,
++  pkg-config,
++  qt6,
++  buildPackages,
++  libhybris,
++  libudev,
++  glib,
++  mtdev,
++  metaAsteroidSrc,
++}:
++
++let
++  # HWC2 was introduced after the Android 6 headers in android-headers 23.
++  # Supplement the device headers with HWC2 declarations. Native window and
++  # gralloc types must still come from the exact headers used by libhybris:
++  # mixing Android 6 and Pie changes the C++ buffer base offset on ARM.
++  hwc2Headers = runCommand "android-hwc2-headers" { } ''
++    mkdir -p $out/include/hardware
++    cp ${
++      fetchurl {
++        url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hardware.h";
++        sha256 = "1s5f4gxmqhd4xfddwaiw9q8csjnk8fcmb02370v7xj6n100jzk05";
++      }
++    } $out/include/hardware/hardware.h
++    cp ${
++      fetchurl {
++        url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer_defs.h";
++        sha256 = "1far10f35b95apgqdasmpl7jgdqm51j5xjwzsgj3h59n5n1almhi";
++      }
++    } $out/include/hardware/hwcomposer_defs.h
++    cp ${
++      fetchurl {
++        url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer.h";
++        sha256 = "12i9w601lnsli38wnwal81zzvfr4x6ynlxhm2crd1qwhw29jwqz7";
++      }
++    } $out/include/hardware/hwcomposer.h
++    cp ${
++      fetchurl {
++        url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer2.h";
++        sha256 = "0f2vp1mqvn7psvx0xhdfspxjf07f4gr42wprkv1l8n5llfxqklgd";
++      }
++    } $out/include/hardware/hwcomposer2.h
++  '';
++in
++stdenv.mkDerivation (finalAttrs: {
++  pname = "qt6-qpa-hwcomposer-plugin";
++  version = "6.3.0+git";
++
++  src = fetchFromGitHub {
++    owner = "mer-hybris";
++    repo = "qt5-qpa-hwcomposer-plugin";
++    rev = "998956aebe21ac7ba6e7315d1c12e6e11c93d742";
++    hash = "sha256-AOannPAXLDEUedz6KFLvLZE92VbhgNG1vdxDRbJLhaw=";
++  };
++
++  sourceRoot = "source/hwcomposer";
++  patchFlags = [ "-p2" ];
++
++  patches = [
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0001-Add-ambient-mode-display-support.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0003-Support-Qt-6.10.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0005-Explicitly-make-hwcomposer-a-shared-library.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0006-v10-Fix-refresh-rate-fallback-unit.patch"
++    "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0007-v10-Make-updates-request-driven-and-vsync-paced.patch"
++    ./hwc-present-diagnostics.patch
++  ];
++
++  strictDeps = true;
++  dontWrapQtApps = true;
++
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++  ];
++
++  buildInputs = [
++    qt6.qtbase
++    qt6.qtdeclarative
++    qt6.qtwayland
++    libhybris
++    libhybris.androidHeaders
++    hwc2Headers
++    libudev
++    glib
++    mtdev
++  ];
++
++  cmakeFlags = [
++    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
++    "-DQt6QuickTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QuickTools"
++  ];
++
++  postPatch = ''
++    substituteInPlace main.cpp \
++      --replace-fail 'Q_PLUGIN_METADATA(IID QPlatformIntegrationFactoryInterface_iid FILE "hwcomposer.json")' \
++                     'Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QPA.QPlatformIntegrationFactoryInterface.5.3" FILE "hwcomposer.json")'
++
++    substituteInPlace hwcomposer_backend.cpp \
++      --replace-fail 'pwr_module->init(pwr_module);' 'if (pwr_module->init) pwr_module->init(pwr_module);' \
++      --replace-fail 'pwr_module->powerHint(pwr_module, POWER_HINT_INTERACTION, NULL);' 'if (pwr_module->powerHint) pwr_module->powerHint(pwr_module, POWER_HINT_INTERACTION, NULL);'
++
++    substituteInPlace hwcomposer_backend_v20.cpp \
++      --replace-fail 'pwr_device->setInteractive(pwr_device, false);' 'if (pwr_device->setInteractive) pwr_device->setInteractive(pwr_device, false);' \
++      --replace-fail 'pwr_device->setInteractive(pwr_device, true);' 'if (pwr_device->setInteractive) pwr_device->setInteractive(pwr_device, true);'
++
++    # Embed precompiled Qt 6 GraphicalEffects shaders (.qsb) into the QPA plugin
++    # so they are registered in memory (qrc:/qt-project.org/imports/Qt5Compat/GraphicalEffects/shaders_ng/*)
++    # when asteroid-launcher loads the hwcomposer QPA platform plugin.
++    tar -xf ${qt6.qt5compat.src} --strip-components=4 "qt5compat-everywhere-src-${qt6.qt5compat.version}/src/imports/graphicaleffects5/shaders_ng"
++    cat > shaders.qrc << 'QRC'
++<RCC>
++    <qresource prefix="/qt-project.org/imports/Qt5Compat/GraphicalEffects">
++        <file>shaders_ng/brightnesscontrast.frag.qsb</file>
++        <file>shaders_ng/colorize.frag.qsb</file>
++        <file>shaders_ng/coloroverlay.frag.qsb</file>
++        <file>shaders_ng/conicalgradient_mask.frag.qsb</file>
++        <file>shaders_ng/conicalgradient_nomask.frag.qsb</file>
++        <file>shaders_ng/desaturate.frag.qsb</file>
++        <file>shaders_ng/displace.frag.qsb</file>
++        <file>shaders_ng/fastblur.frag.qsb</file>
++        <file>shaders_ng/fastblur_internal.frag.qsb</file>
++        <file>shaders_ng/fastblur_internal.vert.qsb</file>
++        <file>shaders_ng/fastinnershadow.frag.qsb</file>
++        <file>shaders_ng/fastinnershadow_level0.frag.qsb</file>
++        <file>shaders_ng/fastglow.frag.qsb</file>
++        <file>shaders_ng/gammaadjust.frag.qsb</file>
++        <file>shaders_ng/gaussianinnershadow.frag.qsb</file>
++        <file>shaders_ng/gaussianinnershadow_shadow.frag.qsb</file>
++        <file>shaders_ng/huesaturation.frag.qsb</file>
++        <file>shaders_ng/leveladjust.frag.qsb</file>
++        <file>shaders_ng/lineargradient.vert.qsb</file>
++        <file>shaders_ng/lineargradient_mask.frag.qsb</file>
++        <file>shaders_ng/lineargradient_nomask.frag.qsb</file>
++        <file>shaders_ng/opacitymask.frag.qsb</file>
++        <file>shaders_ng/opacitymask_invert.frag.qsb</file>
++        <file>shaders_ng/radialgradient.vert.qsb</file>
++        <file>shaders_ng/radialgradient_mask.frag.qsb</file>
++        <file>shaders_ng/radialgradient_nomask.frag.qsb</file>
++        <file>shaders_ng/recursiveblur.vert.qsb</file>
++        <file>shaders_ng/recursiveblur.frag.qsb</file>
++        <file>shaders_ng/rectangularglow.frag.qsb</file>
++        <file>shaders_ng/thresholdmask.frag.qsb</file>
++    </qresource>
++</RCC>
++QRC
++    ${buildPackages.qt6.qtbase}/libexec/rcc shaders.qrc -o qrc_shaders.cpp
++
++    cat > CMakeLists.txt <<EOF
++    cmake_minimum_required(VERSION 3.16)
++    project(hwcomposer LANGUAGES CXX)
++    set(CMAKE_CXX_STANDARD 17)
++    set(CMAKE_AUTOMOC ON)
++
++    find_package(Qt6 REQUIRED COMPONENTS Core Gui DBus OpenGL WaylandCompositor)
++    find_package(PkgConfig REQUIRED)
++    pkg_check_modules(GLIB REQUIRED glib-2.0)
++    pkg_check_modules(LIBUDEV REQUIRED libudev)
++    pkg_check_modules(MTDEV REQUIRED mtdev)
++
++    add_library(hwcomposer MODULE
++      main.cpp
++      hwcomposer_context.cpp
++      hwcomposer_screeninfo.cpp
++      hwcomposer_backend.cpp
++      hwcomposer_backend_v0.cpp
++      hwcomposer_backend_v10.cpp
++      hwcomposer_backend_v11.cpp
++      hwcomposer_backend_v20.cpp
++      qeglfsbackingstore.cpp
++      qeglfscontext.cpp
++      qeglfsintegration.cpp
++      qeglfsscreen.cpp
++      qeglfswindow.cpp
++      qrc_shaders.cpp
++    )
++
++    target_include_directories(hwcomposer PRIVATE
++      .
++      ${hwc2Headers}/include
++      ${libhybris.androidHeadersInclude}
++      ${libhybris.androidHeadersInclude}/hardware
++      ${libhybris}/include
++      ${libhybris}/include/hybris/eglplatformcommon
++      ${libhybris}/include/hybris/platformcommon
++      ${libhybris}/include/hybris/hwcomposerwindow
++      ${qt6.qtbase}/include/QtCore/${qt6.qtbase.version}
++      ${qt6.qtbase}/include/QtCore/${qt6.qtbase.version}/QtCore
++      ${qt6.qtbase}/include/QtGui/${qt6.qtbase.version}
++      ${qt6.qtbase}/include/QtGui/${qt6.qtbase.version}/QtGui
++      ${qt6.qtbase}/include/QtGui/${qt6.qtbase.version}/QtGui/private
++      ${qt6.qtbase.dev}/include/QtCore/${qt6.qtbase.version}
++      ${qt6.qtbase.dev}/include/QtGui/${qt6.qtbase.version}
++      ${qt6.qtbase.dev}/include/QtGui/${qt6.qtbase.version}/QtGui
++      ${qt6.qtwayland.dev}/include/QtWaylandCompositor/${qt6.qtwayland.version}
++      ${qt6.qtwayland.dev}/include/QtWaylandCompositor/${qt6.qtwayland.version}/QtWaylandCompositor
++      ''${GLIB_INCLUDE_DIRS}
++      ''${LIBUDEV_INCLUDE_DIRS}
++      ''${MTDEV_INCLUDE_DIRS}
++    )
++    target_compile_definitions(hwcomposer PRIVATE
++      QCOM_BSP
++      QEGL_EXTRA_DEBUG
++      MESA_EGL_NO_X11_HEADERS
++      QT_OPENGL_ES_2
++      GL_GLEXT_PROTOTYPES
++      HWC_PLUGIN_HAVE_HWCOMPOSER1_API
++      HWC_PLUGIN_HAVE_HWCOMPOSER2_API
++    )
++    target_compile_options(hwcomposer PRIVATE
++      "SHELL:-include stddef.h"
++      "SHELL:-include ${hwc2Headers}/include/hardware/hardware.h"
++      "SHELL:-include ${hwc2Headers}/include/hardware/hwcomposer_defs.h"
++      "SHELL:-include ${hwc2Headers}/include/hardware/hwcomposer.h"
++    )
++    target_link_libraries(hwcomposer PRIVATE
++      Qt6::Core
++      Qt6::Gui
++      Qt6::DBus
++      Qt6::OpenGL
++      Qt6::WaylandCompositor
++      ''${GLIB_LIBRARIES}
++      ''${LIBUDEV_LIBRARIES}
++      ''${MTDEV_LIBRARIES}
++      ${libhybris}/lib/libEGL.so.1
++      ${libhybris}/lib/libGLESv2.so.2
++      ${libhybris}/lib/libhybris-common.so.1
++      ${libhybris}/lib/libsync.so.2
++      ${libhybris}/lib/libhardware.so.2.0.0
++      ${libhybris}/lib/libhwc2.so.1.0.0
++      ${libhybris}/lib/libhybris-eglplatformcommon.so.1.0.0
++      ${libhybris}/lib/libhybris-hwcomposerwindow.so.1.0.0
++    )
++
++    install(TARGETS hwcomposer LIBRARY DESTINATION lib/qt-6/plugins/platforms)
++EOF
++  '';
++
++  postFixup = ''
++    ${buildPackages.patchelf}/bin/patchelf \
++      --set-rpath "${libhybris}/lib:$(${buildPackages.patchelf}/bin/patchelf --print-rpath $out/lib/qt-6/plugins/platforms/libhwcomposer.so)" \
++      $out/lib/qt-6/plugins/platforms/libhwcomposer.so
++  '';
++
++  meta = with lib; {
++    description = "Qt6 QPA plugin for libhybris hwcomposer";
++    homepage = "https://github.com/mer-hybris/qt5-qpa-hwcomposer-plugin";
++    license = licenses.lgpl21Only;
++    platforms = platforms.linux;
++  };
++})
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
+new file mode 100644
+index 00000000..fb5f9bd6
+--- /dev/null
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/hwc-present-diagnostics.patch
+@@ -0,0 +1,204 @@
++--- a/hwcomposer/hwcomposer_backend.cpp
+++++ b/hwcomposer/hwcomposer_backend.cpp
++@@ -109,6 +109,7 @@
++         // Create hwcomposer backend directly without opening hardware module
++         // because on some devices loading hwc2 module twice breaks graphics
++         // (The first load is in the composer android service.)
+++        fprintf(stderr, "== hwcomposer: using HWC2 backend ==\n");
++         return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
++     }
++ #endif
++@@ -196,7 +197,8 @@
++ #endif /* HWC_PLUGIN_HAVE_HWCOMPOSER1_API */
++ #ifdef HWC_PLUGIN_HAVE_HWCOMPOSER2_API
++             case HWC_DEVICE_API_VERSION_2_0:
++-                return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
+++                fprintf(stderr, "== hwcomposer: using HWC2 backend ==\n");
+++        return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
++ #endif
++             default:
++                 fprintf(stderr, "Unknown hwcomposer API: 0x%x/0x%x/0x%x\n",
++@@ -209,6 +211,7 @@
++ #ifdef HWC_PLUGIN_HAVE_HWCOMPOSER2_API
++     else {
++         // Create hwc2 backend directly if opening hardware module fails
+++        fprintf(stderr, "== hwcomposer: using HWC2 backend ==\n");
++         return new HwComposerBackend_v20(NULL, pwr_module, libminisf);
++     }
++ #endif
++--- a/hwcomposer/hwcomposer_backend_v20.cpp
+++++ b/hwcomposer/hwcomposer_backend_v20.cpp
++@@ -88,6 +88,54 @@
++                                 new QEvent(QEvent::User));
++ }
++ 
+++// Composition diagnostics (Matawaa debug builds).
+++//
+++// QPA_HWC_FORCE_GLES=1 (upstream meta-hoki 20-device.conf) hands the
+++// compositor's gralloc buffers straight to the display HAL. When the vendor
+++// MDP rejects those buffers the only symptom is a black screen: the scene
+++// graph still reports rendered frames, so nothing in Qt's own logging points
+++// at the display path. QPA_HWC_DEBUG=1 logs the buffer handle and every HWC2
+++// return code, which is what identifies a failing buffer import.
+++static bool hwcDebugEnabled()
+++{
+++    static const bool enabled = qEnvironmentVariableIsSet("QPA_HWC_DEBUG");
+++    return enabled;
+++}
+++
+++static const char *hwcErrorName(hwc2_error_t error)
+++{
+++    switch (error) {
+++    case HWC2_ERROR_NONE: return "NONE";
+++    case HWC2_ERROR_BAD_CONFIG: return "BAD_CONFIG";
+++    case HWC2_ERROR_BAD_DISPLAY: return "BAD_DISPLAY";
+++    case HWC2_ERROR_BAD_LAYER: return "BAD_LAYER";
+++    case HWC2_ERROR_BAD_PARAMETER: return "BAD_PARAMETER";
+++    case HWC2_ERROR_HAS_CHANGES: return "HAS_CHANGES";
+++    case HWC2_ERROR_NO_RESOURCES: return "NO_RESOURCES";
+++    case HWC2_ERROR_NOT_VALIDATED: return "NOT_VALIDATED";
+++    case HWC2_ERROR_UNSUPPORTED: return "UNSUPPORTED";
+++    default: return "UNKNOWN";
+++    }
+++}
+++
+++static void hwcLogBuffer(const char *what, int index,
+++                         HWComposerNativeWindowBuffer *buffer, int acquireFenceFd)
+++{
+++    if (!hwcDebugEnabled())
+++        return;
+++
+++    const native_handle_t *handle = buffer ? buffer->handle : nullptr;
+++    qDebug("hwc: %s #%d buffer=%p %ux%u stride=%d format=0x%x usage=0x%llx "
+++           "handleFds=%d handleFd0=%d acquireFence=%d",
+++           what, index, static_cast<void *>(buffer),
+++           buffer ? buffer->width : 0u, buffer ? buffer->height : 0u,
+++           buffer ? buffer->stride : 0, buffer ? buffer->format : 0,
+++           buffer ? static_cast<unsigned long long>(buffer->usage) : 0ULL,
+++           handle ? handle->numFds : -1,
+++           (handle && handle->numFds > 0) ? handle->data[0] : -1,
+++           acquireFenceFd);
+++}
+++
++ void hwc2_callback_hotplug(HWC2EventListener* listener, int32_t sequenceId,
++                            hwc2_display_t display, bool connected,
++                            bool primaryDisplay)
++@@ -167,6 +215,11 @@
++ 
++     int acquireFenceFd = getFenceBufferFd(buffer);
++ 
+++    static int presentCount = 0;
+++    const int presentIndex = presentCount++;
+++    if (presentIndex < 5 || (presentIndex % 300) == 0)
+++        hwcLogBuffer("present", presentIndex, buffer, acquireFenceFd);
+++
++     if (m_syncBeforeSet && acquireFenceFd >= 0) {
++         sync_wait(acquireFenceFd, -1);
++         close(acquireFenceFd);
++@@ -182,33 +235,48 @@
++     error = hwc2_compat_display_validate(hwcDisplay, &numTypes,
++                                                     &numRequests);
++     if (error != HWC2_ERROR_NONE && error != HWC2_ERROR_HAS_CHANGES) {
++-        qDebug("prepare: validate failed for display %d: %d", displayId, error);
+++        qWarning("hwc: validate failed for display %d: %s (%d), frame dropped",
+++                 displayId, hwcErrorName(error), error);
++         return;
++     }
++ 
++     if (numTypes || numRequests) {
++-        qDebug("prepare: validate required changes for display %d: %d",
++-               displayId, error);
+++        qDebug("hwc: validate requested changes for display %d: %s (%d), "
+++               "types=%u requests=%u, frame dropped",
+++               displayId, hwcErrorName(error), error, numTypes, numRequests);
++         return;
++     }
++ 
++     error = hwc2_compat_display_accept_changes(hwcDisplay);
++     if (error != HWC2_ERROR_NONE) {
++-        qDebug("prepare: acceptChanges failed: %d", error);
+++        qWarning("hwc: accept_changes failed: %s (%d), frame dropped",
+++                 hwcErrorName(error), error);
++         return;
++     }
++ 
++     QPA_HWC_TIMING_SAMPLE(prepareTime);
++ 
++     QSystrace::begin("graphics", "QPA::set_client_target", "");
++-    hwc2_compat_display_set_client_target(hwcDisplay, /* slot */0, buffer,
++-                                          acquireFenceFd,
++-                                          HAL_DATASPACE_UNKNOWN);
+++    const hwc2_error_t setTargetError =
+++        hwc2_compat_display_set_client_target(hwcDisplay, /* slot */0, buffer,
+++                                              acquireFenceFd,
+++                                              HAL_DATASPACE_UNKNOWN);
++     QSystrace::end("graphics", "QPA::set_client_target", "");
+++    if (setTargetError != HWC2_ERROR_NONE) {
+++        qWarning("hwc: set_client_target failed: %s (%d), buffer fd=%d",
+++                 hwcErrorName(setTargetError), setTargetError,
+++                 (buffer && buffer->handle && buffer->handle->numFds > 0)
+++                     ? buffer->handle->data[0] : -1);
+++    }
++ 
++     QSystrace::begin("graphics", "QPA::present", "");
++     int presentFence = -1;
++-    hwc2_compat_display_present(hwcDisplay, &presentFence);
+++    const hwc2_error_t presentError =
+++        hwc2_compat_display_present(hwcDisplay, &presentFence);
+++    if (presentError != HWC2_ERROR_NONE) {
+++        qWarning("hwc: present failed: %s (%d)",
+++                 hwcErrorName(presentError), presentError);
+++    }
++     QSystrace::end("graphics", "QPA::present", "");
++ 
++     QPA_HWC_TIMING_SAMPLE(setTime);
++@@ -221,6 +289,9 @@
++     lastPresentFence = presentFence != -1 ? dup(presentFence) : -1;
++ 
++     setFenceBufferFd(buffer, presentFence);
+++
+++    if (hwcDebugEnabled() && (presentIndex < 5 || (presentIndex % 300) == 0))
+++        qDebug("hwc: present #%d done, fence=%d", presentIndex, presentFence);
++ 
++     if (m_dozeWorkaround && m_backend->isDozing()) {
++         hwc2_compat_display_set_power_mode(hwcDisplay, HWC2_POWER_MODE_DOZE_SUSPEND);
++@@ -263,6 +334,17 @@
++     }
++     HWC_PLUGIN_ASSERT_NOT_NULL(hwc2_primary_display);
++ 
+++    if (hwcDebugEnabled()) {
+++        HWC2DisplayConfig *config =
+++            hwc2_compat_display_get_active_config(hwc2_primary_display);
+++        qDebug("hwc: primary display id=%" PRIu64 " config=%dx%d "
+++               "vsyncPeriod=%" PRId64 " dpi=%.1fx%.1f",
+++               static_cast<uint64_t>(procs->primaryDisplayId),
+++               config ? config->width : 0, config ? config->height : 0,
+++               config ? config->vsyncPeriod : int64_t(0),
+++               config ? config->dpiX : 0.0, config ? config->dpiY : 0.0);
+++    }
+++
++     sleepDisplay(false);
++ }
++ 
++@@ -309,6 +391,10 @@
++                                          HAL_PIXEL_FORMAT_RGBA_8888,
++                                          hwc2_primary_display, layer, this);
++ 
+++    if (hwcDebugEnabled())
+++        qDebug("hwc: window %dx%d format=0x%x layer=%p", width, height,
+++               HAL_PIXEL_FORMAT_RGBA_8888, static_cast<void *>(layer));
+++
++     return (EGLNativeWindowType) static_cast<ANativeWindow *>(hwc_win);
++ }
++ 
++@@ -325,7 +411,9 @@
++     timer.start();
++ #endif
++ 
++-    eglSwapBuffers(display, surface);
+++    const EGLBoolean swapped = eglSwapBuffers(display, surface);
+++    if (hwcDebugEnabled() && swapped != EGL_TRUE)
+++        qWarning("hwc: eglSwapBuffers failed: 0x%x", eglGetError());
++ 
++ #ifdef QPA_HWC_TIMING
++     qDebug("HWComposerBackend::swap(), present=%.3f, sync=%.3f, prepare=%.3f, set=%.3f, total=%.3f",
+diff --git a/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch b/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
+deleted file mode 100644
+index 20e222dc..00000000
+--- a/overlay/libhybris/0001-Removes-failing-test-for-wayland-less-builds.patch
++++ /dev/null
+@@ -1,24 +0,0 @@
+-From 95d9181f725f06e4d00d920c9608cb1ed9c6537a Mon Sep 17 00:00:00 2001
+-From: Samuel Dionne-Riel <samuel@dionne-riel.com>
+-Date: Mon, 9 Dec 2019 23:38:59 -0500
+-Subject: [PATCH] Removes failing test for wayland-less builds
+-
+----
+- hybris/tests/Makefile.am | 1 -
+- 1 file changed, 1 deletion(-)
+-
+-diff --git a/hybris/tests/Makefile.am b/hybris/tests/Makefile.am
+-index 6f97c3e..1a1656d 100644
+---- a/tests/Makefile.am
+-+++ b/tests/Makefile.am
+-@@ -7,7 +7,6 @@ bin_PROGRAMS = \
+- 	test_sensors \
+- 	test_input \
+- 	test_lights \
+--	test_camera \
+- 	test_vibrator \
+- 	test_media \
+- 	test_recorder \
+--- 
+-2.23.0
+-
+diff --git a/overlay/libhybris/default.nix b/overlay/libhybris/default.nix
+index 37b0df7d..3c1e8538 100644
+--- a/overlay/libhybris/default.nix
++++ b/overlay/libhybris/default.nix
+@@ -1,12 +1,16 @@
+ {
+-stdenv
++  stdenv
+ , lib
+ , fetchFromGitHub
++, fetchurl
+ , autoreconfHook
+ , pkg-config
+ 
+ , android-headers
+ , file
++, wayland
++, buildPackages
++, meta-asteroid-src ? null
+ , useLegacyProperties ? false
+ }:
+ 
+@@ -17,20 +21,23 @@ let
+ in
+ stdenv.mkDerivation {
+   pname = "libhybris";
+-  version = "2019-12-02";
++  version = "2024-11-07";
+ 
+   src = fetchFromGitHub {
+     owner = "libhybris";
+     repo = "libhybris";
+-    rev = "d27c1a85703db8dea4539ceb4d869792fd78ee37";
+-    sha256 = "014wrpzd1w2bbza5jsy51qhhn9lvffz5h8l6mkwvkkn98i3h9yzn";
++    rev = "9f61f26c44d9a3bf62efb67d4c32a7a0c89c21ca";
++    hash = "sha256-OH5lhpOAw5LtfmR0XkbF2hoDXlskmsuqfWb7DBub0uw=";
+   };
+ 
+-  patches = [
+-    ./0001-Removes-failing-test-for-wayland-less-builds.patch
+-  ]
+-    ++ lib.optional useLegacyProperties ./0001-HACK-Rely-on-legacy-properties-rather-than-native-pr.patch
+-  ;
++  patches = lib.optional useLegacyProperties ./0001-HACK-Rely-on-legacy-properties-rather-than-native-pr.patch;
++
++  postPatch = ''
++    # These upstream patches are generated from the repository root, while
++    # sourceRoot points at hybris/.
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0001-Remove-references-to-host-path-in-package-config-fil.patch
++    patch -p2 -i ${meta-asteroid-src}/recipes-core/libhybris/libhybris/0002-tests-workaround-Wimplicit-function-declaration-in-s.patch
++  '';
+ 
+   postAutoreconf = ''
+     substituteInPlace configure \
+@@ -38,9 +45,8 @@ stdenv.mkDerivation {
+   '';
+ 
+   NIX_CFLAGS_COMPILE = [
+-    # This libhybris is old, but even libhybris from 2024 fails to compile
+-    # due to many warnings. Let's instead ignore the warnings, and instead
+-    # plan to get an updated adbd that maybe does not depend on libhybris.
++    # libhybris trips -Werror=implicit-function-declaration / int-conversion /
++    # incompatible-pointer-types with modern toolchains.
+     "-Wno-implicit-function-declaration"
+     "-Wno-incompatible-pointer-types"
+     "-Wno-int-conversion"
+@@ -52,15 +58,38 @@ stdenv.mkDerivation {
+ 
+   configureFlags = [
+     "--with-android-headers=${android-headers}/include/android/"
++    # Upstream meta-asteroid libhybris_git.bbappend.
++    "--enable-wayland"
++    "--with-default-egl-platform=wayland"
+   ]
+   ++ lib.optional targetPlatform.isAarch64 "--enable-arch=arm64"
+   ++ lib.optional targetPlatform.isAarch32 "--enable-arch=arm"
+   ;
+ 
++  # configure.ac searches for wayland-scanner, but nixpkgs splits it into its
++  # own package; make the build-machine scanner explicit.
++  makeFlags = [
++    "WAYLAND_SCANNER=${buildPackages.wayland-scanner.bin}/bin/wayland-scanner"
++  ];
++
+   sourceRoot = "source/hybris";
+ 
+   nativeBuildInputs = [
+     autoreconfHook
+     pkg-config
++    # configure.ac looks for wayland-scanner in the target prefix first, then
++    # in $PATH; the target wayland package ships no runnable scanner.
++    buildPackages.wayland-scanner.bin
++  ];
++
++  buildInputs = [
++    wayland
+   ];
++
++  passthru = {
++    # Android headers this libhybris was configured against. Out-of-tree
++    # libhybris plugins must compile against the same set.
++    androidHeaders = android-headers;
++    androidHeadersInclude = "${android-headers}/include/android";
++  };
+ }
+diff --git a/overlay/oans/default.nix b/overlay/oans/default.nix
+new file mode 100644
+index 00000000..e6888d6f
+--- /dev/null
++++ b/overlay/oans/default.nix
+@@ -0,0 +1,61 @@
++# oans: fast deduplication tool for btrfs/XFS, forked from duperemove.
++# Used as a build-time pass over the generated btrfs image.
++# https://github.com/martinus/oans
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  pkg-config,
++  glib,
++  sqlite,
++  util-linux,
++  libuuid,
++  libbsd,
++  xxhash,
++}:
++
++stdenv.mkDerivation (finalAttrs: {
++  pname = "oans";
++  version = "1.14.1";
++
++  src = fetchFromGitHub {
++    owner = "martinus";
++    repo = "oans";
++    rev = "v${finalAttrs.version}";
++    hash = "sha256-rWUNNLCmmO/OLcuASBCRBe4d4Lpq4LqsB+QdLv3TNOw=";
++  };
++
++  strictDeps = true;
++
++  nativeBuildInputs = [
++    pkg-config
++  ];
++
++  buildInputs = [
++    glib
++    sqlite
++    util-linux
++    libuuid
++    libbsd
++    xxhash
++  ];
++
++  # The Makefile derives the version from git; the release tarball has none.
++  makeFlags = [
++    "VERSION=${finalAttrs.version}"
++  ];
++
++  installPhase = ''
++    runHook preInstall
++    make install PREFIX=$out DESTDIR=
++    runHook postInstall
++  '';
++
++  meta = with lib; {
++    description = "Faster deduplication for btrfs and XFS (duperemove fork)";
++    homepage = "https://github.com/martinus/oans";
++    license = licenses.gpl2Only;
++    platforms = platforms.linux;
++    mainProgram = "oans";
++  };
++})

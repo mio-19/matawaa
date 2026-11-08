@@ -1,0 +1,467 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:55:46 +1100
+Subject: [PATCH] rootfs: support legacy-compatible btrfs and sparse fastboot
+ images
+
+---
+ boot/init/tasks/auto_resize.rb                |  22 +++
+ modules/rootfs.nix                            | 141 +++++++++++-------
+ modules/system-types/android/default.nix      |  50 ++++++-
+ .../filesystem-image/filesystem/btrfs.nix     |  91 ++++++++++-
+ 4 files changed, 246 insertions(+), 58 deletions(-)
+
+diff --git a/boot/init/tasks/auto_resize.rb b/boot/init/tasks/auto_resize.rb
+index 3e7e33e5..8a1677e0 100644
+--- a/boot/init/tasks/auto_resize.rb
++++ b/boot/init/tasks/auto_resize.rb
+@@ -49,6 +49,26 @@ class Tasks::AutoResize < Task
+     filesystem_size < (partition_size - fudge)
+   end
+ 
++  def resize_btrfs()
++    mountpoint = "/run/auto-resize-btrfs"
++
++    System.run("mkdir", "-p", mountpoint)
++    begin
++      # btrfs can only resize a mounted filesystem. The rootfs is not mounted
++      # yet at this point, so mount it temporarily and grow it to the
++      # partition size before the real root mount.
++      System.run("mount", "-n", "-t", "btrfs", "-o", "rw", @device, mountpoint)
++      Progress.exec_with_message("Resizing #{@device}...") do
++        System.run_long_running("btrfs", "filesystem", "resize", "max", mountpoint)
++      end
++    rescue System::CommandError => e
++      $logger.warn("Could not auto-resize btrfs #{@device}: #{e.message}")
++    ensure
++      System.run("umount", mountpoint) rescue nil
++      System.run("rmdir", mountpoint) rescue nil
++    end
++  end
++
+   def run()
+     if @type.match(/^ext[234]$/)
+       if needs_resize?
+@@ -73,6 +93,8 @@ class Tasks::AutoResize < Task
+       else
+         log("No need to resize #{@device}...")
+       end
++    elsif @type == "btrfs"
++      resize_btrfs()
+     else
+       $logger.warn("Cannot resize #{@type}... filesystem left untouched.")
+     end
+diff --git a/modules/rootfs.nix b/modules/rootfs.nix
+index 818308b1..246aca44 100644
+--- a/modules/rootfs.nix
++++ b/modules/rootfs.nix
+@@ -1,9 +1,19 @@
+ # This provides `build.rootfs`, which is the rootfs image (ext4) built from
+ # the current configuration.
+-{ config, lib, pkgs, ... }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
+ 
+ let
+-  inherit (lib) mkIf mkOption optionalString types;
++  inherit (lib)
++    mkIf
++    mkOption
++    optionalString
++    types
++    ;
+   inherit (config.mobile._internal) compressLargeArtifacts;
+   inherit (pkgs) buildPackages;
+   rootfsLabel = config.mobile.generatedFilesystems.rootfs.label;
+@@ -36,38 +46,49 @@ in
+   config = mkIf (config.mobile.rootfs.enableDefaultConfiguration) {
+     boot.growPartition = lib.mkDefault true;
+ 
+-    mobile.generatedFilesystems.rootfs = lib.mkDefault {
+-      filesystem = "ext4";
+-      label = "NIXOS_SYSTEM";
++    mobile.generatedFilesystems.rootfs = {
++      filesystem = lib.mkDefault "ext4";
++      label = lib.mkDefault "NIXOS_SYSTEM";
+       ext4.partitionID = "44444444-4444-4444-8888-888888888888";
++      btrfs.partitionID = "44444444-4444-4444-8888-888888888888";
++      # Linux 4.14 btrfs accepts compress=zstd (default level), compress=zlib,
++      # noatime and space_cache=v2. It rejects the level syntax
++      # (compress=zstd:3 / zstd3) and the v1 space_cache option. The image
++      # builder disables block-group-tree for these older kernels.
++      btrfs.compression = "zstd";
+ 
+       populateCommands =
+-      let
+-        closureInfo = pkgs.buildPackages.closureInfo { rootPaths = config.system.build.toplevel; };
+-      in
+-      ''
+-        mkdir -p ./nix/store
+-        echo "Copying system closure..."
+-
+-        err=0
+-        while IFS= read -r path; do
+-          echo "  Copying $path"
+-          if test -e "$path"; then
+-            cp -prf "$path" ./nix/store
+-          else
+-            2>&1 printf "ERROR: path %q does not exist...\n" "$path"
+-            (( ++err ))
++        let
++          closureInfo = pkgs.buildPackages.closureInfo { rootPaths = config.system.build.toplevel; };
++        in
++        ''
++          mkdir -p ./nix/store
++          # The generated rootfs must contain the standard /var symlinks before
++          # systemd starts; creating them in stage 1 is too late for early units.
++          mkdir -p ./var
++          ln -sfn /run ./var/run
++          ln -sfn /run/lock ./var/lock
++          echo "Copying system closure..."
++
++          err=0
++          while IFS= read -r path; do
++            echo "  Copying $path"
++            if test -e "$path"; then
++              cp -prf "$path" ./nix/store
++            else
++              2>&1 printf "ERROR: path %q does not exist...\n" "$path"
++              (( ++err ))
++            fi
++          done < "${closureInfo}/store-paths"
++
++          if (( err > 0 )); then
++            2>&1 printf "... Bailing out, %d errors.\n" "$err"
++            exit 2
+           fi
+-        done < "${closureInfo}/store-paths"
+ 
+-        if (( err > 0 )); then
+-          2>&1 printf "... Bailing out, %d errors.\n" "$err"
+-          exit 2
+-        fi
+-
+-        echo "Done copying system closure..."
+-        cp -v ${closureInfo}/registration ./nix-path-registration
+-      '';
++          echo "Done copying system closure..."
++          cp -v ${closureInfo}/registration ./nix-path-registration
++        '';
+ 
+       # Give some headroom for initial mounting.
+       extraPadding = pkgs.image-builder.helpers.size.MiB 20;
+@@ -77,24 +98,26 @@ in
+       # FIXME: See #117, move compression into the image builder.
+       # Zstd can take a long time to complete successfully at high compression
+       # levels. Increasing the compression level could lead to timeouts.
+-      additionalCommands = optionalString compressLargeArtifacts ''
+-        echo ":: Compressing rootfs image"
+-        (PS4=" $ "; set -x
+-        cd $out_path
+-        # Hacky, but the img path here already has .zst appended.
+-        # Let's rename it (we assume rootfs.img) and do the compression here.
+-        mv "$img" "rootfs.img"
+-        time ${buildPackages.zstd}/bin/zstd -10 --rm "rootfs.img"
+-        )
+-      '' + ''
+-        echo ":: Adding hydra-build-products"
+-        (PS4=" $ "; set -x
+-        mkdir -p $out_path/nix-support
+-        cat <<EOF > $out_path/nix-support/hydra-build-products
+-        file rootfs${optionalString compressLargeArtifacts "-zstd"} $img
+-        EOF
+-        )
+-      '';
++      additionalCommands =
++        optionalString compressLargeArtifacts ''
++          echo ":: Compressing rootfs image"
++          (PS4=" $ "; set -x
++          cd $out_path
++          # Hacky, but the img path here already has .zst appended.
++          # Let's rename it (we assume rootfs.img) and do the compression here.
++          mv "$img" "rootfs.img"
++          time ${buildPackages.zstd}/bin/zstd -10 --rm "rootfs.img"
++          )
++        ''
++        + ''
++          echo ":: Adding hydra-build-products"
++          (PS4=" $ "; set -x
++          mkdir -p $out_path/nix-support
++          cat <<EOF > $out_path/nix-support/hydra-build-products
++          file rootfs${optionalString compressLargeArtifacts "-zstd"} $img
++          EOF
++          )
++        '';
+     };
+ 
+     boot.postBootCommands = mkIf (config.mobile.rootfs.rehydrateStore) ''
+@@ -115,16 +138,30 @@ in
+     fileSystems = {
+       "/" = lib.mkDefault {
+         device = "/dev/disk/by-label/${rootfsLabel}";
+-        fsType = "ext4";
++        fsType = config.mobile.generatedFilesystems.rootfs.filesystem;
++        options =
++          if config.mobile.generatedFilesystems.rootfs.filesystem == "btrfs" then
++            [
++              # 4.14-compatible btrfs options. Do not use compress=zstd:3 or
++              # space_cache (v1); the vendor kernel rejects both.
++              "compress=${config.mobile.generatedFilesystems.rootfs.btrfs.compression}"
++              "noatime"
++              "space_cache=v2"
++            ]
++          else
++            [ "defaults" ];
+         autoResize = true;
+       };
+     };
+ 
+-    # FIXME: Move this in a proper module + task for the filesystem.
+-    # This is a "wrong" assumption, that only holds through since we are setting
+-    # fileSystems."/".autoResize to true here.
++    # Include appropriate filesystem tools in stage-1 extraUtils
+     mobile.boot.stage-1.extraUtils = [
+-      { package = pkgs.e2fsprogs; }
++      (lib.mkIf (config.mobile.generatedFilesystems.rootfs.filesystem == "ext4") {
++        package = pkgs.e2fsprogs;
++      })
++      (lib.mkIf (config.mobile.generatedFilesystems.rootfs.filesystem == "btrfs") {
++        package = pkgs.btrfs-progs;
++      })
+     ];
+   };
+ }
+diff --git a/modules/system-types/android/default.nix b/modules/system-types/android/default.nix
+index 5c5639aa..2281e409 100644
+--- a/modules/system-types/android/default.nix
++++ b/modules/system-types/android/default.nix
+@@ -9,7 +9,7 @@ let
+   inherit (config.mobile.system.android) ab_partitions has_recovery_partition flashingMethod;
+   inherit (stage-0.mobile.boot.stage-1) kernel;
+ 
+-  kernelPackage = kernel.package;
++  kernelPackage = if kernel.package != null then kernel.package else config.boot.kernelPackages.kernel;
+ 
+   cmdline = concatStringsSep " " config.boot.kernelParams;
+ 
+@@ -18,7 +18,7 @@ let
+     inherit cmdline;
+     inherit (config.mobile.outputs) initrd;
+     name = "mobile-nixos_${device.name}_${bootimg.name}";
+-    kernel = "${kernelPackage}/${if kernelPackage ? file then kernelPackage.file else kernelPackage.target}";
++    kernel = "${kernelPackage}/${if kernelPackage ? file then kernelPackage.file else (kernelPackage.target or "zImage")}";
+     inherit (config.mobile.system.android) appendDTB;
+   };
+ 
+@@ -31,9 +31,16 @@ let
+   # either of fastboot or the outputs.
+   # This is because this output should have no refs. A simple tarball of this
+   # output should be usable even on systems without Nix.
+-  android-fastboot-images = pkgs.runCommand "android-fastboot-images-${device.name}" {} ''
++  android-fastboot-images = pkgs.runCommand "android-fastboot-images-${device.name}" {
++    nativeBuildInputs = lib.optionals config.mobile.system.android.sparseSystemImage [ pkgs.buildPackages.android-tools ];
++  } ''
+     mkdir -p $out
++    ${if config.mobile.system.android.sparseSystemImage then ''
++    echo "Converting rootfs image to Android sparse format with img2simg..."
++    img2simg ${rootfs.imagePath} $out/system.img
++    '' else ''
+     cp -v ${rootfs.imagePath} $out/system.img
++    ''}
+     cp -v ${android-bootimg} $out/boot.img
+     ${optionalString has_recovery_partition ''
+     cp -v ${android-recovery} $out/recovery.img
+@@ -72,6 +79,33 @@ let
+     echo "The system image needs to be flashed manually to the ${config.mobile.system.android.system_partition_destination} partition."
+     EOF
+     chmod +x $out/flash-critical.sh
++
++    cat > $out/flash-all.sh <<'EOF'
++    #!/usr/bin/env bash
++    dir="$(cd "$(dirname "''${BASH_SOURCE[0]}")"; echo "$PWD")"
++    PS4=" $ "
++    echo "Flashing boot, ${optionalString has_recovery_partition "recovery, "}and system/userdata partitions..."
++    (
++    set -x
++    ${if flashingMethod == "fastboot" then ''
++      fastboot flash ${optionalString ab_partitions "--slot=all"} boot "$dir"/boot.img
++      ${optionalString has_recovery_partition ''
++      fastboot flash ${optionalString ab_partitions "--slot=all"} recovery "$dir"/recovery.img
++      ''}
++      fastboot flash ${optionalString ab_partitions "--slot=all"} ${config.mobile.system.android.system_partition_destination} "$dir"/system.img
++    ''
++    else if flashingMethod == "odin" then ''
++      heimdall flash \
++        --BOOT "$dir"/boot.img ${optionalString has_recovery_partition ''
++        --RECOVERY "$dir"/recovery.img
++      ''} \
++        --USERDATA "$dir"/system.img
++    ''
++    else builtins.throw "No flashing method for ${flashingMethod}"})
++    echo ""
++    echo "Full flashing completed."
++    EOF
++    chmod +x $out/flash-all.sh
+   '';
+ 
+   mkBootimgOption = name: lib.mkOption {
+@@ -139,6 +173,12 @@ in
+         internal = true;
+       };
+ 
++      sparseSystemImage = lib.mkOption {
++        type = types.bool;
++        description = "Whether to convert the system rootfs image into an Android sparse image format using img2simg for faster, reliable fastboot flashing.";
++        default = true;
++      };
++
+       bootimg = {
+         name = lib.mkOption {
+           type = types.str;
+@@ -234,11 +274,11 @@ in
+       ];
+     })
+ 
+-    (lib.mkIf (kernelPackage != null && kernelPackage.isQcdt) {
++    (lib.mkIf (kernelPackage != null && kernelPackage ? isQcdt && kernelPackage.isQcdt) {
+       mobile.system.android.bootimg.dt = "${kernelPackage}/dt.img";
+     })
+ 
+-    (lib.mkIf (kernelPackage != null && kernelPackage.isExynosDT) {
++    (lib.mkIf (kernelPackage != null && kernelPackage ? isExynosDT && kernelPackage.isExynosDT) {
+       mobile.system.android.bootimg.dt = "${kernelPackage}/dt.img";
+     })
+ 
+diff --git a/overlay/image-builder/filesystem-image/filesystem/btrfs.nix b/overlay/image-builder/filesystem-image/filesystem/btrfs.nix
+index f6d95e13..a25d9181 100644
+--- a/overlay/image-builder/filesystem-image/filesystem/btrfs.nix
++++ b/overlay/image-builder/filesystem-image/filesystem/btrfs.nix
+@@ -12,7 +12,11 @@ let
+   ;
+ 
+   inherit (config) label;
+-  inherit (config.btrfs) partitionID;
++  inherit (config.btrfs) partitionID dedupe;
++
++  # The image as built by the generic builder. The dedupe pass below copies it
++  # into a VM, mounts it, deduplicates it, and shrinks it again.
++  rawImage = pkgs.callPackage ../builder.nix { config = config; };
+ in
+ {
+   options.btrfs = {
+@@ -24,6 +28,31 @@ in
+         Volume ID of the filesystem.
+       '';
+     };
++    compression = mkOption {
++      type = types.nullOr types.str;
++      default = "zstd:3";
++      example = "zstd:3";
++      description = ''
++        Transparent compression algorithm and level for files populated into the image.
++      '';
++    };
++    dedupe = mkOption {
++      type = types.bool;
++      # Measured on the fossil-hoki rootfs (Android sparse system.img, the
++      # size that is actually flashed):
++      #   zstd compression only:            1 290 399 244 bytes
++      #   zstd + oans dedupe:               1 429 898 552 bytes
++      #   zstd + oans + balance:            1 393 098 540 bytes
++      # Deduplication reclaims ~124 MiB of data, but the extra shared-extent
++      # metadata outweighs that here, so compression alone is the smaller
++      # image. Enable per-device when the content has large duplicate files.
++      default = false;
++      description = ''
++        Deduplicate the populated filesystem with oans before finalizing the
++        image. Deduplication needs a mounted btrfs, so this runs in a VM; the
++        image is re-shrunk afterwards.
++      '';
++    };
+   };
+ 
+   config = mkMerge [
+@@ -41,12 +70,17 @@ in
+       minimumSize = config.helpers.size.MiB 110;
+ 
+       computeMinimalSize = ''
++        # Btrfs metadata overhead and compression buffer space before shrinking
++        size=$(( size + (size * 10 / 100) + 150 * 1024 * 1024 ))
+       '';
+ 
+       buildPhases = {
+         copyPhase = ''
+           mkfs.btrfs \
++            -f \
++            -O ^block-group-tree \
+             -r . \
++            ${optionalString (config.btrfs.compression != null) "--compress ${config.btrfs.compression}"} \
+             ${optionalString (partitionID != null) "-U ${partitionID}"} \
+             ${optionalString (label != null) "-L ${escapeShellArg label}"} \
+             ${optionalString (config.size == null) "--shrink"} \
+@@ -57,6 +91,61 @@ in
+           faketime -f "1970-01-01 00:00:01" btrfs check "$img"
+         '';
+       };
++
++      # oans needs the filesystem mounted (FIDEDUPERANGE ioctl), which the
++      # sandboxed builder cannot do. Run the pass in a VM, then consolidate and
++      # shrink the image to the space it actually needs.
++      output = mkIf dedupe (lib.mkForce (
++        pkgs.buildPackages.vmTools.runInLinuxVM (
++          pkgs.buildPackages.runCommand "filesystem-image-dedupe" {
++            nativeBuildInputs = with pkgs.buildPackages; [
++              oans
++              btrfs-progs
++              util-linux
++              coreutils
++              kmod
++            ];
++            outputs = [ "out" "metadata" ];
++            memSize = 2048;
++          } ''
++            set -eu
++
++            mkdir -p "$(dirname "$out${config.location}")"
++            cp "${rawImage}${config.location}" "$out${config.location}"
++            cp -r ${rawImage.metadata}/. "$metadata/"
++
++            img="$out${config.location}"
++            chmod u+w "$img"
++
++            # mkfs shrank the filesystem to its minimum; give the dedupe pass
++            # room to allocate metadata, then shrink back afterwards.
++            truncate -s +512M "$img"
++
++            mkdir -p /mnt
++            modprobe loop 2>/dev/null || true
++            [ -e /dev/loop-control ] || mknod /dev/loop-control c 10 237
++            [ -e /dev/loop0 ] || mknod /dev/loop0 b 7 0
++            losetup /dev/loop0 "$img"
++            mount /dev/loop0 /mnt
++            btrfs filesystem resize max /mnt
++
++            oans -rd --hashfile=/tmp/oans.hash /mnt
++            sync
++
++            # Shrink in steps; btrfs refuses beyond its minimum, which is
++            # exactly where we want to stop.
++            while btrfs filesystem resize -128m /mnt 2>/dev/null; do :; done
++
++            umount /mnt
++            losetup -d /dev/loop0
++
++            total=$(btrfs inspect-internal dump-super -f "$img" | sed -n 's/^total_bytes *//p' | head -1)
++            truncate -s "$total" "$img"
++
++            btrfs check "$img"
++          ''
++        )
++      ));
+     })
+   ];
+ }

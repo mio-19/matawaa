@@ -1,0 +1,1688 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:55:55 +1100
+Subject: [PATCH] fossil-hoki: add Gen 6 hardware firmware audio and family
+ variants
+
+---
+ devices/fossil-firefish/default.nix           |  56 ++
+ devices/fossil-hoki/android-init.nix          | 224 +++++++
+ devices/fossil-hoki/android-system-data.nix   |  26 +
+ devices/fossil-hoki/audio-modules.nix         | 122 ++++
+ devices/fossil-hoki/default.nix               | 588 ++++++++++++++++++
+ devices/fossil-hoki/gps_xtra.ini              |   2 +
+ .../hwcomposer-allocation-diagnostics.patch   |  31 +
+ devices/fossil-hoki/hybris-android.nix        |  30 +
+ devices/fossil-hoki/hybris.nix                |  47 ++
+ devices/fossil-hoki/tfa9890.cnt.base64        |  93 +++
+ devices/fossil-hoki/wlan-firmware-hoki.sh     |  42 ++
+ devices/fossil-hoki/wlan.nix                  | 112 ++++
+ ...co_profile-fix-use-of-adapter-before.patch |  30 +
+ ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 +
+ devices/fossil-hoki/wlan/wakelock.h           |   3 +
+ devices/fossil-ray/default.nix                |  56 ++
+ devices/fossil-triggerfish/default.nix        |  56 ++
+ 17 files changed, 1543 insertions(+)
+ create mode 100644 devices/fossil-firefish/default.nix
+ create mode 100644 devices/fossil-hoki/android-init.nix
+ create mode 100644 devices/fossil-hoki/android-system-data.nix
+ create mode 100644 devices/fossil-hoki/audio-modules.nix
+ create mode 100644 devices/fossil-hoki/default.nix
+ create mode 100644 devices/fossil-hoki/gps_xtra.ini
+ create mode 100644 devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
+ create mode 100644 devices/fossil-hoki/hybris-android.nix
+ create mode 100644 devices/fossil-hoki/hybris.nix
+ create mode 100644 devices/fossil-hoki/tfa9890.cnt.base64
+ create mode 100644 devices/fossil-hoki/wlan-firmware-hoki.sh
+ create mode 100644 devices/fossil-hoki/wlan.nix
+ create mode 100644 devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
+ create mode 100644 devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
+ create mode 100644 devices/fossil-hoki/wlan/wakelock.h
+ create mode 100644 devices/fossil-ray/default.nix
+ create mode 100644 devices/fossil-triggerfish/default.nix
+
+diff --git a/devices/fossil-firefish/default.nix b/devices/fossil-firefish/default.nix
+new file mode 100644
+index 00000000..b8605a4c
+--- /dev/null
++++ b/devices/fossil-firefish/default.nix
+@@ -0,0 +1,56 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++{
++  imports = [
++    ../families/asteroidos.nix
++  ];
++
++  mobile.device.name = "fossil-firefish";
++  mobile.device.identity = {
++    name = "Gen 4 Explorist HR";
++    manufacturer = "Fossil";
++  };
++
++  mobile.device.supportLevel = "supported";
++
++  mobile.hardware = {
++    # Qualcomm Snapdragon Wear 2100 (MSM8909W)
++    soc = "qualcomm-msm8909w";
++    ram = 512;
++    screen = {
++      width = 454;
++      height = 454;
++    };
++    watch = {
++      hasCrown = true;
++      hasHaptics = true;
++      aodSupport = true;
++    };
++  };
++
++  mobile.system.android = {
++    device_name = "firefish";
++    bootimg.flash = {
++      offset_base = "0x80000000";
++      offset_kernel = "0x00008000";
++      offset_ramdisk = "0x01000000";
++      offset_second = "0x00f00000";
++      offset_tags = "0x00000100";
++      pagesize = "2048";
++    };
++  };
++
++  boot.kernelParams = [
++    "console=ttyMSM0,115200,n8"
++    "androidboot.console=ttyMSM0"
++    "androidboot.hardware=firefish"
++    "msm_rtb.filter=0x237"
++    "ehci-hcd.park=3"
++    "vmalloc=300M"
++  ];
++}
+diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
+new file mode 100644
+index 00000000..471fe087
+--- /dev/null
++++ b/devices/fossil-hoki/android-init.nix
+@@ -0,0 +1,224 @@
++{
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
++
++  # The hoki init.rc supplements the stock Android init with the Qualcomm
++  # subsystem setup and the Fossil extras. It must not import the stock
++  # hw/init.rc: the stock /system/bin/init already reads it.
++  initRc = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-hoki/recipes-android/android-init/android-init/init.rc";
++    hash = "sha256-TBa60Z7PdgTjZYECheZYEA/6D/OZwpVx3bU70XwWJHU=";
++  };
++
++  platPropertyContexts = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-hoki/recipes-android/android-init/android-init/plat_property_contexts";
++    hash = "sha256-Je6T4SOA1vfc8bJOLBRwaBqIW4BCO+akXS7L+P1QYuo=";
++  };
++
++  nonplatPropertyContexts = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/8c1dbee6c37cdd4ad97d083a59085abf7032ad42/meta-hoki/recipes-android/android-init/android-init/nonplat_property_contexts";
++    hash = "sha256-PkLCQb9VlnKQXqMofCNFB6p2SXxwd06+E8yFAWMLWXY=";
++  };
++
++  # ld.config.28.txt from AsteroidOS:
++  # Allows Android binaries to load libraries from /usr/libexec/hal-droid/system/lib
++  ldConfig = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/085844a91fd23691f55d8ac08bc3e4c0a8429936/meta-beluga/recipes-core/initrdscripts/initramfs-scripts-android/ld.config.28.txt";
++    hash = "sha256-7QCh5Q/9QxMEhlcA52ykhPVRsNQZbyPqY7YmBCGGYZE=";
++  };
++
++  # AsteroidOS SELinux stub integration for core service managers.
++  # Matches AsteroidOS meta-skipjack, meta-koi, meta-narwhal, meta-pike, meta-ray.
++  patchedInitRc = pkgs.runCommand "init.rc" { } ''
++    ${pkgs.gnused}/bin/sed \
++      -e '/start vndservicemanager/a \    start vendor.gralloc-2-0\n    start vendor.configstore-hal\n    start vendor.audio-hal-2-0' \
++      -e '/setprop sys.hwc.gpu_perf_mode 1/a \    setprop vendor.gralloc.enable_fb_ubwc 0\n    setprop vendor.gralloc.disable_ubwc 1' \
++      ${initRc} > $out
++    cat >> $out <<'EOF'
++
++# AsteroidOS SELinux stub integration for core service managers
++service servicemanager /system/bin/servicemanager
++    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
++    class core
++
++service hwservicemanager /system/bin/hwservicemanager
++    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
++    class core
++
++service vndservicemanager /vendor/bin/vndservicemanager /dev/vndbinder
++    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
++    class core
++
++# Graphics Allocator and ConfigStore services for Qualcomm Treble HIDL
++service vendor.gralloc-2-0 /vendor/bin/hw/android.hardware.graphics.allocator@2.0-service
++    class hal
++    user system
++    group graphics drmrpc
++    capabilities SYS_NICE
++
++service vendor.configstore-hal /vendor/bin/hw/android.hardware.configstore@1.1-service
++    class hal
++    user system
++    group system
++EOF
++  '';
++in
++{
++  # Early boot setup for Android HAL and libhybris property contexts and init.rc.
++  # These files reside in the Nix store and are symlinked into / every boot
++  # during early sysinit by systemd-tmpfiles.
++  systemd.tmpfiles.rules = [
++    "L+ /init.rc - - - - ${patchedInitRc}"
++    "L+ /plat_property_contexts - - - - ${platPropertyContexts}"
++    "L+ /nonplat_property_contexts - - - - ${nonplatPropertyContexts}"
++    "L+ /plat_hwservice_contexts - - - - /system/etc/selinux/plat_hwservice_contexts"
++    "L+ /vendor_hwservice_contexts - - - - /vendor/etc/selinux/vendor_hwservice_contexts"
++    "L+ /vndservice_contexts - - - - /vendor/etc/selinux/vndservice_contexts"
++  ];
++
++  # AsteroidOS-style Pie stack: /system is the hal-droid Android 9 tree from
++  # the hybris tarball and /vendor is the stock Pie vendor, so run the matching
++  # hal-droid Pie init. It parses the Pie system/vendor rc files (no apex or
++  # perform_apex_config) and starts servicemanager, hwservicemanager and the
++  # graphics composer that libhybris talks to.
++  systemd.services.android-init = {
++    description = "/system/bin/init initializes the property service and launches servicemanager and logd";
++    wantedBy = [
++      "multi-user.target"
++      "basic.target"
++    ];
++    after = [ "local-fs.target" ];
++    before = [
++      "network.target"
++      "bluetooth.service"
++      "ofono.service"
++      "sensord.service"
++    ];
++    unitConfig.DefaultDependencies = false;
++    unitConfig.Conflicts = [ "shutdown.target" ];
++    serviceConfig = {
++      Type = "simple";
++      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
++        # Ensure Qualcomm bootdevice and platform by-name symlinks exist for rmt_storage
++        ${pkgs.coreutils}/bin/mkdir -p /dev/block/bootdevice/by-name /dev/block/platform/msm_sdcc.1/by-name /dev/block/platform/soc/7824900.sdhci/by-name
++        if [ -d /dev/disk/by-partlabel ]; then
++          for p in /dev/disk/by-partlabel/*; do
++            [ -e "$p" ] || continue
++            name=$(${pkgs.coreutils}/bin/basename "$p")
++            ln_force "$p" /dev/block/bootdevice/by-name/"$name"
++            ln_force "$p" /dev/block/platform/msm_sdcc.1/by-name/"$name"
++            ln_force "$p" /dev/block/platform/soc/7824900.sdhci/by-name/"$name"
++          done
++        fi
++        ln_force ${patchedInitRc} /init.rc
++        ln_force ${platPropertyContexts} /plat_property_contexts
++        ln_force ${nonplatPropertyContexts} /nonplat_property_contexts
++        if [ -d /system/lib ]; then
++          # Android Bionic linker namespace isolation requires libraries in /system/lib
++          # to be regular files (not symlinks to /nix/store, which fail namespace checks).
++          # Use cmp -s to skip copying when already identical, avoiding redundant writes.
++          if [ -L /system/lib/libselinux.so ] || ! ${pkgs.diffutils}/bin/cmp -s ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so; then
++            ${pkgs.coreutils}/bin/rm -f /system/lib/libselinux.so
++            ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux.so
++          fi
++          if [ -L /system/lib/libselinux_stubs.so ] || ! ${pkgs.diffutils}/bin/cmp -s ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux_stubs.so; then
++            ${pkgs.coreutils}/bin/rm -f /system/lib/libselinux_stubs.so
++            ${pkgs.coreutils}/bin/cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so /system/lib/libselinux_stubs.so
++          fi
++        fi
++        if [ -f /system/etc/selinux/plat_hwservice_contexts ]; then
++          ln_force /system/etc/selinux/plat_hwservice_contexts /plat_hwservice_contexts
++        fi
++        if [ -f /vendor/etc/selinux/vendor_hwservice_contexts ]; then
++          ln_force /vendor/etc/selinux/vendor_hwservice_contexts /vendor_hwservice_contexts
++        fi
++        if [ -f /vendor/etc/selinux/vndservice_contexts ]; then
++          ln_force /vendor/etc/selinux/vndservice_contexts /vndservice_contexts
++        fi
++        if [ -f /system/etc/ld.config.28.txt ]; then
++          ${pkgs.util-linux}/bin/mount --bind ${ldConfig} /system/etc/ld.config.28.txt || true
++        fi
++
++        # Ensure /lib/firmware exists and has links to all vendor and dynamic firmware
++        ${pkgs.coreutils}/bin/mkdir -p /lib/firmware
++        for dir in /vendor/firmware /system/etc/firmware; do
++          if [ -d "$dir" ]; then
++            for f in "$dir"/*; do
++              [ -e "$f" ] || continue
++              name=$(${pkgs.coreutils}/bin/basename "$f")
++              ln_force "$f" /lib/firmware/"$name"
++            done
++          fi
++        done
++        for dir in /vendor/firmware_mnt/image /vendor/firmware_mnt /vendor/bt_firmware/image /vendor/bt_firmware; do
++          if [ -d "$dir" ]; then
++            for f in "$dir"/*; do
++              [ -e "$f" ] || continue
++              name=$(${pkgs.coreutils}/bin/basename "$f")
++              ln_force "$f" /lib/firmware/"$name"
++            done
++          fi
++        done
++        # Ensure TFA98xx amplifier container firmware is linked under both names expected by kernel
++        if [ -e /system/etc/firmware/tfa98xx.cnt ]; then
++          ln_force /system/etc/firmware/tfa98xx.cnt /lib/firmware/tfa98xx.cnt
++          ln_force /system/etc/firmware/tfa98xx.cnt /lib/firmware/tfa9890.cnt
++        fi
++
++        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
++      '';
++      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
++    };
++  };
++
++  # Hardware Composer 2.1 Treble service for libhybris graphics composition.
++  # Managed via systemd so it starts reliably after Android init/servicemanager
++  # with correct bionic library paths and survives Android framework restarts.
++  systemd.services.android-hwcomposer = {
++    description = "Android Hardware Composer 2.1 Service";
++    wantedBy = [ "multi-user.target" ];
++    after = [ "android-init.service" ];
++    requires = [ "android-init.service" ];
++    serviceConfig = {
++      Type = "simple";
++      Restart = "always";
++      RestartSec = "1s";
++      Environment = [
++        "PATH=/system/bin:/vendor/bin"
++        "LD_LIBRARY_PATH=/vendor/lib:/system/lib"
++      ];
++      ExecStartPre = pkgs.writeShellScript "hwcomposer-pre" ''
++        env -i /system/bin/setprop vendor.gralloc.enable_fb_ubwc 0 || true
++        env -i /system/bin/setprop vendor.gralloc.disable_ubwc 1 || true
++      '';
++      ExecStart = "/vendor/bin/hw/android.hardware.graphics.composer@2.1-service";
++    };
++  };
++
++  # AsteroidOS installs root property contexts and init.rc into / at image build time
++  # Reference: meta-smartwatch meta-hoki/recipes-android/android-init/android-init_1.0.bbappend
++  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
++    ln -sf ${patchedInitRc} ./init.rc
++    ln -sf ${platPropertyContexts} ./plat_property_contexts
++    ln -sf ${nonplatPropertyContexts} ./nonplat_property_contexts
++    if [ -f ./system/etc/ld.config.28.txt ]; then
++      cp -f ${ldConfig} ./system/etc/ld.config.28.txt
++    fi
++  '';
++}
+diff --git a/devices/fossil-hoki/android-system-data.nix b/devices/fossil-hoki/android-system-data.nix
+new file mode 100644
+index 00000000..36d3b739
+--- /dev/null
++++ b/devices/fossil-hoki/android-system-data.nix
+@@ -0,0 +1,26 @@
++{ pkgs }:
++
++# Installs the Fossil Gen 6 Android 9 system and vendor data for libhybris.
++# Matches upstream AsteroidOS recipe:
++# AsteroidOS/meta-smartwatch: meta-hoki/recipes-android/android/android-system-data_hoki-p.bb
++let
++  inherit (pkgs) buildPackages;
++in
++pkgs.runCommand "android-system-data-hoki-p" {
++  nativeBuildInputs = [
++    buildPackages.gnutar
++    buildPackages.gzip
++  ];
++} ''
++  mkdir -p $out
++  tar -xzf ${
++    pkgs.fetchurl {
++      url = "https://dl.dropboxusercontent.com/s/1mmpew8kyn52jko/system-hoki-p.tar.gz";
++      hash = "sha256-FBagGo/RnpyCqgypveM9toU+sI9UEVkrSxeDZJcUF84=";
++    }
++  } -C $out
++
++  # GNSS vendor HAL symlink (matching AsteroidOS PR #342)
++  ln -sfn android.hardware.gnss@1.0-service-qti \
++    $out/vendor/bin/hw/android.hardware.gnss@1.0-service
++''
+diff --git a/devices/fossil-hoki/audio-modules.nix b/devices/fossil-hoki/audio-modules.nix
+new file mode 100644
+index 00000000..4bcf1878
+--- /dev/null
++++ b/devices/fossil-hoki/audio-modules.nix
+@@ -0,0 +1,122 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  kernel = config.mobile.boot.stage-1.kernel.package;
++
++  # Upstream AsteroidOS recipe:
++  # https://github.com/AsteroidOS/meta-smartwatch/blob/88b4ac9/meta-hoki/recipes-kernel/modules/linux-audio-modules-hoki_p.bb
++  audioSrc = pkgs.fetchFromGitHub {
++    owner = "fossil-engineering";
++    repo = "kernel-msm-fossil-extra-cw-audiokernel";
++    rev = "c984389253fc58bc316af06bf3504dd2c25382be";
++    hash = "sha256-dcg4NBM8fMuhY1J/Fm4mZrhzSNIaFXQlebcNiTwvB2Q=";
++  };
++
++  upstreamPatch =
++    name: hash:
++    pkgs.fetchurl {
++      url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/88b4ac9/meta-hoki/recipes-kernel/modules/linux-audio-modules-hoki/${name}";
++      inherit hash;
++    };
++
++  audioModules = kernel.stdenv.mkDerivation {
++    pname = "linux-audio-modules-hoki";
++    version = kernel.version;
++    src = audioSrc;
++
++    patches = [
++      (upstreamPatch "0001-Remove-export-from-Kbuild-files.patch" "sha256-vjptUX54W5JCTL1wxFuba6fJC5mSl27sYaBYDF/xL2o=")
++      (upstreamPatch "0002-Avoid-shell-expansion-in-recursively-expanded-variab.patch" "sha256-11a78Tdzw37koeax5WYEu0HvCzxN4ABecyjWG5QHHmc=")
++      (upstreamPatch "0003-Import-beluga-makefile.patch" "sha256-VLbhbVGqJdbYYxAumcyoXpFIHHm3XPHHUqwEBXo4nHc=")
++      (upstreamPatch "0004-Ignore-compilation-warnings.patch" "sha256-5NAHGsk7Go//CPf85rNyjAzbhpnM653ThevAeSik/dQ=")
++      (upstreamPatch "0005-dsp-Compile-codecs-for-out-of-tree-builds.patch" "sha256-/hY0VsLIEY2Xwol3LFqjWaatMZFKiwWsrA7q1uZ33yQ=")
++    ];
++
++    nativeBuildInputs =
++      (with pkgs.buildPackages; [
++        bc
++        bison
++        flex
++        openssl
++        python3
++      ])
++      ++ [ pkgs.buildPackages.buildPackages.gcc ];
++    buildInputs = [ kernel ];
++
++    # Prepare the kernel source tree (with the same stable/device patches as the
++    # running kernel so vermagic matches 4.14.213) and the sibling
++    # kernel-build-artifacts directory expected by 0003-Import-beluga-makefile.patch.
++    configurePhase = ''
++      runHook preConfigure
++      cp -r ${kernel.src} kernel-src
++      chmod -R u+w kernel-src
++      for p in ${lib.concatMapStringsSep " " (p: "${p}") kernel.patches}; do
++        patch -d kernel-src -p1 < "$p"
++      done
++      cp ${kernel.configfile} kernel-src/.config
++      make -C kernel-src ARCH=arm CROSS_COMPILE=${kernel.stdenv.cc.targetPrefix} CC=${kernel.stdenv.cc}/bin/${kernel.stdenv.cc.targetPrefix}cc HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc olddefconfig
++      make -C kernel-src ARCH=arm CROSS_COMPILE=${kernel.stdenv.cc.targetPrefix} CC=${kernel.stdenv.cc}/bin/${kernel.stdenv.cc.targetPrefix}cc HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc modules_prepare
++
++      mkdir -p kernel-build-artifacts/usr/include/linux kernel-build-artifacts/scripts
++      ${pkgs.buildPackages.buildPackages.gcc}/bin/gcc -std=gnu11 kernel-src/scripts/unifdef.c -o kernel-build-artifacts/scripts/unifdef
++
++      # Extract vmlinux Module.symvers from the built kernel zImage + System.map
++      # so CONFIG_MODVERSIONS=y CRC checks (including module_layout) pass at load time.
++      python3 - "${kernel}" kernel-src/Module.symvers <<'PY'
++      import struct, sys, zlib
++      kdir, out_path = sys.argv[1], sys.argv[2]
++      zimg = open(kdir + "/zImage", "rb").read()
++      img = zlib.decompress(zimg[zimg.find(b"\x1f\x8b\x08"):], 16 + zlib.MAX_WBITS)
++      syms, ksymtab = {}, []
++      for line in open(kdir + "/System.map"):
++          addr_s, _, name = line.split()
++          addr = int(addr_s, 16)
++          syms[name] = addr
++          if name.startswith("__ksymtab_"):
++              ksymtab.append((addr, name[len("__ksymtab_"):]))
++      base = syms["_text"]
++      with open(out_path, "w") as out:
++          for saddr, sname in sorted(ksymtab):
++              if saddr < syms["__start___ksymtab_gpl"]:
++                  i = (saddr - syms["__start___ksymtab"]) // 8
++                  crc_addr, lic = syms["__start___kcrctab"] + i * 4, "EXPORT_SYMBOL"
++              else:
++                  i = (saddr - syms["__start___ksymtab_gpl"]) // 8
++                  crc_addr, lic = syms["__start___kcrctab_gpl"] + i * 4, "EXPORT_SYMBOL_GPL"
++              crc = struct.unpack_from("<I", img, crc_addr - base)[0]
++              out.write(f"0x{crc:08x}\t{sname}\tvmlinux\t{lic}\n")
++      PY
++      runHook postConfigure
++    '';
++
++    makeFlags = [
++      "ARCH=arm"
++      "CROSS_COMPILE=${kernel.stdenv.cc.targetPrefix}"
++      "CC=${kernel.stdenv.cc}/bin/${kernel.stdenv.cc.targetPrefix}cc"
++      "HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc"
++      "KERNEL_SRC=$(PWD)/kernel-src"
++    ];
++
++    installPhase = ''
++      runHook preInstall
++      modDir=$out/lib/modules/${kernel.modDirVersion}
++      mkdir -p "$modDir/extra"
++      find asoc dsp ipc soc -name '*.ko' -exec cp -v {} "$modDir/extra/" \;
++      for ko in "$modDir/extra"/*.ko; do
++        touch "$ko.cer"
++      done
++      touch "$modDir/modules.cer" "$modDir/modules.builtin" "$modDir/modules.builtin.modinfo"
++      echo "#" > "$modDir/modules.order"
++      runHook postInstall
++    '';
++  };
++in
++{
++  # Loaded by init.rc (`exec -- /sbin/modprobe -a audio_apr ...`) before booting ADSP.
++  boot.extraModulePackages = [ audioModules ];
++}
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+new file mode 100644
+index 00000000..a6a6e41d
+--- /dev/null
++++ b/devices/fossil-hoki/default.nix
+@@ -0,0 +1,588 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
++  androidSystemData = import ./android-system-data.nix { inherit pkgs; };
++
++  tfa9890Cnt = pkgs.runCommand "tfa9890.cnt" { } ''
++    ${pkgs.coreutils}/bin/base64 -d ${./tfa9890.cnt.base64} > $out
++  '';
++
++  # Static vendor and system firmware package for kernel direct firmware loader
++  hokiFirmware = pkgs.runCommand "hoki-firmware" { } ''
++    mkdir -p $out/lib/firmware
++    cp -a ${androidSystemData}/vendor/firmware/* $out/lib/firmware/
++    if [ -d ${androidSystemData}/system/etc/firmware ]; then
++      cp -a ${androidSystemData}/system/etc/firmware/* $out/lib/firmware/
++    fi
++    cp -f ${tfa9890Cnt} $out/lib/firmware/tfa9890.cnt
++  '';
++
++  # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd_git.bbappend
++  hokiNgfdIni = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd/51-ffmemless.ini";
++    sha256 = "19bzmmhhn526wyqcg163x1hc8czrmxli22m68s07srr4zza9dman";
++  };
++
++  hokiNgfdConfig = pkgs.runCommand "hoki-ngfd-config" { } ''
++    install -Dm644 ${hokiNgfdIni} $out/share/ngfd/plugins.d/51-ffmemless.ini
++  '';
++
++  # Debug builds get Qt plugin/loader tracing in the compositor environment,
++  # so a launcher dlopen/EGL failure is visible in the journal without
++  # hand-editing 20-device.conf on the device.
++  debugBuild =
++    config.mobile.hardware.watch.stage1-pause-debug.enable
++    || config.mobile.hardware.watch.stage2-save-logs.enable
++    || config.mobile.hardware.watch.stage2-ssh.enable;
++in
++{
++  imports = [
++    ../families/asteroidos.nix
++    ./hybris.nix
++    ./android-init.nix
++    ./wlan.nix
++    ./audio-modules.nix
++  ];
++
++  mobile.device.name = "fossil-hoki";
++  mobile.device.identity = {
++    name = "Gen 6";
++    manufacturer = "Fossil";
++  };
++
++  mobile.device.supportLevel = "supported";
++
++  # Upstream meta-hoki/conf/machine/hoki.conf: MACHINE_HAS_SPEAKER = "true".
++  # Exposed to the launcher/QML through /etc/asteroid/machine.conf.
++  mobile.hardware.watch.hasSpeaker = true;
++
++  # Linux 4.14 btrfs supports compress=zstd (without a level), noatime and
++  # space_cache=v2. It rejects compress=zstd:3 / zstd3 and space_cache v1.
++  # The image builder disables block-group-tree for this kernel.
++  mobile.generatedFilesystems.rootfs = {
++    filesystem = lib.mkForce "btrfs";
++    btrfs.compression = "zstd";
++  };
++
++  # btrfs-progs provides `btrfs filesystem resize` for rootfs growth and
++  # maintenance; stage-1 already gets it from modules/rootfs.nix.
++
++  mobile.hardware = {
++    # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), Cortex-A53.
++    # The Android system image is the 32-bit armv7l ABI.
++    soc = "qualcomm-sda429w";
++    ram = 1024 * 1;
++    screen = {
++      width = 416;
++      height = 416;
++    };
++    watch = {
++      hasCrown = true;
++      hasHaptics = true;
++      aodSupport = true;
++      stage1-pause-debug.enable = false;
++      stage2-ssh.enable = true;
++      stage2-save-logs.enable = true;
++    };
++  };
++
++  mobile.boot.stage-1 = {
++    kernel.package = pkgs.callPackage ./kernel { };
++  };
++
++  mobile.system.android = {
++    device_name = "hoki";
++    ab_partitions = true;
++    bootimg.flash = {
++      offset_base = "0x80000000";
++      offset_kernel = "0x00008000";
++      offset_ramdisk = "0x01000000";
++      offset_second = "0x00f00000";
++      offset_tags = "0x00000100";
++      pagesize = "4096";
++    };
++  };
++
++  # The DTB is appended to the kernel image (CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE).
++  # 90_dtbs-install.patch copies it flat into $out/dtbs/.
++  mobile.system.android.appendDTB = [
++    "dtbs/sda429-hoki.dtb"
++  ];
++
++  # Kernel parameters matching upstream AsteroidOS / Android bootloader configuration
++  # Reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-kernel/linux/linux-hoki/img_info
++  boot.kernelParams = [
++    "console=ttyMSM0,115200,n8"
++    "androidboot.console=ttyMSM0"
++    "androidboot.hardware=hoki"
++    "androidboot.selinux=permissive"
++    "audit=0"
++    "user_debug=30"
++    "msm_rtb.filter=0x237"
++    "ehci-hcd.park=3"
++    "androidboot.bootdevice=7824900.sdhci"
++    "lpm_levels.sleep_disabled=1"
++    "earlycon=msm_serial_dm,0x78b0000"
++    "vmalloc=300M"
++    "androidboot.usbconfigfs=true"
++    "loop.max_part=7"
++    "cgroup.memory=nokmem,nosocket"
++    "datapart=/dev/mmcblk0p50"
++  ]
++  ++ lib.optionals config.mobile.hardware.watch.stage1-pause-debug.enable [
++    # Verbose systemd logging for early stage-2 debugging.
++    "systemd.log_level=debug"
++    "systemd.log_target=kmsg"
++  ];
++
++  mobile.system.type = "android";
++
++  # The hoki vendor kernel does not provide a zram module; avoid the
++  # dev-zram0.device boot timeout.
++  zramSwap.enable = lib.mkForce false;
++
++  # Device-specific userdata partition for stage-1 boot discovery
++  mobile.boot.stage-1.bootConfig.partitions.userdata = "/dev/mmcblk0p50";
++
++  # Ensure stage-1 udev immediately links userdata to /dev/disk/by-label/NIXOS_SYSTEM and /dev/disk/by-partlabel/userdata
++  mobile.boot.stage-1.extraUdevRules = ''
++    KERNEL=="mmcblk0p50", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
++    ENV{PARTNAME}=="userdata", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
++    ENV{ID_PART_ENTRY_NAME}=="userdata", SYMLINK+="disk/by-label/NIXOS_SYSTEM", SYMLINK+="disk/by-partlabel/userdata"
++  '';
++
++  environment.systemPackages = [
++    pkgs.alsa-utils
++    pkgs.btrfs-progs
++    pkgs.qrtr
++    pkgs.tinyalsa
++    hokiNgfdConfig
++  ];
++
++  # Include static Qualcomm Adreno GPU, audio DSP and Wi-Fi firmware in the system
++  # closure so the kernel direct firmware loader (/sys/module/firmware_class/parameters/path)
++  # finds a530_pm4.fw, a530_pfp.fw, a506_zap.*, ice40.bin, and tfa98xx.cnt.
++  hardware.firmware = [ hokiFirmware ];
++  mobile.boot.stage-1.firmware = [ hokiFirmware ];
++
++  # Hardware audio mixer DAI link routing for NXP TFA98xx speaker amplifier & digital mic
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/issues/343
++  systemd.services.audio-routing-hoki = {
++    description = "Fossil Gen 6 TFA98xx audio amplifier and microphone mixer routing";
++    wantedBy = [ "multi-user.target" ];
++    wants = [ "dev-snd-controlC0.device" ];
++    after = [
++      "dev-snd-controlC0.device"
++      "sound.target"
++    ];
++    path = with pkgs; [
++      alsa-utils
++      coreutils
++      tinyalsa
++    ];
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = pkgs.writeShellScript "audio-routing-hoki" ''
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
++        # Ensure TFA98xx amplifier DSP container firmware is linked under both names in /lib/firmware
++        mkdir -p /lib/firmware
++        ln_force "${tfa9890Cnt}" /lib/firmware/tfa9890.cnt
++        for p in /system/etc/firmware/tfa98xx.cnt /vendor/firmware/tfa98xx.cnt /etc/firmware/tfa98xx.cnt; do
++          if [ -e "$p" ]; then
++            ln_force "$p" /lib/firmware/tfa98xx.cnt
++            break
++          fi
++        done
++
++        # Bounded poll for ALSA mixer control node (up to 30 seconds) to avoid cold boot race
++        for i in $(seq 1 60); do
++          if [ -e /dev/snd/controlC0 ]; then
++            break
++          fi
++          sleep 0.5
++        done
++
++        if [ -e /dev/snd/controlC0 ]; then
++          # QUAT_MI2S_RX connects MultiMedia1 frontend to TFA98xx speaker amplifier DAI link
++          tinymix -D 0 set "QUAT_MI2S_RX Audio Mixer MultiMedia1" 1 || true
++          tinymix -D 0 set "Playback 0 Volume" 8192 || true
++          tinymix -D 0 set "mono Profile" "Music" || true
++          tinymix -D 0 set "mono Music Playback Volume" 3 || true
++          # TERT_MI2S_TX connects digital microphone to MultiMedia1 capture frontend
++          tinymix -D 0 set "MultiMedia1 Mixer TERT_MI2S_TX" 1 || true
++          # Route digital mic 1 to DEC1
++          tinymix -D 0 set "DEC1 MUX" "DMIC1" || true
++        fi
++      '';
++    };
++  };
++
++  # AsteroidOS Wayland compositor environment is installed as
++  # /var/lib/environment/compositor/20-device.conf below, matching the
++  # upstream EnvironmentFile contract.
++
++  # Hardware node permissions and symlinks for Android HAL / libhybris
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-android/android-init/android-init/init.rc
++  services.udev.extraRules = ''
++    KERNEL=="binder", MODE="0666"
++    KERNEL=="ashmem", MODE="0666"
++    KERNEL=="hwbinder", MODE="0666"
++    KERNEL=="vndbinder", MODE="0666"
++    KERNEL=="mdss_rotator", MODE="0666"
++    SUBSYSTEM=="leds", KERNEL=="vibrator", ATTR{trigger}="transient", MODE="0666"
++    DEVPATH=="/devices/platform/soc/soc:qcom,bg-rsb", ATTR{enable}=="*", MODE="0666"
++
++    # Upstream AsteroidOS block device symlinks for Qualcomm rmt_storage and Android HALs
++    # Reference: meta-asteroid 998-droid-system.rules & Qualcomm bootdevice scheme
++    ENV{ID_PART_ENTRY_NAME}=="?*", SYMLINK+="block/bootdevice/by-name/$env{ID_PART_ENTRY_NAME}", SYMLINK+="block/platform/msm_sdcc.1/by-name/$env{ID_PART_ENTRY_NAME}", SYMLINK+="block/platform/soc/7824900.sdhci/by-name/$env{ID_PART_ENTRY_NAME}"
++  '';
++
++  # Persistent hardware partition mounts on Fossil Gen 6 eMMC
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-core/base-files/base-files/fstab
++  # Upstream AsteroidOS uses hwcomposer and direct MDP overlays; msm-fb-refresher
++  # pans /dev/fb0 continuously which exhausts MDSS hardware pipes (no 2 type pipes available).
++  mobile.quirks.fb-refresher.enable = lib.mkForce false;
++  mobile.quirks.fb-refresher.stage-1.enable = lib.mkForce false;
++
++  fileSystems = {
++    # Upstream AsteroidOS installs /system and /vendor directly into the rootfs
++    # from system-hoki-p.tar.gz rather than mounting an on-disk vendor partition.
++    # /vendor/bt_firmware and /vendor/firmware_mnt mount modem & bluetooth firmware
++    # onto mountpoints within /vendor.
++    "/persist" = {
++      device = "/dev/disk/by-partlabel/persist";
++      fsType = "ext4";
++      options = [
++        "nofail"
++        "errors=continue"
++      ];
++    };
++    "/vendor/firmware_mnt" = {
++      device = "/dev/disk/by-partlabel/modem";
++      fsType = "vfat";
++      options = [
++        "ro"
++        "shortname=lower"
++        "nofail"
++      ];
++    };
++    "/vendor/bt_firmware" = {
++      device = "/dev/disk/by-partlabel/bluetooth";
++      fsType = "vfat";
++      options = [
++        "ro"
++        "shortname=lower"
++        "nofail"
++      ];
++    };
++  };
++
++  # Subsystem boots and firmware mount setup
++  # GNSS vendor service symlink PR: https://github.com/AsteroidOS/meta-smartwatch/pull/342
++  systemd.tmpfiles.rules = [
++    "d /var/lib/environment/compositor 0755 root root -"
++    "L+ /dev/graphics/fb0 - - - - /dev/fb0"
++    "z /dev/fb0 0660 root video -"
++    "z /dev/input/event* 0660 root input -"
++    "d /mnt/vendor 0755 root root -"
++    "L+ /mnt/vendor/persist - - - - /persist"
++    "d /data/vendor 0755 root root -"
++    "d /data/vendor/ssrdump 0755 root root -"
++    "d /data/vendor/bgdaemon 0755 root root -"
++    "d /dev/block 0755 root root -"
++    "d /dev/block/bootdevice 0755 root root -"
++    "L+ /dev/block/bootdevice/by-name - - - - /dev/disk/by-partlabel"
++    "d /dev/block/platform 0755 root root -"
++    "L+ /dev/block/platform/msm_sdcc.1/by-name - - - - /dev/disk/by-partlabel"
++    "p+ /run/psplash_fifo 0666 root root -"
++    "d /sbin 0755 root root -"
++    "L+ /sbin/modprobe - - - - ${pkgs.kmod}/bin/modprobe"
++    "d /lib/firmware 0755 root root -"
++    "L+ /lib/modules - - - - /run/current-system/kernel-modules/lib/modules"
++    "L+ /etc/firmware - - - - /vendor/firmware"
++  ];
++
++  # systemd-tmpfiles refuses to create the compositor environment file at boot:
++  # the image root is owned by uid 1000 (the unprivileged image builder), which
++  # makes /var -> /var/lib an unsafe ownership transition. Install the file in
++  # the image instead so the launcher always sees QPA_HWC_*.
++  mobile.generatedFilesystems.rootfs.populateCommands = lib.mkAfter ''
++    # AsteroidOS installs the hal-droid tree at /usr/libexec/hal-droid
++    mkdir -p ./usr/libexec ./sbin
++    ln -sfn ${hybrisAndroid}/usr/libexec/hal-droid ./usr/libexec/hal-droid
++    ln -sfn ${pkgs.kmod}/bin/modprobe ./sbin/modprobe
++
++    # AsteroidOS installs the Fossil Gen 6 Android 9 system and vendor data
++    # Reference: meta-smartwatch meta-hoki/recipes-android/android/android-system-data_hoki-p.bb
++    mkdir -p ./system ./vendor ./lib/firmware ./etc
++    ln -sfn /run/current-system/kernel-modules/lib/modules ./lib/modules
++    cp -a ${androidSystemData}/system/* ./system/
++    cp -a ${androidSystemData}/vendor/* ./vendor/
++    chmod -R u+w ./system ./vendor
++
++    # Populate /lib/firmware and /etc/firmware with vendor & system firmware for kernel direct loading
++    cp -a ${androidSystemData}/vendor/firmware/* ./lib/firmware/ 2>/dev/null || true
++    if [ -d ${androidSystemData}/system/etc/firmware ]; then
++      cp -a ${androidSystemData}/system/etc/firmware/* ./lib/firmware/ 2>/dev/null || true
++    fi
++    [ -e ./lib/firmware/tfa98xx.cnt ] && ln -sf tfa98xx.cnt ./lib/firmware/tfa9890.cnt || true
++    ln -sfn /vendor/firmware ./etc/firmware
++
++    # Replace stock Android libselinux.so with AsteroidOS libselinux_stubs.so
++    # to stub out SELinux calls for all Android HALs and service managers.
++    cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so ./system/lib/libselinux.so
++    cp -f ${hybrisAndroid}/usr/libexec/hal-droid/system/lib/libselinux_stubs.so ./system/lib/libselinux_stubs.so
++
++    # Symlink SELinux service and hardware service contexts to root if present
++    if [ -f ./system/etc/selinux/plat_hwservice_contexts ]; then
++      ln -sf /system/etc/selinux/plat_hwservice_contexts ./plat_hwservice_contexts
++    fi
++    if [ -f ./vendor/etc/selinux/vendor_hwservice_contexts ]; then
++      ln -sf /vendor/etc/selinux/vendor_hwservice_contexts ./vendor_hwservice_contexts
++    fi
++    if [ -f ./vendor/etc/selinux/vndservice_contexts ]; then
++      ln -sf /vendor/etc/selinux/vndservice_contexts ./vndservice_contexts
++    fi
++
++    mkdir -p ./var/lib/environment/compositor
++    cp ${pkgs.writeText "00-default.conf" ''
++      QT_IM_MODULE=qtvirtualkeyboard
++    ''} ./var/lib/environment/compositor/00-default.conf
++
++    cp ${pkgs.writeText "10-platform.conf" ''
++      EGL_PLATFORM=hwcomposer
++      QT_QPA_PLATFORM=hwcomposer
++      QT_ENABLE_GLYPH_CACHE_WORKAROUND=true
++      QT_GSTREAMER_CAMERABIN_SRC=droidcamsrc
++    ''} ./var/lib/environment/compositor/10-platform.conf
++
++    cp ${pkgs.writeText "20-device.conf" ''
++      LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
++      QPA_HWC_FORCE_GLES=1
++      QPA_HWC2_FORCE_DOZE_UPDATE=1
++      QT_OPENGL_NO_BGRA=1
++      ${lib.optionalString debugBuild ''
++        QT_DEBUG_PLUGINS=1
++      ''}
++    ''} ./var/lib/environment/compositor/20-device.conf
++
++    cp ${pkgs.writeText "qt6-hidpi.conf" ''
++      QT_ENABLE_HIGHDPI_SCALING=0
++    ''} ./var/lib/environment/compositor/qt6-hidpi.conf
++  '';
++
++  # Symlink modem and bluetooth partition firmware into /lib/firmware
++  # once /vendor/firmware_mnt and /vendor/bt_firmware are mounted.
++  systemd.services.firmware-mount-links-hoki = {
++    description = "Symlink dynamic modem and bluetooth firmware into /lib/firmware";
++    after = [
++      "vendor-firmware_mnt.mount"
++      "vendor-bt_firmware.mount"
++    ];
++    before = [
++      "android-init.service"
++      "wlan-firmware-hoki.service"
++    ];
++    wantedBy = [ "multi-user.target" ];
++    unitConfig = {
++      DefaultDependencies = false;
++      Conflicts = [ "shutdown.target" ];
++    };
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = pkgs.writeShellScript "firmware-mount-links-hoki" ''
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
++        mkdir -p /lib/firmware
++        # Link modem partition PIL firmware (wcnss, venus, modem, adsp, etc.)
++        for dir in /vendor/firmware_mnt/image /vendor/firmware_mnt; do
++          if [ -d "$dir" ]; then
++            for f in "$dir"/*; do
++              [ -e "$f" ] || continue
++              base=$(${pkgs.coreutils}/bin/basename "$f")
++              ln_force "$f" "/lib/firmware/$base"
++            done
++          fi
++        done
++        # Link bluetooth partition firmware
++        for dir in /vendor/bt_firmware/image /vendor/bt_firmware; do
++          if [ -d "$dir" ]; then
++            for f in "$dir"/*; do
++              [ -e "$f" ] || continue
++              base=$(${pkgs.coreutils}/bin/basename "$f")
++              ln_force "$f" "/lib/firmware/$base"
++            done
++          fi
++        done
++      '';
++    };
++  };
++
++  # The hoki init.rc (run by android-init.service) boots the ADSP/CDSP/SLPI
++  # subsystems, sets their restart levels, fixes up the bg-rsb permissions and
++  # runs init.rsb.sh on sys.boot_completed, matching AsteroidOS. No separate
++  # systemd service is needed.
++
++  # Fossil Gen 6 CPU/GPU underclock and power collapse profile
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-core/underclock/underclock/underclock
++  # Commit: https://github.com/AsteroidOS/meta-smartwatch/commit/8c1dbee6c37cdd4ad97d083a59085abf7032ad42
++  systemd.services.underclock-hoki = {
++    description = "Fossil Gen 6 low power collapse and CPU underclocking";
++    wantedBy = [ "multi-user.target" ];
++    serviceConfig = {
++      Type = "simple";
++      ExecStart = pkgs.writeShellScript "underclock-hoki" ''
++        # Delay tuning until the boot has settled, but do not hold
++        # multi-user.target while waiting.
++        ${pkgs.coreutils}/bin/sleep 20
++
++        # Enable low power mode & allow system-pc
++        if [ -f /sys/module/lpm_levels/parameters/sleep_disabled ]; then
++          echo 0 > /sys/module/lpm_levels/parameters/sleep_disabled 2>/dev/null || true
++        fi
++        if [ -f /sys/module/lpm_levels/system/system-pc/idle_enabled ]; then
++          echo 0 > /sys/module/lpm_levels/system/system-pc/idle_enabled 2>/dev/null || true
++        fi
++        # Set CPU governor to ondemand for quick burst responses
++        if [ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]; then
++          echo ondemand > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || true
++        fi
++        # Disable secondary cores to save battery on wrist
++        for c in 1 2 3; do
++          if [ -f /sys/devices/system/cpu/cpu$c/online ]; then
++            echo 0 > /sys/devices/system/cpu/cpu$c/online 2>/dev/null || true
++          fi
++        done
++      '';
++    };
++  };
++
++  # WCNSS Wi-Fi firmware initialization and driver loading
++  # Upstream PR: https://github.com/AsteroidOS/meta-smartwatch/pull/341 ("hoki: wlan: working WiFi driver from source")
++  systemd.services.wlan-firmware-hoki = {
++    description = "Enable pronto WLAN firmware and load the wlan module on hoki";
++    after = [ "android-init.service" ];
++    before = [ "connman.service" ];
++    wantedBy = [ "multi-user.target" ];
++    path = with pkgs; [
++      kmod
++      coreutils
++    ];
++    serviceConfig = {
++      # Never hold multi-user.target: the prima module waits for WCNSS
++      # firmware inside the kernel, which can take minutes when the firmware
++      # is missing. WiFi coming up late must not delay the user session.
++      Type = "simple";
++      ExecStart = "${pkgs.writeShellScript "wlan-firmware-hoki" (
++        builtins.readFile ./wlan-firmware-hoki.sh
++      )}";
++    };
++  };
++
++  # GNSS AGPS NTP injection configuration & Android HAL library symlink
++  # Upstream PR: https://github.com/AsteroidOS/meta-smartwatch/pull/342 ("hoki: gnss: symlink real vendor HAL service, enable NTP AGPS assistance")
++  environment.etc."gps_xtra.ini".source = ./gps_xtra.ini;
++
++  # The vendor GNSS rc references android.hardware.gnss@1.0-service but the
++  # stock vendor ships the -qti variant. Create the alias at boot (the vendor
++  # partition is read-only, so remount it for the operation) and drop the AGPS
++  # assistance file on /persist, matching PR #342.
++  systemd.services.gnss-hoki = {
++    description = "hoki GNSS vendor service symlink and AGPS assistance";
++    after = [
++      "persist.mount"
++    ];
++    before = [ "android-init.service" ];
++    wantedBy = [ "multi-user.target" ];
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = pkgs.writeShellScript "gnss-hoki" ''
++        ln_force() {
++          local target="$1"
++          local link="$2"
++          if [ -L "$link" ] && [ "$(${pkgs.coreutils}/bin/readlink "$link")" = "$target" ]; then
++            return 0
++          fi
++          ${pkgs.coreutils}/bin/rm -rf "$link"
++          ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$link")"
++          ${pkgs.coreutils}/bin/ln -sfn "$target" "$link"
++        }
++
++        if [ -d /persist ] && [ -e /etc/gps_xtra.ini ]; then
++          ln_force /etc/gps_xtra.ini /persist/gps_xtra.ini
++        fi
++      '';
++    };
++  };
++
++  # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/ngfd/ngfd/51-ffmemless.ini
++  environment.etc."ngf/51-ffmemless.ini".source = hokiNgfdIni;
++  environment.etc."ngfd/plugins.d/51-ffmemless.ini".source = hokiNgfdIni;
++
++  # Qualcomm IPC Router name service
++  # Upstream reference: meta-hoki/conf/machine/hoki.conf (IMAGE_INSTALL += "qrtr")
++  systemd.services.qrtr-ns = {
++    description = "QIPCRTR Name Service";
++    wantedBy = [ "multi-user.target" ];
++    serviceConfig = {
++      ExecStart = "${pkgs.qrtr}/bin/qrtr-ns -f 1";
++      Restart = "always";
++    };
++  };
++
++  # Near Field Communication (NFC) controller configuration
++  # Upstream reference: https://github.com/AsteroidOS/meta-smartwatch/blob/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/libnci/libncicore/libncicore.conf
++  environment.etc."libncicore.conf".source = pkgs.fetchurl {
++    url = "https://raw.githubusercontent.com/AsteroidOS/meta-smartwatch/873c865ca06593d239f911b76b09228ddd70eccc/meta-hoki/recipes-nemomobile/libnci/libncicore/libncicore.conf";
++    sha256 = "12zg3n0jysy7lczqwh0kl5ccg1ljgidkqazj6i8v2j9k0nckkx29";
++  };
++
++  # Qualcomm MSM8909W / SDM429W DSP frontend (MultiMedia1 / hw:0,0) only accepts 48,000 Hz.
++  # Configure ALSA plug with rate 48000 so all apps (including 44.1 kHz beatfork tick.wav)
++  # are transparently resampled and play properly.
++  environment.etc."asound.conf".text = ''
++    pcm.!default {
++      type plug
++      slave {
++        pcm "hw:0,0"
++        rate 48000
++        format S16_LE
++      }
++    }
++
++    ctl.!default {
++      type hw
++      card 0
++    }
++  '';
++}
+diff --git a/devices/fossil-hoki/gps_xtra.ini b/devices/fossil-hoki/gps_xtra.ini
+new file mode 100644
+index 00000000..594fc6c1
+--- /dev/null
++++ b/devices/fossil-hoki/gps_xtra.ini
+@@ -0,0 +1,2 @@
++[ntp]
++NTP_FORCE_INJECT=true
+diff --git a/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch b/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
+new file mode 100644
+index 00000000..cb9ddd4b
+--- /dev/null
++++ b/devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
+@@ -0,0 +1,31 @@
++--- a/egl/platforms/hwcomposer/hwcomposer_window.cpp
+++++ b/egl/platforms/hwcomposer/hwcomposer_window.cpp
++@@ -106,7 +106,27 @@
++     busy = 0;
++     status = 0;
++ 
++-    hybris_gralloc_allocate(width, height, format, (uint32_t)usage, &handle, (uint32_t*)&stride);
+++    const int allocationResult =
+++        hybris_gralloc_allocate(width, height, format, (uint32_t)usage,
+++                                &handle, (uint32_t*)&stride);
+++
+++    if (getenv("HYBRIS_HWC_DEBUG")) {
+++        const native_handle_t *nativeHandle = handle;
+++        fprintf(stderr,
+++                "hybris-hwc: allocate this=%p native=%p requested=%ux%u "
+++                "format=0x%x usage=0x%" PRIx64 " result=%d "
+++                "buffer=%ux%u stride=%d format=0x%x usage=0x%" PRIx64 " "
+++                "handle=%p numFds=%d numInts=%d fd0=%d\n",
+++                this, static_cast<ANativeWindowBuffer *>(this),
+++                width, height, format, usage, allocationResult,
+++                ANativeWindowBuffer::width, ANativeWindowBuffer::height,
+++                ANativeWindowBuffer::stride, ANativeWindowBuffer::format,
+++                ANativeWindowBuffer::usage, nativeHandle,
+++                nativeHandle ? nativeHandle->numFds : -1,
+++                nativeHandle ? nativeHandle->numInts : -1,
+++                (nativeHandle && nativeHandle->numFds > 0)
+++                    ? nativeHandle->data[0] : -1);
+++    }
++ 
++     TRACE("width=%d height=%d stride=%d format=x%x usage=x%x status=%s this=%p",
++         width, height, stride, format, usage, strerror(-status), this);
+diff --git a/devices/fossil-hoki/hybris-android.nix b/devices/fossil-hoki/hybris-android.nix
+new file mode 100644
+index 00000000..49b976fc
+--- /dev/null
++++ b/devices/fossil-hoki/hybris-android.nix
+@@ -0,0 +1,30 @@
++{ pkgs }:
++# AsteroidOS ships patched Android system libraries and headers for hybris on
++# the Fossil Gen 6. They contain the HWC2 compatibility layer that the stock
++# Fossil system/vendor image lacks, and the hal-droid init/system binaries
++# used by android-init.service.
++# Source: meta-asteroid recipes-android/android/android_armv7-pie64.bb
++let
++  inherit (pkgs) buildPackages;
++in
++pkgs.runCommand "hybris-p-msm8909w" {
++  nativeBuildInputs = [
++    buildPackages.gnutar
++    buildPackages.gzip
++  ];
++} ''
++  mkdir -p $out
++  tar xf ${
++    pkgs.fetchurl {
++      url = "https://dl.dropboxusercontent.com/s/2btck4hlowhronv/hybris-p-msm8909w.tar.gz";
++      hash = "sha256-19kXAAB3la7c30//pBhVLt8rP9QaAiM2dAGQb09N/tM=";
++    }
++  } -C $out
++
++  # GNSS (#342): the vendor provides gps.default.so under /vendor/lib/hw.
++  # /system is the read-only hal-droid tree, so create the hw module alias at
++  # build time rather than relying on a boot-time symlink into the store.
++  mkdir -p $out/usr/libexec/hal-droid/system/lib/hw
++  ln -sfn /vendor/lib/hw/gps.default.so \
++    $out/usr/libexec/hal-droid/system/lib/hw/gps.default.so
++''
+diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
+new file mode 100644
+index 00000000..6c9f6620
+--- /dev/null
++++ b/devices/fossil-hoki/hybris.nix
+@@ -0,0 +1,47 @@
++{
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
++in
++{
++  # Build libhybris against the AsteroidOS Android headers and point its
++  # runtime Android library path at the hal-droid tree, matching
++  # meta-asteroid's libhybris_git.bbappend. android-init.service installs
++  # the hybris tarball at /usr/libexec/hal-droid/system.
++  nixpkgs.overlays = lib.mkAfter [
++    (final: super: {
++      libhybris = super.libhybris.overrideAttrs (old: {
++        patches = (old.patches or [ ]) ++ [ ./hwcomposer-allocation-diagnostics.patch ];
++        configureFlags =
++          (lib.filter (
++            flag:
++            !(lib.hasPrefix "--with-android-headers=" flag)
++            && !(lib.hasPrefix "--with-default-hybris-ld-library-path=" flag)
++          ) (old.configureFlags or [ ]))
++          ++ [
++            "--with-android-headers=${hybrisAndroid}/include"
++            "--with-default-hybris-ld-library-path=/usr/libexec/hal-droid/system/lib:${hybrisAndroid}/usr/libexec/hal-droid/system/lib:/vendor/lib:/system/lib"
++          ];
++
++        # mce-plugin-libhybris compiles against the Android headers libhybris
++        # was built with; android-headers 23 lacks android-config.h, so expose
++        # the device's pie headers.
++        passthru = (old.passthru or { }) // {
++          androidHeaders = hybrisAndroid;
++          androidHeadersInclude = "${hybrisAndroid}/include";
++        };
++      });
++
++      # Upstream AsteroidOS installs qt5compat-qmlplugins via OpenEmbedded:
++      # https://github.com/AsteroidOS/meta-asteroid/blob/master/classes/asteroid-image.bbclass
++      # The cross-compilation overlay in overlay/cross-compile.nix builds the full
++      # native Qt5Compat.GraphicalEffects and private C++ plugins (libqtgraphicaleffectsprivateplugin.so),
++      # so qt5compatQml provides the genuine upstream qt5compat package matching meta-asteroid.
++      qt5compatQml = super.qt6.qt5compat;
++    })
++  ];
++}
+diff --git a/devices/fossil-hoki/tfa9890.cnt.base64 b/devices/fossil-hoki/tfa9890.cnt.base64
+new file mode 100644
+index 00000000..8aed5309
+--- /dev/null
++++ b/devices/fossil-hoki/tfa9890.cnt.base64
+@@ -0,0 +1,93 @@
++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
++ZmlnAKwMAAPwAQAAU1AxXzAw8AFEjCCoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
++AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//MP//BP//U///Jf//oP//S///kv//K///Rv//
++P///RP/+zv//Hf/+1///Yv//Bv//Qv//Jf//X///Dv//C//+6f/+lf/+xf/+Xf/+s//+4//+q//+
++Xf/+Kv//D//9yf/+9f/+y//+Dv/+w//+aP/+ff/+Pf/+Qv/+Yf/+RP/+Ff/+Rv/+F//9vP/93v/9
++4P/9IP/+U//9Wv/9///9R//9l//9k//9af/88P/+M//9Of/9ZP/9l//85v/9Cf/87f/87f/8mP/8
++vf/8f//8lv/8S//79//84v/7h//9B//70v/78v/7f//7pv/7uv/7l//7fv/66P/7YP/7Bv/7DP/6
++VP/7gP/7A//5+f/7ZP/47P/8YP/35P//CP/1xAABuv/xHAAA6f/qpAAC2f/r0AAN/f/1MwAVqv/u
++uf//nf/PFf/hVP/WdQAPAAA4igBiQwBfQP/tM//SnAi61v/oUwAAAAAAAAAAAAAAAAAAAAAAAAAA
++AAAAAAAAAAAAAAAAAAAAAEAAAFCj1yAAACAAACAAABo9cQADogAD4AIAAABHrg8AAAB9LEVGVDFf
++OTAxLnNwZWFrZXIATXVzaWMuNDgwMDAACADDBAIAYQSaDgADwQEAAFZQMl8wMcEB+otlX05YUAAA
++AAAAZGV2a2l0AAB2ZXIgMS4wAAEIAAAAAAAAAQABcgAAAgCAAAALuAAAAAABLAFHrgArsAAA0gAQ
++YgEAAAKAAAKzMweFHwgAAAHmZgEzMwAMzQBAAAABSAABSAEAAAABSAABSAeuFAeFHwAHrgAAFAAA
++AcSc0ns35A98c+EHGQ98cwEDAADIQzMzMz8AAEDBAAABwlNQfYCYPTHkgn9oQHrMAAdHAchD1wW1
++P9gAQEAAAADqqqsAAAAlVVVKqqolVVUBAgCAO0YzMzM/AAAAAAAAAJ5++3KJZWqugY12m3bShAEH
++AND3RQAAAEEAAADBAAABzKpiQBOONavov+xyPam2AQcAYOpFAADAQAAAgMAAAAHVactk7iIokYub
++Ed5CBKoBBwBAHEXNzEw/AADAPwAAAQAAAAAAAAAAAAAAAEAAAAABAAB6RPMEtT8AAAAAAAABAAAA
++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
++cAA=
+diff --git a/devices/fossil-hoki/wlan-firmware-hoki.sh b/devices/fossil-hoki/wlan-firmware-hoki.sh
+new file mode 100644
+index 00000000..95d80bb2
+--- /dev/null
++++ b/devices/fossil-hoki/wlan-firmware-hoki.sh
+@@ -0,0 +1,42 @@
++#!/bin/sh
++# SPDX-License-Identifier: MIT
++# Symlink stock vendor WCNSS firmware/calibration data into the path the
++# out-of-tree pronto WLAN driver actually looks under, power up WCNSS by
++# opening (not writing) /dev/wcnss_wlan, then load the driver.
++# See https://github.com/AsteroidOS/meta-smartwatch/issues/224
++
++ln_force() {
++	target="$1"
++	link="$2"
++	if [ -L "$link" ] && [ "$(readlink "$link")" = "$target" ]; then
++		return 0
++	fi
++	rm -rf "$link"
++	mkdir -p "$(dirname "$link")"
++	ln -sfn "$target" "$link"
++}
++
++mkdir -p /lib/firmware/wlan/prima
++
++for f in WCNSS_qcom_cfg.ini WCNSS_qcom_wlan_nv.bin WCNSS_wlan_dictionary.dat; do
++	if [ -e "/vendor/firmware/wlan/prima/$f" ]; then
++		ln_force "/vendor/firmware/wlan/prima/$f" "/lib/firmware/wlan/prima/$f"
++	fi
++done
++
++# The PIL firmware loader requests /lib/firmware/wcnss.mdt and the
++# wcnss.b00..b09 segments, not the /vendor path, so link those too.
++for dir in /vendor/firmware /vendor/firmware_mnt/image /vendor/firmware_mnt; do
++	if [ -d "$dir" ]; then
++		for f in "$dir"/wcnss.*; do
++			[ -e "$f" ] || continue
++			ln_force "$f" "/lib/firmware/${f##*/}"
++		done
++	fi
++done
++
++# Opening this device node is what actually powers WCNSS up; the write
++# itself is expected to fail and is not an error.
++echo 1 > /dev/wcnss_wlan 2>/dev/null || true
++
++modprobe wlan
+diff --git a/devices/fossil-hoki/wlan.nix b/devices/fossil-hoki/wlan.nix
+new file mode 100644
+index 00000000..18d05338
+--- /dev/null
++++ b/devices/fossil-hoki/wlan.nix
+@@ -0,0 +1,112 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  kernel = config.mobile.boot.stage-1.kernel.package;
++
++  # AsteroidOS PR #341: "hoki: wlan: working WiFi driver from source".
++  # The stock /vendor/lib/modules/wlan.ko was built against Fossil's own
++  # 4.14.206-perf+ kernel and fails with a vermagic mismatch against ours, so
++  # build the out-of-tree Qualcomm pronto/prima driver against this kernel.
++  prima = pkgs.fetchFromGitHub {
++    owner = "Dev-msm8953";
++    repo = "vendor_qcom_opensource_wlan_prima";
++    rev = "3401b53";
++    hash = "sha256-nApGIHSWY5V06TGqm9w7kylWucddPBAd6yFCXNI/anY=";
++  };
++
++  wlanModule = pkgs.stdenv.mkDerivation {
++    pname = "wlan-prima";
++    version = "4.14";
++    src = prima;
++
++    patches = [
++      ./wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
++      ./wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
++    ];
++
++    nativeBuildInputs =
++      (with pkgs.buildPackages; [
++        bc
++        bison
++        flex
++        openssl
++        python3
++      ])
++      ++ [ pkgs.buildPackages.buildPackages.gcc ];
++    buildInputs = [ kernel ];
++
++    # The mobile-nixos kernel output has no module build tree, so prepare one
++    # from the kernel source and the config the kernel was built with.
++    # HOSTCC must be a build-platform compiler: the kernel builds fixdep for
++    # the build machine. pkgs.buildPackages.gcc is still the cross compiler,
++    # so reach one level further out for the native one.
++    configurePhase = ''
++      runHook preConfigure
++      cp -r ${kernel.src} kernel-src
++      chmod -R u+w kernel-src
++      for p in ${lib.concatMapStringsSep " " (p: "${p}") kernel.patches}; do
++        patch -d kernel-src -p1 < "$p"
++      done
++      cp ${kernel.configfile} kernel-src/.config
++      cp ${./wlan/wakelock.h} kernel-src/include/linux/wakelock.h
++      make -C kernel-src ARCH=arm CROSS_COMPILE=${pkgs.stdenv.cc.targetPrefix} HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc olddefconfig
++      make -C kernel-src ARCH=arm CROSS_COMPILE=${pkgs.stdenv.cc.targetPrefix} HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc modules_prepare
++
++      # Extract vmlinux Module.symvers from the built kernel zImage + System.map
++      # so CONFIG_MODVERSIONS=y CRC checks (including module_layout) pass at load time.
++      python3 - "${kernel}" kernel-src/Module.symvers <<'PY'
++      import struct, sys, zlib
++      kdir, out_path = sys.argv[1], sys.argv[2]
++      zimg = open(kdir + "/zImage", "rb").read()
++      img = zlib.decompress(zimg[zimg.find(b"\x1f\x8b\x08"):], 16 + zlib.MAX_WBITS)
++      syms, ksymtab = {}, []
++      for line in open(kdir + "/System.map"):
++          addr_s, _, name = line.split()
++          addr = int(addr_s, 16)
++          syms[name] = addr
++          if name.startswith("__ksymtab_"):
++              ksymtab.append((addr, name[len("__ksymtab_"):]))
++      base = syms["_text"]
++      with open(out_path, "w") as out:
++          for saddr, sname in sorted(ksymtab):
++              if saddr < syms["__start___ksymtab_gpl"]:
++                  i = (saddr - syms["__start___ksymtab"]) // 8
++                  crc_addr, lic = syms["__start___kcrctab"] + i * 4, "EXPORT_SYMBOL"
++              else:
++                  i = (saddr - syms["__start___ksymtab_gpl"]) // 8
++                  crc_addr, lic = syms["__start___kcrctab_gpl"] + i * 4, "EXPORT_SYMBOL_GPL"
++              crc = struct.unpack_from("<I", img, crc_addr - base)[0]
++              out.write(f"0x{crc:08x}\t{sname}\tvmlinux\t{lic}\n")
++      PY
++      runHook postConfigure
++    '';
++
++    makeFlags = [
++      "ARCH=arm"
++      "CROSS_COMPILE=${pkgs.stdenv.cc.targetPrefix}"
++      "HOSTCC=${pkgs.buildPackages.buildPackages.gcc}/bin/gcc"
++      "KERNEL_SOURCE=$(PWD)/kernel-src"
++      "KERNEL_SRC=$(PWD)/kernel-src"
++      "CONFIG_PRONTO_WLAN=m"
++      "WLAN_ROOT=$(PWD)"
++      "MODNAME=wlan"
++    ];
++
++    installPhase = ''
++      mkdir -p $out/lib/modules/${kernel.modDirVersion}/extra
++      cp wlan.ko $out/lib/modules/${kernel.modDirVersion}/extra/wlan.ko
++      touch $out/lib/modules/${kernel.modDirVersion}/extra/wlan.ko.cer
++    '';
++  };
++in
++{
++  # wlan-firmware-hoki.sh symlinks the vendor firmware and opens
++  # /dev/wcnss_wlan before this module is loaded.
++  boot.extraModulePackages = [ wlanModule ];
++  boot.kernelModules = [ "wlan" ];
++}
+diff --git a/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch b/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
+new file mode 100644
+index 00000000..05d22dda
+--- /dev/null
++++ b/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
+@@ -0,0 +1,30 @@
++From 749c0d6d61aaf3e2e9f655cd1af980c0d06efc6e Mon Sep 17 00:00:00 2001
++From: pettcomputers <chris@pettcomputers.com>
++Date: Sun, 30 Aug 2026 09:48:28 -0500
++Subject: [PATCH] hdd_process_bt_sco_profile: fix use of adapter before
++ assignment
++
++---
++ CORE/HDD/src/wlan_hdd_main.c | 7 +++++++
++ 1 file changed, 7 insertions(+)
++
++diff --git a/CORE/HDD/src/wlan_hdd_main.c b/CORE/HDD/src/wlan_hdd_main.c
++index 91368f1..a80b1f4 100644
++--- a/CORE/HDD/src/wlan_hdd_main.c
+++++ b/CORE/HDD/src/wlan_hdd_main.c
++@@ -3974,6 +3974,13 @@ int hdd_process_bt_sco_profile(hdd_context_t *hdd_ctx,
++ 		return -EINVAL;
++ 	}
++ 
+++	adapter = hdd_get_adapter(hdd_ctx, WLAN_HDD_INFRA_STATION);
+++	if (!adapter) {
+++		hddLog(VOS_TRACE_LEVEL_ERROR,
+++		       "%s: No station adapter, skipping bt profile", __func__);
+++		return -EINVAL;
+++	}
+++
++ 	INIT_COMPLETION(hdd_ctx->sw_pta_comp);
++ 
++ 	hal_status = sme_sw_pta_req(hdd_ctx->hHal, hdd_sw_pta_resp_callback,
++-- 
++2.51.1
+diff --git a/devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch b/devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
+new file mode 100644
+index 00000000..19a90d46
+--- /dev/null
++++ b/devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
+@@ -0,0 +1,25 @@
++From c597ca249a4ec61fd8ceddd9474eda6e6717535c Mon Sep 17 00:00:00 2001
++From: pettcomputers <chris@pettcomputers.com>
++Date: Sun, 30 Aug 2026 10:10:18 -0500
++Subject: [PATCH] Makefile: quote CC/LD/AR/OBJCOPY/STRIP in nested make
++ invocation
++
++---
++ Makefile | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/Makefile b/Makefile
++index d5c94f0..c644d01 100644
++--- a/Makefile
+++++ b/Makefile
++@@ -5,7 +5,7 @@ KBUILD_OPTIONS += MODNAME=wlan
++ 
++ all::
++ 	$(MAKE) -C $(KERNEL_SOURCE) $(KBUILD_OPTIONS) $(EXTRA_CFLAGS) ARCH=$(ARCH) \
++-		SUBDIRS=$(CURDIR) CC=${CC} modules
+++		SUBDIRS=$(CURDIR) CC="$(CC)" LD="$(LD)" AR="$(AR)" OBJCOPY="$(OBJCOPY)" STRIP="$(STRIP)" modules
++ 
++ modules_install:
++ 	$(MAKE) INSTALL_MOD_STRIP=1 -C $(KERNEL_SRC) M=$(shell pwd) modules_install
++-- 
++2.51.1
+diff --git a/devices/fossil-hoki/wlan/wakelock.h b/devices/fossil-hoki/wlan/wakelock.h
+new file mode 100644
+index 00000000..02faafd6
+--- /dev/null
++++ b/devices/fossil-hoki/wlan/wakelock.h
+@@ -0,0 +1,3 @@
++/* Empty stub. This header was removed from mainline Linux (replaced by the
++ * wakeup_source API) but the vendor pronto WLAN driver still #includes it.
++ * See https://github.com/AsteroidOS/meta-smartwatch/issues/224 */
+diff --git a/devices/fossil-ray/default.nix b/devices/fossil-ray/default.nix
+new file mode 100644
+index 00000000..1aa4a568
+--- /dev/null
++++ b/devices/fossil-ray/default.nix
+@@ -0,0 +1,56 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++{
++  imports = [
++    ../families/asteroidos.nix
++  ];
++
++  mobile.device.name = "fossil-ray";
++  mobile.device.identity = {
++    name = "Gen 4 (41mm)";
++    manufacturer = "Fossil";
++  };
++
++  mobile.device.supportLevel = "supported";
++
++  mobile.hardware = {
++    # Qualcomm Snapdragon Wear 2100 (MSM8909W)
++    soc = "qualcomm-msm8909w";
++    ram = 512;
++    screen = {
++      width = 390;
++      height = 390;
++      shape = "round";
++    };
++    watch = {
++      hasCrown = true;
++      hasHaptics = true;
++      aodSupport = true;
++      burnInProtection = true;
++    };
++  };
++
++  mobile.system.android = {
++    device_name = "ray";
++    bootimg.flash = {
++      offset_base = "0x80000000";
++      offset_kernel = "0x00008000";
++      offset_ramdisk = "0x02000000";
++      offset_second = "0x00f00000";
++      offset_tags = "0x01e00000";
++      pagesize = "2048";
++    };
++  };
++
++  boot.kernelParams = [
++    "console=ttyMSM0,115200,n8"
++    "androidboot.console=ttyMSM0"
++    "androidboot.hardware=ray"
++    "msm_rtb.filter=0x237"
++  ];
++}
+diff --git a/devices/fossil-triggerfish/default.nix b/devices/fossil-triggerfish/default.nix
+new file mode 100644
+index 00000000..b29f7d73
+--- /dev/null
++++ b/devices/fossil-triggerfish/default.nix
+@@ -0,0 +1,56 @@
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++{
++  imports = [
++    ../families/asteroidos.nix
++  ];
++
++  mobile.device.name = "fossil-triggerfish";
++  mobile.device.identity = {
++    name = "Gen 5";
++    manufacturer = "Fossil";
++  };
++
++  mobile.device.supportLevel = "supported";
++
++  mobile.hardware = {
++    # Qualcomm Snapdragon Wear 3100
++    soc = "qualcomm-sda429w";
++    ram = 1024 * 1;
++    screen = {
++      width = 416;
++      height = 416;
++    };
++    watch = {
++      hasCrown = true;
++      hasHaptics = true;
++      aodSupport = true;
++    };
++  };
++
++  mobile.system.android = {
++    device_name = "triggerfish";
++    bootimg.flash = {
++      offset_base = "0x80000000";
++      offset_kernel = "0x00008000";
++      offset_ramdisk = "0x01000000";
++      offset_second = "0x00f00000";
++      offset_tags = "0x00000100";
++      pagesize = "2048";
++    };
++  };
++
++  boot.kernelParams = [
++    "console=ttyMSM0,115200,n8"
++    "androidboot.console=ttyMSM0"
++    "androidboot.hardware=triggerfish"
++    "msm_rtb.filter=0x237"
++    "ehci-hcd.park=3"
++    "vmalloc=300M"
++  ];
++}

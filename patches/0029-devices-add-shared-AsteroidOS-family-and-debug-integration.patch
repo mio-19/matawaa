@@ -1,0 +1,336 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:55:55 +1100
+Subject: [PATCH] devices: add shared AsteroidOS family and debug integration
+
+---
+ devices/families/asteroidos.nix | 320 ++++++++++++++++++++++++++++++++
+ 1 file changed, 320 insertions(+)
+ create mode 100644 devices/families/asteroidos.nix
+
+diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
+new file mode 100644
+index 00000000..f1e3d863
+--- /dev/null
++++ b/devices/families/asteroidos.nix
+@@ -0,0 +1,320 @@
++{
++  config,
++  options,
++  lib,
++  pkgs,
++  ...
++}:
++
++let
++  inherit (lib)
++    mkDefault
++    mkIf
++    ;
++  cfg = config.mobile.hardware.watch.stage1-pause-debug;
++  journalCfg = config.mobile.hardware.watch.stage2-save-logs;
++  stage2SshCfg = config.mobile.hardware.watch.stage2-ssh;
++  debugNetwork = cfg.enable || stage2SshCfg.enable;
++in
++{
++  # Legacy smartwatch kernels (Linux 4.x) lack STATX_MNT_ID, close_range, and modern
++  # cgroup/pidfd APIs required by systemd >= 261. Override systemd and udev system-wide
++  # to systemd 257 for all consumers on legacy watch targets (without polluting buildPackages).
++  nixpkgs.overlays = lib.mkIf (config.mobile.hardware.watch.kernel == "legacy") (lib.mkAfter [
++    (final: super: super.lib.optionalAttrs (super.stdenv.hostPlatform.isAarch32) {
++      systemd = final.systemd257;
++      udev = final.systemd257;
++      lvm2 = super.lvm2.overrideAttrs (old: {
++        outputChecks = builtins.mapAttrs (_: v: (v // { disallowedRequisites = [ ]; })) (
++          old.outputChecks or { }
++        );
++      });
++    })
++  ]);
++
++  assertions = [
++    {
++      assertion = !(cfg.enable && stage2SshCfg.enable);
++      message = "mobile.hardware.watch.stage1-pause-debug and mobile.hardware.watch.stage2-ssh are mutually exclusive.";
++    }
++  ];
++
++  mobile.system.type = mkDefault "android";
++  mobile.system.system = mkDefault "armv7l-linux";
++
++  mobile.hardware.watch = {
++    enable = mkDefault true;
++    hasHaptics = mkDefault true;
++    aodSupport = mkDefault true;
++    burnInProtection = mkDefault true;
++    powerManagement.enable = mkDefault true;
++  };
++
++  # Smartwatches flash fixed system/userdata partitions via fastboot;
++  # growPartition must be disabled to avoid pulling 64-bit qemu-utils into 32-bit ARMv7 targets.
++  boot.growPartition = lib.mkForce false;
++
++  # Display quirks for Qualcomm MDSS framebuffer and DSI command-mode panels
++  mobile.quirks.fb-refresher.enable = mkDefault true;
++  mobile.quirks.fb-refresher.stage-1.enable = mkDefault true;
++  mobile.quirks.qualcomm.fb-notify.enable = mkDefault true;
++
++  # Ensure display is unblanked and backlight is active on boot
++  boot.postBootCommands = ''
++    # Unblank display panel
++    if [ -e /sys/class/graphics/fb0/blank ]; then
++      echo 0 > /sys/class/graphics/fb0/blank || true
++    fi
++
++    # Set display backlight brightness (~50%)
++    for bl in /sys/class/backlight/* /sys/class/leds/*backlight /sys/class/leds/*lcd*; do
++      if [ -e "$bl/max_brightness" ]; then
++        max=$(cat "$bl/max_brightness")
++        echo $(( max / 2 )) > "$bl/brightness" || true
++      elif [ -e "$bl/brightness" ]; then
++        echo 50 > "$bl/brightness" || true
++      fi
++    done
++  '';
++
++  # Downstream Android/AsteroidOS vendor kernels use specialized defconfigs (disabling desktop VT, etc.)
++  # Reference: https://github.com/AsteroidOS/meta-smartwatch/tree/master/meta-hoki/recipes-kernel/linux
++  mobile.boot.stage-1.kernel.useStrictKernelConfig = lib.mkForce false;
++
++  # Watches are embedded appliances; disable installer tools to shrink image and avoid heavy cross-compilation
++  system.disableInstallerTools = mkDefault true;
++
++  # Disable documentation and manual pages on constrained smartwatch storage to shrink closure
++  documentation = {
++    enable = mkDefault false;
++    man.enable = mkDefault false;
++    doc.enable = mkDefault false;
++    info.enable = mkDefault false;
++    nixos.enable = mkDefault false;
++  };
++
++  # nscd is now Type=simple, but the journal still shows multi-user.target
++  # waiting for systemd-user-sessions.service, whose upstream unit is ordered
++  # after nss-user-lookup.target. Keep the nscd fix and explicitly remove that
++  # ordering so the user session and launcher can start.
++  systemd.services.systemd-user-sessions = {
++    after = lib.mkForce [ ];
++    overrideStrategy = "asDropin";
++  };
++
++  # nsncd's generated nscd.service is Type=notify but the daemon never sends
++  # READY. Use an explicit drop-in so the setting applies to the nscd unit that
++  # nss-user-lookup.target requires, not only to a newly generated unit. With
++  # nscd actually active, nss-user-lookup and systemd-user-sessions can complete
++  # normally without bypassing the user-sessions gate.
++  systemd.services.nscd = {
++    overrideStrategy = "asDropin";
++    serviceConfig.Type = lib.mkForce "simple";
++  };
++
++  # Keep DHCP available but do not let it hold boot. There is no guaranteed
++  # DHCP-capable interface at stage-2 startup, and dhcpcd otherwise waits for
++  # an address, holding multi-user.target. Forking to background lets the user
++  # session and launcher start while dhcpcd continues to watch for links.
++  networking.dhcpcd.wait = lib.mkDefault "background";
++
++  # Disable heavy desktop/server utilities and editors not used on smartwatches
++  programs.nano.enable = mkDefault false;
++  programs.command-not-found.enable = mkDefault false;
++  services.lvm.enable = mkDefault false;
++  boot.bcache.enable = mkDefault false;
++  boot.enableContainers = mkDefault false;
++  services.logrotate.enable = mkDefault false;
++  services.udisks2.enable = mkDefault false;
++  services.kmscon.enable = mkDefault false;
++  services.resolved.enable = mkDefault false;
++  boot.plymouth.enable = lib.mkForce false;
++  environment.defaultPackages = mkDefault [ ];
++  # Disable unnecessary stub-ld and desktop XDG components not used on smartwatches
++  environment.stub-ld.enable = mkDefault false;
++  xdg.icons.enable = mkDefault false;
++  xdg.mime.enable = mkDefault false;
++  xdg.sounds.enable = mkDefault false;
++  xdg.autostart.enable = mkDefault false;
++
++  # Flashing method defaults to fastboot, destination to userdata partition
++  mobile.system.android.flashingMethod = mkDefault "fastboot";
++  mobile.system.android.system_partition_destination = mkDefault "userdata";
++
++  # Default stateVersion
++  system.stateVersion = mkDefault "26.11";
++
++  # Smartwatch stem/power button should be handled by compositor/shell, not
++  # logind shutdown; match AsteroidOS systemd-conf powerkey.conf.
++  # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd-conf/powerkey.conf
++  services.logind.settings = {
++    Login = {
++      HandlePowerKey = mkDefault "ignore";
++      HandlePowerKeyLongPress = mkDefault "ignore";
++      HandleRebootKey = mkDefault "ignore";
++      HandleSuspendKey = mkDefault "ignore";
++      HandleHibernateKey = mkDefault "ignore";
++      HandleLidSwitch = mkDefault "ignore";
++    };
++  };
++
++  # Enable zram compressed in-memory swap to avoid OOM on 512MB-1GB smartwatches
++  zramSwap = {
++    enable = mkDefault true;
++    memoryPercent = lib.mkOptionDefault 50;
++  };
++
++  mobile.boot.stage-1.fail.delay = mkDefault 60;
++
++  # AsteroidOS credits the saved random seed as entropy to avoid slow boots on
++  # pre-5.4 watch kernels.
++  # Reference: https://github.com/AsteroidOS/meta-asteroid/commit/cda451a3e582cc4877b06c37638398542d53d986
++  systemd.services.systemd-random-seed.environment.SYSTEMD_RANDOM_SEED_CREDIT = "force";
++
++  # AsteroidOS grants the video group access to Android graphics nodes.
++  # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd/50-video.rules
++  services.udev.extraRules = lib.mkAfter ''
++    ACTION=="add", KERNEL=="ion", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="kgsl-3d0", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mm_interlock", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mm_v3d", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mtk_disp_mgr", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="MTK_SMI", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="mali", MODE="0664", GROUP="video"
++    ACTION=="add", KERNEL=="vboxguest", MODE="0664", GROUP="video"
++
++    # Export power_supply capacity and status to udev database for MCE battery-udev plugin
++    SUBSYSTEM=="power_supply", ATTR{type}=="Battery", ATTR{capacity}=="?*", ENV{POWER_SUPPLY_CAPACITY}="$attr{capacity}"
++    SUBSYSTEM=="power_supply", ATTR{type}=="Battery", ATTR{status}=="?*", ENV{POWER_SUPPLY_STATUS}="$attr{status}"
++    SUBSYSTEM=="power_supply", KERNEL=="battery", ATTR{capacity}=="?*", ENV{POWER_SUPPLY_CAPACITY}="$attr{capacity}"
++    SUBSYSTEM=="power_supply", KERNEL=="battery", ATTR{status}=="?*", ENV{POWER_SUPPLY_STATUS}="$attr{status}"
++  '';
++
++  # Default to ext4 root filesystem for compatibility across vendor kernels
++  mobile.generatedFilesystems.rootfs.filesystem = mkDefault "ext4";
++
++  # Common kernel parameters recommended for AsteroidOS android-based kernels
++  boot.kernelParams = [
++    "loop.max_part=7"
++  ];
++
++  # Persist the journal and coredumps only for stage1 debug/ssh bring-up;
++  # production watches keep the volatile journal to avoid eMMC/UFS writes.
++  services.journald.settings.Journal = mkIf journalCfg.enable {
++    Storage = lib.mkForce "persistent";
++    SystemMaxUse = lib.mkForce "64M";
++  };
++
++  # systemd-coredump writes external files for the launcher/compositor
++  # crashes that otherwise only appear as "Core dump" lines in kmsg.
++  systemd.coredump = mkIf journalCfg.enable {
++    enable = true;
++    settings.Coredump = {
++      Storage = "external";
++      MaxUse = "256M";
++    };
++  };
++
++  mobile.beautification.silentBoot = mkIf cfg.enable (lib.mkForce false);
++
++  mobile.usb = mkIf debugNetwork {
++    mode = mkDefault "gadgetfs";
++    idVendor = mkDefault "18d1";
++    idProduct = mkDefault "d002";
++    gadgetfs.functions.rndis = "ncm.usb0";
++  };
++
++  # Stage-1 owns gadget creation on these Android kernels. Keep it enabled
++  # whenever debug networking is requested, even when boot continues directly
++  # into stage-2; otherwise usb_f_ncm is not loaded and no USB NIC appears.
++  mobile.boot.stage-1.networking.enable = mkIf debugNetwork (mkDefault true);
++  mobile.boot.stage-1.ssh.enable = mkIf cfg.enable (mkDefault true);
++
++  services.openssh = mkIf debugNetwork {
++    enable = mkDefault true;
++    settings = {
++      PermitRootLogin = "yes";
++      PermitEmptyPasswords = "yes";
++      # Keyboard-interactive PAM authentication succeeds on the vendor kernel
++      # but fails during pam_setcred(); direct password sessions work.
++      PasswordAuthentication = true;
++      KbdInteractiveAuthentication = false;
++    };
++  };
++
++  # A pending stage-2 sshd holds back multi-user.target on first boot; stage-1
++  # telnet/SSH remains available for debugging.
++  systemd.services.sshd.wantedBy = mkIf (cfg.enable && !stage2SshCfg.enable) (lib.mkForce [ ]);
++
++  networking.firewall.enable = mkIf debugNetwork (mkDefault false);
++
++  # ConnMan otherwise claims the gadget as a tethering device and brings it
++  # down after the static debug addresses have been configured.
++  services.connman.networkInterfaceBlacklist = mkIf debugNetwork (
++    lib.mkAfter (
++      options.services.connman.networkInterfaceBlacklist.default
++      ++ [
++        "usb"
++        "rndis"
++      ]
++    )
++  );
++
++  networking.interfaces.usb0.ipv4.addresses = mkIf debugNetwork [
++    {
++      address = "192.168.2.15";
++      prefixLength = 24;
++    }
++    {
++      address = "172.16.42.1";
++      prefixLength = 24;
++    }
++  ];
++
++  users.users.root.password = mkIf debugNetwork "root";
++
++  systemd.services.usb-gadget-network = mkIf debugNetwork {
++    description = "USB Gadget Ethernet (NCM) Setup";
++    wantedBy = [ "multi-user.target" ];
++    wants = [ "network-pre.target" ];
++    before = [ "network-pre.target" ];
++    unitConfig.DefaultDependencies = false;
++    serviceConfig = {
++      Type = "oneshot";
++      RemainAfterExit = true;
++      ExecStart = pkgs.writeShellScript "setup-usb-gadget" ''
++        set -e
++        ${pkgs.util-linux}/bin/mountpoint -q /sys/kernel/config || { mkdir -p /sys/kernel/config; ${pkgs.util-linux}/bin/mount -t configfs none /sys/kernel/config; }
++        udc="$(ls /sys/class/udc 2>/dev/null | head -n1)"
++        [ -n "$udc" ] || { echo "No USB device controller found" >&2; exit 1; }
++        g=/sys/kernel/config/usb_gadget/g1
++        if [ ! -d "$g" ]; then
++          mkdir -p "$g/strings/0x409" "$g/functions/ncm.usb0" "$g/configs/c.1/strings/0x409"
++          echo 0x18d1 > "$g/idVendor"
++          echo 0xd002 > "$g/idProduct"
++          echo AsteroidOS > "$g/strings/0x409/manufacturer"
++          echo Smartwatch > "$g/strings/0x409/product"
++          echo "CDC NCM" > "$g/configs/c.1/strings/0x409/configuration"
++          ln -sf "$g/functions/ncm.usb0" "$g/configs/c.1/"
++        fi
++        # Configfs attribute sizes do not report whether a controller is bound.
++        [ -n "$(cat "$g/UDC")" ] || echo "$udc" > "$g/UDC"
++
++        # Binding the NCM function creates usb0, but does not necessarily bring
++        # the netdev up. A down usb0 leaves macOS with an enumerated but
++        # inactive USB Ethernet port.
++        for attempt in $(seq 1 20); do
++          [ -e /sys/class/net/usb0 ] && break
++          sleep 0.25
++        done
++        [ -e /sys/class/net/usb0 ] || { echo "NCM gadget did not create usb0" >&2; exit 1; }
++        ${pkgs.iproute2}/bin/ip link set dev usb0 up
++        # The normal NixOS address unit can run before gadget binding creates
++        # usb0. Configure both debug subnets here after the netdev exists; the
++        # declarative interface config remains as a fallback on later starts.
++        ${pkgs.iproute2}/bin/ip address replace 192.168.2.15/24 dev usb0
++        ${pkgs.iproute2}/bin/ip address replace 172.16.42.1/24 dev usb0
++      '';
++    };
++  };
++}

@@ -1,0 +1,1715 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:55:52 +1100
+Subject: [PATCH] asteroid: package community apps with build and usability
+ fixes
+
+---
+ .../beatfork-tack-improvements.patch          | 449 ++++++++++
+ overlay/asteroidos/community-apps/default.nix | 384 +++++++++
+ .../map-comaps-improvements.patch             | 814 ++++++++++++++++++
+ .../community-apps/weatherfetch-gcc16.patch   |  11 +
+ overlay/asteroidos/default.nix                |   6 +
+ 5 files changed, 1664 insertions(+)
+ create mode 100644 overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
+ create mode 100644 overlay/asteroidos/community-apps/default.nix
+ create mode 100644 overlay/asteroidos/community-apps/map-comaps-improvements.patch
+ create mode 100644 overlay/asteroidos/community-apps/weatherfetch-gcc16.patch
+
+diff --git a/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch b/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
+new file mode 100644
+index 00000000..3887693a
+--- /dev/null
++++ b/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
+@@ -0,0 +1,449 @@
++diff -ruN a/src/main.qml b/src/main.qml
++--- a/src/main.qml	2026-10-18 23:59:51.691512427 +1100
+++++ b/src/main.qml	2026-10-19 00:03:53.163889229 +1100
++@@ -138,6 +138,39 @@
++         event: "press"
++     }
++ 
+++    NonGraphicalFeedback {
+++        id: hapticAccent
+++        event: "warning"
+++    }
+++
+++    // Tack-inspired time signatures & subdivisions (1/4, 2/4, 3/4, 4/4, 5/4, 6/8, 7/8)
+++    readonly property var timeSignatures: [
+++        { name: "1/4", beats: 1 },
+++        { name: "2/4", beats: 2 },
+++        { name: "3/4", beats: 3 },
+++        { name: "4/4", beats: 4 },
+++        { name: "5/4", beats: 5 },
+++        { name: "6/8", beats: 6 },
+++        { name: "7/8", beats: 7 }
+++    ]
+++    property int timeSignatureIndex: 3
+++    property int beatIndex:          0
+++    property bool isAccent:          true
+++    property bool isMuted:           false
+++    property var mutedBeats:         ({})
+++
+++    readonly property var tempoPresets: [60, 80, 100, 120, 140, 160, 180]
+++
+++    // Tack-inspired practice duration tracker
+++    property int practiceElapsedSeconds: 0
+++    Timer {
+++        id: practiceTimer
+++        interval: 1000
+++        repeat: true
+++        running: page1State.soundActive || page1State.hapticActive || page1State.pulseVisible
+++        onTriggered: app.practiceElapsedSeconds++
+++    }
+++
++     Timer {
++         id: beatTimer
++         interval:         Math.max(1, Math.round(60000 / bpmConfig.value))
++@@ -186,9 +219,19 @@
++     signal beat()
++ 
++     function beatFlash() {
+++        var numBeats = app.timeSignatures[app.timeSignatureIndex].beats
+++        app.beatIndex = (app.beatIndex + 1) % numBeats
+++        app.isAccent = (app.beatIndex === 0)
+++        app.isMuted = !!(app.mutedBeats && app.mutedBeats[app.beatIndex])
+++
++         app.beat()
++-        if (page1State.soundActive)  tickSound.play()
++-            if (page1State.hapticActive) hapticFeedback.play()
+++        if (!app.isMuted) {
+++            if (page1State.soundActive) tickSound.play()
+++            if (page1State.hapticActive) {
+++                if (app.isAccent) hapticAccent.play()
+++                else hapticFeedback.play()
+++            }
+++        }
++     }
++ 
++     ListView {
++@@ -265,6 +308,44 @@
++                 soundActive:    page1State.soundActive
++                 hapticActive:   page1State.hapticActive
++                 beatSource:     app
+++                isAccent:               app.isAccent
+++                isMuted:                app.isMuted
+++                timeSignatureIndex:     app.timeSignatureIndex
+++                timeSignatures:         app.timeSignatures
+++                currentBeat:            app.beatIndex
+++                mutedBeats:             app.mutedBeats
+++                practiceElapsedSeconds: app.practiceElapsedSeconds
+++
+++                onTimeSignatureCycle: {
+++                    app.timeSignatureIndex = (app.timeSignatureIndex + 1) % app.timeSignatures.length
+++                    app.beatIndex = 0
+++                    app.isAccent = true
+++                    app.mutedBeats = ({})
+++                }
+++
+++                onToggleMuteBeat: function(bIdx) {
+++                    var m = Object.assign({}, app.mutedBeats)
+++                    if (m[bIdx]) delete m[bIdx]
+++                    else m[bIdx] = true
+++                    app.mutedBeats = m
+++                }
+++
+++                onResetPracticeTimer: {
+++                    app.practiceElapsedSeconds = 0
+++                }
+++
+++                onNextPreset: {
+++                    var cur = bpmConfig.value
+++                    var next = app.tempoPresets[0]
+++                    for (var i = 0; i < app.tempoPresets.length; i++) {
+++                        if (app.tempoPresets[i] > cur) {
+++                            next = app.tempoPresets[i]
+++                            break
+++                        }
+++                    }
+++                    bpmConfig.value = next
+++                }
+++
++                 onPulseVisibleSet: page1State.pulseVisible = active
++                 onSoundActiveSet:  page1State.soundActive  = active
++                 onHapticActiveSet: page1State.hapticActive = active
++diff -ruN a/src/MetronomePage.qml b/src/MetronomePage.qml
++--- a/src/MetronomePage.qml	2026-10-18 23:59:51.690512425 +1100
+++++ b/src/MetronomePage.qml	2026-10-19 00:08:09.939289726 +1100
++@@ -30,12 +30,73 @@
++ 
++     property bool   pageActive: false
++ 
+++    // Tack-inspired properties
+++    property bool   isAccent:     false
+++    property bool   isMuted:      false
+++    property int    timeSignatureIndex: 3
+++    property var    timeSignatures: [
+++        { name: "1/4", beats: 1 },
+++        { name: "2/4", beats: 2 },
+++        { name: "3/4", beats: 3 },
+++        { name: "4/4", beats: 4 },
+++        { name: "5/4", beats: 5 },
+++        { name: "6/8", beats: 6 },
+++        { name: "7/8", beats: 7 }
+++    ]
+++    property int    currentBeat:  0
+++    property var    mutedBeats:   ({})
+++    property int    practiceElapsedSeconds: 0
+++    property var    tapTimes:     []
+++
++     // Write-back signals
++     signal pulseVisibleSet(bool active)
++     signal soundActiveSet(bool active)
++     signal hapticActiveSet(bool active)
++     signal colorIndexSet(int idx)
++-    signal bpmPending(int bpm)          // main restarts spinnerDebounce and sets pendingBpm
+++    signal timeSignatureCycle()
+++    signal toggleMuteBeat(int bIdx)
+++    signal resetPracticeTimer()
+++    signal nextPreset()
+++    signal bpmPending(int bpm)
+++
+++    function getTempoName(bpm) {
+++        if (bpm < 45)  return "Grave"
+++        if (bpm < 60)  return "Largo"
+++        if (bpm < 66)  return "Larghetto"
+++        if (bpm < 76)  return "Adagio"
+++        if (bpm < 108) return "Andante"
+++        if (bpm < 120) return "Moderato"
+++        if (bpm < 156) return "Allegro"
+++        if (bpm < 176) return "Vivace"
+++        if (bpm <= 200) return "Presto"
+++        return "Prestissimo"
+++    }
+++
+++    function formatPracticeTime(totalSeconds) {
+++        var m = Math.floor(totalSeconds / 60)
+++        var s = totalSeconds % 60
+++        return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s)
+++    }
+++
+++    function registerTap() {
+++        var now = Date.now()
+++        if (tapTimes.length > 0 && (now - tapTimes[tapTimes.length - 1]) > 2000) {
+++            tapTimes = []
+++        }
+++        tapTimes.push(now)
+++        if (tapTimes.length > 6) tapTimes.shift()
+++        if (tapTimes.length >= 2) {
+++            var total = 0
+++            for (var i = 1; i < tapTimes.length; i++) {
+++                total += (tapTimes[i] - tapTimes[i - 1])
+++            }
+++            var avgDelta = total / (tapTimes.length - 1)
+++            var newBpm = Math.round(60000 / avgDelta)
+++            if (newBpm >= page.bpmMin && newBpm <= page.bpmMax) {
+++                page.bpmPending(newBpm)
+++            }
+++        }
+++    }
++ 
++     // ── Settle guard ──────────────────────────────────────────────────────────
++     property bool settled: false
++@@ -95,7 +156,7 @@
++             Connections {
++                 target: page.beatSource
++                 function onBeat() {
++-                    if (page.settled && page.pulseVisible) pulseToggleBeat.restart()
+++                    if (page.settled && page.pulseVisible && !page.isMuted) pulseToggleBeat.restart()
++                 }
++             }
++         }
++@@ -149,7 +210,7 @@
++             Connections {
++                 target: page.beatSource
++                 function onBeat() {
++-                    if (page.settled && page.pulseVisible) colorCycleBeat.restart()
+++                    if (page.settled && page.pulseVisible && !page.isMuted) colorCycleBeat.restart()
++                 }
++             }
++         }
++@@ -198,7 +259,7 @@
++             Connections {
++                 target: page.beatSource
++                 function onBeat() {
++-                    if (page.settled && page.soundActive) soundToggleBeat.restart()
+++                    if (page.settled && page.soundActive && !page.isMuted) soundToggleBeat.restart()
++                 }
++             }
++         }
++@@ -250,7 +311,7 @@
++             Connections {
++                 target: page.beatSource
++                 function onBeat() {
++-                    if (page.settled && page.hapticActive) hapticToggleBeat.restart()
+++                    if (page.settled && page.hapticActive && !page.isMuted) hapticToggleBeat.restart()
++                 }
++             }
++         }
++@@ -288,14 +349,111 @@
++ 
++         SequentialAnimation {
++             id: pulseBigAnim
++-            NumberAnimation { target: pulseBig; property: "opacity"; to: 1.0; duration: 60;  easing.type: Easing.OutQuad }
+++            NumberAnimation { target: pulseBig; property: "opacity"; to: page.isAccent ? 1.0 : 0.55; duration: 60;  easing.type: Easing.OutQuad }
++             NumberAnimation { target: pulseBig; property: "opacity"; to: 0.0; duration: 140; easing.type: Easing.InQuad }
++         }
++ 
++         Connections {
++             target: page.beatSource
++             function onBeat() {
++-                if (page.settled && page.pulseVisible) pulseBigAnim.restart()
+++                if (page.settled && page.pulseVisible && !page.isMuted) pulseBigAnim.restart()
+++            }
+++        }
+++    }
+++
+++    // ── Concentric visual pulse ring (Tack-inspired) ─────────────────────────
+++    Rectangle {
+++        id: pulseRing
+++        anchors.centerIn: parent
+++        width: Dims.l(25)
+++        height: width
+++        radius: width / 2
+++        color: "transparent"
+++        border.color: page.pulseColor
+++        border.width: page.isAccent ? Dims.l(3.5) : Dims.l(1.8)
+++        opacity: 0.0
+++        z: 10
+++
+++        ParallelAnimation {
+++            id: pulseRingAnim
+++            NumberAnimation { target: pulseRing; property: "width"; from: Dims.l(25); to: page.isAccent ? Dims.l(95) : Dims.l(75); duration: 250; easing.type: Easing.OutQuad }
+++            NumberAnimation { target: pulseRing; property: "opacity"; from: page.isAccent ? 0.95 : 0.65; to: 0.0; duration: 250; easing.type: Easing.OutQuad }
+++        }
+++
+++        Connections {
+++            target: page.beatSource
+++            function onBeat() {
+++                if (page.settled && page.pulseVisible && !page.isMuted) pulseRingAnim.restart()
+++            }
+++        }
+++    }
+++
+++    // ── Subdivision indicator & Time Signature Selector (Tack-inspired) ────────
+++    Item {
+++        id: subdivisionControl
+++        anchors.top: parent.top
+++        anchors.topMargin: Dims.h(11)
+++        anchors.horizontalCenter: parent.horizontalCenter
+++        width: Dims.w(58)
+++        height: Dims.h(12)
+++        z: 3
+++
+++        Rectangle {
+++            anchors.fill: parent
+++            radius: height / 2
+++            color: "#182030"
+++            opacity: 0.88
+++            border.color: page.isAccent ? page.pulseColor : "#3a4660"
+++            border.width: 1
+++        }
+++
+++        Row {
+++            anchors.centerIn: parent
+++            spacing: Dims.w(2.5)
+++
+++            // Time Signature pill
+++            Item {
+++                width: timeSigText.implicitWidth + Dims.w(2)
+++                height: parent.height
+++
+++                Text {
+++                    id: timeSigText
+++                    anchors.centerIn: parent
+++                    text: page.timeSignatures[page.timeSignatureIndex].name
+++                    color: page.pulseColor
+++                    font.bold: true
+++                    font.pixelSize: Dims.l(5.5)
+++                }
+++
+++                MouseArea {
+++                    anchors.fill: parent
+++                    onClicked: page.timeSignatureCycle()
+++                }
+++            }
+++
+++            // Beat dots with mute support (Tack-inspired)
+++            Row {
+++                anchors.verticalCenter: parent.verticalCenter
+++                spacing: Dims.w(1.5)
+++
+++                Repeater {
+++                    model: page.timeSignatures[page.timeSignatureIndex].beats
+++                    Rectangle {
+++                        property bool muted: !!(page.mutedBeats && page.mutedBeats[index])
+++                        width: Dims.l(index === 0 ? 3.6 : 2.6)
+++                        height: width
+++                        radius: width / 2
+++                        color: muted ? "transparent" : (index === page.currentBeat ? page.pulseColor : (index === 0 ? "#708090" : "#404855"))
+++                        border.color: muted ? "#FF4444" : "transparent"
+++                        border.width: muted ? 1.5 : 0
+++                        opacity: index === page.currentBeat ? 1.0 : (muted ? 0.5 : 0.65)
+++
+++                        MouseArea {
+++                            anchors.fill: parent
+++                            onClicked: page.toggleMuteBeat(index)
+++                        }
+++                    }
+++                }
++             }
++         }
++     }
++@@ -305,7 +463,7 @@
++         id: bpmSpinner
++         anchors.centerIn: parent
++         width:  Dims.w(40)
++-        height: Dims.h(60)
+++        height: Dims.h(58)
++         z: 1
++         model: page.bpmModelCount
++         currentIndex: {
++@@ -317,6 +475,101 @@
++         }
++     }
++ 
+++    // ── Italian Musical Tempo Name & Preset Quick-Select (Tack-inspired) ─────
+++    Item {
+++        id: tempoNameBadge
+++        anchors.bottom: bottomRow.top
+++        anchors.bottomMargin: Dims.h(1)
+++        anchors.horizontalCenter: parent.horizontalCenter
+++        width: Dims.w(45)
+++        height: Dims.h(6)
+++        z: 3
+++
+++        Text {
+++            anchors.centerIn: parent
+++            text: page.getTempoName(page.bpmValue)
+++            color: page.pulseColor
+++            font.bold: true
+++            font.pixelSize: Dims.l(4.2)
+++            opacity: 0.9
+++        }
+++
+++        MouseArea {
+++            anchors.fill: parent
+++            onClicked: page.nextPreset()
+++        }
+++    }
+++
+++    // ── Tap Tempo Button & Practice Duration (Tack-inspired) ──────────────────
+++    Row {
+++        id: bottomRow
+++        anchors.bottom: parent.bottom
+++        anchors.bottomMargin: Dims.h(8)
+++        anchors.horizontalCenter: parent.horizontalCenter
+++        spacing: Dims.w(3)
+++        z: 3
+++
+++        // Tap Button
+++        Item {
+++            id: tapTempoButton
+++            width: Dims.w(25)
+++            height: Dims.h(8.5)
+++
+++            Rectangle {
+++                anchors.fill: parent
+++                radius: height / 2
+++                color: tapMouse.pressed ? page.pulseColor : "#1c2538"
+++                opacity: 0.88
+++                border.color: page.pulseColor
+++                border.width: 1
+++            }
+++
+++            Text {
+++                anchors.centerIn: parent
+++                text: "TAP"
+++                color: tapMouse.pressed ? "#000000" : page.pulseColor
+++                font.bold: true
+++                font.pixelSize: Dims.l(4.8)
+++            }
+++
+++            MouseArea {
+++                id: tapMouse
+++                anchors.fill: parent
+++                onClicked: page.registerTap()
+++            }
+++        }
+++
+++        // Practice Duration Timer Badge
+++        Item {
+++            id: practiceTimerBadge
+++            width: Dims.w(25)
+++            height: Dims.h(8.5)
+++
+++            Rectangle {
+++                anchors.fill: parent
+++                radius: height / 2
+++                color: timerMouse.pressed ? "#304060" : "#141c2c"
+++                opacity: 0.88
+++                border.color: "#3a4660"
+++                border.width: 1
+++            }
+++
+++            Text {
+++                anchors.centerIn: parent
+++                text: "⏱ " + page.formatPracticeTime(page.practiceElapsedSeconds)
+++                color: "#E0E6F0"
+++                font.bold: true
+++                font.pixelSize: Dims.l(3.4)
+++            }
+++
+++            MouseArea {
+++                id: timerMouse
+++                anchors.fill: parent
+++                onClicked: page.resetPracticeTimer()
+++            }
+++        }
+++    }
+++
++     Connections {
++         target: bpmSpinner
++         function onCurrentIndexChanged() {
+diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
+new file mode 100644
+index 00000000..1c6b5f86
+--- /dev/null
++++ b/overlay/asteroidos/community-apps/default.nix
+@@ -0,0 +1,384 @@
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  qt6,
++  mkAsteroidApp,
++  mlite,
++  espeak-classic,
++  noUsrShareHook,
++}:
++
++rec {
++  unofficial-watchfaces = stdenv.mkDerivation {
++    pname = "asteroid-unofficial-watchfaces";
++    version = "nightly";
++
++    src = fetchFromGitHub {
++      owner = "AsteroidOS";
++      repo = "unofficial-watchfaces";
++      rev = "7d1d2673922c1e6a8d8d0650032795ee2bd19683";
++      sha256 = "047jyapyc3h7vgi4apgkgw76116z76mb1n2z71j11mi9x8y3x72a";
++    };
++
++    installPhase = ''
++      runHook preInstall
++      mkdir -p $out/share/asteroid-launcher/watchfaces
++      cp -r * $out/share/asteroid-launcher/watchfaces/
++      runHook postInstall
++    '';
++
++    meta = with lib; {
++      description = "Community collection of watchfaces for AsteroidOS launcher";
++      homepage = "https://github.com/AsteroidOS/unofficial-watchfaces";
++      license = licenses.gpl3Plus;
++      platforms = platforms.all;
++    };
++  };
++
++  blaster = mkAsteroidApp {
++    name = "blaster";
++    owner = "eLtMosen";
++    repo = "asteroid-blaster";
++    desc = "Tilt-controlled asteroid shooting arcade frenzy for AsteroidOS smartwatches";
++    rev = "7947938807d5de4ea7cb918b0241377aac9d3216";
++    sha256 = "1vsndy01pwc333zs2c4lp4rcj4qvgmgpq0lc574h27dgkjqkphl1";
++    extraBuildInputs = [
++      qt6.qtsensors
++      qt6.qtshadertools
++    ];
++  };
++
++  dodger = mkAsteroidApp {
++    name = "dodger";
++    owner = "eLtMosen";
++    repo = "asteroid-dodger";
++    desc = "Tilt-controlled asteroid survival game for AsteroidOS smartwatches";
++    rev = "9643d40db9c609a006ed89a87dc1afd907492af1";
++    sha256 = "098igv2yaj3pjkiklkzmby8wlr3zmrbb8rmv0f3l1x6n56dv5096";
++    extraBuildInputs = [
++      qt6.qtsensors
++      qt6.qtshadertools
++    ];
++  };
++
++  sensorlogd = mkAsteroidApp {
++    name = "sensorlogd";
++    desc = "Background sensor logging daemon and QML plugin for health metrics on AsteroidOS";
++    rev = "bdc9f0bb0fd6ef39f08fb01697d95cb2b98c86b6";
++    sha256 = "1lb5m8g4k8sq9j9kynmffmzfj6q98rnwzbi7dr1i8fs6iq12a1ri";
++    # The wearable sensor types (QHrmSensor, QStepCounterSensor, …) come from
++    # Qt Sensors itself: the upstream AsteroidOS patches are applied to
++    # qt6.qtsensors in overlay/cross-compile.nix. No in-tree mock headers here.
++    # Upstream: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-qt/qt6/qtsensors
++    extraBuildInputs = [
++      qt6.qtsensors
++      mlite
++    ];
++  };
++
++  health = mkAsteroidApp {
++    name = "health";
++    desc = "Step counter, heart rate monitor, and wellness tracker for AsteroidOS";
++    rev = "c85390fb9dd643f9b58e73bf698833ed7727b89f";
++    sha256 = "1kk8y094sva6y3hnw0lbrk1liacpnfqknbrlv6hsry9fwgdxv3kq";
++    extraBuildInputs = [
++      qt6.qtsensors
++      mlite
++      sensorlogd
++    ];
++  };
++
++  # Inspired by CoMaps offline map caching and compass heading orientation: https://github.com/comaps/comaps
++  map = mkAsteroidApp {
++    name = "map";
++    desc = "Touch and GPS map viewer for AsteroidOS smartwatches";
++    rev = "8263b2175843e83c32baee2eec5380559db2b735";
++    sha256 = "0f9rfbkr42fpa5f1bj3w9b8hwp1qn9v9zy7rwrjr10m1c5q64c7h";
++    patches = [
++      ./map-comaps-improvements.patch
++    ];
++    extraBuildInputs = [
++      qt6.qtlocation
++      qt6.qtpositioning
++    ];
++  };
++
++  qmltester = mkAsteroidApp {
++    name = "qmltester";
++    owner = "MagneFire";
++    repo = "asteroid-qmltester";
++    desc = "Interactive developer QML viewer and testing workbench on AsteroidOS";
++    rev = "b397ebfa77025ddbf093fa4cbab7d5d218cc8624";
++    sha256 = "0szlc78av6d94bpzgbc0lwwf5z921b87agpjg0nw1x80asz8xwbp";
++  };
++
++  skedaddle = mkAsteroidApp {
++    name = "skedaddle";
++    owner = "beroset";
++    repo = "asteroid-skedaddle";
++    desc = "Outdoor exercise and running activity tracker with GPX recording";
++    rev = "f5620c7b0c6f7ca06e2ee483ed2a0377204b6682";
++    sha256 = "0v07y2fzh1zvnsnsg7b77fjpv9mq1sn4lc0k050pyf7yziy6liya";
++    extraBuildInputs = [
++      qt6.qtpositioning
++      espeak-classic
++    ];
++  };
++
++  weatherfetch = mkAsteroidApp {
++    name = "weatherfetch";
++    owner = "beroset";
++    repo = "asteroid-weatherfetch";
++    desc = "Direct internet weather forecast fetcher for AsteroidOS";
++    rev = "70044bb4904d22f521fa7eb7448d5007bd863f97";
++    sha256 = "04m1shcw9a36dpa5ibw5728c6d1vqiah9djlr79fq51c12sy7fvl";
++    patches = [
++      ./weatherfetch-gcc16.patch
++    ];
++    extraBuildInputs = [
++      mlite
++    ];
++  };
++
++  # A metronome and chromatic tuning fork app for smartwatches
++  # Upstream repository: https://github.com/moWerk/asteroid-beatfork
++  # Inspired by Tack metronome features (tap tempo, accented subdivisions, pulse ring, haptics): https://github.com/patzly/tack-android
++  beatfork = mkAsteroidApp {
++    name = "beatfork";
++    owner = "moWerk";
++    repo = "asteroid-beatfork";
++    desc = "Metronome and chromatic tuning fork app for smartwatches";
++    rev = "e3fbc5dd6da40868e0f338c9a0d3f6e877afca25";
++    sha256 = "1s4n5qfqximi05szksjbl806rpd37j3q7245z1iip5rrnlbkc7m2";
++    patches = [
++      ./beatfork-tack-improvements.patch
++    ];
++    postPatch = ''
++      substituteInPlace src/events.d/beatfork-tick.ini \
++        --replace-fail '/usr/share/sounds/tick.wav' "$out/share/sounds/tick.wav"
++    '';
++    extraBuildInputs = [
++      qt6.qtmultimedia
++    ];
++  };
++
++  # Benchmark tool for smartwatches: https://github.com/moWerk/benchymark
++  benchymark = mkAsteroidApp {
++    name = "benchymark";
++    owner = "moWerk";
++    repo = "benchymark";
++    desc = "Benchmark tool for AsteroidOS smartwatches";
++    rev = "11e90920e76e6c62fe1076d4c3927b81b1154e96";
++    sha256 = "0x3c5rm2b8b8cfq7a1kl1699lmn88id70zmrsqzf53bxiv1ms8x4";
++    postPatch = ''
++      for phase in src/phases/CloudLight.qml src/phases/CloudHeavy.qml; do
++        substituteInPlace "$phase" \
++          --replace-fail 'file:///usr/share/benchymark/' "file://$out/share/benchymark/"
++      done
++    '';
++    extraBuildInputs = [
++      qt6.qtsensors
++    ];
++  };
++
++  # Docking bay and charging status: https://github.com/moWerk/asteroid-docking-bay
++  docking-bay = stdenv.mkDerivation {
++    pname = "asteroid-docking-bay";
++    version = "nightly";
++
++    src = fetchFromGitHub {
++      owner = "moWerk";
++      repo = "asteroid-docking-bay";
++      rev = "37503828b30c4061a815b10887c46b548137b34f";
++      sha256 = "0g8x6v27ni3zqwir2sif7a0csb78adii47g4y4mnqm3vfklknnp1";
++    };
++
++    postPatch = ''
++      substituteInPlace asteroid_docking_bay/watchctl.py \
++        --replace-fail '/usr/share/locale' '/run/current-system/sw/share/locale' \
++        --replace-fail '/usr/share/sounds/notification.wav' '/run/current-system/sw/share/sounds/notification.wav'
++      substituteInPlace asteroid_docking_bay/wanze.py \
++        --replace-fail 'Path("/usr/share/wanze")' 'Path("/run/current-system/sw/share/wanze")'
++      substituteInPlace asteroid_docking_bay/rpcops.py \
++        --replace-fail '/usr/share/locale' '/run/current-system/sw/share/locale'
++    '';
++
++    dontBuild = true;
++
++    nativeBuildInputs = [ noUsrShareHook ];
++
++    installPhase = ''
++      runHook preInstall
++      mkdir -p $out/bin $out/share/asteroid-docking-bay
++      cp -r * $out/share/asteroid-docking-bay/
++      if [ -f bin/watchctl ]; then
++        install -m 755 bin/watchctl $out/bin/watchctl
++      fi
++      runHook postInstall
++    '';
++
++    meta = with lib; {
++      description = "Docking bay and battery charge status monitor for smartwatches";
++      homepage = "https://github.com/moWerk/asteroid-docking-bay";
++      license = licenses.gpl3Plus;
++      platforms = platforms.all;
++    };
++  };
++
++  # Solar elevation and daylight tracker: https://github.com/moWerk/asteroid-heliograph
++  heliograph = mkAsteroidApp {
++    name = "heliograph";
++    owner = "moWerk";
++    desc = "Solar elevation, daylight tracker, and sundial calculator for smartwatches";
++    rev = "612fd6b1e9229cbacb5f724bc21e239cd034f632";
++    sha256 = "11khf2f2fj2vgvrc7m95n13ac7f09phi1x07xf5g12rwc09yw648";
++    extraBuildInputs = [
++      qt6.qtpositioning
++    ];
++  };
++
++  # Artificial horizon and spirit level: https://github.com/moWerk/asteroid-horizon
++  horizon = mkAsteroidApp {
++    name = "horizon";
++    owner = "moWerk";
++    desc = "Artificial horizon and spirit level bubble display for smartwatches";
++    rev = "3339b36ab549e11949f3399e49ced07e1035ee96";
++    sha256 = "1gvy5nkgdr62f1aqss6sxbzlwc4n74r3xa82ymvyml0ccnp80iql";
++    extraBuildInputs = [
++      qt6.qtsensors
++    ];
++  };
++
++  # Space arcade memory reflex matching game: https://github.com/moWerk/asteroid-meteormatch
++  meteormatch = mkAsteroidApp {
++    name = "meteormatch";
++    owner = "moWerk";
++    desc = "Fast-paced space arcade memory and reflex matching game for smartwatches";
++    rev = "3a597047d1e4021d8eddf715e4c6e110c04080d1";
++    sha256 = "043jmqf4hb4fci13ikn88r32cr0r280jy16kaik43k7cnnacbgzv";
++  };
++
++  # Stroboscope and visual flasher: https://github.com/moWerk/asteroid-pulsar
++  pulsar = mkAsteroidApp {
++    name = "pulsar";
++    owner = "moWerk";
++    desc = "Stroboscope and pulsing visual flasher tool for smartwatches";
++    rev = "a7b9339bc6ba882ec0717a45e2edddc1e304cd84";
++    sha256 = "10ddg0ig5nmx7mczxxbw67qpawqv04261y8fmm92dzm1b4qb59yz";
++  };
++
++  # RAG dataset and design specification: https://github.com/moWerk/asteroid-rag
++  rag = stdenv.mkDerivation {
++    pname = "asteroid-rag";
++    version = "nightly";
++
++    src = fetchFromGitHub {
++      owner = "moWerk";
++      repo = "asteroid-rag";
++      rev = "0eaf32483ac17a69ee2ce79524c2d8704fcce619";
++      sha256 = "0s9zh7cqhwzbh99xwd812bfc7xz64axwaagbzg926mi4yz87h5cx";
++    };
++
++    dontBuild = true;
++
++    installPhase = ''
++      runHook preInstall
++      mkdir -p $out/share/doc/asteroid-rag
++      cp -r * $out/share/doc/asteroid-rag/
++      runHook postInstall
++    '';
++
++    meta = with lib; {
++      description = "Reference design guide and RAG dataset for AsteroidOS";
++      homepage = "https://github.com/moWerk/asteroid-rag";
++      license = licenses.gpl3Plus;
++      platforms = platforms.all;
++    };
++  };
++
++  # Checklist and shopping list app: https://github.com/moWerk/asteroid-shopper
++  shopper = mkAsteroidApp {
++    name = "shopper";
++    owner = "moWerk";
++    desc = "Simple and handy checklist and shopping list app for smartwatches";
++    rev = "c0eea7e655611d060071fa213a64fa03f03de0ff";
++    sha256 = "0mgvbhp6spahhp2jz94k7id9l18axk0blnl4rpcgngbfqg7awqgd";
++  };
++
++  # Mechanical watch timegrapher: https://github.com/moWerk/asteroid-toolwatch
++  toolwatch = mkAsteroidApp {
++    name = "toolwatch";
++    owner = "moWerk";
++    desc = "Mechanical watch accuracy checker and timegrapher tool for smartwatches";
++    rev = "07b6675ae6e4734fee7971d4f4a22a9637f5f1a9";
++    sha256 = "0jd3nj6pi9by5i8rpalsmpj63yiqjqqri6fz5v45lhis4add0p0v";
++  };
++
++  # Lunar lander retro thruster game: https://github.com/moWerk/asteroid-touchdown
++  touchdown = mkAsteroidApp {
++    name = "touchdown";
++    owner = "moWerk";
++    desc = "Lunar lander retro thruster landing game for smartwatches";
++    rev = "660a26f3bd06846766c0114357c06fa195081c6c";
++    sha256 = "1h47612wf7zfb76glg78099xysvidpln71pmjyafi1ras81jfvk3";
++    extraBuildInputs = [
++      qt6.qtsensors
++    ];
++  };
++
++  # Keystroke injection and penetration testing utility: https://github.com/Snoarlax/asteroid-hack
++  hackwatch = mkAsteroidApp {
++    name = "hack";
++    pname = "asteroid-hackwatch";
++    owner = "Snoarlax";
++    repo = "asteroid-hack";
++    desc = "Keystroke injection and penetration testing utility for AsteroidOS";
++    rev = "b2af485c78e26e18e950e3e064584b0765c163e5";
++    sha256 = "1cf0vrc9s3s72p0b3iyrjjmy0zd4rmvpyhlzjhfbi4yn590ylkkk";
++    postPatch = ''
++      substituteInPlace CMakeLists.txt \
++        --replace "find_package(AsteroidApp REQUIRED)" "find_package(AsteroidApp6 REQUIRED)" \
++        --replace "include(AsteroidCMakeSettings)" "include(Asteroid6CMakeSettings)" \
++        --replace "include(AsteroidTranslations)" "include(Asteroid6Translations)"
++      substituteInPlace src/CMakeLists.txt \
++        --replace "AsteroidApp" "Asteroid::AsteroidApp6"
++    '';
++    postBuild = ''
++      $CC $CFLAGS $LDFLAGS ../src/utilities/keyboard_interface.c -o keyboard_interface
++    '';
++    postInstall = ''
++      install -Dm755 keyboard_interface $out/bin/keyboard_interface
++    '';
++  };
++
++  # CLI system information tool: https://github.com/AsteroidOS/meta-asteroid-community/tree/master/recipes-tools/neofetch
++  neofetch = stdenv.mkDerivation {
++    pname = "neofetch";
++    version = "7.1.0";
++    src = fetchFromGitHub {
++      owner = "dylanaraps";
++      repo = "neofetch";
++      rev = "ccd5d9f52609bbdcd5d8fa78c4fdb0f12954125f";
++      hash = "sha256-9MoX6ykqvd2iB0VrZCfhSyhtztMpBTukeKejfAWYW1w=";
++    };
++    postPatch = ''
++      substituteInPlace neofetch \
++        --replace-fail '/usr/share/gtk-2.0/gtkrc' '/run/current-system/sw/share/gtk-2.0/gtkrc' \
++        --replace-fail '/usr/share/gtk-3.0/settings.ini' '/run/current-system/sw/share/gtk-3.0/settings.ini'
++    '';
++    dontBuild = true;
++    nativeBuildInputs = [ noUsrShareHook ];
++    installPhase = ''
++      runHook preInstall
++      install -Dm755 neofetch $out/bin/neofetch
++      runHook postInstall
++    '';
++    meta = with lib; {
++      description = "CLI system information tool written in BASH";
++      homepage = "https://github.com/dylanaraps/neofetch";
++      license = licenses.mit;
++      platforms = platforms.all;
++    };
++  };
++}
+diff --git a/overlay/asteroidos/community-apps/map-comaps-improvements.patch b/overlay/asteroidos/community-apps/map-comaps-improvements.patch
+new file mode 100644
+index 00000000..ae5644a8
+--- /dev/null
++++ b/overlay/asteroidos/community-apps/map-comaps-improvements.patch
+@@ -0,0 +1,814 @@
++diff -ruN a/src/DefaultMapControls.qml b/src/DefaultMapControls.qml
++--- a/src/DefaultMapControls.qml	2026-10-18 23:51:39.228743971 +1100
+++++ b/src/DefaultMapControls.qml	2026-10-18 23:52:35.213831333 +1100
++@@ -19,80 +19,199 @@
++ import org.asteroid.utils
++ 
++ Item {
++-    IconButton {
++-        iconName: "ios-add-circle-outline"
+++    // Zoom in (+) circular disc
+++    Rectangle {
+++        id: zoomInDisc
++         anchors.right: parent.right
+++        anchors.rightMargin: Dims.w(DeviceSpecs.hasRoundScreen ? 4 : 3)
++         anchors.verticalCenter: parent.verticalCenter
++-        anchors.verticalCenterOffset: - height/2 + DeviceSpecs.flatTireHeight/2
++-        height: parent.height*0.2
+++        anchors.verticalCenterOffset: -height * 0.75 + DeviceSpecs.flatTireHeight / 2
+++        height: parent.height * 0.18
++         width: height
++-        iconColor: colors.primary
+++        radius: height / 2
+++        color: zoomInMouse.pressed ? colors.secondary : "#80000000"
+++        border.color: colors.secondary
+++        border.width: 1.5
++         z: 2
++-        onClicked: mapView.zoomLevel = mapView.zoomLevel + 0.3
+++
+++        Icon {
+++            anchors.centerIn: parent
+++            width: parent.width * 0.68
+++            height: width
+++            name: "ios-add"
+++            color: zoomInMouse.pressed ? "#000000" : colors.secondary
+++        }
+++        MouseArea {
+++            id: zoomInMouse
+++            anchors.fill: parent
+++            onClicked: mapView.zoomLevel = Math.min(mapView.maximumZoomLevel, mapView.zoomLevel + 0.5)
+++        }
++     }
++-    IconButton {
++-        iconName: "ios-remove-circle-outline"
+++
+++    // Zoom out (-) circular disc
+++    Rectangle {
+++        id: zoomOutDisc
++         anchors.right: parent.right
+++        anchors.rightMargin: Dims.w(DeviceSpecs.hasRoundScreen ? 4 : 3)
++         anchors.verticalCenter: parent.verticalCenter
++-        anchors.verticalCenterOffset: height/2 + DeviceSpecs.flatTireHeight/2
++-        height: parent.height*0.2
+++        anchors.verticalCenterOffset: height * 0.75 + DeviceSpecs.flatTireHeight / 2
+++        height: parent.height * 0.18
++         width: height
++-        iconColor: colors.primary
+++        radius: height / 2
+++        color: zoomOutMouse.pressed ? colors.secondary : "#80000000"
+++        border.color: colors.secondary
+++        border.width: 1.5
++         z: 2
++-        onClicked: mapView.zoomLevel = mapView.zoomLevel - 0.3
+++
+++        Icon {
+++            anchors.centerIn: parent
+++            width: parent.width * 0.68
+++            height: width
+++            name: "ios-remove"
+++            color: zoomOutMouse.pressed ? "#000000" : colors.secondary
+++        }
+++        MouseArea {
+++            id: zoomOutMouse
+++            anchors.fill: parent
+++            onClicked: mapView.zoomLevel = Math.max(mapView.minimumZoomLevel, mapView.zoomLevel - 0.5)
+++        }
++     }
++-    MouseArea {
+++
+++    // Compass Heading Orientation circular disc (CoMaps style)
+++    Rectangle {
+++        id: compassDisc
++         anchors.left: parent.left
+++        anchors.leftMargin: Dims.w(DeviceSpecs.hasRoundScreen ? 4 : 3)
++         anchors.verticalCenter: parent.verticalCenter
++-        anchors.verticalCenterOffset: - height/2 + DeviceSpecs.flatTireHeight/2
++-        height: parent.height*0.2
+++        anchors.verticalCenterOffset: -height * 0.75 + DeviceSpecs.flatTireHeight / 2
+++        height: parent.height * 0.18
++         width: height
+++        radius: height / 2
+++        color: compassMouse.pressed ? colors.secondary : "#80000000"
+++        border.color: colors.secondary
+++        border.width: 1.5
++         z: 2
++-        rotation: compassMode.value == 1 ? 360 - compass.reading.azimuth : 45
++-        onClicked: compassMode.value = enableCompass.value ? (compassMode.value+1)%3 : 0
++-        onPressAndHold: {
++-            if (compassMode.value == 2) {compassMode.value = 0}
++-            mapView.bearing = 0
++-        }
+++
++         Icon {
+++            anchors.centerIn: parent
+++            width: parent.width * 0.68
+++            height: width
+++            name: compassMode.value == 2
+++                ? "ios-navigate"
+++                : (compass.reading && compass.reading.calibrationLevel > 0 ? "ios-compass-outline" : "ios-infinite-outline")
+++            rotation: compassMode.value == 1 ? (compass.reading ? 360 - compass.reading.azimuth : 0) : 0
+++            color: compassMouse.pressed ? "#000000" : (compassMode.value == 2 ? "#FFCC00" : colors.secondary)
+++            Behavior on rotation { NumberAnimation { duration: 150 } }
+++        }
+++        MouseArea {
+++            id: compassMouse
++             anchors.fill: parent
++-            name: compass.reading.calibrationLevel > 0 ? "ios-compass-outline" : "ios-infinite-outline"
++-            rotation: -45
++-            color: colors.primary
+++            onClicked: {
+++                compassMode.value = enableCompass.value ? (compassMode.value + 1) % 3 : 0
+++                if (compassMode.value == 0) {
+++                    mapView.bearing = 0
+++                }
+++            }
+++            onPressAndHold: {
+++                compassMode.value = 0
+++                mapView.bearing = 0
+++            }
++         }
++     }
++-    IconButton {
++-        iconName: "ios-locate-outline"
++-        anchors.verticalCenter: parent.verticalCenter
++-        anchors.verticalCenterOffset: height/2 + DeviceSpecs.flatTireHeight/2
+++
+++    // Locate / Recenter & Follow-Me circular disc (CoMaps style)
+++    Rectangle {
+++        id: locateDisc
++         anchors.left: parent.left
++-        height: parent.height*0.2
+++        anchors.leftMargin: Dims.w(DeviceSpecs.hasRoundScreen ? 4 : 3)
+++        anchors.verticalCenter: parent.verticalCenter
+++        anchors.verticalCenterOffset: height * 0.75 + DeviceSpecs.flatTireHeight / 2
+++        height: parent.height * 0.18
++         width: height
++-        iconColor: colors.primary
+++        radius: height / 2
+++        color: locateMouse.pressed ? colors.secondary : "#80000000"
+++        border.color: followMe ? "#FFCC00" : colors.secondary
+++        border.width: 1.5
++         z: 2
++-        onClicked: positionProvider.update()
+++
+++        Icon {
+++            anchors.centerIn: parent
+++            width: parent.width * 0.68
+++            height: width
+++            name: "ios-locate-outline"
+++            color: locateMouse.pressed ? "#000000" : (followMe ? "#FFCC00" : colors.secondary)
+++        }
+++        MouseArea {
+++            id: locateMouse
+++            anchors.fill: parent
+++            onClicked: {
+++                positionProvider.update()
+++                if (positionProvider.position && positionProvider.position.coordinate.isValid) {
+++                    mapView.center = positionProvider.position.coordinate
+++                }
+++                followMe = true
+++            }
+++        }
++     }
++-    IconButton {
++-        iconName: "ios-menu-outline"
+++
+++    // Settings circular disc
+++    Rectangle {
+++        id: settingsDisc
++         anchors.bottom: parent.bottom
+++        anchors.bottomMargin: Dims.h(DeviceSpecs.hasRoundScreen ? 3 : 2)
++         anchors.right: parent.horizontalCenter
++-        height: parent.height*0.2
+++        anchors.rightMargin: Dims.w(4)
+++        height: parent.height * 0.17
++         width: height
++-        iconColor: colors.primary
+++        radius: height / 2
+++        color: settingsMouse.pressed ? colors.secondary : "#80000000"
+++        border.color: colors.secondary
+++        border.width: 1.5
++         z: 2
++-        onClicked: pageStack.push(settingsPage,{})
+++
+++        Icon {
+++            anchors.centerIn: parent
+++            width: parent.width * 0.65
+++            height: width
+++            name: "ios-menu-outline"
+++            color: settingsMouse.pressed ? "#000000" : colors.secondary
+++        }
+++        MouseArea {
+++            id: settingsMouse
+++            anchors.fill: parent
+++            onClicked: pageStack.push(settingsPage, {})
+++        }
++     }
++-    IconButton {
++-        iconName: "ios-pin-outline"
+++
+++    // Pin waypoint circular disc
+++    Rectangle {
+++        id: pinDisc
++         anchors.bottom: parent.bottom
+++        anchors.bottomMargin: Dims.h(DeviceSpecs.hasRoundScreen ? 3 : 2)
++         anchors.left: parent.horizontalCenter
++-        height: parent.height*0.2
+++        anchors.leftMargin: Dims.w(4)
+++        height: parent.height * 0.17
++         width: height
++-        iconColor: colors.primary
+++        radius: height / 2
+++        color: pinMouse.pressed ? colors.secondary : "#80000000"
+++        border.color: colors.secondary
+++        border.width: 1.5
++         z: 2
++-        onClicked: {
++-            parent.visible = false
++-            setPointControls.visible = true
+++
+++        Icon {
+++            anchors.centerIn: parent
+++            width: parent.width * 0.65
+++            height: width
+++            name: "ios-pin-outline"
+++            color: pinMouse.pressed ? "#000000" : colors.secondary
+++        }
+++        MouseArea {
+++            id: pinMouse
+++            anchors.fill: parent
+++            onClicked: {
+++                parent.visible = false
+++                setPointControls.visible = true
+++            }
++         }
++     }
++ }
++diff -ruN a/src/MainMapView.qml b/src/MainMapView.qml
++--- a/src/MainMapView.qml	2026-10-18 23:51:39.228743971 +1100
+++++ b/src/MainMapView.qml	2026-10-18 23:52:20.268808011 +1100
++@@ -16,12 +16,15 @@
++  */
++ import QtQuick
++ import org.asteroid.controls
+++import org.asteroid.utils
++ import Nemo.Configuration
++ import QtPositioning
++ import QtLocation
++ import QtSensors
++ 
++ Item {
+++    id: root
+++
++     ConfigurationValue {
++         id: mapZoom
++         key: "/map/view/zoomlevel"
++@@ -48,35 +51,89 @@
++         defaultValue: "[]"
++         onValueChanged: {
++             mapView.updateWaypoints()
++-            console.log("value changed")
++         }
++         Component.onCompleted: mapView.updateWaypoints()
++     }
++ 
+++    property bool followMe: true
+++    property bool hudWaypointMode: false
+++
+++    function getCardinalDirection(deg) {
+++        var val = Math.floor((deg / 22.5) + 0.5);
+++        var arr = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+++        return arr[(val % 16)];
+++    }
+++
+++    function getNearestWaypointInfo() {
+++        if (!positionProvider.position || !positionProvider.position.coordinate.isValid) return null
+++        var waypointsList = []
+++        try {
+++            waypointsList = JSON.parse(waypointSource.value || "[]")
+++        } catch (e) {
+++            return null
+++        }
+++        if (!waypointsList || waypointsList.length === 0) return null
+++
+++        var myCoord = positionProvider.position.coordinate
+++        var minDist = 999999999
+++        var nearest = null
+++        for (var i = 0; i < waypointsList.length; i++) {
+++            var wp = waypointsList[i]
+++            var wpCoord = QtPositioning.coordinate(wp[1][0], wp[1][1])
+++            var d = myCoord.distanceTo(wpCoord)
+++            if (d < minDist) {
+++                minDist = d
+++                var az = myCoord.azimuthTo(wpCoord)
+++                nearest = {
+++                    name: wp[3] || ("Pin " + (i + 1)),
+++                    distance: d,
+++                    bearing: az
+++                }
+++            }
+++        }
+++        return nearest
+++    }
+++
++     Label {
++         text: "Map Data from OpenStreetMap"
++-        font.pixelSize: parent.width*0.03
+++        font.pixelSize: parent.width * 0.03
++         anchors.centerIn: parent
++         z: 0
++     }
+++
++     Map {
++         id: mapView
++         plugin: mapProvider
++         anchors.fill: parent
++-        copyrightsVisible: false //this is compensated by showing the copyright when application is loading
+++        copyrightsVisible: false
++         color: "#00000000"
++         z: 1
+++
+++        function applyMapStyle() {
+++            if (supportedMapTypes && supportedMapTypes.length > 0) {
+++                var idx = Math.min(Math.max(0, mapStyle.value), supportedMapTypes.length - 1)
+++                activeMapType = supportedMapTypes[idx]
+++            }
+++        }
+++
++         Component.onCompleted: {
++             zoomLevel = mapZoom.value
++-            //the precision of the saved value seems to get truncated by nemo-configuration or its backend.
++-            //multiply by a million to prevent the value getting 'rounded'
++-            center.latitude = mapCenterLat.value/1000000
++-            center.longitude = mapCenterLong.value/1000000
+++            center.latitude = mapCenterLat.value / 1000000
+++            center.longitude = mapCenterLong.value / 1000000
+++            applyMapStyle()
++         }
+++
++         Component.onDestruction: {
++             mapZoom.value = zoomLevel
++-            mapCenterLat.value = center.latitude*1000000
++-            mapCenterLong.value = center.longitude*1000000
+++            mapCenterLat.value = center.latitude * 1000000
+++            mapCenterLong.value = center.longitude * 1000000
+++        }
+++
+++        Connections {
+++            target: mapStyle
+++            function onValueChanged() {
+++                mapView.applyMapStyle()
+++            }
++         }
++ 
++         PinchHandler {
++@@ -95,66 +152,236 @@
++             }
++             grabPermissions: PointerHandler.TakeOverForbidden
++         }
+++
++         WheelHandler {
++             id: wheel
++-            rotationScale: 1/120
+++            rotationScale: 1 / 120
++             property: "zoomLevel"
++         }
+++
++         DragHandler {
++             id: drag
++             target: null
++-            onTranslationChanged: (delta) => mapView.pan(-delta.x, -delta.y)
+++            onTranslationChanged: (delta) => {
+++                followMe = false
+++                mapView.pan(-delta.x, -delta.y)
+++            }
++         }
+++
++         Connections {
++             target: positionProvider
++             function onPositionChanged() {
++-                mapView.center = positionProvider.position.coordinate
+++                if (followMe && positionProvider.position && positionProvider.position.coordinate.isValid) {
+++                    mapView.center = positionProvider.position.coordinate
+++                }
+++                if (compassMode.value == 2 && positionProvider.position && positionProvider.position.directionValid) {
+++                    mapView.bearing = positionProvider.position.direction
+++                }
++             }
++         }
+++
++         Connections {
++             target: compass
++             function onReadingChanged() {
++-                if (compassMode.value == 2) {
+++                if (compassMode.value == 1 && compass.reading) {
++                     mapView.bearing = compass.reading.azimuth
++                 }
++             }
++         }
+++
++         property MapQuickItem mapItem
++         function updateWaypoints() {
++             clearMapItems()
++-            var waypointsList = JSON.parse(waypointSource.value)
++-            console.log(waypointsList)
++-            for(var i = 0, size = waypointsList.length; i < size ; i++){
+++            var waypointsList = []
+++            try {
+++                waypointsList = JSON.parse(waypointSource.value || "[]")
+++            } catch (e) {
+++                return
+++            }
+++            for (var i = 0, size = waypointsList.length; i < size; i++) {
++                 var currWaypointData = waypointsList[i]
++                 mapItem = waypoint.createObject(mapView)
++-                mapItem.coordinate = QtPositioning.coordinate(currWaypointData[1][0],currWaypointData[1][1])
++-                console.log(mapItem.coordinate)
+++                mapItem.coordinate = QtPositioning.coordinate(currWaypointData[1][0], currWaypointData[1][1])
++                 mapItem.iconName = currWaypointData[0]
++-                console.log(currWaypointData[2])
++                 mapItem.iconColor = currWaypointData[2]
++                 mapItem.index = i
++                 mapView.addMapItem(mapItem)
++             }
++-            console.log("waypoints updated")
++         }
++     }
+++
+++    // CoMaps-inspired Outdoor Telemetrics & Navigation HUD Bar
+++    Rectangle {
+++        id: outdoorHUD
+++        visible: showOutdoorHUD.value
+++        anchors.top: parent.top
+++        anchors.topMargin: Dims.h(DeviceSpecs.hasRoundScreen ? 4 : 2)
+++        anchors.horizontalCenter: parent.horizontalCenter
+++        width: DeviceSpecs.hasRoundScreen ? Dims.w(75) : Dims.w(85)
+++        height: Dims.h(6)
+++        radius: height / 2
+++        color: "#B0000000"
+++        border.color: colors.secondary
+++        border.width: 1
+++        z: 3
+++
+++        MouseArea {
+++            anchors.fill: parent
+++            onClicked: hudWaypointMode = !hudWaypointMode
+++        }
+++
+++        Row {
+++            anchors.centerIn: parent
+++            spacing: Dims.w(2.5)
+++            visible: !hudWaypointMode
+++
+++            // Speed
+++            Text {
+++                text: (positionProvider.position && positionProvider.position.speedValid)
+++                    ? (positionProvider.position.speed * 3.6).toFixed(0) + " km/h"
+++                    : "-- km/h"
+++                color: colors.secondary
+++                font.bold: true
+++                font.pixelSize: Dims.h(2.8)
+++            }
+++
+++            Text {
+++                text: "•"
+++                color: "#60FFFFFF"
+++                font.pixelSize: Dims.h(2.8)
+++            }
+++
+++            // Altitude
+++            Text {
+++                text: (positionProvider.position && positionProvider.position.altitudeValid)
+++                    ? Math.round(positionProvider.position.coordinate.altitude) + "m"
+++                    : "--m"
+++                color: "white"
+++                font.bold: true
+++                font.pixelSize: Dims.h(2.8)
+++            }
+++
+++            Text {
+++                text: "•"
+++                color: "#60FFFFFF"
+++                font.pixelSize: Dims.h(2.8)
+++            }
+++
+++            // Heading & Cardinal direction
+++            Text {
+++                property real az: compass.reading ? compass.reading.azimuth : mapView.bearing
+++                text: Math.round(az) + "° " + getCardinalDirection(az)
+++                color: colors.secondary
+++                font.bold: true
+++                font.pixelSize: Dims.h(2.8)
+++            }
+++        }
+++
+++        // Waypoint navigation telemetrics mode
+++        Row {
+++            anchors.centerIn: parent
+++            spacing: Dims.w(2)
+++            visible: hudWaypointMode
+++
+++            property var nearestInfo: getNearestWaypointInfo()
+++
+++            Text {
+++                text: parent.nearestInfo
+++                    ? ("⚑ " + parent.nearestInfo.name + ": " + (parent.nearestInfo.distance >= 1000 ? (parent.nearestInfo.distance / 1000).toFixed(1) + "km" : Math.round(parent.nearestInfo.distance) + "m"))
+++                    : "No active waypoints"
+++                color: parent.nearestInfo ? "#FFCC00" : "#A0FFFFFF"
+++                font.bold: true
+++                font.pixelSize: Dims.h(2.6)
+++            }
+++        }
+++    }
+++
+++    // CoMaps-inspired Dynamic Metric Scale Bar
+++    Item {
+++        id: scaleBar
+++        visible: showScaleBar.value
+++        anchors.bottom: parent.bottom
+++        anchors.bottomMargin: Dims.h(13)
+++        anchors.horizontalCenter: parent.horizontalCenter
+++        height: Dims.h(3)
+++        width: calculateScaleWidth()
+++        z: 3
+++
+++        property real metersPerPixel: 156543.03392 * Math.cos(mapView.center.latitude * Math.PI / 180.0) / Math.pow(2, mapView.zoomLevel)
+++        property real targetDistance: 100
+++
+++        function calculateScaleWidth() {
+++            if (metersPerPixel <= 0 || isNaN(metersPerPixel)) return 60
+++            var steps = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000]
+++            var idealDistance = metersPerPixel * Dims.w(22)
+++            var chosen = steps[0]
+++            for (var i = 0; i < steps.length; i++) {
+++                if (steps[i] <= idealDistance) {
+++                    chosen = steps[i]
+++                } else {
+++                    break
+++                }
+++            }
+++            targetDistance = chosen
+++            var pxWidth = chosen / metersPerPixel
+++            return Math.max(30, Math.min(Dims.w(45), pxWidth))
+++        }
+++
+++        Rectangle {
+++            anchors.bottom: parent.bottom
+++            anchors.horizontalCenter: parent.horizontalCenter
+++            width: parent.width
+++            height: 2
+++            color: "white"
+++            opacity: 0.8
+++        }
+++        Rectangle {
+++            anchors.left: parent.left
+++            anchors.bottom: parent.bottom
+++            width: 2
+++            height: 6
+++            color: "white"
+++            opacity: 0.8
+++        }
+++        Rectangle {
+++            anchors.right: parent.right
+++            anchors.bottom: parent.bottom
+++            width: 2
+++            height: 6
+++            color: "white"
+++            opacity: 0.8
+++        }
+++        Text {
+++            anchors.top: parent.top
+++            anchors.horizontalCenter: parent.horizontalCenter
+++            text: targetDistance >= 1000 ? (targetDistance / 1000) + " km" : targetDistance + " m"
+++            color: "white"
+++            font.pixelSize: Dims.h(1.8)
+++            font.bold: true
+++            opacity: 0.9
+++        }
+++    }
+++
++     DefaultMapControls {
++         id: mapControls
++         anchors.fill: parent
++         z: 2
++     }
+++
++     SetPointMapControls {
++         id: setPointControls
++         anchors.fill: parent
++         visible: false
++         z: 2
++         function primaryButtonAction() {
++-             pageStack.push(setPointPage,{coord: mapView.center})
+++            pageStack.push(setPointPage, { coord: mapView.center })
++         }
++     }
+++
++     function editWaypoint(index) {
++-        pageStack.push(setPointPage,{editMode: true, editIndex: index})
+++        pageStack.push(setPointPage, { editMode: true, editIndex: index })
++     }
+++
++     Component {
++         id: waypoint
++         MapWaypoint {
++diff -ruN a/src/main.qml b/src/main.qml
++--- a/src/main.qml	2026-10-18 23:51:39.230743974 +1100
+++++ b/src/main.qml	2026-10-18 23:51:59.255775222 +1100
++@@ -36,10 +36,18 @@
++     Plugin {
++         id: mapProvider
++         name: "osm"
+++        // CoMaps-inspired offline tile caching configuration: https://github.com/comaps/comaps
+++        PluginParameter { name: "osm.mapping.offline.directory"; value: "/home/nixos/.cache/maps/offline" }
+++        PluginParameter { name: "osm.mapping.cache.directory"; value: "/home/nixos/.cache/maps" }
+++        PluginParameter { name: "osm.mapping.cache.disk.size"; value: 200000000 }
+++        PluginParameter { name: "osm.mapping.highdpi"; value: true }
+++        PluginParameter { name: "osm.useragent"; value: "NixOS-Smartwatch-Map/1.0 (AsteroidOS; Linux)" }
++     }
++     PositionSource {
++         id: positionProvider
++         preferredPositioningMethods: prioritiseGPS.value ? PositionSource.SatellitePositioningMethods : PositionSource.AllPositioningMethods
+++        active: true
+++        updateInterval: 1000
++     }
++     Compass {
++         id: compass
++@@ -60,6 +68,21 @@
++         key: "/map/prioritiseGPS"
++         defaultValue: true
++     }
+++    ConfigurationValue {
+++        id: mapStyle
+++        key: "/map/view/mapStyle"
+++        defaultValue: 0
+++    }
+++    ConfigurationValue {
+++        id: showOutdoorHUD
+++        key: "/map/view/showOutdoorHUD"
+++        defaultValue: true
+++    }
+++    ConfigurationValue {
+++        id: showScaleBar
+++        key: "/map/view/showScaleBar"
+++        defaultValue: true
+++    }
++     Component {
++         id: mainMapView
++         MainMapView {
++diff -ruN a/src/SettingsPage.qml b/src/SettingsPage.qml
++--- a/src/SettingsPage.qml	2026-10-18 23:51:39.229743973 +1100
+++++ b/src/SettingsPage.qml	2026-10-18 23:52:46.562849042 +1100
++@@ -21,58 +21,131 @@
++ 
++ Item {
++     id: root
+++
+++    readonly property var mapStyles: ["Standard OSM", "Outdoors / Topo", "Cycling"]
+++
++     PageHeader {
++         text: "Map settings"
++     }
+++
++     Flickable {
++         anchors.fill: parent
++         contentHeight: contentColumn.implicitHeight
+++
++         Column {
++             id: contentColumn
++             anchors.fill: parent
++-            Item { width: parent.width ; height: root.width*0.2 }
+++
+++            Item { width: parent.width; height: root.width * 0.18 }
+++
+++            // Map Style Selector (CoMaps)
+++            Item {
+++                width: parent.width
+++                height: root.width * 0.22
+++
+++                Column {
+++                    anchors.centerIn: parent
+++                    spacing: 4
+++
+++                    Label {
+++                        anchors.horizontalCenter: parent.horizontalCenter
+++                        text: "Map Style (CoMaps)"
+++                        font.pixelSize: root.width * 0.04
+++                        color: colors.secondary
+++                    }
+++
+++                    Rectangle {
+++                        anchors.horizontalCenter: parent.horizontalCenter
+++                        width: root.width * 0.72
+++                        height: root.width * 0.11
+++                        radius: height / 2
+++                        color: "#25000000"
+++                        border.color: colors.secondary
+++                        border.width: 1
+++
+++                        Text {
+++                            anchors.centerIn: parent
+++                            text: root.mapStyles[mapStyle.value % root.mapStyles.length]
+++                            color: "white"
+++                            font.bold: true
+++                            font.pixelSize: root.width * 0.042
+++                        }
+++
+++                        MouseArea {
+++                            anchors.fill: parent
+++                            onClicked: {
+++                                mapStyle.value = (mapStyle.value + 1) % root.mapStyles.length
+++                            }
+++                        }
+++                    }
+++                }
+++            }
+++
++             LabeledSwitch {
++                 width: parent.width
++-                height: root.width*0.2
++-                text: "enable compass"
+++                height: root.width * 0.18
+++                text: "Outdoor HUD"
+++                Component.onCompleted: checked = showOutdoorHUD.value
+++                onCheckedChanged: showOutdoorHUD.value = checked
+++            }
+++
+++            LabeledSwitch {
+++                width: parent.width
+++                height: root.width * 0.18
+++                text: "Distance scale"
+++                Component.onCompleted: checked = showScaleBar.value
+++                onCheckedChanged: showScaleBar.value = checked
+++            }
+++
+++            LabeledSwitch {
+++                width: parent.width
+++                height: root.width * 0.18
+++                text: "Enable compass"
++                 Component.onCompleted: checked = enableCompass.value
++                 onCheckedChanged: enableCompass.value = checked
++             }
+++
++             LabeledSwitch {
++                 width: parent.width
++-                height: root.width*0.2
++-                text: "enable GPS"
+++                height: root.width * 0.18
+++                text: "Enable GPS"
++                 Component.onCompleted: checked = prioritiseGPS.value
++                 onCheckedChanged: prioritiseGPS.value = checked
++             }
++-            Item { width: parent.width ; height: root.width*0.2 }
+++
+++            Item { width: parent.width; height: root.width * 0.1 }
+++
++             Column {
++-                width: parent.width*0.7
+++                width: parent.width * 0.75
++                 anchors.horizontalCenter: parent.horizontalCenter
+++                spacing: 2
+++
++                 Label {
++-                    text: "Map Data © OpenStreetMap contributors"
++-                    width: parent.width
++-                    font.pixelSize: root.width*0.05
++-                    wrapMode: Text.Wrap
++-                }
++-                Label {
++-                    text: "under the ODbL"
+++                    text: "CoMaps Offline Caching & Navigation"
++                     width: parent.width
++-                    font.pixelSize: root.width*0.05
+++                    font.pixelSize: root.width * 0.045
+++                    font.bold: true
+++                    color: colors.secondary
+++                    horizontalAlignment: Text.AlignHCenter
++                 }
++-            Item { width: parent.width ; height: root.width*0.05 }
++                 Label {
++-                    text: "Made by dodoradio"
+++                    text: "Cache: /home/nixos/.cache/maps"
++                     width: parent.width
++-                    font.pixelSize: root.width*0.05
+++                    font.pixelSize: root.width * 0.035
+++                    color: "#A0FFFFFF"
+++                    horizontalAlignment: Text.AlignHCenter
++                 }
+++                Item { width: parent.width; height: root.width * 0.03 }
++                 Label {
++-                    text: "dodorad.io"
+++                    text: "Map Data © OpenStreetMap contributors"
++                     width: parent.width
++-                    font.pixelSize: root.width*0.05
+++                    font.pixelSize: root.width * 0.035
+++                    wrapMode: Text.Wrap
+++                    horizontalAlignment: Text.AlignHCenter
++                 }
++             }
++-            Item { width: parent.width ; height: root.width*0.2 }
+++
+++            Item { width: parent.width; height: root.width * 0.2 }
++         }
++     }
++ }
+diff --git a/overlay/asteroidos/community-apps/weatherfetch-gcc16.patch b/overlay/asteroidos/community-apps/weatherfetch-gcc16.patch
+new file mode 100644
+index 00000000..26bb0392
+--- /dev/null
++++ b/overlay/asteroidos/community-apps/weatherfetch-gcc16.patch
+@@ -0,0 +1,11 @@
++--- a/src/WeatherParser.cpp
+++++ b/src/WeatherParser.cpp
++@@ -199,7 +199,7 @@ void WeatherParser::parseWeatherJson(const QString &weatherJson)
++ {
++     constexpr unsigned maxWeatherDays{5};
++     auto days{weatherJsonToVector(weatherJson)};
++-    unsigned count{std::min(maxWeatherDays, days.size())};
+++    unsigned count{static_cast<unsigned>(std::min<std::size_t>(maxWeatherDays, days.size()))};
++     for (unsigned i = 0; i < count; ++i) {
++         MDConfItem(QString("/org/asteroidos/weather/day%1/id").arg(i)).set(days[i].icon);
++         MDConfItem(QString("/org/asteroidos/weather/day%1/min-temp").arg(i)).set(days[i].mintemp);
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index 3ca02e0b..10727c53 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -160,4 +160,10 @@ rec {
+ 
+   virtualkeyboard = callPackage ./virtualkeyboard { inherit noUsrShareHook; };
+ 
++  community-apps = callPackage ./community-apps {
++    inherit mkAsteroidApp mlite noUsrShareHook;
++    inherit (pkgs) espeak-classic;
++  };
++
++  inherit (pkgs) msm-fb-refresher;
+ }

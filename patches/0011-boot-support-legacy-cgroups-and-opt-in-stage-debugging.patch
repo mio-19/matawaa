@@ -1,0 +1,191 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 10:55:47 +1100
+Subject: [PATCH] boot: support legacy cgroups and opt-in stage debugging
+
+---
+ boot/init/tasks/switch_root.rb | 30 ++++++++++++++
+ modules/initrd-ssh.nix         | 72 +++++++++++++++++++++++++++-------
+ 2 files changed, 87 insertions(+), 15 deletions(-)
+
+diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
+index 6a3ad197..0644044c 100644
+--- a/boot/init/tasks/switch_root.rb
++++ b/boot/init/tasks/switch_root.rb
+@@ -383,6 +383,23 @@ class Tasks::SwitchRoot < SingletonTask
+     end
+   end
+ 
++  def should_hold?()
++    return false if System.cmdline().grep(/^mobile-nixos\.hold=(no|0)$/).any?
++    return true if System.cmdline().grep(/^mobile-nixos\.hold(=yes|=1)?$/).any?
++    Configuration["debug"] == true
++  end
++
++  def hold_before_switch_root()
++    return unless should_hold?
++
++    log("Stage-1 hold: run 'continue-boot' to resume.")
++    File.delete("/run/continue-boot") if File.exist?("/run/continue-boot")
++    Tasks::Splash.instance.quit("Stage-1 debug hold (run 'continue-boot')", sticky: true)
++    sleep 0.5 until File.exist?("/run/continue-boot")
++    File.delete("/run/continue-boot") rescue nil
++    Tasks::Splash.instance.quit("Continuing to stage-2")
++  end
++
+   def run()
+     init = File.join(selected_generation.path, "init")
+ 
+@@ -401,6 +418,8 @@ class Tasks::SwitchRoot < SingletonTask
+     log("***")
+     log("")
+ 
++    hold_before_switch_root()
++
+     kexec_in_generation(selected_generation) if will_kexec?
+ 
+     Tasks::UDev.instance.teardown()
+@@ -416,6 +435,17 @@ class Tasks::SwitchRoot < SingletonTask
+       System.run("mount", "--move", mount_point, new_location)
+     end
+ 
++    # TODO: systemd 261 mounts cgroup2 with "nsdelegate,memory_recursiveprot",
++    # which vendor 4.14 kernels reject and then freeze. Pre-mount cgroup2 with
++    # the newest options the kernel accepts so systemd's mount_setup() sees an
++    # existing mount and skips its own. Remove once systemd handles this.
++    cgroup2_path = File.join(SYSTEM_MOUNT_POINT, "sys/fs/cgroup")
++    begin
++      System.run("mount", "-t", "cgroup2", "-o", "nsdelegate,memory_recursiveprot", "cgroup2", cgroup2_path)
++    rescue System::CommandError
++      System.run("mount", "-t", "cgroup2", "cgroup2", cgroup2_path)
++    end
++
+     switch_root = System.which("switch_root")
+     System.exec({}, switch_root, SYSTEM_MOUNT_POINT, init)
+   end
+diff --git a/modules/initrd-ssh.nix b/modules/initrd-ssh.nix
+index db771346..b4842997 100644
+--- a/modules/initrd-ssh.nix
++++ b/modules/initrd-ssh.nix
+@@ -1,15 +1,27 @@
+-{ config, lib, pkgs, ... }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
+ 
+ let
+   inherit (lib)
+     mkOption
+     types
+-  ;
++    ;
+   device_name = config.mobile.device.name;
+   cfg = config.mobile.boot.stage-1.ssh;
+   banner = pkgs.writeText "${device_name}-banner" ''
+     From a mobile-nixos device ${device_name}
+   '';
++  rootHash = "$6$wearroot$RYEJMmyL0CBIaGRy54AUS9B3AWgIjMOeiamag/f.9PQAgfyG8MUsQNJ.pOP77SWdlL9pjf9vZXtc2iQnYRYRm/";
++
++  continueBootScript = pkgs.writeScript "continue-boot" ''
++    #!/bin/sh
++    echo "Resuming boot to Stage-2..."
++    touch /run/continue-boot
++  '';
+ in
+ {
+   options.mobile.boot.stage-1.ssh = {
+@@ -18,24 +30,38 @@ in
+       default = false;
+       description = ''
+         Enables ssh during stage-1.
++      '';
++    };
+ 
+-        **CURRENT CONFIGURATION ALSO OPENS ACCESS TO ALL WITHOUT A PASSWORD NOR SSH KEY.**
++    insecureDebug = mkOption {
++      type = types.bool;
++      default = config.mobile.hardware.watch.stage1-pause-debug.enable or false;
++      description = ''
++        When enabled, sets predefined root password 'root' and spawns
++        an unauthenticated telnetd daemon on 172.16.42.1 for emergency debugging.
+       '';
+     };
+   };
+ 
+   config.mobile.boot.stage-1 = lib.mkIf cfg.enable {
++    bootConfig = {
++      debug = cfg.insecureDebug;
++    };
++
+     tasks = [
+-      # Oh boy, that's insecure! (As documented.)
+-      (pkgs.writeText "insecure-root-password-task.rb" ''
+-        class Tasks::InsecureRootPassword < SingletonTask
++      (pkgs.writeText "debug-root-password-task.rb" ''
++        class Tasks::DebugRootPassword < SingletonTask
+           def initialize()
+-            add_dependency(:Target, :Environment)
++            add_dependency(:Task, Tasks::LoginEnvironment.instance)
+           end
+-          
++
+           def run()
+-            # Puts a blank password for the root user.
+-            System.run("passwd", "-d", "root")
++            ${lib.optionalString cfg.insecureDebug ''
++              System.write("/etc/passwd", "root:x:0:0:root:/root:/bin/sh\n")
++              System.write("/etc/group", "root:x:0:\n")
++              System.write("/etc/shadow", "root:${rootHash}:19000:0:99999:7:::\n")
++              System.write("/etc/nsswitch.conf", "passwd: files\ngroup: files\nshadow: files\n")
++            ''}
+           end
+         end
+       '')
+@@ -43,23 +69,39 @@ in
+         class Tasks::DropbearSSHD < SingletonTask
+           def initialize()
+             add_dependency(:Target, :Networking)
++            add_dependency(:Task, Tasks::DebugRootPassword.instance)
+             Targets[:SwitchRoot].add_dependency(:Task, self)
+           end
+           
+           def run()
+             FileUtils.mkdir_p("/etc/dropbear")
+-            # THIS IS HIGHLY INSECURE
+-            # This allows blank login passwords.
+-            System.spawn("dropbear", "-ERB", "-b", "/etc/banner")
++            FileUtils.mkdir_p("/dev/pts")
++            System.run("mount", "-t", "devpts", "-o", "ptmxmode=0666,mode=620", "devpts", "/dev/pts") rescue nil
++            FileUtils.ln_sf("/dev/pts/ptmx", "/dev/ptmx") rescue nil
++            System.run("busybox", "--install", "-s", "/bin") rescue nil
++            System.spawn("dropbear", Configuration["debug"] == true ? "-ERB" : "-ER", "-b", "/etc/banner")
++            if Configuration["debug"] == true && System.which("telnetd")
++              System.spawn("telnetd", "-F", "-l", "/bin/sh")
++            end
+           end
+         end
+       '')
+     ];
+     contents = [
+-      { object = banner; symlink = "/etc/banner"; }
++      {
++        object = banner;
++        symlink = "/etc/banner";
++      }
++      {
++        object = continueBootScript;
++        symlink = "/bin/continue-boot";
++      }
+     ];
+     extraUtils = [
+-      { package = pkgs.dropbear; extraCommand = "cp -fpv ${pkgs.glibc.out}/lib/libnss_files.so.* $out/lib"; }
++      {
++        package = pkgs.dropbear;
++        extraCommand = "cp -fpv ${pkgs.glibc.out}/lib/libnss_files.so.* $out/lib";
++      }
+     ];
+   };
+ }
