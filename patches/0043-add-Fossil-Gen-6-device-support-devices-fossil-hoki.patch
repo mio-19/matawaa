@@ -18,7 +18,7 @@ and keep the underclock and WLAN firmware setup services non-blocking so
 they cannot hold multi-user.target.
 ---
  devices/fossil-firefish/default.nix           |  56 ++
- devices/fossil-hoki/android-init.nix          | 181 +++++++
+ devices/fossil-hoki/android-init.nix          | 199 +++++++
  devices/fossil-hoki/android-system-data.nix   |  26 +
  devices/fossil-hoki/audio-modules.nix         | 122 +++++
  devices/fossil-hoki/default.nix               | 511 ++++++++++++++++++
@@ -43,7 +43,7 @@ they cannot hold multi-user.target.
  overlay/asteroidos/default.nix                |   2 +-
  .../qt6-qpa-hwcomposer-plugin/default.nix     |  95 +++-
  .../hwc-present-diagnostics.patch             | 204 +++++++
- 26 files changed, 2556 insertions(+), 72 deletions(-)
+ 26 files changed, 2574 insertions(+), 72 deletions(-)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -132,10 +132,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..92122a96
+index 00000000..0dc31172
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,181 @@
+@@ -0,0 +1,199 @@
 +{
 +  lib,
 +  pkgs,
@@ -174,7 +174,7 @@ index 00000000..92122a96
 +  # Matches AsteroidOS meta-skipjack, meta-koi, meta-narwhal, meta-pike, meta-ray.
 +  patchedInitRc = pkgs.runCommand "init.rc" { } ''
 +    ${pkgs.gnused}/bin/sed \
-+      -e '/start vndservicemanager/a \    start vendor.hwcomposer-2-1\n    start vendor.gralloc-2-0\n    start vendor.configstore-hal' \
++      -e '/start vndservicemanager/a \    start vendor.gralloc-2-0\n    start vendor.configstore-hal' \
 +      -e '/setprop sys.hwc.gpu_perf_mode 1/a \    setprop vendor.gralloc.enable_fb_ubwc 0\n    setprop vendor.gralloc.disable_ubwc 1' \
 +      ${initRc} > $out
 +    cat >> $out <<'EOF'
@@ -192,13 +192,7 @@ index 00000000..92122a96
 +    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
 +    class core
 +
-+# Hardware Composer and Graphics Allocator services for Qualcomm Treble HIDL
-+service vendor.hwcomposer-2-1 /vendor/bin/hw/android.hardware.graphics.composer@2.1-service
-+    class hal
-+    user system
-+    group graphics drmrpc
-+    capabilities SYS_NICE
-+
++# Graphics Allocator and ConfigStore services for Qualcomm Treble HIDL
 +service vendor.gralloc-2-0 /vendor/bin/hw/android.hardware.graphics.allocator@2.0-service
 +    class hal
 +    user system
@@ -303,6 +297,30 @@ index 00000000..92122a96
 +        ${pkgs.coreutils}/bin/touch /dev/.coldboot_done
 +      '';
 +      ExecStart = "${hybrisAndroid}/usr/libexec/hal-droid/system/bin/init";
++    };
++  };
++
++  # Hardware Composer 2.1 Treble service for libhybris graphics composition.
++  # Managed via systemd so it starts reliably after Android init/servicemanager
++  # with correct bionic library paths and survives Android framework restarts.
++  systemd.services.android-hwcomposer = {
++    description = "Android Hardware Composer 2.1 Service";
++    wantedBy = [ "multi-user.target" ];
++    after = [ "android-init.service" ];
++    requires = [ "android-init.service" ];
++    serviceConfig = {
++      Type = "simple";
++      Restart = "always";
++      RestartSec = "1s";
++      Environment = [
++        "PATH=/system/bin:/vendor/bin"
++        "LD_LIBRARY_PATH=/vendor/lib:/system/lib"
++      ];
++      ExecStartPre = pkgs.writeShellScript "hwcomposer-pre" ''
++        env -i /system/bin/setprop vendor.gralloc.enable_fb_ubwc 0 || true
++        env -i /system/bin/setprop vendor.gralloc.disable_ubwc 1 || true
++      '';
++      ExecStart = "/vendor/bin/hw/android.hardware.graphics.composer@2.1-service";
 +    };
 +  };
 +
