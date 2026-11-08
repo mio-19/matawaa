@@ -132,7 +132,7 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..ecaca223
+index 00000000..206dc17f
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
 @@ -0,0 +1,160 @@
@@ -177,7 +177,7 @@ index 00000000..ecaca223
 +    cat >> $out <<'EOF'
 +
 +# AsteroidOS SELinux stub integration for core service managers
-+service servicemanager /usr/libexec/hal-droid/system/bin/servicemanager
++service servicemanager /system/bin/servicemanager
 +    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
 +    class core
 +

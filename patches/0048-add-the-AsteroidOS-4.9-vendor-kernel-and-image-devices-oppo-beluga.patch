@@ -14,7 +14,7 @@ Subject: [PATCH] add the AsteroidOS 4.9 vendor kernel and image
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
 new file mode 100644
-index 00000000..8c88b481
+index 00000000..e734b3dd
 --- /dev/null
 +++ b/devices/oppo-beluga/android-init.nix
 @@ -0,0 +1,122 @@
@@ -58,7 +58,7 @@ index 00000000..8c88b481
 +    cat >> $out <<'EOF'
 +
 +# AsteroidOS SELinux stub integration for core service managers
-+service servicemanager /usr/libexec/hal-droid/system/bin/servicemanager
++service servicemanager /system/bin/servicemanager
 +    setenv LD_PRELOAD /usr/libexec/hal-droid/system/lib/libselinux_stubs.so
 +    class core
 +
