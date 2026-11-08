@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 01:09:35 +1100
+Subject: [PATCH] overlay/asteroidos/ngfd: fall back to alsasink when
+ PulseAudio server is not available
+
+---
+ .../0005-gst-sink-fallback-to-alsasink.patch  | 22 +++++++++++++++++++
+ overlay/asteroidos/ngfd/default.nix           |  1 +
+ 2 files changed, 23 insertions(+)
+ create mode 100644 overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch
+
+diff --git a/overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch b/overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch
+new file mode 100644
+index 00000000..a4f4f863
+--- /dev/null
++++ b/overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch
+@@ -0,0 +1,22 @@
++--- a/src/plugins/gst/plugin.c	2026-11-09 01:08:19.958950297 +1100
+++++ b/src/plugins/gst/plugin.c	2026-11-09 01:08:19.958950297 +1100
++@@ -606,7 +606,18 @@
++     decoder = gst_element_factory_make ("decodebin", NULL);
++     audioconv = gst_element_factory_make ("audioconvert", NULL);
++     volume = gst_element_factory_make ("volume", NULL);
++-    sink = gst_element_factory_make ("pulsesink", NULL);
+++    /* Prefer pulsesink if a PulseAudio server is active, otherwise fall back to alsasink */
+++    if (g_getenv ("PULSE_SERVER") != NULL ||
+++        g_file_test ("/run/user/1000/pulse/native", G_FILE_TEST_EXISTS) ||
+++        g_file_test ("/var/run/pulse/native", G_FILE_TEST_EXISTS)) {
+++        sink = gst_element_factory_make ("pulsesink", NULL);
+++    }
+++    if (!sink) {
+++        sink = gst_element_factory_make ("alsasink", NULL);
+++    }
+++    if (!sink) {
+++        sink = gst_element_factory_make ("pulsesink", NULL);
+++    }
++ 
++     if (!pipeline || !source || !decoder || !audioconv || !volume || !sink) {
++         N_ERROR (LOG_CAT "failed to create required elements.");
+diff --git a/overlay/asteroidos/ngfd/default.nix b/overlay/asteroidos/ngfd/default.nix
+index 8d854190..44b0f80f 100644
+--- a/overlay/asteroidos/ngfd/default.nix
++++ b/overlay/asteroidos/ngfd/default.nix
+@@ -48,6 +48,7 @@ stdenv.mkDerivation (finalAttrs: {
+     "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0002-ffmemless-Reserve-enough-space-for-sprintf.patch"
+     "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0003-ffmemless-support-FF_PERIODIC-only-haptic-drivers.patch"
+     "${metaAsteroidSrc}/recipes-nemomobile/ngfd/ngfd/0004-profile-source-vibration-gate-from-dconf.patch"
++    ./0005-gst-sink-fallback-to-alsasink.patch
+   ];
+ 
+   nativeBuildInputs = [
