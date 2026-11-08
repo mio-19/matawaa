@@ -355,8 +355,11 @@ def deploy_copy(
 
     log(f"Copying system closure to {user}@{host} via nix-copy-closure...")
     env = os.environ.copy()
-    env["NIX_SSHOPTS"] = f"-p {port} -o StrictHostKeyChecking=accept-new"
-    cmd = ["nix-copy-closure", "-v", "--to", f"{user}@{host}", toplevel]
+    env["NIX_SSHOPTS"] = (
+        f"-p {port} -o StrictHostKeyChecking=accept-new "
+        "-o ServerAliveInterval=15 -o ServerAliveCountMax=6 -o TCPKeepAlive=yes"
+    )
+    cmd = ["nix-copy-closure", "--gzip", "-v", "--to", f"{user}@{host}", toplevel]
     run_cmd(cmd, env=env)
 
     if bootimg:
