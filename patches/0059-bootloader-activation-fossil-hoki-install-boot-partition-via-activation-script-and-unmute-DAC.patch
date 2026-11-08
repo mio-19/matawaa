@@ -11,10 +11,10 @@ Subject: [PATCH] bootloader, activation, fossil-hoki: install boot partition
  3 files changed, 127 insertions(+), 14 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index 397277f4..8db1b268 100644
+index 5ae5b7cb..a6a6e41d 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -219,6 +219,7 @@ in
+@@ -223,6 +223,7 @@ in
          if [ -e /dev/snd/controlC0 ]; then
            # QUAT_MI2S_RX connects MultiMedia1 frontend to TFA98xx speaker amplifier DAI link
            tinymix -D 0 set "QUAT_MI2S_RX Audio Mixer MultiMedia1" 1 || true

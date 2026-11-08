@@ -5,8 +5,8 @@ Subject: [PATCH] fossil-hoki, virtualkeyboard, btsyncd: fix audio amp firmware
  and add phone input mode
 
 ---
- devices/fossil-hoki/default.nix               |  17 +--
- devices/fossil-hoki/tfa9890.cnt               | Bin 0 -> 5246 bytes
+ devices/fossil-hoki/default.nix               |  21 +--
+ devices/fossil-hoki/tfa9890.cnt.base64        |  93 +++++++++++++
  .../asteroid-btsyncd/appbridgeservice.cpp     |  39 ++++++
  .../0001-add-rime-plugin-and-layouts.patch    |   7 +-
  .../asteroidos/virtualkeyboard/default.nix    |   2 +
@@ -20,8 +20,8 @@ Subject: [PATCH] fossil-hoki, virtualkeyboard, btsyncd: fix audio amp firmware
  .../virtualkeyboard/layouts/zh_TW/main.qml    |  80 ++++++++++-
  .../virtualkeyboard/phoneinputbridge.cpp      |  86 ++++++++++++
  .../virtualkeyboard/phoneinputbridge.h        |  46 +++++++
- 15 files changed, 860 insertions(+), 22 deletions(-)
- create mode 100644 devices/fossil-hoki/tfa9890.cnt
+ 15 files changed, 957 insertions(+), 22 deletions(-)
+ create mode 100644 devices/fossil-hoki/tfa9890.cnt.base64
  create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_GB/main.qml
  create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_GB/symbols.qml
  create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_US/main.qml
@@ -31,21 +31,32 @@ Subject: [PATCH] fossil-hoki, virtualkeyboard, btsyncd: fix audio amp firmware
  create mode 100644 overlay/asteroidos/virtualkeyboard/phoneinputbridge.h
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
-index ba41941c..397277f4 100644
+index ba41941c..5ae5b7cb 100644
 --- a/devices/fossil-hoki/default.nix
 +++ b/devices/fossil-hoki/default.nix
-@@ -16,9 +16,7 @@ let
+@@ -9,6 +9,10 @@ let
+   hybrisAndroid = import ./hybris-android.nix { inherit pkgs; };
+   androidSystemData = import ./android-system-data.nix { inherit pkgs; };
+ 
++  tfa9890Cnt = pkgs.runCommand "tfa9890.cnt" { } ''
++    ${pkgs.coreutils}/bin/base64 -d ${./tfa9890.cnt.base64} > $out
++  '';
++
+   # Static vendor and system firmware package for kernel direct firmware loader
+   hokiFirmware = pkgs.runCommand "hoki-firmware" { } ''
+     mkdir -p $out/lib/firmware
+@@ -16,9 +20,7 @@ let
      if [ -d ${androidSystemData}/system/etc/firmware ]; then
        cp -a ${androidSystemData}/system/etc/firmware/* $out/lib/firmware/
      fi
 -    if [ -e $out/lib/firmware/tfa98xx.cnt ]; then
 -      ln -sf tfa98xx.cnt $out/lib/firmware/tfa9890.cnt
 -    fi
-+    cp -f ${./tfa9890.cnt} $out/lib/firmware/tfa9890.cnt
++    cp -f ${tfa9890Cnt} $out/lib/firmware/tfa9890.cnt
    '';
  
    # Non-graphic feedback (haptics) DRV260X configuration for tactile feedback
-@@ -176,7 +174,10 @@ in
+@@ -176,7 +178,10 @@ in
      description = "Fossil Gen 6 TFA98xx audio amplifier and microphone mixer routing";
      wantedBy = [ "multi-user.target" ];
      wants = [ "dev-snd-controlC0.device" ];
@@ -57,11 +68,11 @@ index ba41941c..397277f4 100644
      path = with pkgs; [
        alsa-utils
        coreutils
-@@ -199,10 +200,10 @@ in
+@@ -199,10 +204,10 @@ in
  
          # Ensure TFA98xx amplifier DSP container firmware is linked under both names in /lib/firmware
          mkdir -p /lib/firmware
-+        ln_force "${./tfa9890.cnt}" /lib/firmware/tfa9890.cnt
++        ln_force "${tfa9890Cnt}" /lib/firmware/tfa9890.cnt
          for p in /system/etc/firmware/tfa98xx.cnt /vendor/firmware/tfa98xx.cnt /etc/firmware/tfa98xx.cnt; do
            if [ -e "$p" ]; then
              ln_force "$p" /lib/firmware/tfa98xx.cnt
@@ -69,7 +80,7 @@ index ba41941c..397277f4 100644
              break
            fi
          done
-@@ -216,10 +217,10 @@ in
+@@ -216,10 +221,10 @@ in
          done
  
          if [ -e /dev/snd/controlC0 ]; then
@@ -83,85 +94,105 @@ index ba41941c..397277f4 100644
            # TERT_MI2S_TX connects digital microphone to MultiMedia1 capture frontend
            tinymix -D 0 set "MultiMedia1 Mixer TERT_MI2S_TX" 1 || true
            # Route digital mic 1 to DEC1
-diff --git a/devices/fossil-hoki/tfa9890.cnt b/devices/fossil-hoki/tfa9890.cnt
+diff --git a/devices/fossil-hoki/tfa9890.cnt.base64 b/devices/fossil-hoki/tfa9890.cnt.base64
 new file mode 100644
-index 0000000000000000000000000000000000000000..21bff2e0072dbac46339069a4b4207625b66c86f
-GIT binary patch
-literal 5246
-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
-
-literal 0
-HcmV?d00001
-
+index 00000000..8aed5309
+--- /dev/null
++++ b/devices/fossil-hoki/tfa9890.cnt.base64
+@@ -0,0 +1,93 @@
++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
++ZmlnAKwMAAPwAQAAU1AxXzAw8AFEjCCoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
++AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//MP//BP//U///Jf//oP//S///kv//K///Rv//
++P///RP/+zv//Hf/+1///Yv//Bv//Qv//Jf//X///Dv//C//+6f/+lf/+xf/+Xf/+s//+4//+q//+
++Xf/+Kv//D//9yf/+9f/+y//+Dv/+w//+aP/+ff/+Pf/+Qv/+Yf/+RP/+Ff/+Rv/+F//9vP/93v/9
++4P/9IP/+U//9Wv/9///9R//9l//9k//9af/88P/+M//9Of/9ZP/9l//85v/9Cf/87f/87f/8mP/8
++vf/8f//8lv/8S//79//84v/7h//9B//70v/78v/7f//7pv/7uv/7l//7fv/66P/7YP/7Bv/7DP/6
++VP/7gP/7A//5+f/7ZP/47P/8YP/35P//CP/1xAABuv/xHAAA6f/qpAAC2f/r0AAN/f/1MwAVqv/u
++uf//nf/PFf/hVP/WdQAPAAA4igBiQwBfQP/tM//SnAi61v/oUwAAAAAAAAAAAAAAAAAAAAAAAAAA
++AAAAAAAAAAAAAAAAAAAAAEAAAFCj1yAAACAAACAAABo9cQADogAD4AIAAABHrg8AAAB9LEVGVDFf
++OTAxLnNwZWFrZXIATXVzaWMuNDgwMDAACADDBAIAYQSaDgADwQEAAFZQMl8wMcEB+otlX05YUAAA
++AAAAZGV2a2l0AAB2ZXIgMS4wAAEIAAAAAAAAAQABcgAAAgCAAAALuAAAAAABLAFHrgArsAAA0gAQ
++YgEAAAKAAAKzMweFHwgAAAHmZgEzMwAMzQBAAAABSAABSAEAAAABSAABSAeuFAeFHwAHrgAAFAAA
++AcSc0ns35A98c+EHGQ98cwEDAADIQzMzMz8AAEDBAAABwlNQfYCYPTHkgn9oQHrMAAdHAchD1wW1
++P9gAQEAAAADqqqsAAAAlVVVKqqolVVUBAgCAO0YzMzM/AAAAAAAAAJ5++3KJZWqugY12m3bShAEH
++AND3RQAAAEEAAADBAAABzKpiQBOONavov+xyPam2AQcAYOpFAADAQAAAgMAAAAHVactk7iIokYub
++Ed5CBKoBBwBAHEXNzEw/AADAPwAAAQAAAAAAAAAAAAAAAEAAAAABAAB6RPMEtT8AAAAAAAABAAAA
++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
++cAA=
 diff --git a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp b/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
 index 8802310f..e73d496f 100644
 --- a/overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
