@@ -1,0 +1,203 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 18:46:49 +1100
+Subject: [PATCH] watch: generate machine config and reuse packaged Rime data
+
+---
+ modules/asteroid-config.nix                   | 33 +++++++++----------
+ modules/hardware-watch.nix                    | 16 +++++----
+ modules/watch-power.nix                       |  1 -
+ .../asteroidos/virtualkeyboard/default.nix    | 29 +++++-----------
+ 4 files changed, 33 insertions(+), 46 deletions(-)
+
+diff --git a/modules/asteroid-config.nix b/modules/asteroid-config.nix
+index dc08f497..422aec0f 100644
+--- a/modules/asteroid-config.nix
++++ b/modules/asteroid-config.nix
+@@ -6,7 +6,7 @@
+ }:
+ 
+ let
+-  inherit (lib) mkDefault mkIf;
++  inherit (lib) mkIf;
+   screenCfg = config.mobile.hardware.screen;
+   watchCfg = config.mobile.hardware.watch;
+   devName =
+@@ -17,23 +17,22 @@ let
+ 
+   # Generates standard /etc/asteroid/machine.conf expected by AsteroidOS launcher,
+   # qml-asteroid, and applications.
+-  machineConf = pkgs.writeText "machine.conf" ''
+-    [Display]
+-    FLAT_TIRE=${toString screenCfg.chinHeight}
+-    ${
+-      lib.optionalString (
+-        watchCfg.borderGestureWidth != null
+-      ) "BORDER_GESTURE_WIDTH=${toString watchCfg.borderGestureWidth}\n"
+-    }ROUND=${if screenCfg.shape == "round" || screenCfg.shape == "chin" then "true" else "false"}
+-    NEEDS_BURN_IN_PROTECTION=${if watchCfg.burnInProtection then "true" else "false"}
+-
+-    [Capabilities]
+-    HAS_WLAN=true
+-    HAS_SPEAKER=${if watchCfg.hasSpeaker then "true" else "false"}
++  machineConf = (pkgs.formats.ini { }).generate "machine.conf" {
++    Display = {
++      FLAT_TIRE = screenCfg.chinHeight;
++      ROUND = screenCfg.shape == "round" || screenCfg.shape == "chin";
++      NEEDS_BURN_IN_PROTECTION = watchCfg.burnInProtection;
++    }
++    // lib.optionalAttrs (watchCfg.borderGestureWidth != null) {
++      BORDER_GESTURE_WIDTH = watchCfg.borderGestureWidth;
++    };
++    Capabilities = {
++      HAS_WLAN = watchCfg.hasWlan;
++      HAS_SPEAKER = watchCfg.hasSpeaker;
++    };
++    Identity.MACHINE = devName;
++  };
+ 
+-    [Identity]
+-    MACHINE=${devName}
+-  '';
+ in
+ {
+   config = mkIf (config.mobile.enable && watchCfg.enable) {
+diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
+index 4c9a9b22..c6b448f2 100644
+--- a/modules/hardware-watch.nix
++++ b/modules/hardware-watch.nix
+@@ -1,16 +1,12 @@
+ {
+   config,
+   lib,
+-  pkgs,
+   ...
+ }:
+ 
+ let
+   inherit (lib)
+-    mkDefault
+-    mkEnableOption
+     mkIf
+-    mkMerge
+     mkOption
+     types
+     ;
+@@ -43,7 +39,7 @@ in
+     };
+ 
+     chinHeight = mkOption {
+-      type = types.int;
++      type = types.ints.unsigned;
+       default = 0;
+       description = ''
+         Height in pixels of the non-display cutout area at the bottom of the screen
+@@ -57,7 +53,7 @@ in
+         if
+           watchCfg.enable && (screenCfg.shape == "round" || screenCfg.shape == "chin") && (screenCfg ? width)
+         then
+-          screenCfg.width / 2
++          builtins.div screenCfg.width 2
+         else
+           0;
+       description = ''
+@@ -92,6 +88,12 @@ in
+       '';
+     };
+ 
++    hasWlan = mkOption {
++      type = types.bool;
++      default = true;
++      description = "Whether the watch has Wi-Fi, exposed as upstream MACHINE_HAS_WLAN.";
++    };
++
+     hasSpeaker = mkOption {
+       type = types.bool;
+       default = false;
+@@ -103,7 +105,7 @@ in
+     };
+ 
+     borderGestureWidth = mkOption {
+-      type = types.nullOr (types.either types.str types.float);
++      type = types.nullOr (types.numbers.between 0 1);
+       default = null;
+       description = ''
+         Fraction of display width/height dedicated to border gestures (0.0 - 1.0).
+diff --git a/modules/watch-power.nix b/modules/watch-power.nix
+index 5b936f61..5cec15a2 100644
+--- a/modules/watch-power.nix
++++ b/modules/watch-power.nix
+@@ -1,7 +1,6 @@
+ {
+   config,
+   lib,
+-  pkgs,
+   ...
+ }:
+ 
+diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
+index 315cdafe..9ad1a161 100644
+--- a/overlay/asteroidos/virtualkeyboard/default.nix
++++ b/overlay/asteroidos/virtualkeyboard/default.nix
+@@ -11,7 +11,7 @@
+   noUsrShareHook,
+ }:
+ 
+-stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
+   pname = "asteroid-virtualkeyboard";
+   version = "2.1.0";
+ 
+@@ -19,7 +19,7 @@ stdenv.mkDerivation (finalAttrs: {
+     owner = "AsteroidOS";
+     repo = "asteroid-virtualkeyboard";
+     rev = "666743fc42eaa02b9f82155ff3aff3a40e0d45ac";
+-    sha256 = "0yw1xq315p7q7illjpq92cs0060lrw94bfk8ywc7fbrr1gmkmvjf";
++    hash = "sha256-Tu466ws5L3cY92i6RRLPFBgANBMJX0lpPPjcEgbugXs=";
+   };
+ 
+   patches = [
+@@ -43,7 +43,6 @@ stdenv.mkDerivation (finalAttrs: {
+     cmake
+     pkg-config
+     qt6.wrapQtAppsHook
+-    buildPackages.librime
+     noUsrShareHook
+   ];
+ 
+@@ -64,29 +63,17 @@ stdenv.mkDerivation (finalAttrs: {
+     "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
+   ];
+ 
+-  # Pre-deploy common Chinese schemas (Pinyin, Shuangpin, Wubi, Cangjie, Stroke, Bopomofo, Jyutping)
+-  # Upstream: https://github.com/rime/librime
++  # Reuse nixpkgs' compiled schemas and dictionaries instead of redeploying
++  # them locally with ignored errors.
+   postInstall = ''
+-    mkdir -p $out/share/rime-data/build
+-    cp -r ${rime-data}/share/rime-data/* $out/share/rime-data/
+-
+-    # Run rime_deployer on host buildPlatform to compile binary tables
+-    mkdir -p build-deploy/user build-deploy/staging
+-    ${buildPackages.librime}/bin/rime_deployer --add-schema \
+-      luna_pinyin double_pinyin wubi86 cangjie5 stroke bopomofo jyutping \
+-      build-deploy/user $out/share/rime-data
+-
+-    ${buildPackages.librime}/bin/rime_deployer --build \
+-      build-deploy/user $out/share/rime-data build-deploy/staging || true
+-
+-    cp -n build-deploy/staging/* $out/share/rime-data/build/ 2>/dev/null || true
+-    cp -n build-deploy/staging/* $out/share/rime-data/ 2>/dev/null || true
++    mkdir -p "$out/share/rime-data"
++    cp -r ${rime-data}/share/rime-data/. "$out/share/rime-data/"
+   '';
+ 
+   meta = with lib; {
+     description = "AsteroidOS on-screen virtual keyboard with watch style, layouts, and integrated RIME input method engine";
+     homepage = "https://asteroidos.org/";
+-    license = licenses.gpl3Plus;
++    license = licenses.gpl3Only;
+     platforms = platforms.linux;
+   };
+-})
++}

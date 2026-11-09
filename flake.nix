@@ -89,8 +89,6 @@
         mkDeviceModule =
           device:
           {
-            config,
-            lib,
             pkgs,
             ...
           }:
@@ -142,8 +140,6 @@
         // {
           default =
             {
-              config,
-              lib,
               pkgs,
               ...
             }:

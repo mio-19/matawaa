@@ -132,6 +132,7 @@ while read -r f; do
   [ -n "$so" ] && printf '%s\t%s\n' "$so" "$f" >>"$WORK/index.tsv"
 done <"$WORK/all-elfs.txt"
 sort -u "$WORK/index.tsv" -o "$WORK/index.tsv"
+cut -f1 "$WORK/index.tsv" | sort -u >"$WORK/sonames.txt"
 
 # --- 3. audit ---------------------------------------------------------------
 : >"$WORK/missing-needed.tsv"
@@ -143,7 +144,7 @@ while read -r f; do
   # 3a. every direct NEEDED must exist somewhere in the scanned set
   while read -r so; do
     [ -z "$so" ] && continue
-    if ! cut -f1 "$WORK/index.tsv" | grep -qxF "$so"; then
+    if ! grep -qxF "$so" "$WORK/sonames.txt"; then
       printf '%s\t%s\n' "$f" "$so" >>"$WORK/missing-needed.tsv"
     fi
   done < <(readelf -d --wide "$f" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p')
