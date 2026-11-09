@@ -1446,10 +1446,10 @@ index 00000000..703662c4
 +    };
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index db4c459d..3ca02e0b 100644
+index ceed388d..6cbaf356 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -146,6 +146,18 @@ rec {
+@@ -159,6 +159,18 @@ rec {
      inherit qml-asteroid amber-mpris mlite;
    };
  
@@ -1458,7 +1458,7 @@ index db4c459d..3ca02e0b 100644
 +      inherit mkAsteroidApp mce-dev ngf-qt6;
 +    })
 +    // {
-+      
++
 +    };
 +
 +  assets = (callPackage ./assets { inherit metaAsteroidSrc; }) // {

@@ -3,16 +3,14 @@
 
 Stages NixOS system profiles and Android boot images on wearable devices:
   1. Builds the full AsteroidOS UI desktop toplevel closure locally.
-  2. Builds the stage-1 Android boot image (`boot.img`).
-  3. Copies closures via `nix-copy-closure` over USB networking or Wi-Fi.
-  4. Flashes stage-1 to the Android boot partition if updated.
-  5. Stages the new generation for the next boot, or activates it immediately.
+  2. Copies closures via `nix-copy-closure` over USB networking or Wi-Fi.
+  3. Runs NixOS activation, which installs the included boot image when needed.
+  4. Stages the new generation for the next boot, or activates it immediately.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import os
 import shlex
 import subprocess
@@ -171,152 +169,6 @@ def build_asteroid_toplevel(repo_root: Path, device: str) -> str:
     return toplevel
 
 
-def build_stage1_bootimg(repo_root: Path, device: str) -> str:
-    log(f"Building stage-1 boot.img (kernel + initrd) for '{device}'...")
-    examples_path = repo_root / "work" / "mobile-nixos" / "examples" / "asteroid"
-    if examples_path.is_dir():
-        cmd = [
-            "nix-build",
-            str(examples_path),
-            "--argstr",
-            "device",
-            device,
-            "-A",
-            "outputs.android.android-bootimg",
-            "--no-link",
-        ]
-    else:
-        cmd = [
-            "nix",
-            "build",
-            f"{repo_root}#nixosConfigurations.{device}.config.mobile.outputs.android.android-bootimg",
-            "--no-link",
-            "--print-out-paths",
-        ]
-    bootimg_path = run_build_cmd(cmd, cwd=repo_root)
-    log_success(f"Built stage-1 boot image: {bootimg_path}")
-    return bootimg_path
-
-
-def flash_stage1_bootimg_remote(
-    host: str,
-    port: int,
-    user: str,
-    local_bootimg: str,
-) -> None:
-    bootimg_file = Path(local_bootimg)
-    if not bootimg_file.is_file():
-        # Might be a directory containing boot.img
-        candidate = bootimg_file / "boot.img"
-        if candidate.is_file():
-            bootimg_file = candidate
-        else:
-            raise FileNotFoundError(f"Cannot locate boot.img at {local_bootimg}")
-
-    img_size = bootimg_file.stat().st_size
-    digest = hashlib.sha256()
-    with open(bootimg_file, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    img_sha256 = digest.hexdigest()
-
-    log(f"Stage-1 boot.img size: {img_size} bytes, sha256: {img_sha256[:16]}...")
-
-    # Shell script to locate boot partition and compare checksum before transfer
-    check_script = f"""
-set -euo pipefail
-BOOT_PART=""
-for cand in \\
-    /dev/block/bootdevice/by-name/boot \\
-    /dev/block/by-name/boot \\
-    /dev/block/platform/*/by-name/boot \\
-    /dev/disk/by-partlabel/boot \\
-    /dev/disk/by-partlabel/BOOT; do
-    if [ -b "$cand" ]; then
-        BOOT_PART="$cand"
-        break
-    fi
-done
-
-if [ -z "$BOOT_PART" ]; then
-    slot=$(sed -n 's/.*androidboot.slot_suffix=\\(_[ab]\\).*/\\1/p' /proc/cmdline)
-    if [ -n "$slot" ]; then
-        for cand in /dev/block/bootdevice/by-name/boot"$slot" /dev/block/by-name/boot"$slot"; do
-            if [ -b "$cand" ]; then BOOT_PART="$cand"; break; fi
-        done
-    fi
-fi
-
-if [ -z "$BOOT_PART" ]; then
-    echo "No active boot partition block device found" >&2
-    exit 1
-fi
-
-part_size=$(blockdev --getsize64 "$BOOT_PART")
-if [ "$part_size" -lt {img_size} ]; then
-    echo "Boot image exceeds $BOOT_PART ($part_size bytes)" >&2
-    exit 1
-fi
-
-echo "$BOOT_PART"
-head -c {img_size} "$BOOT_PART" | sha256sum | awk '{{print $1}}'
-"""
-    check_res = ssh_exec(
-        host, port, user, f"bash -c {shlex.quote(check_script)}", sudo=True, capture_output=True
-    )
-    lines = [line.strip() for line in check_res.stdout.splitlines() if line.strip()]
-    if len(lines) < 2:
-        raise RuntimeError(f"Unexpected output checking boot partition: {check_res.stdout}")
-    boot_part = lines[0]
-    part_sha = lines[1]
-
-    log(f"Found boot partition block device: {boot_part}")
-    if part_sha == img_sha256:
-        log_success(
-            f"Stage-1 boot partition already matches new boot.img ({img_sha256}). Flashing not needed."
-        )
-        return
-
-    log(f"Stage-1 hash mismatch ({part_sha} != {img_sha256}). Flashing new boot.img...")
-
-    # Copy boot.img to watch /tmp
-    remote_tmp_img = f"/tmp/new-stage1-{img_sha256[:16]}-{os.getpid()}.img"
-    log(f"Transferring stage-1 boot.img to watch at {remote_tmp_img}...")
-    scp_cmd = [
-        "scp",
-        "-O",
-        "-P",
-        str(port),
-        "-o",
-        "StrictHostKeyChecking=accept-new",
-        str(bootimg_file),
-        f"{user}@{host}:{remote_tmp_img}",
-    ]
-    run_cmd(scp_cmd)
-
-    # Shell script to flash boot partition and verify
-    flash_script = f"""
-set -euo pipefail
-trap 'rm -f {remote_tmp_img}' EXIT
-
-actual_sha=$(sha256sum {remote_tmp_img} | cut -d' ' -f1)
-if [ "$actual_sha" != "{img_sha256}" ]; then
-    echo "Transferred boot image checksum mismatch" >&2
-    exit 1
-fi
-
-dd if={remote_tmp_img} of="{boot_part}" bs=4M status=progress conv=fsync
-sync
-flashed_sha=$(head -c {img_size} "{boot_part}" | sha256sum | cut -d' ' -f1)
-if [ "$flashed_sha" != "{img_sha256}" ]; then
-    echo "Boot partition read-back checksum mismatch" >&2
-    exit 1
-fi
-echo "[+] Stage-1 successfully flashed to {boot_part}!"
-"""
-    ssh_exec(host, port, user, f"bash -c {shlex.quote(flash_script)}", sudo=True)
-
-
 def reboot_remote_target(host: str, port: int, user: str) -> None:
     log("Rebooting watch now...")
     try:
@@ -339,7 +191,6 @@ def deploy_copy(
     user: str,
     action: str,
     dry_run: bool,
-    flash_boot: bool,
     reboot: bool,
 ) -> None:
     toplevel = build_asteroid_toplevel(repo_root, device)
@@ -527,19 +378,6 @@ Examples:
         help="Build/evaluate configuration without copying or activating",
     )
     parser.add_argument(
-        "--flash-boot",
-        dest="flash_boot",
-        action="store_true",
-        default=True,
-        help="Flash stage-1 boot.img if updated (default: True)",
-    )
-    parser.add_argument(
-        "--no-flash-boot",
-        dest="flash_boot",
-        action="store_false",
-        help="Skip flashing stage-1 boot.img",
-    )
-    parser.add_argument(
         "--no-reboot",
         dest="reboot",
         action="store_false",
@@ -577,7 +415,7 @@ Examples:
     print(f" Target:     {target}")
     print(f" Action:     {args.action}")
     print(f" Method:     {args.method}")
-    print(f" Flash Boot: {args.flash_boot and args.method == 'copy' and args.action in ('boot', 'switch')}")
+    print(" Boot image: installed by NixOS activation for boot/switch")
     print(f" Dry run:    {args.dry_run}")
     print("=" * 60)
 
@@ -590,7 +428,6 @@ Examples:
             user=args.user,
             action=args.action,
             dry_run=args.dry_run,
-            flash_boot=args.flash_boot,
             reboot=args.reboot,
         )
     elif args.method == "nixos-rebuild":

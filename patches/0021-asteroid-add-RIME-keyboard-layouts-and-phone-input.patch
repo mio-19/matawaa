@@ -38,10 +38,10 @@ Subject: [PATCH] asteroid: add RIME keyboard layouts and phone input
  create mode 100644 overlay/asteroidos/virtualkeyboard/rimeinputmethod.h
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 4fdd21ba..db4c459d 100644
+index 262d4cf2..ceed388d 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -146,4 +146,6 @@ rec {
+@@ -159,4 +159,6 @@ rec {
      inherit qml-asteroid amber-mpris mlite;
    };
  

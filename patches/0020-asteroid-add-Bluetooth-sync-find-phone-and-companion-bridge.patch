@@ -906,11 +906,11 @@ index 00000000..6a5592d0
 +  </policy>
 +</busconfig>
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 2901c4b7..4fdd21ba 100644
+index 16227de4..262d4cf2 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -142,4 +142,8 @@ rec {
-     inherit accounts-qt kcalendarcore mkcal timed-qt6 libiodata;
+@@ -155,4 +155,8 @@ rec {
+       ;
    };
  
 +  asteroid-btsyncd = callPackage ./asteroid-btsyncd {

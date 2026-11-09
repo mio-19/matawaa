@@ -4,16 +4,16 @@ Date: Mon, 9 Nov 2026 10:55:55 +1100
 Subject: [PATCH] devices: add shared AsteroidOS family and debug integration
 
 ---
- devices/families/asteroidos.nix | 320 ++++++++++++++++++++++++++++++++
- 1 file changed, 320 insertions(+)
+ devices/families/asteroidos.nix | 325 ++++++++++++++++++++++++++++++++
+ 1 file changed, 325 insertions(+)
  create mode 100644 devices/families/asteroidos.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 new file mode 100644
-index 00000000..f1e3d863
+index 00000000..892a862b
 --- /dev/null
 +++ b/devices/families/asteroidos.nix
-@@ -0,0 +1,320 @@
+@@ -0,0 +1,325 @@
 +{
 +  config,
 +  options,
@@ -36,17 +36,22 @@ index 00000000..f1e3d863
 +  # Legacy smartwatch kernels (Linux 4.x) lack STATX_MNT_ID, close_range, and modern
 +  # cgroup/pidfd APIs required by systemd >= 261. Override systemd and udev system-wide
 +  # to systemd 257 for all consumers on legacy watch targets (without polluting buildPackages).
-+  nixpkgs.overlays = lib.mkIf (config.mobile.hardware.watch.kernel == "legacy") (lib.mkAfter [
-+    (final: super: super.lib.optionalAttrs (super.stdenv.hostPlatform.isAarch32) {
-+      systemd = final.systemd257;
-+      udev = final.systemd257;
-+      lvm2 = super.lvm2.overrideAttrs (old: {
-+        outputChecks = builtins.mapAttrs (_: v: (v // { disallowedRequisites = [ ]; })) (
-+          old.outputChecks or { }
-+        );
-+      });
-+    })
-+  ]);
++  nixpkgs.overlays = lib.mkIf (config.mobile.hardware.watch.kernel == "legacy") (
++    lib.mkAfter [
++      (
++        final: super:
++        super.lib.optionalAttrs (super.stdenv.hostPlatform.isAarch32) {
++          systemd = final.systemd257;
++          udev = final.systemd257;
++          lvm2 = super.lvm2.overrideAttrs (old: {
++            outputChecks = builtins.mapAttrs (_: v: (v // { disallowedRequisites = [ ]; })) (
++              old.outputChecks or { }
++            );
++          });
++        }
++      )
++    ]
++  );
 +
 +  assertions = [
 +    {

@@ -4,20 +4,20 @@ Date: Mon, 9 Nov 2026 10:55:57 +1100
 Subject: [PATCH] examples: add AsteroidOS desktop and smartwatch system
 
 ---
- examples/asteroid/asteroid-desktop.nix | 906 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 910 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++
  examples/asteroid/default.nix          |  15 +
- 3 files changed, 964 insertions(+)
+ 3 files changed, 968 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..7e4faafc
+index 00000000..d684d006
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,906 @@
+@@ -0,0 +1,910 @@
 +{
 +  config,
 +  lib,
@@ -103,113 +103,112 @@ index 00000000..7e4faafc
 +    in
 +    {
 +
-+    # Watch system beautification and boot visibility
-+    mobile.beautification = {
-+      silentBoot = mkDefault false;
-+      splash = mkDefault true;
-+    };
++      # Watch system beautification and boot visibility
++      mobile.beautification = {
++        silentBoot = mkDefault false;
++        splash = mkDefault true;
++      };
 +
-+    # Enable Bluetooth and low-energy profiles for companion phone syncing
-+    hardware.bluetooth = {
-+      enable = mkDefault true;
-+      powerOnBoot = mkDefault true;
-+    };
++      # Enable Bluetooth and low-energy profiles for companion phone syncing
++      hardware.bluetooth = {
++        enable = mkDefault true;
++        powerOnBoot = mkDefault true;
++      };
 +
-+    # System packages for the watch environment
-+    environment.systemPackages =
-+      with pkgs;
-+      [
-+        # Provides the D-Bus service used by GSettings and AsteroidOS mlite.
-+        dconf
-+        asteroid.qml-asteroid
-+        # Sound and feedback pipelines
-+        gst_all_1.gstreamer
-+        gst_all_1.gstreamer.out
-+        gst_all_1.gst-plugins-base
-+        gst_all_1.gst-plugins-good
-+        # Provides the invoker command used by AsteroidOS Qt app launchers.
-+        asteroid.mapplauncherd
-+        asteroid.asteroid-launcher
-+        asteroid.asteroid-btsyncd
-+        asteroid.nemo-qml-plugin-dbus
-+        asteroid.libconnman-qt
-+        asteroid.mce
-+        asteroid.ngfd
-+        asteroid.nfcd
-+        asteroid.keepalive
-+        asteroid.nemo-qml-plugin-calendar
-+        asteroid.nemo-qml-plugin-alarms
-+        asteroid.nemo-qml-plugin-notifications
-+        asteroid.timed-qt6
-+        # Qt modules used by apps and the launcher.
-+        qt6.qtdeclarative
-+        qt6.qt5compat
-+        # Asset suite
-+        asteroid.assets.wallpapers
-+        asteroid.assets.sounds
-+        asteroid.assets.icons
-+        asteroid.assets.fonts
-+        asteroid.assets.keymaps
-+        asteroid.assets.supported-languages
-+        asteroid.virtualkeyboard
-+        # Complete application suite
-+        asteroid.apps.stopwatch
-+        asteroid.apps.timer
-+        asteroid.apps.alarmclock
-+        asteroid.apps.calculator
-+        asteroid.apps.settings
-+        asteroid.apps.weather
-+        asteroid.apps.music
-+        asteroid.apps.compass
-+        asteroid.apps.flashlight
-+        asteroid.apps.calendar
-+        asteroid.apps.diamonds
-+        asteroid.apps.hrm
-+        asteroid.apps.camera
-+        asteroid.apps.gps-test
-+        asteroid.apps.telegram
-+        asteroid.apps.kiwix
-+      ]
-+      ++ lib.optionals cfg.browser.enable [
-+        asteroid.apps.browser
-+      ]
-+      ++ (with pkgs; [
-+        asteroid.community-apps.unofficial-watchfaces
-+        asteroid.community-apps.blaster
-+        asteroid.community-apps.dodger
-+        asteroid.community-apps.health
-+        asteroid.community-apps.sensorlogd
-+        asteroid.community-apps.map
-+        asteroid.community-apps.qmltester
-+        asteroid.community-apps.skedaddle
-+        asteroid.community-apps.weatherfetch
-+        asteroid.community-apps.beatfork
-+        asteroid.community-apps.benchymark
-+        asteroid.community-apps.docking-bay
-+        asteroid.community-apps.heliograph
-+        asteroid.community-apps.horizon
-+        asteroid.community-apps.meteormatch
-+        asteroid.community-apps.pulsar
-+        asteroid.community-apps.rag
-+        asteroid.community-apps.shopper
-+        asteroid.community-apps.toolwatch
-+        asteroid.community-apps.touchdown
-+        asteroid.community-apps.hackwatch
-+        asteroid.community-apps.neofetch
-+        tree
-+      ]);
++      # System packages for the watch environment
++      environment.systemPackages =
++        with pkgs;
++        [
++          # Provides the D-Bus service used by GSettings and AsteroidOS mlite.
++          dconf
++          asteroid.qml-asteroid
++          # Sound and feedback pipelines
++          gst_all_1.gstreamer
++          gst_all_1.gstreamer.out
++          gst_all_1.gst-plugins-base
++          gst_all_1.gst-plugins-good
++          # Provides the invoker command used by AsteroidOS Qt app launchers.
++          asteroid.mapplauncherd
++          asteroid.asteroid-launcher
++          asteroid.asteroid-btsyncd
++          asteroid.nemo-qml-plugin-dbus
++          asteroid.libconnman-qt
++          asteroid.mce
++          asteroid.ngfd
++          asteroid.nfcd
++          asteroid.keepalive
++          asteroid.nemo-qml-plugin-calendar
++          asteroid.nemo-qml-plugin-alarms
++          asteroid.nemo-qml-plugin-notifications
++          asteroid.timed-qt6
++          # Qt modules used by apps and the launcher.
++          qt6.qtdeclarative
++          qt6.qt5compat
++          # Asset suite
++          asteroid.assets.wallpapers
++          asteroid.assets.sounds
++          asteroid.assets.icons
++          asteroid.assets.fonts
++          asteroid.assets.keymaps
++          asteroid.assets.supported-languages
++          asteroid.virtualkeyboard
++          # Complete application suite
++          asteroid.apps.stopwatch
++          asteroid.apps.timer
++          asteroid.apps.alarmclock
++          asteroid.apps.calculator
++          asteroid.apps.settings
++          asteroid.apps.weather
++          asteroid.apps.music
++          asteroid.apps.compass
++          asteroid.apps.flashlight
++          asteroid.apps.calendar
++          asteroid.apps.diamonds
++          asteroid.apps.hrm
++          asteroid.apps.camera
++          asteroid.apps.gps-test
++          asteroid.apps.telegram
++          asteroid.apps.kiwix
++        ]
++        ++ lib.optionals cfg.browser.enable [
++          asteroid.apps.browser
++        ]
++        ++ (with pkgs; [
++          asteroid.community-apps.unofficial-watchfaces
++          asteroid.community-apps.blaster
++          asteroid.community-apps.dodger
++          asteroid.community-apps.health
++          asteroid.community-apps.sensorlogd
++          asteroid.community-apps.map
++          asteroid.community-apps.qmltester
++          asteroid.community-apps.skedaddle
++          asteroid.community-apps.weatherfetch
++          asteroid.community-apps.beatfork
++          asteroid.community-apps.benchymark
++          asteroid.community-apps.docking-bay
++          asteroid.community-apps.heliograph
++          asteroid.community-apps.horizon
++          asteroid.community-apps.meteormatch
++          asteroid.community-apps.pulsar
++          asteroid.community-apps.rag
++          asteroid.community-apps.shopper
++          asteroid.community-apps.toolwatch
++          asteroid.community-apps.touchdown
++          asteroid.community-apps.hackwatch
++          asteroid.community-apps.neofetch
++          tree
++        ]);
 +
-+    systemd.tmpfiles.rules = [
-+      "d /var/lib/kiwix 0775 ceres users -"
-+      # MCE runtime/config directories; upstream mce_git.bb installs
-+      # builtin-gconf.values into /var/lib/mce. Use "C" to seed writable defaults.
-+      "d /run/mce 0755 root root -"
-+      "d /var/lib/mce 0755 root root -"
-+      "C /var/lib/mce/builtin-gconf.values 0644 root root - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
-+      # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
-+      "d /var/lib/connman 0755 root root -"
-+      "C+ /var/lib/connman/settings 0644 root root - ${
-+        pkgs.writeText "connman-settings" ''
++      systemd.tmpfiles.rules = [
++        "d /var/lib/kiwix 0775 ceres users -"
++        # MCE runtime/config directories; upstream mce_git.bb installs
++        # builtin-gconf.values into /var/lib/mce. Use "C" to seed writable defaults.
++        "d /run/mce 0755 root root -"
++        "d /var/lib/mce 0755 root root -"
++        "C /var/lib/mce/builtin-gconf.values 0644 root root - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
++        # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
++        "d /var/lib/connman 0755 root root -"
++        "C+ /var/lib/connman/settings 0644 root root - ${pkgs.writeText "connman-settings" ''
 +          [global]
 +          OfflineMode=false
 +
@@ -220,709 +219,714 @@ index 00000000..7e4faafc
 +          [Gadget]
 +          Enable=true
 +          Tethering=false
-+        ''
-+      }"
-+      # Upstream dsme_git.bb seeds /var/lib/dsme/alarm_queue_status.
-+      "d /var/lib/dsme 0755 root root -"
-+      "C+ /var/lib/dsme/alarm_queue_status 0644 root root - ${
-+        pkgs.writeText "dsme-alarm-queue-status" "0\n"
-+      }"
-+      # Upstream nfcd state storage directory.
-+      "d /var/lib/nfcd 0700 root root -"
-+      # Upstream timed_git.bb creates /var/lib/timed for shared events/settings.
-+      # timed runs in user session (ceres), so shared events/settings must be owned by ceres.
-+      "d /var/lib/timed 0775 ceres users -"
-+      "d /var/lib/timed/shared_events 0775 ceres users -"
-+      "d /var/lib/timed/shared_settings 0775 ceres users -"
-+      # Upstream supported-languages_git.bb seeds the ceres locale drop-in that
-+      # user@.service.d/locale.conf reads (installed via environment.etc below).
-+      # Use "C" (create only if non-existent) to allow user locale selections to persist across reboots.
-+      "d /home/.system/var/lib/environment/1000 0755 ceres users -"
-+      "C /home/.system/var/lib/environment/1000/locale.conf 0644 ceres users - ${
-+        pkgs.writeText "asteroid-locale.conf" ''
++        ''}"
++        # Upstream dsme_git.bb seeds /var/lib/dsme/alarm_queue_status.
++        "d /var/lib/dsme 0755 root root -"
++        "C+ /var/lib/dsme/alarm_queue_status 0644 root root - ${pkgs.writeText "dsme-alarm-queue-status" "0\n"}"
++        # Upstream nfcd state storage directory.
++        "d /var/lib/nfcd 0700 root root -"
++        # Upstream timed_git.bb creates /var/lib/timed for shared events/settings.
++        # timed runs in user session (ceres), so shared events/settings must be owned by ceres.
++        "d /var/lib/timed 0775 ceres users -"
++        "d /var/lib/timed/shared_events 0775 ceres users -"
++        "d /var/lib/timed/shared_settings 0775 ceres users -"
++        # Upstream supported-languages_git.bb seeds the ceres locale drop-in that
++        # user@.service.d/locale.conf reads (installed via environment.etc below).
++        # Use "C" (create only if non-existent) to allow user locale selections to persist across reboots.
++        "d /home/.system/var/lib/environment/1000 0755 ceres users -"
++        "C /home/.system/var/lib/environment/1000/locale.conf 0644 ceres users - ${pkgs.writeText "asteroid-locale.conf" ''
 +          # Default locale generated dynamically from config.i18n.defaultLocale
 +          LANG=${config.i18n.defaultLocale}
 +          LOCALE_ARCHIVE=/run/current-system/sw/lib/locale/locale-archive
-+        ''
-+      }"
-+      # Upstream asteroid-launcher_git.bb seeds the privileged notification DB.
-+      # mkcal (used by nemo-qml-plugin-calendar) creates its database under
-+      # ~/.local/share/system/Calendar, so that tree must belong to ceres.
-+      "d /home/ceres/.local/share/system 0755 ceres users -"
-+      "d /home/ceres/.local/share/system/Calendar 0755 ceres users -"
-+      "d /home/ceres/.local/share/system/privileged 0755 ceres users -"
-+      "d /home/ceres/.local/share/system/privileged/Notifications 0755 ceres users -"
-+      "C+ /home/ceres/.local/share/system/privileged/Notifications/notifications.db 0600 ceres users - ${launcherNotifications}"
-+      "C+ /home/ceres/.local/share/system/privileged/Notifications/notifications.db-wal 0600 ceres users - ${launcherNotificationsWal}"
-+      "C+ /home/ceres/.local/share/system/privileged/Notifications/notifications.db-shm 0600 ceres users - ${launcherNotificationsShm}"
-+    ];
-+
-+    # Link AsteroidOS shared resources into /run/current-system/sw/share
-+    environment.pathsToLink = [
-+      "/share/asteroid-launcher"
-+      "/share/icons"
-+      "/share/sounds"
-+      "/share/fonts"
-+      "/share/lipstick"
-+      "/share/ngfd"
-+      "/share/qt6"
-+      "/share/translations"
-+      "/share/rime-data"
-+      "/share/supported-languages"
-+      "/share/asteroid-docking-bay"
-+    ];
-+
-+    # Expose smartwatch typography suite to fontconfig
-+    fonts.packages = [
-+      pkgs.asteroid.assets.fonts
-+    ];
-+
-+    i18n.defaultLocale = "en_GB.UTF-8";
-+    i18n.supportedLocales = [
-+      "en_US.UTF-8/UTF-8"
-+      "en_GB.UTF-8/UTF-8"
-+    ];
-+
-+
-+    # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
-+    # Reference: https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/src/main.conf
-+    hardware.bluetooth.settings = {
-+      General = {
-+        ControllerMode = "dual";
-+        DiscoverableTimeout = 180;
-+      };
-+    };
-+
-+    # Ensure graphical compositor on framebuffer is not trampled over by VT console login
-+    # Reference: Mobile NixOS examples/hello/configuration.nix
-+    systemd.services."getty@tty1" = {
-+      enable = false;
-+    };
-+
-+    # The getty generator also creates autovt@tty1 from the active console.
-+    # On this watch it waits for a tty device that udev never finishes, holding
-+    # back multi-user.target and the user session.
-+    systemd.services."autovt@tty1" = {
-+      enable = false;
-+    };
-+
-+    # Mode Control Entity (MCE) daemon — genuine Nemomobile MCE with the
-+    # AsteroidOS gesture/ambient-display patches.
-+    # Upstream unit: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/mce/mce/mce.service
-+    # Upstream recipe: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/mce/mce_git.bb
-+
-+    # The upstream recipe installs builtin-gconf.values into /var/lib/mce;
-+    # the tmpfiles entries for /run/mce and /var/lib/mce live next to the
-+    # other tmpfiles rules above.
-+
-+    systemd.services.mce = {
-+      description = "Mode Control Entity (MCE)";
-+      wantedBy = [ "multi-user.target" ];
-+      requires = [ "dbus.socket" ];
-+      after = [
-+        "dbus.socket"
-+        "local-fs.target"
++        ''}"
++        # Upstream asteroid-launcher_git.bb seeds the privileged notification DB.
++        # mkcal (used by nemo-qml-plugin-calendar) creates its database under
++        # ~/.local/share/system/Calendar, so that tree must belong to ceres.
++        "d /home/ceres/.local/share/system 0755 ceres users -"
++        "d /home/ceres/.local/share/system/Calendar 0755 ceres users -"
++        "d /home/ceres/.local/share/system/privileged 0755 ceres users -"
++        "d /home/ceres/.local/share/system/privileged/Notifications 0755 ceres users -"
++        "C+ /home/ceres/.local/share/system/privileged/Notifications/notifications.db 0600 ceres users - ${launcherNotifications}"
++        "C+ /home/ceres/.local/share/system/privileged/Notifications/notifications.db-wal 0600 ceres users - ${launcherNotificationsWal}"
++        "C+ /home/ceres/.local/share/system/privileged/Notifications/notifications.db-shm 0600 ceres users - ${launcherNotificationsShm}"
 +      ];
-+      conflicts = [ "shutdown.target" ];
-+      unitConfig.DefaultDependencies = false;
-+      # Upstream mce.service talks to DSME (the device state machine) over this socket.
-+      environment.DSME_SOCKFILE = "/run/dsme.socket";
-+      # MCE's display module decides "compositor startup triggers display on"
-+      # only when /run/systemd/boot-status/init-done does NOT exist yet, and it
-+      # reads BOOTSTATE from /run/systemd/boot-status/bootstate (else it assumes
-+      # ACT_DEAD). Sailfish's boot-status provides both before MCE starts:
-+      #   modules/display.c: mdy_flagfiles_start_tracking()
-+      # Without the directory MCE sets mdy_init_done=TRUE and skips the
-+      # display-on at compositor startup - the panel stays black.
-+      preStart = ''
-+        ${pkgs.coreutils}/bin/mkdir -p /run/systemd/boot-status
-+        printf 'BOOTSTATE=USER' > /run/systemd/boot-status/bootstate
-+      '';
-+      serviceConfig = {
-+        Type = "notify";
-+        # MCE writes its boot marker to $MCE_RUN_DIR/boot (/run/mce/boot) at
-+        # startup; upstream's rootfs provides /run/mce. Without it the write
-+        # fails ("Cannot open `/var/run/mce/boot' for writing").
-+        RuntimeDirectory = "mce";
-+        RuntimeDirectoryMode = "0755";
-+        ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
-+        TimeoutSec = 2;
-+        Restart = "always";
-+        RestartSec = "1s";
-+      };
-+    };
 +
-+    # MCE leaves its TRANSITION submode - and only then powers the panel on -
-+    # when it receives the Nokia boot-completion signal:
-+    #   mce-dsme.c: mce_dsme_dbus_init_done_cb() -> mce_dsme_transition_schedule()
-+    # On Sailfish that signal is emitted by init once boot has finished. DSME
-+    # only listens for it (modules/diskmonitor.c, modules/batterytracker.c) and
-+    # the launcher only sends com.nokia.startup.signal.desktop_visible, so the
-+    # signal has to be emitted here after MCE and the user session are up.
-+    # Without it MCE keeps display=UNDEF and the panel stays black even though
-+    # the compositor is rendering.
-+    systemd.services."nokia-init-done" = {
-+      description = "Emit com.nokia.startup.signal.init_done";
-+      wantedBy = [ "multi-user.target" ];
-+      requires = [ "dbus.service" ];
-+      after = [
-+        "dbus.service"
-+        "mce.service"
-+        "user@1000.service"
++      # Link AsteroidOS shared resources into /run/current-system/sw/share
++      environment.pathsToLink = [
++        "/share/asteroid-launcher"
++        "/share/icons"
++        "/share/sounds"
++        "/share/fonts"
++        "/share/lipstick"
++        "/share/ngfd"
++        "/share/qt6"
++        "/share/translations"
++        "/share/rime-data"
++        "/share/supported-languages"
++        "/share/asteroid-docking-bay"
 +      ];
-+      serviceConfig = {
-+        Type = "oneshot";
-+        RemainAfterExit = true;
-+        # Upstream creates the same marker in usb-moded.service:
-+        #   ExecStartPre=-/bin/mkdir -p /run/systemd/boot-status/
-+        #   ExecStartPre=-/bin/touch /run/systemd/boot-status/init-done
-+        # but only after the compositor is up: MCE's display module only takes
-+        # the "display on due to compositor startup" path while init-done is
-+        # still absent (modules/display.c). So wait for lipstick's bus name
-+        # before creating the marker, then emit the boot-completion signal.
-+        ExecStartPre = [
-+          "${pkgs.writeShellScript "asteroid-wait-for-lipstick" ''
-+            i=0
-+            while [ "$i" -lt 600 ]; do
-+              if ${pkgs.dbus}/bin/dbus-send --system --print-reply \
-+                   --dest=org.freedesktop.DBus /org/freedesktop/DBus \
-+                   org.freedesktop.DBus.NameHasOwner \
-+                   string:org.nemomobile.lipstick 2>/dev/null \
-+                 | ${pkgs.gnugrep}/bin/grep -q "boolean true"; then
-+                exit 0
-+              fi
-+              i=$((i + 1))
-+              sleep 0.1
-+            done
-+            exit 0
-+          ''}"
-+          "${pkgs.coreutils}/bin/mkdir -p /run/systemd/boot-status"
-+          "${pkgs.coreutils}/bin/touch /run/systemd/boot-status/init-done"
++
++      # Expose smartwatch typography suite to fontconfig
++      fonts.packages = [
++        pkgs.asteroid.assets.fonts
++      ];
++
++      i18n.defaultLocale = "en_GB.UTF-8";
++      i18n.supportedLocales = [
++        "en_US.UTF-8/UTF-8"
++        "en_GB.UTF-8/UTF-8"
++      ];
++
++      # BlueZ dual-mode controller configuration (simultaneous BLE sync and Classic BT profiles)
++      # Reference: https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/src/main.conf
++      hardware.bluetooth.settings = {
++        General = {
++          ControllerMode = "dual";
++          DiscoverableTimeout = 180;
++        };
++      };
++
++      # Ensure graphical compositor on framebuffer is not trampled over by VT console login
++      # Reference: Mobile NixOS examples/hello/configuration.nix
++      systemd.services."getty@tty1" = {
++        enable = false;
++      };
++
++      # The getty generator also creates autovt@tty1 from the active console.
++      # On this watch it waits for a tty device that udev never finishes, holding
++      # back multi-user.target and the user session.
++      systemd.services."autovt@tty1" = {
++        enable = false;
++      };
++
++      # Mode Control Entity (MCE) daemon — genuine Nemomobile MCE with the
++      # AsteroidOS gesture/ambient-display patches.
++      # Upstream unit: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/mce/mce/mce.service
++      # Upstream recipe: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/mce/mce_git.bb
++
++      # The upstream recipe installs builtin-gconf.values into /var/lib/mce;
++      # the tmpfiles entries for /run/mce and /var/lib/mce live next to the
++      # other tmpfiles rules above.
++
++      systemd.services.mce = {
++        description = "Mode Control Entity (MCE)";
++        wantedBy = [ "multi-user.target" ];
++        requires = [ "dbus.socket" ];
++        after = [
++          "dbus.socket"
++          "local-fs.target"
 +        ];
-+        ExecStart = "${pkgs.dbus}/bin/dbus-send --system --type=signal /com/nokia/startup/signal com.nokia.startup.signal.init_done";
++        conflicts = [ "shutdown.target" ];
++        unitConfig.DefaultDependencies = false;
++        # Upstream mce.service talks to DSME (the device state machine) over this socket.
++        environment.DSME_SOCKFILE = "/run/dsme.socket";
++        # MCE's display module decides "compositor startup triggers display on"
++        # only when /run/systemd/boot-status/init-done does NOT exist yet, and it
++        # reads BOOTSTATE from /run/systemd/boot-status/bootstate (else it assumes
++        # ACT_DEAD). Sailfish's boot-status provides both before MCE starts:
++        #   modules/display.c: mdy_flagfiles_start_tracking()
++        # Without the directory MCE sets mdy_init_done=TRUE and skips the
++        # display-on at compositor startup - the panel stays black.
++        preStart = ''
++          ${pkgs.coreutils}/bin/mkdir -p /run/systemd/boot-status
++          printf 'BOOTSTATE=USER' > /run/systemd/boot-status/bootstate
++        '';
++        serviceConfig = {
++          Type = "notify";
++          # MCE writes its boot marker to $MCE_RUN_DIR/boot (/run/mce/boot) at
++          # startup; upstream's rootfs provides /run/mce. Without it the write
++          # fails ("Cannot open `/var/run/mce/boot' for writing").
++          RuntimeDirectory = "mce";
++          RuntimeDirectoryMode = "0755";
++          ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
++          TimeoutSec = 2;
++          Restart = "always";
++          RestartSec = "1s";
++        };
 +      };
-+    };
 +
-+    # DSME device state machine — MCE's counterpart.
-+    # Upstream unit: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/dsme/dsme/dsme.service
-+    systemd.services.dsme = {
-+      description = "DSME";
-+      wantedBy = [ "multi-user.target" ];
-+      requires = [ "dbus.service" ];
-+      after = [
-+        "local-fs.target"
-+        "dbus.service"
-+      ];
-+      conflicts = [ "shutdown.target" ];
-+      unitConfig.DefaultDependencies = false;
-+      environment = {
-+        BOOTSTATE = "USER";
-+        DSME_SOCKFILE = "/run/dsme.socket";
-+      };
-+      serviceConfig = {
-+        Type = "notify";
-+        ExecStart = "${pkgs.asteroid.dsme}/sbin/dsme -- -v 4 -p ${pkgs.asteroid.dsme}/lib/dsme/startup.so --systemd";
-+        Restart = "always";
-+        RestartSec = 1;
-+        StartLimitIntervalSec = 600;
-+        StartLimitBurst = 3;
-+        StartLimitAction = "reboot";
-+      };
-+    };
-+
-+    # SensorFW daemon — backend for the Qt Sensors sensorfw plugin.
-+    # Upstream unit: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/sensorfw/files/sensorfwd.service
-+    systemd.services.sensorfwd = {
-+      description = "Sensor daemon for sensor framework";
-+      wantedBy = [ "multi-user.target" ];
-+      after = [ "dbus.socket" ];
-+      requires = [ "dbus.service" ];
-+      conflicts = [ "shutdown.target" ];
-+      serviceConfig = {
-+        Type = "notify";
-+        ExecStart = "${pkgs.asteroid.sensorfw}/sbin/sensorfwd -c=/etc/sensorfw/primaryuse.conf --systemd --log-level=${if debugBuild then "debug" else "warning"} --no-magnetometer-bg-calibration";
-+        ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
-+        Restart = "always";
-+        RestartSec = 2;
-+        CapabilityBoundingSet = [
-+          "CAP_BLOCK_SUSPEND"
-+          "CAP_DAC_OVERRIDE"
-+          "CAP_FOWNER"
++      # MCE leaves its TRANSITION submode - and only then powers the panel on -
++      # when it receives the Nokia boot-completion signal:
++      #   mce-dsme.c: mce_dsme_dbus_init_done_cb() -> mce_dsme_transition_schedule()
++      # On Sailfish that signal is emitted by init once boot has finished. DSME
++      # only listens for it (modules/diskmonitor.c, modules/batterytracker.c) and
++      # the launcher only sends com.nokia.startup.signal.desktop_visible, so the
++      # signal has to be emitted here after MCE and the user session are up.
++      # Without it MCE keeps display=UNDEF and the panel stays black even though
++      # the compositor is rendering.
++      systemd.services."nokia-init-done" = {
++        description = "Emit com.nokia.startup.signal.init_done";
++        wantedBy = [ "multi-user.target" ];
++        requires = [ "dbus.service" ];
++        after = [
++          "dbus.service"
++          "mce.service"
++          "user@1000.service"
 +        ];
-+        PrivateTmp = true;
-+        ProtectHome = true;
-+        ProtectSystem = "full";
++        serviceConfig = {
++          Type = "oneshot";
++          RemainAfterExit = true;
++          # Upstream creates the same marker in usb-moded.service:
++          #   ExecStartPre=-/bin/mkdir -p /run/systemd/boot-status/
++          #   ExecStartPre=-/bin/touch /run/systemd/boot-status/init-done
++          # but only after the compositor is up: MCE's display module only takes
++          # the "display on due to compositor startup" path while init-done is
++          # still absent (modules/display.c). So wait for lipstick's bus name
++          # before creating the marker, then emit the boot-completion signal.
++          ExecStartPre = [
++            "${pkgs.writeShellScript "asteroid-wait-for-lipstick" ''
++              i=0
++              while [ "$i" -lt 600 ]; do
++                if ${pkgs.dbus}/bin/dbus-send --system --print-reply \
++                     --dest=org.freedesktop.DBus /org/freedesktop/DBus \
++                     org.freedesktop.DBus.NameHasOwner \
++                     string:org.nemomobile.lipstick 2>/dev/null \
++                   | ${pkgs.gnugrep}/bin/grep -q "boolean true"; then
++                  exit 0
++                fi
++                i=$((i + 1))
++                sleep 0.1
++              done
++              exit 0
++            ''}"
++            "${pkgs.coreutils}/bin/mkdir -p /run/systemd/boot-status"
++            "${pkgs.coreutils}/bin/touch /run/systemd/boot-status/init-done"
++          ];
++          ExecStart = "${pkgs.dbus}/bin/dbus-send --system --type=signal /com/nokia/startup/signal com.nokia.startup.signal.init_done";
++        };
 +      };
-+    };
 +
-+    # Upstream sensorfw installs its configs into /etc/sensorfw and the Qt
-+    # Sensors type map into /etc/xdg/QtProject.
-+    environment.etc."sensorfw/primaryuse.conf".source =
-+      "${pkgs.asteroid.sensorfw}/etc/sensorfw/primaryuse.conf";
-+    environment.etc."sensorfw/sensord.conf.d".source =
-+      "${pkgs.asteroid.sensorfw}/etc/sensorfw/sensord.conf.d";
-+    environment.etc."xdg/QtProject/Sensors.conf".source =
-+      "${pkgs.qt6.qtsensors}/etc/xdg/QtProject/Sensors.conf";
++      # DSME device state machine — MCE's counterpart.
++      # Upstream unit: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/dsme/dsme/dsme.service
++      systemd.services.dsme = {
++        description = "DSME";
++        wantedBy = [ "multi-user.target" ];
++        requires = [ "dbus.service" ];
++        after = [
++          "local-fs.target"
++          "dbus.service"
++        ];
++        conflicts = [ "shutdown.target" ];
++        unitConfig.DefaultDependencies = false;
++        environment = {
++          BOOTSTATE = "USER";
++          DSME_SOCKFILE = "/run/dsme.socket";
++        };
++        serviceConfig = {
++          Type = "notify";
++          ExecStart = "${pkgs.asteroid.dsme}/sbin/dsme -- -v 4 -p ${pkgs.asteroid.dsme}/lib/dsme/startup.so --systemd";
++          Restart = "always";
++          RestartSec = 1;
++          StartLimitIntervalSec = 600;
++          StartLimitBurst = 3;
++          StartLimitAction = "reboot";
++        };
++      };
 +
-+    # Upstream meta-hoki IMAGE_INSTALL: udev-droid-system.
-+    # Android-style /dev/block/platform/.../by-name links for the vendor HALs.
-+    services.udev.packages = [ pkgs.asteroid.udev-droid-system ];
++      # SensorFW daemon — backend for the Qt Sensors sensorfw plugin.
++      # Upstream unit: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/sensorfw/files/sensorfwd.service
++      systemd.services.sensorfwd = {
++        description = "Sensor daemon for sensor framework";
++        wantedBy = [ "multi-user.target" ];
++        after = [ "dbus.socket" ];
++        requires = [ "dbus.service" ];
++        conflicts = [ "shutdown.target" ];
++        serviceConfig = {
++          Type = "notify";
++          ExecStart = "${pkgs.asteroid.sensorfw}/sbin/sensorfwd -c=/etc/sensorfw/primaryuse.conf --systemd --log-level=${
++            if debugBuild then "debug" else "warning"
++          } --no-magnetometer-bg-calibration";
++          ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
++          Restart = "always";
++          RestartSec = 2;
++          CapabilityBoundingSet = [
++            "CAP_BLOCK_SUSPEND"
++            "CAP_DAC_OVERRIDE"
++            "CAP_FOWNER"
++          ];
++          PrivateTmp = true;
++          ProtectHome = true;
++          ProtectSystem = "full";
++        };
++      };
 +
-+    # Upstream meta-hoki IMAGE_INSTALL: swclock-offset.
-+    # hoki's RTC is not writable; the offset between RTC and system clock is
-+    # cached at shutdown and re-applied at boot.
-+    systemd.services.swclock-offset-boot = {
-+      description = "Set system time from the cached RTC offset";
-+      wantedBy = [ "sysinit.target" ];
-+      before = [
-+        "systemd-fsck-root.service"
-+        "systemd-fsck@.service"
++      # Upstream sensorfw installs its configs into /etc/sensorfw and the Qt
++      # Sensors type map into /etc/xdg/QtProject.
++      environment.etc."sensorfw/primaryuse.conf".source =
++        "${pkgs.asteroid.sensorfw}/etc/sensorfw/primaryuse.conf";
++      environment.etc."sensorfw/sensord.conf.d".source =
++        "${pkgs.asteroid.sensorfw}/etc/sensorfw/sensord.conf.d";
++      environment.etc."xdg/QtProject/Sensors.conf".source =
++        "${pkgs.qt6.qtsensors}/etc/xdg/QtProject/Sensors.conf";
++
++      # Upstream meta-hoki IMAGE_INSTALL: udev-droid-system.
++      # Android-style /dev/block/platform/.../by-name links for the vendor HALs.
++      services.udev.packages = [ pkgs.asteroid.udev-droid-system ];
++
++      # Upstream meta-hoki IMAGE_INSTALL: swclock-offset.
++      # hoki's RTC is not writable; the offset between RTC and system clock is
++      # cached at shutdown and re-applied at boot.
++      systemd.services.swclock-offset-boot = {
++        description = "Set system time from the cached RTC offset";
++        wantedBy = [ "sysinit.target" ];
++        before = [
++          "systemd-fsck-root.service"
++          "systemd-fsck@.service"
++        ];
++        unitConfig.DefaultDependencies = false;
++        serviceConfig = {
++          Type = "oneshot";
++          TimeoutSec = 0;
++          SuccessExitStatus = [
++            "0"
++            "2"
++          ];
++          ExecStart = "${pkgs.asteroid.swclock-offset}/bin/swclock-offset-boot";
++        };
++      };
++      systemd.services.swclock-offset-shutdown = {
++        description = "Cache the RTC offset before shutdown";
++        wantedBy = [ "shutdown.target" ];
++        before = [ "shutdown.target" ];
++        conflicts = [ "shutdown.target" ];
++        unitConfig.DefaultDependencies = false;
++        serviceConfig = {
++          Type = "oneshot";
++          TimeoutSec = 0;
++          ExecStart = "${pkgs.asteroid.swclock-offset}/bin/swclock-offset-shutdown";
++        };
++      };
++
++      # Upstream meta-hoki IMAGE_INSTALL: bluebinder.
++      # Proxies the Android binder based Bluetooth HAL to BlueZ over vhci.
++      systemd.services.bluebinder = {
++        description = "Android binder based bluetooth proxy (vhci)";
++        wantedBy = [ "graphical.target" ];
++        after = [
++          "android-init.service"
++          "dbus.service"
++        ];
++        before = [ "bluetooth.service" ];
++        serviceConfig = {
++          Type = "notify";
++          ExecStartPre = "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_wait.sh";
++          ExecStart = "${pkgs.asteroid.bluebinder}/sbin/bluebinder";
++          ExecStartPost = "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_post.sh";
++          Restart = "always";
++          TimeoutStartSec = 60;
++        };
++      };
++
++      # Upstream meta-hoki IMAGE_INSTALL: nfcd + nfcd-binder-plugin + nfcd-mce-plugin.
++      # Provides org.sailfishos.nfc.daemon over D-Bus and talks to the Android
++      # hardware.nxp.nfc@1.0 / android.hardware.nfc@1.1 HIDL HAL via libgbinder.
++      systemd.services.nfcd = {
++        description = "NFC daemon";
++        wantedBy = [ "multi-user.target" ];
++        requires = [ "dbus.service" ];
++        after = [
++          "dbus.service"
++          "android-init.service"
++        ];
++        serviceConfig = {
++          Type = "dbus";
++          BusName = "org.sailfishos.nfc.daemon";
++          ExecStart = "${pkgs.asteroid.nfcd}/sbin/nfcd -o syslog";
++          Restart = "on-failure";
++          RestartSec = 1;
++        };
++      };
++
++      # Upstream hoki ships geoclue + geoclue-provider-hybris for location.
++      services.geoclue2.enable = true;
++
++      # Upstream AsteroidOS uses ConnMan as its network stack, and the distro
++      # D-Bus policy grants the `ceres` user access to net.connman.
++      # References:
++      #  - https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-connectivity/connman/connman_%25.bbappend
++      #  - https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-connectivity/connman/connman/connman-dbus.conf
++      services.connman = {
++        enable = true;
++        wifi.backend = "wpa_supplicant";
++      };
++
++      # NixOS makes /etc/dbus-1 a single symlink to a generated config dir, so
++      # policies must come in through services.dbus.packages rather than nested
++      # environment.etc entries. The MCE package ships com.nokia.mce.conf; the
++      # upstream AsteroidOS connman policy replaces connman's own one.
++      services.dbus.packages = [
++        pkgs.dconf
++        pkgs.asteroid.mce
++        pkgs.asteroid.dsme
++        pkgs.asteroid.sensorfw
++        pkgs.asteroid.ngfd
++        pkgs.asteroid.nfcd
++        pkgs.asteroid.timed-qt6
++        connmanDbusPolicy
 +      ];
-+      unitConfig.DefaultDependencies = false;
-+      serviceConfig = {
-+        Type = "oneshot";
-+        TimeoutSec = 0;
-+        SuccessExitStatus = [ "0" "2" ];
-+        ExecStart = "${pkgs.asteroid.swclock-offset}/bin/swclock-offset-boot";
++
++      # Upstream timed_git.bb installs timed.rc into /etc.
++      environment.etc."timed.rc".source = "${pkgs.asteroid.timed-qt6}/etc/timed.rc";
++
++      # users.users.ceres.linger generates NixOS's linger-users.service, which
++      # calls loginctl enable-linger after logind starts. Let the normal systemd
++      # linger mechanism own the marker; do not pre-seed it or override the unit.
++
++      # Smartwatch stem/power button should be handled by compositor/shell, not
++      # logind shutdown; match AsteroidOS systemd-conf powerkey.conf.
++      # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd-conf/powerkey.conf
++      services.logind.settings = {
++        Login = {
++          HandlePowerKey = "ignore";
++          HandlePowerKeyLongPress = "ignore";
++          HandleRebootKey = "ignore";
++          HandleSuspendKey = "ignore";
++          HandleHibernateKey = "ignore";
++          HandleLidSwitch = "ignore";
++        };
 +      };
-+    };
-+    systemd.services.swclock-offset-shutdown = {
-+      description = "Cache the RTC offset before shutdown";
-+      wantedBy = [ "shutdown.target" ];
-+      before = [ "shutdown.target" ];
-+      conflicts = [ "shutdown.target" ];
-+      unitConfig.DefaultDependencies = false;
-+      serviceConfig = {
-+        Type = "oneshot";
-+        TimeoutSec = 0;
-+        ExecStart = "${pkgs.asteroid.swclock-offset}/bin/swclock-offset-shutdown";
++
++      environment.variables = {
++        QT_IM_MODULE = "qtvirtualkeyboard";
++        QT_VIRTUALKEYBOARD_STYLE = "watch";
++        QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
++        RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
++        # Default platform for client apps running under the Wayland compositor
++        QT_QPA_PLATFORM = lib.mkForce "wayland";
++        EGL_PLATFORM = "wayland";
++        WAYLAND_DISPLAY = "wayland-0";
++        XDG_RUNTIME_DIR = "/run/user/1000";
++        QML2_IMPORT_PATH = qmlImportPath;
++        QML_IMPORT_PATH = qmlImportPath;
++        NIXPKGS_QT6_QML_IMPORT_PATH = qmlImportPath;
++        QT_PLUGIN_PATH = qtPluginPath;
++        # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
++        QT_ENABLE_HIGHDPI_SCALING = "0";
++      }
++      // lib.optionalAttrs isLegacy {
++        LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++        LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
 +      };
-+    };
 +
-+    # Upstream meta-hoki IMAGE_INSTALL: bluebinder.
-+    # Proxies the Android binder based Bluetooth HAL to BlueZ over vhci.
-+    systemd.services.bluebinder = {
-+      description = "Android binder based bluetooth proxy (vhci)";
-+      wantedBy = [ "graphical.target" ];
-+      after = [
-+        "android-init.service"
-+        "dbus.service"
-+      ];
-+      before = [ "bluetooth.service" ];
-+      serviceConfig = {
-+        Type = "notify";
-+        ExecStartPre = "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_wait.sh";
-+        ExecStart = "${pkgs.asteroid.bluebinder}/sbin/bluebinder";
-+        ExecStartPost = "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_post.sh";
-+        Restart = "always";
-+        TimeoutStartSec = 60;
++      # Upstream asteroid-alarmclock installs share/systemd/user/alarmpresenter.service
++      # plus the com.nokia.voland D-Bus activation file; expose the same user
++      # service so Nemo.Alarms can present firing alarms on demand when the
++      # Wayland compositor is ready.
++      systemd.user.services.alarmpresenter = {
++        description = "AsteroidOS alarm presenter";
++        requires = [ "dbus.socket" ];
++        after = [
++          "dbus.socket"
++          "asteroid-launcher.service"
++        ];
++        wants = [ "asteroid-launcher.service" ];
++        serviceConfig = {
++          Type = "dbus";
++          BusName = "com.nokia.voland";
++          ExecStart = "${pkgs.asteroid.apps.alarmclock}/bin/asteroid-alarmpresenter";
++          Environment = "QT_WAYLAND_DISABLE_WINDOWDECORATION=1";
++          Restart = "on-failure";
++          RestartSec = "1s";
++        };
 +      };
-+    };
 +
-+    # Upstream meta-hoki IMAGE_INSTALL: nfcd + nfcd-binder-plugin + nfcd-mce-plugin.
-+    # Provides org.sailfishos.nfc.daemon over D-Bus and talks to the Android
-+    # hardware.nxp.nfc@1.0 / android.hardware.nfc@1.1 HIDL HAL via libgbinder.
-+    systemd.services.nfcd = {
-+      description = "NFC daemon";
-+      wantedBy = [ "multi-user.target" ];
-+      requires = [ "dbus.service" ];
-+      after = [
-+        "dbus.service"
-+        "android-init.service"
-+      ];
-+      serviceConfig = {
-+        Type = "dbus";
-+        BusName = "org.sailfishos.nfc.daemon";
-+        ExecStart = "${pkgs.asteroid.nfcd}/sbin/nfcd -o syslog";
-+        Restart = "on-failure";
-+        RestartSec = 1;
++      # Upstream timed.service (installed in /usr/lib/systemd/user and wanted by
++      # default.target): Nemomobile time daemon serving com.nokia.time on the
++      # system bus. Alarms are scheduled through it by Nemo.Alarms.
++      systemd.user.services.timed = {
++        description = "Time Daemon";
++        wantedBy = [ "default.target" ];
++        requires = [ "dbus.socket" ];
++        after = [ "dbus.socket" ];
++        serviceConfig = {
++          Type = "notify";
++          ExecStart = "${pkgs.asteroid.timed-qt6}/bin/timed --systemd";
++          Restart = "always";
++          RestartSec = "1";
++        };
 +      };
-+    };
 +
-+    # Upstream hoki ships geoclue + geoclue-provider-hybris for location.
-+    services.geoclue2.enable = true;
-+
-+    # Upstream AsteroidOS uses ConnMan as its network stack, and the distro
-+    # D-Bus policy grants the `ceres` user access to net.connman.
-+    # References:
-+    #  - https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-connectivity/connman/connman_%25.bbappend
-+    #  - https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-connectivity/connman/connman/connman-dbus.conf
-+    services.connman = {
-+      enable = true;
-+      wifi.backend = "wpa_supplicant";
-+    };
-+
-+    # NixOS makes /etc/dbus-1 a single symlink to a generated config dir, so
-+    # policies must come in through services.dbus.packages rather than nested
-+    # environment.etc entries. The MCE package ships com.nokia.mce.conf; the
-+    # upstream AsteroidOS connman policy replaces connman's own one.
-+    services.dbus.packages = [
-+      pkgs.dconf
-+      pkgs.asteroid.mce
-+      pkgs.asteroid.dsme
-+      pkgs.asteroid.sensorfw
-+      pkgs.asteroid.ngfd
-+      pkgs.asteroid.nfcd
-+      pkgs.asteroid.timed-qt6
-+      connmanDbusPolicy
-+    ];
-+
-+    # Upstream timed_git.bb installs timed.rc into /etc.
-+    environment.etc."timed.rc".source = "${pkgs.asteroid.timed-qt6}/etc/timed.rc";
-+
-+    # users.users.ceres.linger generates NixOS's linger-users.service, which
-+    # calls loginctl enable-linger after logind starts. Let the normal systemd
-+    # linger mechanism own the marker; do not pre-seed it or override the unit.
-+
-+    # Smartwatch stem/power button should be handled by compositor/shell, not
-+    # logind shutdown; match AsteroidOS systemd-conf powerkey.conf.
-+    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-core/systemd/systemd-conf/powerkey.conf
-+    services.logind.settings = {
-+      Login = {
-+        HandlePowerKey = "ignore";
-+        HandlePowerKeyLongPress = "ignore";
-+        HandleRebootKey = "ignore";
-+        HandleSuspendKey = "ignore";
-+        HandleHibernateKey = "ignore";
-+        HandleLidSwitch = "ignore";
++      # Upstream meta-asteroid: ngfd, the non graphical feedback daemon.
++      # Haptics/sounds are requested through D-Bus by the launcher and apps.
++      systemd.user.services.ngfd = {
++        description = "Non Graphical Feedback Daemon";
++        wantedBy = [ "default.target" ];
++        requires = [ "dbus.socket" ];
++        unitConfig.ConditionUser = "!root";
++        environment = {
++          GST_PLUGIN_SYSTEM_PATH_1_0 = "/run/current-system/sw/lib/gstreamer-1.0";
++          NGF_CONF_PATH = "/run/current-system/sw/share/ngfd";
++          NGF_PLUGIN_PATH = "${pkgs.asteroid.ngfd}/lib/ngf";
++          NGF_USER_CONF_PATH = "/etc/ngfd";
++        };
++        serviceConfig = {
++          Type = "simple";
++          ExecStart = "${pkgs.asteroid.ngfd}/bin/ngfd";
++          Restart = "on-failure";
++          RestartSec = "2";
++        };
 +      };
-+    };
 +
-+    environment.variables = {
-+      QT_IM_MODULE = "qtvirtualkeyboard";
-+      QT_VIRTUALKEYBOARD_STYLE = "watch";
-+      QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
-+      RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
-+      # Default platform for client apps running under the Wayland compositor
-+      QT_QPA_PLATFORM = lib.mkForce "wayland";
-+      EGL_PLATFORM = "wayland";
-+      WAYLAND_DISPLAY = "wayland-0";
-+      XDG_RUNTIME_DIR = "/run/user/1000";
-+      QML2_IMPORT_PATH = qmlImportPath;
-+      QML_IMPORT_PATH = qmlImportPath;
-+      NIXPKGS_QT6_QML_IMPORT_PATH = qmlImportPath;
-+      QT_PLUGIN_PATH = qtPluginPath;
-+      # Upstream AsteroidOS qt6-hidpi.conf: prevent over-scaling on small round smartwatch screens
-+      QT_ENABLE_HIGHDPI_SCALING = "0";
-+    } // lib.optionalAttrs isLegacy {
-+      LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
-+      LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
-+    };
-+
-+    # Upstream asteroid-alarmclock installs share/systemd/user/alarmpresenter.service
-+    # plus the com.nokia.voland D-Bus activation file; expose the same user
-+    # service so Nemo.Alarms can present firing alarms on demand when the
-+    # Wayland compositor is ready.
-+    systemd.user.services.alarmpresenter = {
-+      description = "AsteroidOS alarm presenter";
-+      requires = [ "dbus.socket" ];
-+      after = [
-+        "dbus.socket"
-+        "asteroid-launcher.service"
-+      ];
-+      wants = [ "asteroid-launcher.service" ];
-+      serviceConfig = {
-+        Type = "dbus";
-+        BusName = "com.nokia.voland";
-+        ExecStart = "${pkgs.asteroid.apps.alarmclock}/bin/asteroid-alarmpresenter";
-+        Environment = "QT_WAYLAND_DISABLE_WINDOWDECORATION=1";
-+        Restart = "on-failure";
-+        RestartSec = "1s";
-+      };
-+    };
-+
-+    # Upstream timed.service (installed in /usr/lib/systemd/user and wanted by
-+    # default.target): Nemomobile time daemon serving com.nokia.time on the
-+    # system bus. Alarms are scheduled through it by Nemo.Alarms.
-+    systemd.user.services.timed = {
-+      description = "Time Daemon";
-+      wantedBy = [ "default.target" ];
-+      requires = [ "dbus.socket" ];
-+      after = [ "dbus.socket" ];
-+      serviceConfig = {
-+        Type = "notify";
-+        ExecStart = "${pkgs.asteroid.timed-qt6}/bin/timed --systemd";
-+        Restart = "always";
-+        RestartSec = "1";
-+      };
-+    };
-+
-+    # Upstream meta-asteroid: ngfd, the non graphical feedback daemon.
-+    # Haptics/sounds are requested through D-Bus by the launcher and apps.
-+    systemd.user.services.ngfd = {
-+      description = "Non Graphical Feedback Daemon";
-+      wantedBy = [ "default.target" ];
-+      requires = [ "dbus.socket" ];
-+      unitConfig.ConditionUser = "!root";
-+      environment = {
-+        GST_PLUGIN_SYSTEM_PATH_1_0 = "/run/current-system/sw/lib/gstreamer-1.0";
-+        NGF_CONF_PATH = "/run/current-system/sw/share/ngfd";
-+        NGF_PLUGIN_PATH = "${pkgs.asteroid.ngfd}/lib/ngf";
-+        NGF_USER_CONF_PATH = "/etc/ngfd";
-+      };
-+      serviceConfig = {
-+        Type = "simple";
-+        ExecStart = "${pkgs.asteroid.ngfd}/bin/ngfd";
-+        Restart = "on-failure";
-+        RestartSec = "2";
-+      };
-+    };
-+
-+    # Wayland compositor and watchface launcher user service (runs under user session)
-+    # Upstream reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher/asteroid-launcher.service
-+    systemd.user.services.asteroid-launcher = {
-+      description = "AsteroidOS Wayland Compositor and Launcher";
-+      wantedBy = [ "default.target" ];
-+      requires = [ "dbus.socket" ];
-+      unitConfig.ConditionUser = "!root";
-+      environment =
-+        config.environment.variables
-+        // {
-+          PATH = lib.mkForce "/run/wrappers/bin:/run/current-system/sw/bin";
-+          QT_IM_MODULE = "qtvirtualkeyboard";
-+          QT_VIRTUALKEYBOARD_STYLE = "watch";
-+          QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
-+          RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
-+          # The launcher is the compositor.
-+          # On legacy targets with Android kernels, use hwcomposer and libhybris.
-+          # On modern mainline targets, use eglfs on DRM/KMS.
-+          EGL_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
-+          QT_QPA_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
-+          QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
-+          QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
-+          # Direct Qt diagnostic logs to stderr/launcher.log instead of hidden journal
-+          QT_FORCE_STDERR_LOGGING = "1";
-+          QT_ASSUME_STDERR_HAS_CONSOLE = "1";
-+        }
-+        // lib.optionalAttrs isLegacy {
-+          QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "libhybris-egl-server";
-+          LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
-+          LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
-+        }
-+        // lib.optionalAttrs (!isLegacy) {
-+          QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
-+          QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++      # Wayland compositor and watchface launcher user service (runs under user session)
++      # Upstream reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher/asteroid-launcher.service
++      systemd.user.services.asteroid-launcher = {
++        description = "AsteroidOS Wayland Compositor and Launcher";
++        wantedBy = [ "default.target" ];
++        requires = [ "dbus.socket" ];
++        unitConfig.ConditionUser = "!root";
++        environment =
++          config.environment.variables
++          // {
++            PATH = lib.mkForce "/run/wrappers/bin:/run/current-system/sw/bin";
++            QT_IM_MODULE = "qtvirtualkeyboard";
++            QT_VIRTUALKEYBOARD_STYLE = "watch";
++            QT_VIRTUALKEYBOARD_LAYOUT_PATH = "${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts";
++            RIME_SHARED_DATA_DIR = "${pkgs.asteroid.virtualkeyboard}/share/rime-data";
++            # The launcher is the compositor.
++            # On legacy targets with Android kernels, use hwcomposer and libhybris.
++            # On modern mainline targets, use eglfs on DRM/KMS.
++            EGL_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
++            QT_QPA_PLATFORM = if isLegacy then "hwcomposer" else "eglfs";
++            QT_ENABLE_GLYPH_CACHE_WORKAROUND = "true";
++            QT_GSTREAMER_CAMERABIN_SRC = "droidcamsrc";
++            # Direct Qt diagnostic logs to stderr/launcher.log instead of hidden journal
++            QT_FORCE_STDERR_LOGGING = "1";
++            QT_ASSUME_STDERR_HAS_CONSOLE = "1";
++          }
++          // lib.optionalAttrs isLegacy {
++            QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "libhybris-egl-server";
++            LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
++            LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
++          }
++          // lib.optionalAttrs (!isLegacy) {
++            QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
++            QT_QPA_EGLFS_ALWAYS_SET_MODE = "1";
++          }
++          // lib.optionalAttrs debugBuild {
++            # Debug builds: turn on every trace the graphics stack can emit.
++            # These are runtime switches only; the upstream code path is unchanged.
++            # `*=false` also silences the default category, which is where QML
++            # import/instantiation errors and the QML_IMPORT_TRACE output are
++            # reported, so keep `default` warnings and debug on; otherwise a black
++            # screen leaves nothing but renderloop chatter in launcher.log.
++            # QML `console.log/info` (and QML runtime warnings) are logged under the
++            # plain `qml` category, so `*=false` silences them as well: the
++            # diagnostics below would never reach launcher.log without enabling that
++            # category explicitly. `qt.qml.*` only covers its subcategories.
++            # Silence verbose scene graph render loop frame chatter to prevent log explosion.
++            QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.core.plugin.*=true";
++            QT_DEBUG_PLUGINS = "1";
++            # Log every QML import attempt (module, version, and the directory each
++            # candidate was looked up in) plus the scene graph the renderer picked.
++            # Both are runtime switches; a missing QML module shows up here as a
++            # failing import line even before any component error is printed.
++            QML_IMPORT_TRACE = "1";
++            QPA_HWC_DEBUG = "1";
++            HYBRIS_HWC_DEBUG = "1";
++            QSG_INFO = "1";
++            EGL_LOG_LEVEL = "debug";
++            LIBGL_DEBUG = "verbose";
++            MESA_DEBUG = "1";
++            HYBRIS_LOGGING_LEVEL = "debug";
++            HYBRIS_TRACE = "1";
++          };
++        serviceConfig = {
++          # Upstream asteroid-launcher.service: the launcher with --systemd sends
++          # READY=1 itself, so notify is correct now that ExecStart is the real
++          # binary (no intermediate shell wrapper).
++          Type = "notify";
++          WorkingDirectory = "/";
++          # systemd does not glob EnvironmentFile=; explicitly list all compositor drop-ins
++          # matching upstream AsteroidOS load order.
++          EnvironmentFile = [
++            "-/var/lib/environment/compositor/00-default.conf"
++            "-/var/lib/environment/compositor/10-platform.conf"
++            "-/var/lib/environment/compositor/20-device.conf"
++            "-/var/lib/environment/compositor/qt6-hidpi.conf"
++          ];
++          ExecStartPre = [
++            "${pkgs.writeShellScript "asteroid-launcher-precondition" ''
++              # android-init.service touches this marker once the property
++              # service and the vendor HALs are up; wait for it with a bound.
++              i=0
++              while [ ! -e /dev/.coldboot_done ] && [ "$i" -lt 300 ]; do
++                sleep 0.1
++                i=$((i + 1))
++              done
++            ''}"
++            "-${pkgs.bash}/bin/bash -c '(echo QUIT > /run/psplash_fifo) 2>/dev/null || true'"
++            "${pkgs.writeShellScript "asteroid-launcher-sanitize-dconf" ''
++              # Reset dconf keys if they point to an invalid / non-existent path
++              for key in /desktop/asteroid/watchface /desktop/asteroid/nightstand/watchface /desktop/asteroid/applauncher /desktop/asteroid/background-filename; do
++                val=$(${pkgs.dconf}/bin/dconf read "$key" 2>/dev/null || true)
++                path=$(echo "$val" | ${pkgs.gnused}/bin/sed -e "s/^'//" -e "s/'$//" -e 's|^file://||')
++                if [ -n "$path" ] && { echo "$path" | ${pkgs.gnugrep}/bin/grep -qE "^(/nix/store/|/usr/share/)"; } && [ ! -e "$path" ]; then
++                  ${pkgs.dconf}/bin/dconf reset "$key" 2>/dev/null || true
++                fi
++              done
++            ''}"
++          ];
++          # Upstream asteroid-launcher.service runs the launcher directly. The
++          # capabilities upstream attaches with setcap are provided as ambient
++          # capabilities on the user manager and explicitly declared on this service,
++          # so the real binary runs with CAP_WAKE_ALARM and CAP_BLOCK_SUSPEND without
++          # the AT_SECURE side effects of file capabilities.
++          ExecStart = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher -plugin evdevtouch $LIPSTICK_OPTIONS --systemd";
++          AmbientCapabilities = [
++            "CAP_WAKE_ALARM"
++            "CAP_BLOCK_SUSPEND"
++          ];
++          TimeoutStartSec = "180s";
++          TimeoutStopSec = "3s";
++          Restart = "always";
++          RestartSec = "2s";
 +        }
 +        // lib.optionalAttrs debugBuild {
-+        # Debug builds: turn on every trace the graphics stack can emit.
-+        # These are runtime switches only; the upstream code path is unchanged.
-+        # `*=false` also silences the default category, which is where QML
-+        # import/instantiation errors and the QML_IMPORT_TRACE output are
-+        # reported, so keep `default` warnings and debug on; otherwise a black
-+        # screen leaves nothing but renderloop chatter in launcher.log.
-+        # QML `console.log/info` (and QML runtime warnings) are logged under the
-+        # plain `qml` category, so `*=false` silences them as well: the
-+        # diagnostics below would never reach launcher.log without enabling that
-+        # category explicitly. `qt.qml.*` only covers its subcategories.
-+        # Silence verbose scene graph render loop frame chatter to prevent log explosion.
-+        QT_LOGGING_RULES = "*=false;default.warning=true;default.debug=true;qml.debug=true;qml.info=true;qml.warning=true;qml.critical=true;qt.qml.*=true;qt.qpa.*=true;qt.waylandcompositor.*=true;qt.core.plugin.*=true";
-+        QT_DEBUG_PLUGINS = "1";
-+        # Log every QML import attempt (module, version, and the directory each
-+        # candidate was looked up in) plus the scene graph the renderer picked.
-+        # Both are runtime switches; a missing QML module shows up here as a
-+        # failing import line even before any component error is printed.
-+        QML_IMPORT_TRACE = "1";
-+        QPA_HWC_DEBUG = "1";
-+        HYBRIS_HWC_DEBUG = "1";
-+        QSG_INFO = "1";
-+        EGL_LOG_LEVEL = "debug";
-+        LIBGL_DEBUG = "verbose";
-+        MESA_DEBUG = "1";
-+        HYBRIS_LOGGING_LEVEL = "debug";
-+        HYBRIS_TRACE = "1";
++          # Debug builds: the stage-2 journal is volatile and a hard reset loses
++          # it, so keep the launcher's Qt/EGL output in the user's home.
++          StandardOutput = "append:/home/ceres/launcher.log";
++          StandardError = "append:/home/ceres/launcher.log";
++        };
 +      };
-+      serviceConfig = {
-+        # Upstream asteroid-launcher.service: the launcher with --systemd sends
-+        # READY=1 itself, so notify is correct now that ExecStart is the real
-+        # binary (no intermediate shell wrapper).
-+        Type = "notify";
-+        WorkingDirectory = "/";
-+        # systemd does not glob EnvironmentFile=; explicitly list all compositor drop-ins
-+        # matching upstream AsteroidOS load order.
-+        EnvironmentFile = [
-+          "-/var/lib/environment/compositor/00-default.conf"
-+          "-/var/lib/environment/compositor/10-platform.conf"
-+          "-/var/lib/environment/compositor/20-device.conf"
-+          "-/var/lib/environment/compositor/qt6-hidpi.conf"
++
++      # Upstream meta-asteroid installs android-boot-completed.service as a user
++      # unit; setting sys.boot_completed lets hoki's init.rc run init.rsb.sh.
++      systemd.user.services.android-boot-completed = {
++        description = "Tells the Android init system that the boot has been completed";
++        wantedBy = [ "default.target" ];
++        after = [ "asteroid-launcher.service" ];
++        unitConfig = {
++          ConditionUser = "!root";
++          ConditionPathExists = "/system/bin/getprop";
++        };
++        serviceConfig = {
++          Type = "simple";
++          ExecStartPre = "-${pkgs.coreutils}/bin/sleep 1";
++          ExecStart = "${pkgs.bash}/bin/bash -ec 'if [ \"$(env -u LD_PRELOAD -u LD_LIBRARY_PATH /system/bin/getprop sys.boot_completed)\" != 1 ]; then env -u LD_PRELOAD -u LD_LIBRARY_PATH /system/bin/setprop sys.boot_completed 1; fi'";
++        };
++      };
++
++      # AsteroidOS desktop entries and service wrappers invoke apps through
++      # `invoker`. Expose the system profile and Wayland client environment to
++      # all systemd user services so AsteroidOS apps and service wrappers can find
++      # `invoker`, core utilities, QML modules, and libhybris EGL.
++      systemd.user.settings.Manager = {
++        DefaultEnvironment = lib.concatStringsSep " " (
++          [
++            "\"PATH=/run/wrappers/bin:/run/current-system/sw/bin\""
++            "\"LOCALE_ARCHIVE=/run/current-system/sw/lib/locale/locale-archive\""
++            "\"WAYLAND_DISPLAY=wayland-0\""
++            "\"XDG_RUNTIME_DIR=/run/user/1000\""
++            "\"QT_QPA_PLATFORM=wayland\""
++            "\"EGL_PLATFORM=wayland\""
++          ]
++          ++ lib.optionals isLegacy [
++            "\"LD_PRELOAD=${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2\""
++            "\"LD_LIBRARY_PATH=${pkgs.libhybris}/lib\""
++          ]
++          ++ [
++            "\"QML2_IMPORT_PATH=${qmlImportPath}\""
++            "\"QML_IMPORT_PATH=${qmlImportPath}\""
++            "\"NIXPKGS_QT6_QML_IMPORT_PATH=${qmlImportPath}\""
++            "\"QT_PLUGIN_PATH=${qtPluginPath}\""
++            "\"QT_IM_MODULE=qtvirtualkeyboard\""
++            "\"QT_VIRTUALKEYBOARD_STYLE=watch\""
++            "\"QT_VIRTUALKEYBOARD_LAYOUT_PATH=${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts\""
++            "\"RIME_SHARED_DATA_DIR=${pkgs.asteroid.virtualkeyboard}/share/rime-data\""
++            "\"QT_ENABLE_HIGHDPI_SCALING=0\""
++          ]
++        );
++      };
++
++      # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
++      # cap_block_suspend for always-on-display ticks. File capabilities make the
++      # kernel set AT_SECURE, and glibc then discards LD_PRELOAD/LD_LIBRARY_PATH —
++      # which the launcher needs to load libhybris' EGL (Qt links glvnd's libEGL).
++      # Grant the same capabilities to the user manager as ambient capabilities
++      # instead: they are inherited by the launcher and do not set AT_SECURE.
++      # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
++      # Upstream supported-languages_git.bb ships a user@.service.d drop-in so
++      # the user manager reads the locale the settings app writes for ceres.
++      # Apply the same EnvironmentFile on the only user manager we run.
++      systemd.services."user@1000" = {
++        overrideStrategy = "asDropin";
++        serviceConfig.EnvironmentFile = [
++          "-/home/.system/var/lib/environment/1000/locale.conf"
 +        ];
-+        ExecStartPre = [
-+          "${pkgs.writeShellScript "asteroid-launcher-precondition" ''
-+            # android-init.service touches this marker once the property
-+            # service and the vendor HALs are up; wait for it with a bound.
-+            i=0
-+            while [ ! -e /dev/.coldboot_done ] && [ "$i" -lt 300 ]; do
-+              sleep 0.1
-+              i=$((i + 1))
-+            done
-+          ''}"
-+          "-${pkgs.bash}/bin/bash -c '(echo QUIT > /run/psplash_fifo) 2>/dev/null || true'"
-+          "${pkgs.writeShellScript "asteroid-launcher-sanitize-dconf" ''
-+            # Reset dconf keys if they point to an invalid / non-existent path
-+            for key in /desktop/asteroid/watchface /desktop/asteroid/nightstand/watchface /desktop/asteroid/applauncher /desktop/asteroid/background-filename; do
-+              val=$(${pkgs.dconf}/bin/dconf read "$key" 2>/dev/null || true)
-+              path=$(echo "$val" | ${pkgs.gnused}/bin/sed -e "s/^'//" -e "s/'$//" -e 's|^file://||')
-+              if [ -n "$path" ] && { echo "$path" | ${pkgs.gnugrep}/bin/grep -qE "^(/nix/store/|/usr/share/)"; } && [ ! -e "$path" ]; then
-+                ${pkgs.dconf}/bin/dconf reset "$key" 2>/dev/null || true
-+              fi
-+            done
-+          ''}"
-+        ];
-+        # Upstream asteroid-launcher.service runs the launcher directly. The
-+        # capabilities upstream attaches with setcap are provided as ambient
-+        # capabilities on the user manager and explicitly declared on this service,
-+        # so the real binary runs with CAP_WAKE_ALARM and CAP_BLOCK_SUSPEND without
-+        # the AT_SECURE side effects of file capabilities.
-+        ExecStart = "${pkgs.asteroid.asteroid-launcher}/bin/asteroid-launcher -plugin evdevtouch $LIPSTICK_OPTIONS --systemd";
-+        AmbientCapabilities = [
++        serviceConfig.AmbientCapabilities = [
 +          "CAP_WAKE_ALARM"
 +          "CAP_BLOCK_SUSPEND"
 +        ];
-+        TimeoutStartSec = "180s";
-+        TimeoutStopSec = "3s";
-+        Restart = "always";
-+        RestartSec = "2s";
-+      }
-+      // lib.optionalAttrs debugBuild {
-+        # Debug builds: the stage-2 journal is volatile and a hard reset loses
-+        # it, so keep the launcher's Qt/EGL output in the user's home.
-+        StandardOutput = "append:/home/ceres/launcher.log";
-+        StandardError = "append:/home/ceres/launcher.log";
 +      };
-+    };
 +
-+    # Upstream meta-asteroid installs android-boot-completed.service as a user
-+    # unit; setting sys.boot_completed lets hoki's init.rc run init.rsb.sh.
-+    systemd.user.services.android-boot-completed = {
-+      description = "Tells the Android init system that the boot has been completed";
-+      wantedBy = [ "default.target" ];
-+      after = [ "asteroid-launcher.service" ];
-+      unitConfig = {
-+        ConditionUser = "!root";
-+        ConditionPathExists = "/system/bin/getprop";
++      # logind authorizes SetUserLinger through polkit.
++      security.polkit.enable = true;
++
++      # polkitd must be running before linger-users invokes loginctl.
++      systemd.services.polkit = {
++        wantedBy = lib.mkForce [ "multi-user.target" ];
++        before = [ "linger-users.service" ];
++        # The 4.14 vendor kernel has no /dev/mqueue or /dev/hugepages; systemd's
++        # private-device namespace setup exits 226/NAMESPACE. polkit does not
++        # need either, so disable the two private namespaces for this service.
++        serviceConfig = {
++          PrivateDevices = lib.mkForce false;
++          PrivateTmp = lib.mkForce false;
++          PrivateNetwork = lib.mkForce false;
++          PrivateUsers = lib.mkForce false;
++          PrivateMounts = lib.mkForce false;
++          ProtectSystem = lib.mkForce false;
++          ProtectHome = lib.mkForce false;
++          ProtectKernelTunables = lib.mkForce false;
++          ProtectKernelModules = lib.mkForce false;
++          ProtectControlGroups = lib.mkForce false;
++          ProtectClock = lib.mkForce false;
++          ProtectHostname = lib.mkForce false;
++          ProtectProc = lib.mkForce "default";
++          ProcSubset = lib.mkForce "all";
++          RestrictNamespaces = lib.mkForce false;
++        };
 +      };
-+      serviceConfig = {
-+        Type = "simple";
-+        ExecStartPre = "-${pkgs.coreutils}/bin/sleep 1";
-+        ExecStart = "${pkgs.bash}/bin/bash -ec 'if [ \"$(env -u LD_PRELOAD -u LD_LIBRARY_PATH /system/bin/getprop sys.boot_completed)\" != 1 ]; then env -u LD_PRELOAD -u LD_LIBRARY_PATH /system/bin/setprop sys.boot_completed 1; fi'";
++
++      # Upstream AsteroidOS allows the ceres user to reboot and power off.
++      # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-apps/files/30-org.freedesktop.login1.rules
++      security.polkit.extraConfig = ''
++        polkit.addRule(function(action, subject) {
++          if (action.id == "org.freedesktop.login1.set-user-linger" &&
++              (subject.user == "root" || subject.user == "ceres")) {
++            return polkit.Result.YES;
++          }
++          if ((action.id == "org.freedesktop.login1.set-reboot-parameter" ||
++               action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
++               action.id == "org.freedesktop.login1.reboot-multiple-sessions") &&
++              subject.user == "ceres") {
++            return polkit.Result.YES;
++          }
++          if ((action.id == "org.freedesktop.timedate1.set-timezone" ||
++               action.id == "org.freedesktop.timedate1.set-time" ||
++               action.id == "org.freedesktop.timedate1.set-local-rtc" ||
++               action.id == "org.freedesktop.timedate1.set-ntp") &&
++              subject.user == "ceres") {
++            return polkit.Result.YES;
++          }
++        });
++      '';
++
++      # AsteroidOS Bluetooth synchronization daemon (upstream user service)
++      systemd.user.services.asteroid-btsyncd = {
++        description = "AsteroidOS Bluetooth Sync Daemon";
++        wantedBy = [ "default.target" ];
++        requires = [ "dbus.socket" ];
++        after = [ "bluetooth.service" ];
++        unitConfig.ConditionUser = "!root";
++        serviceConfig = {
++          ExecStart = "${pkgs.asteroid.asteroid-btsyncd}/bin/asteroid-btsyncd";
++          Restart = "always";
++          RestartSec = "5s";
++        };
 +      };
-+    };
-+
-+    # AsteroidOS desktop entries and service wrappers invoke apps through
-+    # `invoker`. Expose the system profile and Wayland client environment to
-+    # all systemd user services so AsteroidOS apps and service wrappers can find
-+    # `invoker`, core utilities, QML modules, and libhybris EGL.
-+    systemd.user.settings.Manager = {
-+      DefaultEnvironment = lib.concatStringsSep " " ([
-+        "\"PATH=/run/wrappers/bin:/run/current-system/sw/bin\""
-+        "\"LOCALE_ARCHIVE=/run/current-system/sw/lib/locale/locale-archive\""
-+        "\"WAYLAND_DISPLAY=wayland-0\""
-+        "\"XDG_RUNTIME_DIR=/run/user/1000\""
-+        "\"QT_QPA_PLATFORM=wayland\""
-+        "\"EGL_PLATFORM=wayland\""
-+      ] ++ lib.optionals isLegacy [
-+        "\"LD_PRELOAD=${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2\""
-+        "\"LD_LIBRARY_PATH=${pkgs.libhybris}/lib\""
-+      ] ++ [
-+        "\"QML2_IMPORT_PATH=${qmlImportPath}\""
-+        "\"QML_IMPORT_PATH=${qmlImportPath}\""
-+        "\"NIXPKGS_QT6_QML_IMPORT_PATH=${qmlImportPath}\""
-+        "\"QT_PLUGIN_PATH=${qtPluginPath}\""
-+        "\"QT_IM_MODULE=qtvirtualkeyboard\""
-+        "\"QT_VIRTUALKEYBOARD_STYLE=watch\""
-+        "\"QT_VIRTUALKEYBOARD_LAYOUT_PATH=${pkgs.asteroid.virtualkeyboard}/share/qtvirtualkeyboard/layouts\""
-+        "\"RIME_SHARED_DATA_DIR=${pkgs.asteroid.virtualkeyboard}/share/rime-data\""
-+        "\"QT_ENABLE_HIGHDPI_SCALING=0\""
-+      ]);
-+    };
-+
-+    # Upstream AsteroidOS setcap's the launcher with cap_wake_alarm and
-+    # cap_block_suspend for always-on-display ticks. File capabilities make the
-+    # kernel set AT_SECURE, and glibc then discards LD_PRELOAD/LD_LIBRARY_PATH —
-+    # which the launcher needs to load libhybris' EGL (Qt links glvnd's libEGL).
-+    # Grant the same capabilities to the user manager as ambient capabilities
-+    # instead: they are inherited by the launcher and do not set AT_SECURE.
-+    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
-+    # Upstream supported-languages_git.bb ships a user@.service.d drop-in so
-+    # the user manager reads the locale the settings app writes for ceres.
-+    # Apply the same EnvironmentFile on the only user manager we run.
-+    systemd.services."user@1000" = {
-+      overrideStrategy = "asDropin";
-+      serviceConfig.EnvironmentFile = [
-+        "-/home/.system/var/lib/environment/1000/locale.conf"
-+      ];
-+      serviceConfig.AmbientCapabilities = [
-+        "CAP_WAKE_ALARM"
-+        "CAP_BLOCK_SUSPEND"
-+      ];
-+    };
-+
-+    # logind authorizes SetUserLinger through polkit.
-+    security.polkit.enable = true;
-+
-+    # polkitd must be running before linger-users invokes loginctl.
-+    systemd.services.polkit = {
-+      wantedBy = lib.mkForce [ "multi-user.target" ];
-+      before = [ "linger-users.service" ];
-+      # The 4.14 vendor kernel has no /dev/mqueue or /dev/hugepages; systemd's
-+      # private-device namespace setup exits 226/NAMESPACE. polkit does not
-+      # need either, so disable the two private namespaces for this service.
-+      serviceConfig = {
-+        PrivateDevices = lib.mkForce false;
-+        PrivateTmp = lib.mkForce false;
-+        PrivateNetwork = lib.mkForce false;
-+        PrivateUsers = lib.mkForce false;
-+        PrivateMounts = lib.mkForce false;
-+        ProtectSystem = lib.mkForce false;
-+        ProtectHome = lib.mkForce false;
-+        ProtectKernelTunables = lib.mkForce false;
-+        ProtectKernelModules = lib.mkForce false;
-+        ProtectControlGroups = lib.mkForce false;
-+        ProtectClock = lib.mkForce false;
-+        ProtectHostname = lib.mkForce false;
-+        ProtectProc = lib.mkForce "default";
-+        ProcSubset = lib.mkForce "all";
-+        RestrictNamespaces = lib.mkForce false;
-+      };
-+    };
-+
-+    # Upstream AsteroidOS allows the ceres user to reboot and power off.
-+    # Reference: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-asteroid/asteroid-apps/files/30-org.freedesktop.login1.rules
-+    security.polkit.extraConfig = ''
-+      polkit.addRule(function(action, subject) {
-+        if (action.id == "org.freedesktop.login1.set-user-linger" &&
-+            (subject.user == "root" || subject.user == "ceres")) {
-+          return polkit.Result.YES;
-+        }
-+        if ((action.id == "org.freedesktop.login1.set-reboot-parameter" ||
-+             action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
-+             action.id == "org.freedesktop.login1.reboot-multiple-sessions") &&
-+            subject.user == "ceres") {
-+          return polkit.Result.YES;
-+        }
-+        if ((action.id == "org.freedesktop.timedate1.set-timezone" ||
-+             action.id == "org.freedesktop.timedate1.set-time" ||
-+             action.id == "org.freedesktop.timedate1.set-local-rtc" ||
-+             action.id == "org.freedesktop.timedate1.set-ntp") &&
-+            subject.user == "ceres") {
-+          return polkit.Result.YES;
-+        }
-+      });
-+    '';
-+
-+    # AsteroidOS Bluetooth synchronization daemon (upstream user service)
-+    systemd.user.services.asteroid-btsyncd = {
-+      description = "AsteroidOS Bluetooth Sync Daemon";
-+      wantedBy = [ "default.target" ];
-+      requires = [ "dbus.socket" ];
-+      after = [ "bluetooth.service" ];
-+      unitConfig.ConditionUser = "!root";
-+      serviceConfig = {
-+        ExecStart = "${pkgs.asteroid.asteroid-btsyncd}/bin/asteroid-btsyncd";
-+        Restart = "always";
-+        RestartSec = "5s";
-+      };
-+    };
-+  });
++    }
++  );
 +}
 diff --git a/examples/asteroid/configuration.nix b/examples/asteroid/configuration.nix
 new file mode 100644

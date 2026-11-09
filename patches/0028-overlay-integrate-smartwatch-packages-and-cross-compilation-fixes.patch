@@ -5,11 +5,11 @@ Subject: [PATCH] overlay: integrate smartwatch packages and cross-compilation
  fixes
 
 ---
- modules/cross-workarounds.nix |  55 ++----
- overlay/cross-compile.nix     | 315 ++++++++++++++++++++++++++++++++++
+ modules/cross-workarounds.nix |  55 +++----
+ overlay/cross-compile.nix     | 295 ++++++++++++++++++++++++++++++++++
  overlay/default.nix           |   8 +
  overlay/overlay.nix           |  48 +++++-
- 4 files changed, 386 insertions(+), 40 deletions(-)
+ 4 files changed, 366 insertions(+), 40 deletions(-)
  create mode 100644 overlay/cross-compile.nix
  create mode 100644 overlay/default.nix
 
@@ -82,10 +82,10 @@ index 185117de..9d894d94 100644
  ])
 diff --git a/overlay/cross-compile.nix b/overlay/cross-compile.nix
 new file mode 100644
-index 00000000..02caaf5e
+index 00000000..26d8db46
 --- /dev/null
 +++ b/overlay/cross-compile.nix
-@@ -0,0 +1,315 @@
+@@ -0,0 +1,295 @@
 +# Overlays and package workarounds that only make sense during cross-compilation.
 +#
 +# When building natively, this overlay selects vendored Qt 6.11 for matching
@@ -380,26 +380,6 @@ index 00000000..02caaf5e
 +      });
 +    };
 +
-+    # Port Ladybird browser to 32-bit ARM (armv7l):
-+    # Upstream repository: https://github.com/LadybirdBrowser/ladybird
-+    # Patches LibGC (NanBoxedValue, HeapRegion, BlockAllocator) to support 32-bit pointers
-+    # and reduces the heap cage from 4 TiB to 128 MiB to fit 32-bit virtual memory.
-+    ladybird =
-+      (super.ladybird.override {
-+        skia = final.skia;
-+        angle = final.libglvnd;
-+      }).overrideAttrs
-+        (old: {
-+          patches = (old.patches or [ ]) ++ [
-+            ./ladybird/0001-32bit-support.patch
-+          ];
-+          env = (old.env or { }) // {
-+            NIX_LDFLAGS = (old.env.NIX_LDFLAGS or "") + " -latomic";
-+          };
-+          meta = old.meta // {
-+            platforms = (old.meta.platforms or [ ]) ++ [ "armv7l-linux" ];
-+          };
-+        });
 +  }
 diff --git a/overlay/default.nix b/overlay/default.nix
 new file mode 100644

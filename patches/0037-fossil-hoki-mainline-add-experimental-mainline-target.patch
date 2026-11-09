@@ -6,9 +6,9 @@ Subject: [PATCH] fossil-hoki-mainline: add experimental mainline target
 ---
  devices/fossil-hoki-mainline/README.md        |    46 +
  devices/fossil-hoki-mainline/default.nix      |   131 +
- .../fossil-hoki-mainline/kernel/default.nix   |    21 +
+ .../fossil-hoki-mainline/kernel/default.nix   |    19 +
  devices/fossil-hoki-mainline/sda429-hoki.dts  | 11753 ++++++++++++++++
- 4 files changed, 11951 insertions(+)
+ 4 files changed, 11949 insertions(+)
  create mode 100644 devices/fossil-hoki-mainline/README.md
  create mode 100644 devices/fossil-hoki-mainline/default.nix
  create mode 100644 devices/fossil-hoki-mainline/kernel/default.nix
@@ -205,10 +205,10 @@ index 00000000..5fe70d70
 +}
 diff --git a/devices/fossil-hoki-mainline/kernel/default.nix b/devices/fossil-hoki-mainline/kernel/default.nix
 new file mode 100644
-index 00000000..6fdb768a
+index 00000000..7a12c9b3
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/kernel/default.nix
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,19 @@
 +{
 +  lib,
 +  linuxPackages_6_18,
@@ -223,12 +223,10 @@ index 00000000..6fdb768a
 +# SYSFB_SIMPLEFB=y, USB_CONFIGFS=m, and PSTORE=y enabled in multi_v7_defconfig.
 +# We append the tailored hoki DTS to the upstream Qualcomm DTS Makefile.
 +linuxPackages_6_18.kernel.overrideAttrs (old: {
-+  postPatch =
-+    (old.postPatch or "")
-+    + ''
-+      install -Dm644 ${hokiDts} arch/arm/boot/dts/qcom/sda429-hoki.dts
-+      printf '%s\n' 'dtb-$(CONFIG_ARCH_QCOM) += sda429-hoki.dtb' >> arch/arm/boot/dts/qcom/Makefile
-+    '';
++  postPatch = (old.postPatch or "") + ''
++    install -Dm644 ${hokiDts} arch/arm/boot/dts/qcom/sda429-hoki.dts
++    printf '%s\n' 'dtb-$(CONFIG_ARCH_QCOM) += sda429-hoki.dtb' >> arch/arm/boot/dts/qcom/Makefile
++  '';
 +})
 diff --git a/devices/fossil-hoki-mainline/sda429-hoki.dts b/devices/fossil-hoki-mainline/sda429-hoki.dts
 new file mode 100644

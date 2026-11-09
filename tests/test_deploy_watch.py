@@ -16,38 +16,41 @@ class DeployCopyTests(unittest.TestCase):
     def deploy(self, action):
         with (
             patch.object(deploy_watch, "build_asteroid_toplevel", return_value="/nix/store/system"),
-            patch.object(deploy_watch, "build_stage1_bootimg", return_value="/nix/store/boot.img") as build_boot,
-            patch.object(deploy_watch, "flash_stage1_bootimg_remote") as flash_boot,
             patch.object(deploy_watch, "check_ssh_connectivity"),
             patch.object(deploy_watch, "run_cmd") as run,
             patch.object(deploy_watch, "ssh_exec") as ssh,
         ):
             deploy_watch.deploy_copy(
                 Path("/repo"), "fossil-hoki", "watch", 2222, "root",
-                action, False, True, False,
+                action, False, False,
             )
-            return build_boot.call_count, flash_boot.call_count, run.call_args, ssh.call_args
+            return run.call_args, ssh.call_args
 
     def test_boot_stages_profile_and_uses_requested_ssh_port(self):
-        build_count, flash_count, copy, ssh = self.deploy("boot")
-        self.assertEqual((build_count, flash_count), (1, 1))
+        copy, ssh = self.deploy("boot")
         self.assertIn("-p 2222", copy.kwargs["env"]["NIX_SSHOPTS"])
         self.assertIn("nix-env -p /nix/var/nix/profiles/system --set", ssh.args[3])
-        self.assertNotIn("switch-to-configuration", ssh.args[3])
+        self.assertIn("/bin/switch-to-configuration boot", ssh.args[3])
 
     def test_test_action_neither_flashes_nor_changes_default_profile(self):
-        build_count, flash_count, _, ssh = self.deploy("test")
-        self.assertEqual((build_count, flash_count), (0, 0))
+        _, ssh = self.deploy("test")
         self.assertIn("switch-to-configuration test", ssh.args[3])
         self.assertNotIn("nix-env", ssh.args[3])
 
-    def test_missing_boot_image_fails_before_transfer(self):
-        with patch.object(deploy_watch, "run_cmd") as run:
-            with self.assertRaises(FileNotFoundError):
-                deploy_watch.flash_stage1_bootimg_remote(
-                    "watch", 22, "root", "/nonexistent/boot.img"
-                )
+    def test_dry_run_never_connects_or_activates(self):
+        with (
+            patch.object(deploy_watch, "build_asteroid_toplevel", return_value="/nix/store/system"),
+            patch.object(deploy_watch, "check_ssh_connectivity") as connect,
+            patch.object(deploy_watch, "run_cmd") as run,
+            patch.object(deploy_watch, "ssh_exec") as ssh,
+        ):
+            deploy_watch.deploy_copy(
+                Path("/repo"), "fossil-hoki", "watch", 2222, "root",
+                "boot", True, True,
+            )
+            connect.assert_not_called()
             run.assert_not_called()
+            ssh.assert_not_called()
 
     def test_sudo_wraps_the_entire_remote_command(self):
         with patch.object(deploy_watch, "run_cmd") as run:

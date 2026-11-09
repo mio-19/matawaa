@@ -825,10 +825,10 @@ index 00000000..abd05227
 +    return status;
 +}
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 10727c53..e654401d 100644
+index 88205f61..2277c2ce 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -146,12 +146,18 @@ rec {
+@@ -159,12 +159,18 @@ rec {
      inherit qml-asteroid amber-mpris mlite;
    };
  
@@ -843,7 +843,7 @@ index 10727c53..e654401d 100644
        inherit mkAsteroidApp mce-dev ngf-qt6;
      })
      // {
--      
+-
 +      inherit browser;
      };
  

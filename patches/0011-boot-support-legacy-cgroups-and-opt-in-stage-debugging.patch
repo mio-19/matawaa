@@ -4,9 +4,9 @@ Date: Mon, 9 Nov 2026 10:55:47 +1100
 Subject: [PATCH] boot: support legacy cgroups and opt-in stage debugging
 
 ---
- boot/init/tasks/switch_root.rb | 30 ++++++++++++++
- modules/initrd-ssh.nix         | 72 +++++++++++++++++++++++++++-------
- 2 files changed, 87 insertions(+), 15 deletions(-)
+ boot/init/tasks/switch_root.rb | 30 ++++++++++++++++++
+ modules/initrd-ssh.nix         | 56 +++++++++++++++++++++++++++-------
+ 2 files changed, 75 insertions(+), 11 deletions(-)
 
 diff --git a/boot/init/tasks/switch_root.rb b/boot/init/tasks/switch_root.rb
 index 6a3ad197..0644044c 100644
@@ -64,26 +64,10 @@ index 6a3ad197..0644044c 100644
      System.exec({}, switch_root, SYSTEM_MOUNT_POINT, init)
    end
 diff --git a/modules/initrd-ssh.nix b/modules/initrd-ssh.nix
-index db771346..b4842997 100644
+index db771346..8701e858 100644
 --- a/modules/initrd-ssh.nix
 +++ b/modules/initrd-ssh.nix
-@@ -1,15 +1,27 @@
--{ config, lib, pkgs, ... }:
-+{
-+  config,
-+  lib,
-+  pkgs,
-+  ...
-+}:
- 
- let
-   inherit (lib)
-     mkOption
-     types
--  ;
-+    ;
-   device_name = config.mobile.device.name;
-   cfg = config.mobile.boot.stage-1.ssh;
+@@ -10,6 +10,13 @@ let
    banner = pkgs.writeText "${device_name}-banner" ''
      From a mobile-nixos device ${device_name}
    '';
@@ -97,7 +81,7 @@ index db771346..b4842997 100644
  in
  {
    options.mobile.boot.stage-1.ssh = {
-@@ -18,24 +30,38 @@ in
+@@ -18,24 +25,38 @@ in
        default = false;
        description = ''
          Enables ssh during stage-1.
@@ -130,8 +114,7 @@ index db771346..b4842997 100644
 -            add_dependency(:Target, :Environment)
 +            add_dependency(:Task, Tasks::LoginEnvironment.instance)
            end
--          
-+
+           
            def run()
 -            # Puts a blank password for the root user.
 -            System.run("passwd", "-d", "root")
@@ -144,7 +127,7 @@ index db771346..b4842997 100644
            end
          end
        '')
-@@ -43,23 +69,39 @@ in
+@@ -43,20 +64,33 @@ in
          class Tasks::DropbearSSHD < SingletonTask
            def initialize()
              add_dependency(:Target, :Networking)
@@ -181,11 +164,4 @@ index db771346..b4842997 100644
 +      }
      ];
      extraUtils = [
--      { package = pkgs.dropbear; extraCommand = "cp -fpv ${pkgs.glibc.out}/lib/libnss_files.so.* $out/lib"; }
-+      {
-+        package = pkgs.dropbear;
-+        extraCommand = "cp -fpv ${pkgs.glibc.out}/lib/libnss_files.so.* $out/lib";
-+      }
-     ];
-   };
- }
+       { package = pkgs.dropbear; extraCommand = "cp -fpv ${pkgs.glibc.out}/lib/libnss_files.so.* $out/lib"; }

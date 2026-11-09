@@ -4,22 +4,16 @@ Date: Mon, 9 Nov 2026 10:55:46 +1100
 Subject: [PATCH] bootloader: install boot partitions during system activation
 
 ---
- modules/bootloader.nix   | 125 +++++++++++++++++++++++++++++++++++----
- modules/system-build.nix |  15 ++++-
- 2 files changed, 126 insertions(+), 14 deletions(-)
+ modules/bootloader.nix   | 110 +++++++++++++++++++++++++++++++++++----
+ modules/system-build.nix |   6 +++
+ 2 files changed, 105 insertions(+), 11 deletions(-)
 
 diff --git a/modules/bootloader.nix b/modules/bootloader.nix
-index be91b7cd..1227f2b8 100644
+index be91b7cd..4c029fec 100644
 --- a/modules/bootloader.nix
 +++ b/modules/bootloader.nix
-@@ -1,7 +1,97 @@
--{ config, lib, pkgs, ... }:
-+{
-+  config,
-+  lib,
-+  pkgs,
-+  ...
-+}:
+@@ -1,7 +1,92 @@
+ { config, lib, pkgs, ... }:
  
  let
 -  inherit (lib) mkIf mkOption types;
@@ -112,7 +106,7 @@ index be91b7cd..1227f2b8 100644
  in
  {
    options = {
-@@ -11,21 +101,32 @@ in
+@@ -11,21 +96,24 @@ in
            type = types.bool;
            default = config.mobile.enable;
            description = ''
@@ -143,42 +137,15 @@ index be91b7cd..1227f2b8 100644
  
 +      (mkIf isAndroid {
 +        system.build.installBootLoader = androidBootloaderInstaller;
-+        system.activationScripts.mobileBootloader = {
-+          supportsDryActivation = true;
-+          text = ''
-+            if [ -z "''${NIXOS_ACTION:-}" ] || [ "''${NIXOS_ACTION:-}" != "dry-activate" ]; then
-+              ${androidBootloaderInstaller}
-+            fi
-+          '';
-+        };
 +      })
 +    ]
 +  );
 +}
 diff --git a/modules/system-build.nix b/modules/system-build.nix
-index 064cc218..94e1320d 100644
+index 064cc218..88795a40 100644
 --- a/modules/system-build.nix
 +++ b/modules/system-build.nix
-@@ -1,11 +1,16 @@
--{ config, lib, pkgs, ... }:
-+{
-+  config,
-+  lib,
-+  pkgs,
-+  ...
-+}:
- 
- let
-   inherit (lib) mkIf optionalString;
- 
-   deviceName = config.mobile.device.name;
- 
--  dtbMapping = pkgs.runCommand "dtb-mapping.json" {} ''
-+  dtbMapping = pkgs.runCommand "dtb-mapping.json" { } ''
-     (
-       PS4=" $ "; set -x
-       ${pkgs.buildPackages.mobile-nixos.map-dtbs}/bin/map-dtbs $(find ${config.hardware.deviceTree.package} -name '*.dtb' | sort) > $out
-@@ -24,6 +29,12 @@ in
+@@ -24,6 +24,12 @@ in
          ${optionalString (config.hardware.deviceTree.package != null) ''
            ln -s ${dtbMapping} dtb-mapping.json
          ''}

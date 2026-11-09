@@ -7,12 +7,12 @@ Subject: [PATCH] fossil-hoki: add Gen 6 hardware firmware audio and family
 ---
  devices/fossil-firefish/default.nix           |  56 ++
  devices/fossil-hoki/android-init.nix          | 224 +++++++
- devices/fossil-hoki/android-system-data.nix   |  26 +
+ devices/fossil-hoki/android-system-data.nix   |  28 +
  devices/fossil-hoki/audio-modules.nix         | 122 ++++
  devices/fossil-hoki/default.nix               | 588 ++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini              |   2 +
  .../hwcomposer-allocation-diagnostics.patch   |  31 +
- devices/fossil-hoki/hybris-android.nix        |  30 +
+ devices/fossil-hoki/hybris-android.nix        |  32 +
  devices/fossil-hoki/hybris.nix                |  47 ++
  devices/fossil-hoki/tfa9890.cnt.base64        |  93 +++
  devices/fossil-hoki/wlan-firmware-hoki.sh     |  42 ++
@@ -22,7 +22,7 @@ Subject: [PATCH] fossil-hoki: add Gen 6 hardware firmware audio and family
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 ++
  devices/fossil-triggerfish/default.nix        |  56 ++
- 17 files changed, 1543 insertions(+)
+ 17 files changed, 1547 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -105,7 +105,7 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..471fe087
+index 00000000..43d21df0
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
 @@ -0,0 +1,224 @@
@@ -146,37 +146,37 @@ index 00000000..471fe087
 +  # AsteroidOS SELinux stub integration for core service managers.
 +  # Matches AsteroidOS meta-skipjack, meta-koi, meta-narwhal, meta-pike, meta-ray.
 +  patchedInitRc = pkgs.runCommand "init.rc" { } ''
-+    ${pkgs.gnused}/bin/sed \
-+      -e '/start vndservicemanager/a \    start vendor.gralloc-2-0\n    start vendor.configstore-hal\n    start vendor.audio-hal-2-0' \
-+      -e '/setprop sys.hwc.gpu_perf_mode 1/a \    setprop vendor.gralloc.enable_fb_ubwc 0\n    setprop vendor.gralloc.disable_ubwc 1' \
-+      ${initRc} > $out
-+    cat >> $out <<'EOF'
++        ${pkgs.gnused}/bin/sed \
++          -e '/start vndservicemanager/a \    start vendor.gralloc-2-0\n    start vendor.configstore-hal\n    start vendor.audio-hal-2-0' \
++          -e '/setprop sys.hwc.gpu_perf_mode 1/a \    setprop vendor.gralloc.enable_fb_ubwc 0\n    setprop vendor.gralloc.disable_ubwc 1' \
++          ${initRc} > $out
++        cat >> $out <<'EOF'
 +
-+# AsteroidOS SELinux stub integration for core service managers
-+service servicemanager /system/bin/servicemanager
-+    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
-+    class core
++    # AsteroidOS SELinux stub integration for core service managers
++    service servicemanager /system/bin/servicemanager
++        setenv LD_PRELOAD /system/lib/libselinux_stubs.so
++        class core
 +
-+service hwservicemanager /system/bin/hwservicemanager
-+    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
-+    class core
++    service hwservicemanager /system/bin/hwservicemanager
++        setenv LD_PRELOAD /system/lib/libselinux_stubs.so
++        class core
 +
-+service vndservicemanager /vendor/bin/vndservicemanager /dev/vndbinder
-+    setenv LD_PRELOAD /system/lib/libselinux_stubs.so
-+    class core
++    service vndservicemanager /vendor/bin/vndservicemanager /dev/vndbinder
++        setenv LD_PRELOAD /system/lib/libselinux_stubs.so
++        class core
 +
-+# Graphics Allocator and ConfigStore services for Qualcomm Treble HIDL
-+service vendor.gralloc-2-0 /vendor/bin/hw/android.hardware.graphics.allocator@2.0-service
-+    class hal
-+    user system
-+    group graphics drmrpc
-+    capabilities SYS_NICE
++    # Graphics Allocator and ConfigStore services for Qualcomm Treble HIDL
++    service vendor.gralloc-2-0 /vendor/bin/hw/android.hardware.graphics.allocator@2.0-service
++        class hal
++        user system
++        group graphics drmrpc
++        capabilities SYS_NICE
 +
-+service vendor.configstore-hal /vendor/bin/hw/android.hardware.configstore@1.1-service
-+    class hal
-+    user system
-+    group system
-+EOF
++    service vendor.configstore-hal /vendor/bin/hw/android.hardware.configstore@1.1-service
++        class hal
++        user system
++        group system
++    EOF
 +  '';
 +in
 +{
@@ -335,10 +335,10 @@ index 00000000..471fe087
 +}
 diff --git a/devices/fossil-hoki/android-system-data.nix b/devices/fossil-hoki/android-system-data.nix
 new file mode 100644
-index 00000000..36d3b739
+index 00000000..c74a22e3
 --- /dev/null
 +++ b/devices/fossil-hoki/android-system-data.nix
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,28 @@
 +{ pkgs }:
 +
 +# Installs the Fossil Gen 6 Android 9 system and vendor data for libhybris.
@@ -347,24 +347,26 @@ index 00000000..36d3b739
 +let
 +  inherit (pkgs) buildPackages;
 +in
-+pkgs.runCommand "android-system-data-hoki-p" {
-+  nativeBuildInputs = [
-+    buildPackages.gnutar
-+    buildPackages.gzip
-+  ];
-+} ''
-+  mkdir -p $out
-+  tar -xzf ${
-+    pkgs.fetchurl {
-+      url = "https://dl.dropboxusercontent.com/s/1mmpew8kyn52jko/system-hoki-p.tar.gz";
-+      hash = "sha256-FBagGo/RnpyCqgypveM9toU+sI9UEVkrSxeDZJcUF84=";
-+    }
-+  } -C $out
++pkgs.runCommand "android-system-data-hoki-p"
++  {
++    nativeBuildInputs = [
++      buildPackages.gnutar
++      buildPackages.gzip
++    ];
++  }
++  ''
++    mkdir -p $out
++    tar -xzf ${
++      pkgs.fetchurl {
++        url = "https://dl.dropboxusercontent.com/s/1mmpew8kyn52jko/system-hoki-p.tar.gz";
++        hash = "sha256-FBagGo/RnpyCqgypveM9toU+sI9UEVkrSxeDZJcUF84=";
++      }
++    } -C $out
 +
-+  # GNSS vendor HAL symlink (matching AsteroidOS PR #342)
-+  ln -sfn android.hardware.gnss@1.0-service-qti \
-+    $out/vendor/bin/hw/android.hardware.gnss@1.0-service
-+''
++    # GNSS vendor HAL symlink (matching AsteroidOS PR #342)
++    ln -sfn android.hardware.gnss@1.0-service-qti \
++      $out/vendor/bin/hw/android.hardware.gnss@1.0-service
++  ''
 diff --git a/devices/fossil-hoki/audio-modules.nix b/devices/fossil-hoki/audio-modules.nix
 new file mode 100644
 index 00000000..4bcf1878
@@ -1134,10 +1136,10 @@ index 00000000..cb9ddd4b
 +         width, height, stride, format, usage, strerror(-status), this);
 diff --git a/devices/fossil-hoki/hybris-android.nix b/devices/fossil-hoki/hybris-android.nix
 new file mode 100644
-index 00000000..49b976fc
+index 00000000..85003d89
 --- /dev/null
 +++ b/devices/fossil-hoki/hybris-android.nix
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,32 @@
 +{ pkgs }:
 +# AsteroidOS ships patched Android system libraries and headers for hybris on
 +# the Fossil Gen 6. They contain the HWC2 compatibility layer that the stock
@@ -1147,27 +1149,29 @@ index 00000000..49b976fc
 +let
 +  inherit (pkgs) buildPackages;
 +in
-+pkgs.runCommand "hybris-p-msm8909w" {
-+  nativeBuildInputs = [
-+    buildPackages.gnutar
-+    buildPackages.gzip
-+  ];
-+} ''
-+  mkdir -p $out
-+  tar xf ${
-+    pkgs.fetchurl {
-+      url = "https://dl.dropboxusercontent.com/s/2btck4hlowhronv/hybris-p-msm8909w.tar.gz";
-+      hash = "sha256-19kXAAB3la7c30//pBhVLt8rP9QaAiM2dAGQb09N/tM=";
-+    }
-+  } -C $out
++pkgs.runCommand "hybris-p-msm8909w"
++  {
++    nativeBuildInputs = [
++      buildPackages.gnutar
++      buildPackages.gzip
++    ];
++  }
++  ''
++    mkdir -p $out
++    tar xf ${
++      pkgs.fetchurl {
++        url = "https://dl.dropboxusercontent.com/s/2btck4hlowhronv/hybris-p-msm8909w.tar.gz";
++        hash = "sha256-19kXAAB3la7c30//pBhVLt8rP9QaAiM2dAGQb09N/tM=";
++      }
++    } -C $out
 +
-+  # GNSS (#342): the vendor provides gps.default.so under /vendor/lib/hw.
-+  # /system is the read-only hal-droid tree, so create the hw module alias at
-+  # build time rather than relying on a boot-time symlink into the store.
-+  mkdir -p $out/usr/libexec/hal-droid/system/lib/hw
-+  ln -sfn /vendor/lib/hw/gps.default.so \
-+    $out/usr/libexec/hal-droid/system/lib/hw/gps.default.so
-+''
++    # GNSS (#342): the vendor provides gps.default.so under /vendor/lib/hw.
++    # /system is the read-only hal-droid tree, so create the hw module alias at
++    # build time rather than relying on a boot-time symlink into the store.
++    mkdir -p $out/usr/libexec/hal-droid/system/lib/hw
++    ln -sfn /vendor/lib/hw/gps.default.so \
++      $out/usr/libexec/hal-droid/system/lib/hw/gps.default.so
++  ''
 diff --git a/devices/fossil-hoki/hybris.nix b/devices/fossil-hoki/hybris.nix
 new file mode 100644
 index 00000000..6c9f6620

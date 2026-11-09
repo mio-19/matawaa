@@ -44,10 +44,10 @@ Subject: [PATCH] asteroid: add native TDLib Telegram client
  create mode 100644 overlay/asteroidos/telegram/src/telegramclient.h
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index e654401d..00015551 100644
+index 2277c2ce..adefb02d 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -152,12 +152,19 @@ rec {
+@@ -165,12 +165,19 @@ rec {
      inherit (pkgs) wpewebkit;
    };
  
