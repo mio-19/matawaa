@@ -6,7 +6,7 @@ Subject: [PATCH] fossil-hoki: add Gen 6 hardware firmware audio and family
 
 ---
  devices/fossil-firefish/default.nix           |  56 ++
- devices/fossil-hoki/android-init.nix          | 232 +++++++
+ devices/fossil-hoki/android-init.nix          | 224 +++++++
  devices/fossil-hoki/android-system-data.nix   |  28 +
  devices/fossil-hoki/audio-modules.nix         | 122 ++++
  devices/fossil-hoki/default.nix               | 588 ++++++++++++++++++
@@ -22,7 +22,7 @@ Subject: [PATCH] fossil-hoki: add Gen 6 hardware firmware audio and family
  devices/fossil-hoki/wlan/wakelock.h           |   3 +
  devices/fossil-ray/default.nix                |  56 ++
  devices/fossil-triggerfish/default.nix        |  56 ++
- 17 files changed, 1555 insertions(+)
+ 17 files changed, 1547 insertions(+)
  create mode 100644 devices/fossil-firefish/default.nix
  create mode 100644 devices/fossil-hoki/android-init.nix
  create mode 100644 devices/fossil-hoki/android-system-data.nix
@@ -105,10 +105,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..14061645
+index 00000000..43d21df0
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,224 @@
 +{
 +  lib,
 +  pkgs,
@@ -214,14 +214,6 @@ index 00000000..14061645
 +    unitConfig.Conflicts = [ "shutdown.target" ];
 +    serviceConfig = {
 +      Type = "simple";
-+      # Android init's shutdown waits for the vendor modem to acknowledge
-+      # power-down, which never happens on this device (bgcom_dev
-+      # "Time out on modem down event", then pil-q6v5-mss "halt timeout").
-+      # Without a bound the stop job sits for the default 90 s, so a reboot
-+      # looks hung on a blank screen until systemd finally SIGKILLs the
-+      # whole Android cgroup. Bound it instead; the kernel gets the same
-+      # SIGKILLed init either way, just 75 s sooner.
-+      TimeoutStopSec = "15s";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
 +        ln_force() {
 +          local target="$1"

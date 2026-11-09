@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 13:54:03 +1100
+Subject: [PATCH] wlan-faster-boot: load wlan after firmware setup
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+boot.kernelModules loaded the prima wlan module at sysinit, before
+wlan-firmware-hoki.service symlinked the vendor firmware and powered WCNSS
+up, so every boot waited ~10 s for WCNSS, failed with "No such device",
+and held sysinit.target for that time — a pure stall, since the module is
+loaded again later by wlan-firmware-hoki.service. Drop the early load;
+Wi-Fi still comes up via wlan-firmware-hoki.service and boot is ~5 s
+shorter.
+---
+ devices/fossil-hoki/wlan.nix | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/devices/fossil-hoki/wlan.nix b/devices/fossil-hoki/wlan.nix
+index 18d05338..10b15f15 100644
+--- a/devices/fossil-hoki/wlan.nix
++++ b/devices/fossil-hoki/wlan.nix
+@@ -105,8 +105,10 @@ let
+   };
+ in
+ {
+-  # wlan-firmware-hoki.sh symlinks the vendor firmware and opens
+-  # /dev/wcnss_wlan before this module is loaded.
++  # wlan-firmware-hoki.sh symlinks the vendor firmware, powers WCNSS up and
++  # loads this module itself. Do not also list it in boot.kernelModules:
++  # systemd-modules-load runs before those symlinks exist, so the prima probe
++  # waits ~10 s for WCNSS, fails with "No such device", and holds
++  # sysinit.target (and therefore the whole boot) for that time.
+   boot.extraModulePackages = [ wlanModule ];
+-  boot.kernelModules = [ "wlan" ];
+ }

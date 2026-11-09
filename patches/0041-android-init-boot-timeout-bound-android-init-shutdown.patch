@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Mon, 9 Nov 2026 13:53:34 +1100
+Subject: [PATCH] android-init-boot-timeout: bound android-init shutdown
+
+Android init's stop waits for the vendor modem to acknowledge power-down,
+which never happens on this device (bgcom_dev "Time out on modem down
+event", then pil-q6v5-mss halt timeouts), so with the Bluetooth HAL running
+every reboot sat on a blank screen for the default 90s TimeoutStopSec
+before systemd SIGKILLed the Android cgroup. Bound the stop job to 15s;
+the same SIGKILL now arrives 75s sooner and the reboot still completes
+cleanly.
+---
+ devices/fossil-hoki/android-init.nix | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
+index 43d21df0..14061645 100644
+--- a/devices/fossil-hoki/android-init.nix
++++ b/devices/fossil-hoki/android-init.nix
+@@ -103,6 +103,14 @@ in
+     unitConfig.Conflicts = [ "shutdown.target" ];
+     serviceConfig = {
+       Type = "simple";
++      # Android init's shutdown waits for the vendor modem to acknowledge
++      # power-down, which never happens on this device (bgcom_dev
++      # "Time out on modem down event", then pil-q6v5-mss "halt timeout").
++      # Without a bound the stop job sits for the default 90 s, so a reboot
++      # looks hung on a blank screen until systemd finally SIGKILLs the
++      # whole Android cgroup. Bound it instead; the kernel gets the same
++      # SIGKILLed init either way, just 75 s sooner.
++      TimeoutStopSec = "15s";
+       ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
+         ln_force() {
+           local target="$1"
