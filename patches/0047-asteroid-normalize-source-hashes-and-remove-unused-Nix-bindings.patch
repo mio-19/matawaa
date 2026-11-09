@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 3dd758bea8bbe39d687d03d4f6f15948c336df45 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Mon, 9 Nov 2026 18:46:49 +1100
 Subject: [PATCH] asteroid: normalize source hashes and remove unused Nix
@@ -13,11 +13,11 @@ Subject: [PATCH] asteroid: normalize source hashes and remove unused Nix
  overlay/asteroidos/browser/default.nix        |  4 +--
  overlay/asteroidos/dsme/default.nix           |  6 ++--
  overlay/asteroidos/kcalendarcore/default.nix  |  6 ++--
- overlay/asteroidos/keepalive/default.nix      |  6 ++--
+ overlay/asteroidos/keepalive/default.nix      |  8 ++---
  overlay/asteroidos/kiwix/default.nix          |  4 +--
  overlay/asteroidos/libconnman-qt/default.nix  |  6 ++--
  overlay/asteroidos/libdsme/default.nix        |  6 ++--
- overlay/asteroidos/libiodata/default.nix      |  6 ++--
+ overlay/asteroidos/libiodata/default.nix      |  7 +++--
  overlay/asteroidos/libiphb/default.nix        |  6 ++--
  overlay/asteroidos/libngf/default.nix         |  6 ++--
  overlay/asteroidos/mce-qt6/default.nix        |  6 ++--
@@ -33,11 +33,11 @@ Subject: [PATCH] asteroid: normalize source hashes and remove unused Nix
  overlay/asteroidos/sensorfw/default.nix       |  4 +--
  overlay/asteroidos/swclock-offset/default.nix |  4 +--
  overlay/asteroidos/telegram/default.nix       |  4 +--
- overlay/asteroidos/timed-qt6/default.nix      |  2 +-
+ overlay/asteroidos/timed-qt6/default.nix      | 13 ++++++---
  overlay/asteroidos/usb-moded-dev/default.nix  |  2 +-
  overlay/asteroidos/usb-moded-qt6/default.nix  |  6 ++--
  overlay/asteroidos/wpewebkit-qt/default.nix   |  6 ++--
- 32 files changed, 98 insertions(+), 102 deletions(-)
+ 32 files changed, 108 insertions(+), 106 deletions(-)
 
 diff --git a/overlay/asteroidos/amber-mpris/default.nix b/overlay/asteroidos/amber-mpris/default.nix
 index bcdd9f13..f38be0d3 100644
@@ -373,7 +373,7 @@ index 9b875b0d..c4294dcf 100644
 -})
 +}
 diff --git a/overlay/asteroidos/keepalive/default.nix b/overlay/asteroidos/keepalive/default.nix
-index 0be42b5b..f4cd5b27 100644
+index 0be42b5b..c74b1eb0 100644
 --- a/overlay/asteroidos/keepalive/default.nix
 +++ b/overlay/asteroidos/keepalive/default.nix
 @@ -13,7 +13,7 @@
@@ -394,6 +394,15 @@ index 0be42b5b..f4cd5b27 100644
    };
  
    strictDeps = true;
+@@ -111,7 +111,7 @@ stdenv.mkDerivation (finalAttrs: {
+     Name: libkeepalive
+     Description: Nemomobile CPU/display keepalive development files
+     Version: 1.2.6
+-    Requires: Qt6Core Qt6DBus
++    Requires: Qt6Core Qt6DBus libiphb
+     Libs: -L''${libdir} -lkeepalive
+     Cflags: -I''${includedir}
+     EOF
 @@ -128,4 +128,4 @@ stdenv.mkDerivation (finalAttrs: {
      license = licenses.lgpl21Only;
      platforms = platforms.linux;
@@ -476,7 +485,7 @@ index 2278e470..0599b9f4 100644
 -})
 +}
 diff --git a/overlay/asteroidos/libiodata/default.nix b/overlay/asteroidos/libiodata/default.nix
-index fb890d8a..14f19857 100644
+index fb890d8a..7f1a4590 100644
 --- a/overlay/asteroidos/libiodata/default.nix
 +++ b/overlay/asteroidos/libiodata/default.nix
 @@ -13,7 +13,7 @@
@@ -497,7 +506,15 @@ index fb890d8a..14f19857 100644
    };
  
    strictDeps = true;
-@@ -115,4 +115,4 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -92,6 +92,7 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+     configure_file(iodata-qt6.pc.in iodata-qt6.pc @ONLY)
+     install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/iodata-qt6.pc DESTINATION lib/pkgconfig)
++    install(FILES ''${CMAKE_CURRENT_SOURCE_DIR}/iodata-qt6.prf DESTINATION lib/qt-6/mkspecs/features)
+     EOF
+ 
+         cat << "EOF" > iodata-qt6.pc.in
+@@ -115,4 +116,4 @@ stdenv.mkDerivation (finalAttrs: {
      license = licenses.lgpl21Plus;
      platforms = platforms.linux;
    };
@@ -888,7 +905,7 @@ index 19044600..d8f64f20 100644
 -})
 +}
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
-index 99405259..cd6e7f79 100644
+index 99405259..91976bc9 100644
 --- a/overlay/asteroidos/timed-qt6/default.nix
 +++ b/overlay/asteroidos/timed-qt6/default.nix
 @@ -27,7 +27,7 @@ stdenv.mkDerivation (finalAttrs: {
@@ -900,6 +917,45 @@ index 99405259..cd6e7f79 100644
    };
  
    strictDeps = true;
+@@ -101,7 +101,7 @@ stdenv.mkDerivation (finalAttrs: {
+       ''${IODATA_INCLUDE_DIRS}
+     )
+     target_link_libraries(timed-qt6 PUBLIC Qt6::Core Qt6::DBus ''${IODATA_LIBRARIES} rt)
+-    set_target_properties(timed-qt6 PROPERTIES VERSION 3.6.0 SOVERSION 3)
++    set_target_properties(timed-qt6 PROPERTIES VERSION 0.3.6 SOVERSION 0)
+ 
+     set(VOLAND_SRC
+       src/voland/interface.h
+@@ -218,6 +218,11 @@ stdenv.mkDerivation (finalAttrs: {
+       ''${CMAKE_CURRENT_BINARY_DIR}/timed-voland-qt6.pc
+       DESTINATION lib/pkgconfig
+     )
++    install(FILES
++      src/lib/timed-qt6.prf
++      src/voland/timed-voland-qt6.prf
++      DESTINATION lib/qt-6/mkspecs/features
++    )
+     EOF
+ 
+         cat << "EOF" > timed-qt6.pc.in
+@@ -228,7 +233,7 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+     Name: timed-qt6
+     Description: Timed Qt6 client library
+-    Version: 3.6.0
++    Version: 3.6
+     Requires: Qt6Core Qt6DBus iodata-qt6
+     Libs: -L''${libdir} -ltimed-qt6
+     Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
+@@ -242,7 +247,7 @@ stdenv.mkDerivation (finalAttrs: {
+ 
+     Name: timed-voland-qt6
+     Description: Timed Voland Qt6 communication library
+-    Version: 3.6.0
++    Version: 3.6
+     Requires: Qt6Core Qt6DBus timed-qt6
+     Libs: -L''${libdir} -ltimed-voland-qt6
+     Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
 diff --git a/overlay/asteroidos/usb-moded-dev/default.nix b/overlay/asteroidos/usb-moded-dev/default.nix
 index 6f957515..21b65afd 100644
 --- a/overlay/asteroidos/usb-moded-dev/default.nix
