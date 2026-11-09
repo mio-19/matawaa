@@ -1,6 +1,6 @@
 # Patch review — 2026-11-09
 
-This review covers the 45-patch baseline and the follow-up fixes exported after it. It checks upstream recipe parity, Nix packaging, dependency declarations, and reproducible patch application. A successful build is not hardware validation or a claim that the entire downstream tree is ready for nixpkgs submission.
+This review covers the 43-patch baseline and the follow-up fixes exported after it. It checks upstream recipe parity, Nix packaging, dependency declarations, and reproducible patch application. A successful build is not hardware validation or a claim that the entire downstream tree is ready for nixpkgs submission.
 
 ## Upstream references
 
@@ -36,7 +36,7 @@ The baseline pins AsteroidOS's current `meta-asteroid` revision, `c84c0bbd731f9d
 | 0027–0029: old-systemd and shared device integration | Preserve kernel compatibility work; rebuilding does not prove old-kernel runtime behavior. |
 | 0030–0038: vendor and experimental mainline devices | Preserve hardware source pins, firmware inputs, DTBs/DTS files, and device-specific fixes. No blanket kernel or firmware upgrade without device testing. |
 | 0039–0043: installation, desktop, boot ordering | Preserve intentional NixOS deployment and boot integration. Exercise the resulting Fossil Hoki system build. |
-| 0044–0045: keyboard availability and embedded camera QML | Preserve the functional fixes. Camera remains compiled from its embedded main QML resource. |
+| Keyboard availability is folded into patch 0021 and the camera QML resource fix is folded into patch 0022. These changes remain functional diffs, without patch-only whitespace cleanup. |
 
 ## Remaining findings and validation limits
 
@@ -47,15 +47,15 @@ The baseline pins AsteroidOS's current `meta-asteroid` revision, `c84c0bbd731f9d
 
 ## Validation
 
-- Applied all 45 baseline patches to a fresh checkout of the locked Mobile NixOS revision; its tree matched the working baseline exactly.
+- Applied all 43 baseline patches to a fresh checkout of the locked Mobile NixOS revision; its tree matched the working baseline exactly.
 - Cross-built qml-asteroid with the real launch cache, bluebinder, and the virtual keyboard for Fossil Hoki.
 - Cross-built camera and hackwatch; checked the installed keyboard helper.
 - Ran nixfmt, deadnix, and statix over the AsteroidOS overlay and checked the touched watch modules.
-- Applied follow-up patches 0046–0049 to the clean replay checkout. All 49 patches apply without three-way fallback, and the resulting tree exactly matches the committed working checkout.
+- Applied the four review follow-ups after folding the keyboard and camera fixes into their owning patches. All 47 patches apply without three-way fallback, and the resulting tree exactly matches the committed working checkout.
 - Built the final Fossil Hoki system: `/nix/store/x30cqpmnjj0a5cym5x1b14kz6cw7f8av-nixos-system-nixos-26.11pre-git`.
 - Evaluated the complete system derivations for `oppo-beluga`, `google-aurora`, and `fossil-hoki-mainline`.
 - Audited the launch-cache library, Qt booster, and Asteroid app library (7 ELF paths in a 2,014-ELF runtime closure): no missing NEEDED entries or unresolved symbols. Confirmed the launch-cache package does not reference the build machine's Qt runtime.
 - Generated `machine.conf` with `borderGestureWidth = 0.15` and `hasWlan = false`; checked the upstream-compatible sections, boolean values, and fraction. Confirmed that `borderGestureWidth = 1.5` fails option validation.
 - Ran `bash -n` on the corrected ELF audit script and reproduced the original SIGPIPE false positive with a large SONAME fixture.
 
-Follow-up changes are exported as patches 0046–0049. The root flake's unused module arguments and the ELF audit fix are direct repository edits. Existing feature patches 0044–0045 are retained. No review changes were deployed or published.
+Follow-up changes are exported as patches 0044–0047; keyboard and camera fixes remain in patches 0021 and 0022. The root flake's unused module arguments and the ELF audit fix are direct repository edits. The feature fixes are retained in their owning patches. No review changes were deployed or published.

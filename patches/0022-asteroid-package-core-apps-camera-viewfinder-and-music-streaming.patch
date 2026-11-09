@@ -5,14 +5,14 @@ Subject: [PATCH] asteroid: package core apps camera viewfinder and music
  streaming
 
 ---
- .../apps/camera/camera-companion.patch        | 567 ++++++++++++++++++
+ .../apps/camera/camera-companion.patch        | 565 ++++++++++++++++++
  .../apps/camera/remotecamerabridge.cpp        | 130 ++++
  .../apps/camera/remotecamerabridge.h          |  61 ++
  overlay/asteroidos/apps/default.nix           | 129 ++++
  .../apps/music-ytmusic-streaming.patch        | 306 ++++++++++
  overlay/asteroidos/assets/default.nix         | 196 ++++++
  overlay/asteroidos/default.nix                |  12 +
- 7 files changed, 1401 insertions(+)
+ 7 files changed, 1399 insertions(+)
  create mode 100644 overlay/asteroidos/apps/camera/camera-companion.patch
  create mode 100644 overlay/asteroidos/apps/camera/remotecamerabridge.cpp
  create mode 100644 overlay/asteroidos/apps/camera/remotecamerabridge.h
@@ -22,10 +22,10 @@ Subject: [PATCH] asteroid: package core apps camera viewfinder and music
 
 diff --git a/overlay/asteroidos/apps/camera/camera-companion.patch b/overlay/asteroidos/apps/camera/camera-companion.patch
 new file mode 100644
-index 00000000..1329c71c
+index 00000000..5c709868
 --- /dev/null
 +++ b/overlay/asteroidos/apps/camera/camera-companion.patch
-@@ -0,0 +1,567 @@
+@@ -0,0 +1,565 @@
 +diff --git a/CMakeLists.txt b/CMakeLists.txt
 +index a9aa7ca..f732de5 100644
 +--- a/CMakeLists.txt
@@ -43,15 +43,13 @@ index 00000000..1329c71c
 +index 7d4bdd9..83a5627 100644
 +--- a/src/CMakeLists.txt
 ++++ b/src/CMakeLists.txt
-+@@ -1,17 +1,20 @@
++@@ -1,17 +1,19 @@
 +-add_library(asteroid-camera main.cpp)
 ++add_library(asteroid-camera main.cpp remotecamerabridge.cpp)
 + set_target_properties(asteroid-camera PROPERTIES PREFIX "")
 + 
 + asteroid_app_qml_module(asteroid-camera
-+-	main.qml
-++	URI org.asteroid.camera
-++	VERSION 1.0
++ 	main.qml
 + )
 + 
 + target_link_libraries(
