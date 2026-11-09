@@ -14,7 +14,7 @@ Subject: [PATCH] examples: add AsteroidOS desktop and smartwatch system
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..d684d006
+index 00000000..d5d82014
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
 @@ -0,0 +1,910 @@
@@ -501,7 +501,7 @@ index 00000000..d684d006
 +      # Proxies the Android binder based Bluetooth HAL to BlueZ over vhci.
 +      systemd.services.bluebinder = {
 +        description = "Android binder based bluetooth proxy (vhci)";
-+        wantedBy = [ "graphical.target" ];
++        wantedBy = [ "multi-user.target" ];
 +        after = [
 +          "android-init.service"
 +          "dbus.service"
