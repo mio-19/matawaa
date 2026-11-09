@@ -4,16 +4,16 @@ Date: Mon, 9 Nov 2026 10:55:51 +1100
 Subject: [PATCH] asteroid: add Bluetooth sync find-phone and companion bridge
 
 ---
- .../asteroid-btsyncd/app-bridge.patch         |  85 +++++
+ .../asteroid-btsyncd/app-bridge.patch         |  73 +++++
  .../asteroid-btsyncd/appbridgeservice.cpp     | 300 ++++++++++++++++++
  .../asteroid-btsyncd/appbridgeservice.h       |  86 +++++
  .../asteroid-btsyncd/camera-shutter.sh        |  19 ++
  .../asteroidos/asteroid-btsyncd/default.nix   |  85 +++++
- .../asteroid-btsyncd/find-phone.patch         | 206 ++++++++++++
+ .../asteroid-btsyncd/find-phone.patch         | 195 ++++++++++++
  .../asteroidos/asteroid-btsyncd/find-phone.sh |  37 +++
  .../org.asteroidos.btsyncd.conf               |  16 +
  overlay/asteroidos/default.nix                |   4 +
- 9 files changed, 838 insertions(+)
+ 9 files changed, 815 insertions(+)
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
  create mode 100644 overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
@@ -25,10 +25,10 @@ Subject: [PATCH] asteroid: add Bluetooth sync find-phone and companion bridge
 
 diff --git a/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch b/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
 new file mode 100644
-index 00000000..a0117d6c
+index 00000000..7f5da005
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,73 @@
 +diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
 +index 758b697..4ff5042 100644
 +--- a/src/CMakeLists.txt
@@ -50,18 +50,6 @@ index 00000000..a0117d6c
 + 
 + add_executable(asteroid-btsyncd ${SRC} ${HEADERS})
 +diff --git a/src/advertisement.cpp b/src/advertisement.cpp
-+index 18cd9e6..db95670 100644
-+--- a/src/advertisement.cpp
-++++ b/src/advertisement.cpp
-+@@ -25,6 +25,7 @@ Advertisement::Advertisement(QDBusConnection bus, QObject *parent) : QObject(par
-+     mIncludeTxPower = false;
-+     addServiceUuid("00000000-0000-0000-0000-00a57e401d05");
-+     addServiceUuid(FINDPHONE_UUID);
-++    addServiceUuid(APP_BRIDGE_UUID);
-+     mDiscoverable = true;
-+ 
-+     bus.registerObject(mPath, this, QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllProperties);
-+diff --git a/src/application.cpp b/src/application.cpp
 +index 019f16a..9df9581 100644
 +--- a/src/application.cpp
 ++++ b/src/application.cpp
@@ -630,21 +618,10 @@ index 00000000..770dc95b
 +})
 diff --git a/overlay/asteroidos/asteroid-btsyncd/find-phone.patch b/overlay/asteroidos/asteroid-btsyncd/find-phone.patch
 new file mode 100644
-index 00000000..20c1e484
+index 00000000..b8c94be0
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/find-phone.patch
-@@ -0,0 +1,206 @@
-+diff -ruN btsync-orig/src/advertisement.cpp btsync-mod/src/advertisement.cpp
-+--- btsync-orig/src/advertisement.cpp	2026-10-18 08:44:27.427477548 +1100
-++++ btsync-mod/src/advertisement.cpp	2026-10-18 08:44:49.635530613 +1100
-+@@ -24,6 +24,7 @@
-+     mAdType = "peripheral";
-+     mIncludeTxPower = false;
-+     addServiceUuid("00000000-0000-0000-0000-00a57e401d05");
-++    addServiceUuid(FINDPHONE_UUID);
-+     mDiscoverable = true;
-+ 
-+     bus.registerObject(mPath, this, QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllProperties);
+@@ -0,0 +1,195 @@
 +diff -ruN btsync-orig/src/application.cpp btsync-mod/src/application.cpp
 +--- btsync-orig/src/application.cpp	2026-10-18 08:44:27.427477548 +1100
 ++++ btsync-mod/src/application.cpp	2026-10-18 08:44:49.636530616 +1100
