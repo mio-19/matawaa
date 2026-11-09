@@ -11,12 +11,12 @@ Subject: [PATCH] asteroid: package middleware and device services
  overlay/asteroidos/default.nix                | 113 ++++
  overlay/asteroidos/dsme/default.nix           | 107 ++++
  overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
- overlay/asteroidos/keepalive/default.nix      | 131 ++++
+ overlay/asteroidos/keepalive/default.nix      |  93 +++
  .../patches/0001-Disable-tests.patch          |  23 +
  .../keepalive/patches/0002-Fix-build.patch    |  23 +
  overlay/asteroidos/libconnman-qt/default.nix  | 139 ++++
  overlay/asteroidos/libdsme/default.nix        |  82 +++
- overlay/asteroidos/libiodata/default.nix      | 118 ++++
+ overlay/asteroidos/libiodata/default.nix      |  71 ++
  overlay/asteroidos/libiphb/default.nix        |  54 ++
  overlay/asteroidos/libncicore/default.nix     |  71 ++
  overlay/asteroidos/libnciplugin/default.nix   |  90 +++
@@ -51,11 +51,11 @@ Subject: [PATCH] asteroid: package middleware and device services
  overlay/asteroidos/sensorfw/CMakeLists.txt    | 264 ++++++++
  overlay/asteroidos/sensorfw/default.nix       |  71 ++
  overlay/asteroidos/swclock-offset/default.nix |  30 +
- overlay/asteroidos/timed-qt6/default.nix      | 269 ++++++++
+ overlay/asteroidos/timed-qt6/default.nix      | 109 ++++
  .../asteroidos/udev-droid-system/default.nix  |  24 +
  overlay/asteroidos/usb-moded-dev/default.nix  |  42 ++
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
- 51 files changed, 5748 insertions(+)
+ 51 files changed, 5503 insertions(+)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -480,7 +480,7 @@ index 00000000..e38bf0b5
 +  };
 +})
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
-index 7ce4a083..b21365b0 100644
+index 7ce4a083..46307a2d 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
 @@ -3,7 +3,15 @@
@@ -578,7 +578,7 @@ index 7ce4a083..b21365b0 100644
 +  };
 +
 +  keepalive = callPackage ./keepalive {
-+    inherit mce-dev libiphb;
++    inherit mce-dev libiphb metaAsteroidSrc;
 +  };
 +  timed-qt6 = callPackage ./timed-qt6 {
 +    inherit libiodata metaAsteroidSrc;
@@ -781,10 +781,10 @@ index 00000000..9b875b0d
 +})
 diff --git a/overlay/asteroidos/keepalive/default.nix b/overlay/asteroidos/keepalive/default.nix
 new file mode 100644
-index 00000000..0be42b5b
+index 00000000..77bda95d
 --- /dev/null
 +++ b/overlay/asteroidos/keepalive/default.nix
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,93 @@
 +# Nemo keepalive background activity scheduling library and QML plugin
 +# Upstream repository: https://github.com/sailfishos/nemo-keepalive
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-keepalive/nemo-keepalive_git.bb
@@ -792,15 +792,15 @@ index 00000000..0be42b5b
 +  lib,
 +  stdenv,
 +  fetchFromGitHub,
-+  cmake,
 +  pkg-config,
 +  qt6,
 +  mce-dev,
 +  libiphb,
 +  buildPackages,
++  metaAsteroidSrc,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "keepalive";
 +  version = "1.2.6";
 +
@@ -814,8 +814,12 @@ index 00000000..0be42b5b
 +  strictDeps = true;
 +  dontWrapQtApps = true;
 +
++  patches = [
++    "${metaAsteroidSrc}/recipes-nemomobile/nemo-keepalive/nemo-keepalive/0001-Disable-tests.patch"
++    "${metaAsteroidSrc}/recipes-nemomobile/nemo-keepalive/nemo-keepalive/0002-Fix-build.patch"
++  ];
++
 +  nativeBuildInputs = [
-+    cmake
 +    pkg-config
 +  ];
 +
@@ -826,85 +830,43 @@ index 00000000..0be42b5b
 +    libiphb
 +  ];
 +
-+  cmakeFlags = [
-+    "-DQt6Qml_DIR=${qt6.qtdeclarative}/lib/cmake/Qt6Qml"
-+    "-DQt6QmlTools_DIR=${buildPackages.qt6.qtdeclarative}/lib/cmake/Qt6QmlTools"
-+  ];
-+
-+  preConfigure = ''
-+    cd lib
-+    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -p mceiface.h:mceiface.cpp mceiface.xml
-+    cd ..
-+  '';
++  propagatedBuildInputs = [ libiphb ];
 +
 +  postPatch = ''
-+        cat << "EOF" > CMakeLists.txt
-+    cmake_minimum_required(VERSION 3.16)
-+    project(keepalive LANGUAGES CXX)
-+    set(CMAKE_CXX_STANDARD 17)
-+    set(CMAKE_AUTOMOC ON)
-+
-+    find_package(Qt6 REQUIRED COMPONENTS Core DBus Qml)
-+    find_package(PkgConfig REQUIRED)
-+    pkg_check_modules(IPHB REQUIRED IMPORTED_TARGET libiphb)
-+    pkg_check_modules(MCE REQUIRED IMPORTED_TARGET mce)
-+
-+    set(LIB_SRC
-+      lib/displayblanking.cpp
-+      lib/displayblanking_p.cpp
-+      lib/backgroundactivity.cpp
-+      lib/backgroundactivity_p.cpp
-+      lib/mceiface.cpp
-+      lib/heartbeat.cpp
-+    )
-+
-+    set(PUBLIC_HEADERS
-+      lib/displayblanking.h
-+      lib/backgroundactivity.h
-+    )
-+
-+    add_library(keepalive SHARED ''${LIB_SRC} ''${PUBLIC_HEADERS})
-+    target_include_directories(keepalive PUBLIC
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/lib>
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_BINARY_DIR}>
-+      $<INSTALL_INTERFACE:include/keepalive>
-+    )
-+    target_link_libraries(keepalive PUBLIC Qt6::Core Qt6::DBus PkgConfig::IPHB PkgConfig::MCE)
-+    set_target_properties(keepalive PROPERTIES VERSION 1.2.6 SOVERSION 1)
-+
-+    install(TARGETS keepalive DESTINATION lib)
-+    install(FILES ''${PUBLIC_HEADERS} DESTINATION include/keepalive)
-+
-+    configure_file(keepalive.pc.in keepalive.pc @ONLY)
-+    install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/keepalive.pc DESTINATION lib/pkgconfig)
-+
-+    add_library(keepaliveplugin MODULE
-+      plugin/plugin.cpp
-+      plugin/declarativebackgroundactivity.cpp
-+    )
-+    target_include_directories(keepaliveplugin PRIVATE lib plugin)
-+    target_link_libraries(keepaliveplugin PRIVATE Qt6::Core Qt6::Qml keepalive)
-+
-+    install(TARGETS keepaliveplugin LIBRARY DESTINATION lib/qt-6/qml/Nemo/KeepAlive)
-+    install(FILES plugin/qmldir plugin/plugins.qmltypes DESTINATION lib/qt-6/qml/Nemo/KeepAlive)
-+    EOF
-+
-+        cat << "EOF" > keepalive.pc.in
-+    prefix=@CMAKE_INSTALL_PREFIX@
-+    exec_prefix=''${prefix}
-+    libdir=''${prefix}/lib
-+    includedir=''${prefix}/include/keepalive
-+
-+    Name: libkeepalive
-+    Description: Nemomobile CPU/display keepalive development files
-+    Version: 1.2.6
-+    Requires: Qt6Core Qt6DBus
-+    Libs: -L''${libdir} -lkeepalive
-+    Cflags: -I''${includedir}
-+    EOF
++    substituteInPlace lib/lib.pro \
++      --replace-fail '$$[QT_INSTALL_LIBS]' '/lib' \
++      --replace-fail '/usr/include/keepalive' '/include/keepalive' \
++      --replace-fail 'pkgconfig.files = $$PWD/pkgconfig/keepalive.pc' "" \
++      --replace-fail 'pkgconfig.path  = $$target.path/pkgconfig' "" \
++      --replace-fail 'QMAKE_PKGCONFIG_LIBDIR      = $$target.path' "QMAKE_PKGCONFIG_LIBDIR = $out/lib" \
++      --replace-fail 'QMAKE_PKGCONFIG_INCDIR      = $$develheaders.path' "QMAKE_PKGCONFIG_INCDIR = $out/include/keepalive" \
++      --replace-fail 'QMAKE_PKGCONFIG_REQUIRES    = Qt$''${QT_MAJOR_VERSION}Core Qt$''${QT_MAJOR_VERSION}DBus' \
++                     'QMAKE_PKGCONFIG_REQUIRES = Qt6Core Qt6DBus libiphb' \
++      --replace-fail 'INSTALLS += target develheaders pkgconfig' 'INSTALLS += target develheaders'
++    substituteInPlace plugin/plugin.pro \
++      --replace-fail '$$[QT_INSTALL_QML]' '/lib/qt-6/qml'
++    substituteInPlace keepalive.pro \
++      --replace-fail '$$[QT_INSTALL_EXAMPLES]/keepalive' '/share/qt-6/examples/keepalive'
 +  '';
 +
++  configurePhase = ''
++    runHook preConfigure
++    export PATH="${buildPackages.qt6.qtbase}/bin:$PATH"
++    export QMAKEPATH="${qt6.qtbase.dev}:${qt6.qtdeclarative.dev}"
++    ${buildPackages.qt6.qtbase}/bin/qmake -early \
++      "QMAKE_CC=$CC" "QMAKE_CXX=$CXX" "QMAKE_LINK=$CXX" \
++      "QMAKE_AR=$AR cqs" "QMAKE_STRIP=$STRIP" \
++      "QMAKE_PKG_CONFIG=$PKG_CONFIG"
++    runHook postConfigure
++  '';
++
++  enableParallelBuilding = true;
++
++  installFlags = [ "INSTALL_ROOT=$(out)" ];
++
 +  postInstall = ''
++    substituteInPlace $out/lib/pkgconfig/keepalive.pc \
++      --replace-fail 'prefix=${buildPackages.qt6.qtbase}' 'prefix=$out'
 +    mkdir -p $out/lib/qt-6/qml/org/nemomobile
 +    ln -s ../../Nemo/KeepAlive $out/lib/qt-6/qml/org/nemomobile/keepalive
 +  '';
@@ -915,7 +877,7 @@ index 00000000..0be42b5b
 +    license = licenses.lgpl21Only;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch b/overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
 new file mode 100644
 index 00000000..fe431276
@@ -1209,10 +1171,10 @@ index 00000000..2278e470
 +})
 diff --git a/overlay/asteroidos/libiodata/default.nix b/overlay/asteroidos/libiodata/default.nix
 new file mode 100644
-index 00000000..fb890d8a
+index 00000000..308b398c
 --- /dev/null
 +++ b/overlay/asteroidos/libiodata/default.nix
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,71 @@
 +# Nemomobile's libiodata library
 +# Upstream repository: https://github.com/sailfishos/libiodata
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/libiodata/libiodata_git.bb
@@ -1220,15 +1182,14 @@ index 00000000..fb890d8a
 +  lib,
 +  stdenv,
 +  fetchFromGitHub,
-+  cmake,
-+  pkg-config,
 +  bison,
 +  flex,
 +  qt6,
 +  libxcrypt,
++  buildPackages,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "libiodata";
 +  version = "0.20.0";
 +
@@ -1240,13 +1201,11 @@ index 00000000..fb890d8a
 +  };
 +
 +  strictDeps = true;
++  dontWrapQtApps = true;
 +
 +  nativeBuildInputs = [
-+    cmake
-+    pkg-config
 +    bison
 +    flex
-+    qt6.wrapQtAppsHook
 +  ];
 +
 +  buildInputs = [
@@ -1255,74 +1214,30 @@ index 00000000..fb890d8a
 +  ];
 +
 +  postPatch = ''
-+        cat << "EOF" > CMakeLists.txt
-+    cmake_minimum_required(VERSION 3.16)
-+    project(iodata-qt6 LANGUAGES CXX)
-+    set(CMAKE_CXX_STANDARD 17)
-+    set(CMAKE_AUTOMOC ON)
-+
-+    find_package(Qt6 REQUIRED COMPONENTS Core)
-+    find_package(BISON REQUIRED)
-+    find_package(FLEX REQUIRED)
-+
-+    BISON_TARGET(DataLangParser src/datalang.y ''${CMAKE_CURRENT_BINARY_DIR}/parser.cpp DEFINES_FILE ''${CMAKE_CURRENT_BINARY_DIR}/parser.hpp)
-+    FLEX_TARGET(DataLangScanner src/datalang.l ''${CMAKE_CURRENT_BINARY_DIR}/tokens.cpp)
-+    ADD_FLEX_BISON_DEPENDENCY(DataLangScanner DataLangParser)
-+
-+    set(LIB_SRC
-+      src/iodata.cpp
-+      src/validator.cpp
-+      src/storage.cpp
-+      src/misc.cpp
-+      ''${BISON_DataLangParser_OUTPUTS}
-+      ''${FLEX_DataLangScanner_OUTPUTS}
-+    )
-+
-+    add_library(iodata-qt6 SHARED ''${LIB_SRC})
-+    target_include_directories(iodata-qt6 PUBLIC
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/src>
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_BINARY_DIR}>
-+      $<INSTALL_INTERFACE:include/iodata-qt6>
-+    )
-+    target_link_libraries(iodata-qt6 PUBLIC Qt6::Core)
-+    set_target_properties(iodata-qt6 PROPERTIES VERSION 0.20.0 SOVERSION 0)
-+
-+    install(TARGETS iodata-qt6 DESTINATION lib)
-+
-+    add_executable(iodata-qt6-type-to-c++ type-to-cxx/type-to-cxx.cpp)
-+    target_link_libraries(iodata-qt6-type-to-c++ PRIVATE iodata-qt6 crypt)
-+    install(TARGETS iodata-qt6-type-to-c++ DESTINATION bin)
-+
-+    install(FILES
-+      src/iodata.h
-+      src/validator.h
-+      src/storage.h
-+      src/misc.h
-+      src/log.h
-+      src/iodata
-+      src/validator
-+      src/storage
-+      DESTINATION include/iodata-qt6
-+    )
-+
-+    configure_file(iodata-qt6.pc.in iodata-qt6.pc @ONLY)
-+    install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/iodata-qt6.pc DESTINATION lib/pkgconfig)
-+    EOF
-+
-+        cat << "EOF" > iodata-qt6.pc.in
-+    prefix=@CMAKE_INSTALL_PREFIX@
-+    exec_prefix=''${prefix}
-+    libdir=''${prefix}/lib
-+    includedir=''${prefix}/include/iodata-qt6
-+
-+    Name: iodata-qt6
-+    Description: Nemomobile libiodata Qt6 library
-+    Version: 0.20.0
-+    Requires: Qt6Core
-+    Libs: -L''${libdir} -liodata-qt6
-+    Cflags: -I''${includedir}
-+    EOF
++    substituteInPlace root.pro \
++      --replace-fail 'SUBDIRS = src tests type-to-cxx' 'SUBDIRS = src type-to-cxx' \
++      --replace-fail '$$[QT_HOST_DATA]/mkspecs/features' '/lib/qt-6/mkspecs/features'
++    substituteInPlace src/src.pro \
++      --replace-fail '$$[QT_INSTALL_LIBS]' '/lib' \
++      --replace-fail '/usr/include/iodata-qt6' '/include/iodata-qt6'
++    substituteInPlace type-to-cxx/type-to-cxx.pro \
++      --replace-fail '/usr/bin' '/bin'
 +  '';
++
++  configurePhase = ''
++    runHook preConfigure
++    export IODATA_VERSION=20.0
++    export PATH="${buildPackages.qt6.qtbase}/bin:$PATH"
++    export QMAKEPATH="${qt6.qtbase.dev}"
++    ${buildPackages.qt6.qtbase}/bin/qmake -early \
++      "QMAKE_CC=$CC" "QMAKE_CXX=$CXX" "QMAKE_LINK=$CXX" \
++      "QMAKE_AR=$AR cqs" "QMAKE_STRIP=$STRIP"
++    runHook postConfigure
++  '';
++
++  enableParallelBuilding = true;
++
++  installFlags = [ "INSTALL_ROOT=$(out)" ];
 +
 +  meta = with lib; {
 +    description = "Nemomobile structured data library";
@@ -1330,7 +1245,7 @@ index 00000000..fb890d8a
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/libiphb/default.nix b/overlay/asteroidos/libiphb/default.nix
 new file mode 100644
 index 00000000..6da52c87
@@ -5725,10 +5640,10 @@ index 00000000..d7e91032
 +})
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
 new file mode 100644
-index 00000000..99405259
+index 00000000..0179e746
 --- /dev/null
 +++ b/overlay/asteroidos/timed-qt6/default.nix
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,109 @@
 +# Timed Qt6 daemon, Voland client library, and Timed client library
 +# Upstream repository: https://github.com/sailfishos/timed
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/timed
@@ -5736,7 +5651,6 @@ index 00000000..99405259
 +  lib,
 +  stdenv,
 +  fetchFromGitHub,
-+  cmake,
 +  pkg-config,
 +  qt6,
 +  systemd,
@@ -5750,7 +5664,7 @@ index 00000000..99405259
 +  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
 +  nativeIodata = if isCross then buildPackages.callPackage ../libiodata { } else libiodata;
 +in
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "timed-qt6";
 +  version = "3.6.0";
 +
@@ -5768,7 +5682,6 @@ index 00000000..99405259
 +  ];
 +
 +  nativeBuildInputs = [
-+    cmake
 +    pkg-config
 +    qt6.wrapQtAppsHook
 +    nativeIodata
@@ -5781,215 +5694,57 @@ index 00000000..99405259
 +    tzdata
 +  ];
 +
-+  # timed-qt6.pc Requires iodata-qt6, so consumers need its pkg-config file.
 +  propagatedBuildInputs = [ libiodata ];
 +
-+  preConfigure = ''
-+    mkdir -p include/timed-qt6 include/timed-voland-qt6
-+    cp src/lib/*.h include/timed-qt6/
-+    cp src/lib/event src/lib/interface src/lib/wallclock src/lib/qmacro include/timed-qt6/
-+    cp src/voland/reminder src/voland/interface src/voland/ta_interface src/voland/reminder.h src/voland/interface.h include/timed-voland-qt6/
-+    # NOTE: src/lib/hidden/exception is a qmake-only shim that makes the
-+    # in-tree "#include <exception>" resolve to timed-qt6/exception.h. Do not
-+    # install it: the public include dir is passed as -I to all consumers, and
-+    # a file named "exception" there shadows the C++ standard <exception>
-+    # header (breaking std::exception_ptr / <future> in every dependent).
-+    for t in queue config settings customization tzdata; do
-+      iodata-qt6-type-to-c++ src/server/$t.type -o src/server/iodata_$t.cpp -d src/server/$t.type.h
-+    done
-+  '';
-+
 +  postPatch = ''
-+        cat << "EOF" > CMakeLists.txt
-+    cmake_minimum_required(VERSION 3.16)
-+    project(timed-qt6 LANGUAGES CXX)
-+    set(CMAKE_CXX_STANDARD 17)
-+    set(CMAKE_AUTOMOC ON)
-+
-+    find_package(Qt6 REQUIRED COMPONENTS Core DBus)
-+    find_package(PkgConfig REQUIRED)
-+    pkg_check_modules(IODATA REQUIRED iodata-qt6)
-+    pkg_check_modules(SYSTEMD REQUIRED libsystemd)
-+
-+    set(LIB_SRC
-+      src/lib/interface.h
-+      src/lib/interface.cpp
-+      src/lib/event-io.cpp
-+      src/lib/event-pimple.cpp
-+      src/lib/exception.cpp
-+      src/lib/nanotime.cpp
-+      src/lib/aliases.cpp
-+      src/lib/wall-settings.cpp
-+      src/lib/wall-info.cpp
-+      src/lib/qmacro.cpp
-+    )
-+
-+    add_library(timed-qt6 SHARED ''${LIB_SRC})
-+    target_include_directories(timed-qt6 PUBLIC
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/include>
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/src/lib>
-+      $<INSTALL_INTERFACE:include/timed-qt6>
-+      ''${IODATA_INCLUDE_DIRS}
-+    )
-+    target_link_libraries(timed-qt6 PUBLIC Qt6::Core Qt6::DBus ''${IODATA_LIBRARIES} rt)
-+    set_target_properties(timed-qt6 PROPERTIES VERSION 3.6.0 SOVERSION 3)
-+
-+    set(VOLAND_SRC
-+      src/voland/interface.h
-+      src/voland/reminder.h
-+      src/voland/interface.cpp
-+      src/voland/reminder-pimple.cpp
-+    )
-+
-+    add_library(timed-voland-qt6 SHARED ''${VOLAND_SRC})
-+    target_include_directories(timed-voland-qt6 PUBLIC
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/include>
-+      $<BUILD_INTERFACE:''${CMAKE_CURRENT_SOURCE_DIR}/src/voland>
-+      $<INSTALL_INTERFACE:include/timed-voland-qt6>
-+    )
-+    target_link_libraries(timed-voland-qt6 PUBLIC Qt6::Core Qt6::DBus timed-qt6)
-+    set_target_properties(timed-voland-qt6 PROPERTIES VERSION 0.3.6 SOVERSION 0)
-+
-+    set(SERVER_SRC
-+      src/server/tzdata.h
-+      src/server/cellular.h
-+      src/server/settings.h
-+      src/server/csd.h
-+      src/server/adaptor.h
-+      src/server/timed.h
-+      src/server/state.h
-+      src/server/cluster.h
-+      src/server/machine.h
-+      src/server/singleshot.h
-+      src/server/pinguin.h
-+      src/server/unix-signal.h
-+      src/server/networktime.h
-+      src/server/networktimewatcher.h
-+      src/server/networkoperator.h
-+      src/server/networkregistrationwatcher.h
-+      src/server/networktimeinfo.h
-+      src/server/ofonomodemmanager.h
-+      src/server/modemwatcher.h
-+      src/server/ofonoconstants.h
-+      src/server/ntpcontroller.h
-+      src/server/credentials.h
-+      src/server/tz.h
-+      src/server/notification.h
-+      src/server/tzdata.cpp
-+      src/server/cellular.cpp
-+      src/server/csd.cpp
-+      src/server/cluster.cpp
-+      src/server/machine.cpp
-+      src/server/state.cpp
-+      src/server/main.cpp
-+      src/server/timed.cpp
-+      src/server/timeutil.cpp
-+      src/server/event.cpp
-+      src/server/misc.cpp
-+      src/server/settings.cpp
-+      src/server/pinguin.cpp
-+      src/server/unix-signal.cpp
-+      src/server/networktime.cpp
-+      src/server/networktimewatcher.cpp
-+      src/server/networkoperator.cpp
-+      src/server/networkregistrationwatcher.cpp
-+      src/server/networktimeinfo.cpp
-+      src/server/ofonomodemmanager.cpp
-+      src/server/modemwatcher.cpp
-+      src/server/ofonoconstants.cpp
-+      src/server/ntpcontroller.cpp
-+      src/server/credentials.cpp
-+      src/server/olson.cpp
-+      src/server/tz.cpp
-+      src/server/notification.cpp
-+      src/server/iodata_queue.cpp
-+      src/server/iodata_config.cpp
-+      src/server/iodata_settings.cpp
-+      src/server/iodata_customization.cpp
-+      src/server/iodata_tzdata.cpp
-+    )
-+
-+    add_executable(timed ''${SERVER_SRC})
-+    target_include_directories(timed PRIVATE
-+      ''${CMAKE_CURRENT_SOURCE_DIR}
-+      ''${CMAKE_CURRENT_SOURCE_DIR}/include
-+      ''${CMAKE_CURRENT_SOURCE_DIR}/src/server
-+      ''${CMAKE_CURRENT_SOURCE_DIR}/src/lib
-+      ''${CMAKE_CURRENT_SOURCE_DIR}/src/voland
-+      ''${IODATA_INCLUDE_DIRS}
-+      ''${SYSTEMD_INCLUDE_DIRS}
-+    )
-+    target_link_libraries(timed PRIVATE
-+      timed-qt6
-+      timed-voland-qt6
-+      Qt6::Core
-+      Qt6::DBus
-+      ''${IODATA_LIBRARIES}
-+      ''${SYSTEMD_LIBRARIES}
-+    )
-+
-+    add_executable(timedclient-qt6 tools/timedclient/timedclient.cpp)
-+    target_include_directories(timedclient-qt6 PRIVATE
-+      ''${CMAKE_CURRENT_SOURCE_DIR}/include
-+      ''${CMAKE_CURRENT_SOURCE_DIR}/src/lib
-+    )
-+    target_link_libraries(timedclient-qt6 PRIVATE timed-qt6 Qt6::Core Qt6::DBus)
-+
-+    install(TARGETS timed-qt6 timed-voland-qt6 DESTINATION lib)
-+    install(TARGETS timed timedclient-qt6 DESTINATION bin)
-+    file(GLOB HEADERS "include/timed-qt6/*")
-+    install(FILES ''${HEADERS} DESTINATION include/timed-qt6)
-+    file(GLOB VOLAND_HEADERS "include/timed-voland-qt6/*")
-+    install(FILES ''${VOLAND_HEADERS} DESTINATION include/timed-voland-qt6)
-+
-+    configure_file(timed-qt6.pc.in timed-qt6.pc @ONLY)
-+    configure_file(timed-voland-qt6.pc.in timed-voland-qt6.pc @ONLY)
-+    install(FILES
-+      ''${CMAKE_CURRENT_BINARY_DIR}/timed-qt6.pc
-+      ''${CMAKE_CURRENT_BINARY_DIR}/timed-voland-qt6.pc
-+      DESTINATION lib/pkgconfig
-+    )
-+    EOF
-+
-+        cat << "EOF" > timed-qt6.pc.in
-+    prefix=@CMAKE_INSTALL_PREFIX@
-+    exec_prefix=''${prefix}
-+    libdir=''${prefix}/lib
-+    includedir=''${prefix}/include/timed-qt6
-+
-+    Name: timed-qt6
-+    Description: Timed Qt6 client library
-+    Version: 3.6.0
-+    Requires: Qt6Core Qt6DBus iodata-qt6
-+    Libs: -L''${libdir} -ltimed-qt6
-+    Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
-+    EOF
-+
-+        cat << "EOF" > timed-voland-qt6.pc.in
-+    prefix=@CMAKE_INSTALL_PREFIX@
-+    exec_prefix=''${prefix}
-+    libdir=''${prefix}/lib
-+    includedir=''${prefix}/include/timed-voland-qt6
-+
-+    Name: timed-voland-qt6
-+    Description: Timed Voland Qt6 communication library
-+    Version: 3.6.0
-+    Requires: Qt6Core Qt6DBus timed-qt6
-+    Libs: -L''${libdir} -ltimed-voland-qt6
-+    Cflags: -I''${includedir} -I@CMAKE_INSTALL_PREFIX@/include
-+    EOF
-+
-+        substituteInPlace src/server/settings.cpp \
-+          --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
-+        substituteInPlace src/lib/aliases.cpp \
-+          --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
++    substituteInPlace timed.pro \
++      --replace-fail 'SUBDIRS += src tests tools' 'SUBDIRS += src tools'
++    substituteInPlace src/lib/lib.pro \
++      --replace-fail '$$[QT_INSTALL_LIBS]' '/lib' \
++      --replace-fail '/usr/include/timed-qt$''${QT_MAJOR_VERSION}' '/include/timed-qt$''${QT_MAJOR_VERSION}' \
++      --replace-fail '/usr/include/$$TARGET' '/include/$$TARGET' \
++      --replace-fail '$$[QT_INSTALL_DATA]/mkspecs/features' '/lib/qt-6/mkspecs/features'
++    printf '\nINCLUDEPATH += %s\n' '${libiodata}/include' >> src/lib/lib.pro
++    substituteInPlace src/voland/voland.pro \
++      --replace-fail '$$[QT_INSTALL_LIBS]' '/lib' \
++      --replace-fail '/usr/include/timed-voland-qt$''${QT_MAJOR_VERSION}' '/include/timed-voland-qt$''${QT_MAJOR_VERSION}' \
++      --replace-fail '$$[QT_INSTALL_DATA]/mkspecs/features' '/lib/qt-6/mkspecs/features'
++    substituteInPlace src/server/server.pro \
++      --replace-fail '$$(DESTDIR)/usr/bin' '/bin' \
++      --replace-fail '$$(DESTDIR)/etc/dbus-1/system.d' '/share/dbus-1/system.d' \
++      --replace-fail '$$(DESTDIR)/etc' '/etc' \
++      --replace-fail '$$(DESTDIR)/usr/lib/systemd/user' '/lib/systemd/user' \
++      --replace-fail 'INSTALLS += target timedrc dbusconf systemd oneshot' 'INSTALLS += target timedrc dbusconf systemd'
++    printf '\nINCLUDEPATH += %s\n' '${libiodata}/include' >> src/server/server.pro
++    substituteInPlace tools/timedclient/timedclient.pro \
++      --replace-fail '$$(DESTDIR)/usr/bin' '/bin'
++    cp ${metaAsteroidSrc}/recipes-nemomobile/timed/timed/timed.conf src/server/timed.conf
++    substituteInPlace src/server/settings.cpp \
++      --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
++    substituteInPlace src/lib/aliases.cpp \
++      --replace-fail '"/usr/share/zoneinfo/' "\"${tzdata}/share/zoneinfo/"
 +  '';
 +
-+  postInstall = ''
-+    install -Dm644 ${finalAttrs.src}/src/server/timed.rc $out/etc/timed.rc
-+    install -Dm644 ${metaAsteroidSrc}/recipes-nemomobile/timed/timed/timed.conf $out/share/dbus-1/system.d/timed.conf
-+    install -Dm644 ${finalAttrs.src}/src/server/timed.service $out/lib/systemd/user/timed.service
++  preConfigure = ''
++    mkdir -p src/h/timed-qt6
++    cp src/lib/qmacro.h src/h/timed-qt6/
 +  '';
++
++  configurePhase = ''
++    runHook preConfigure
++    export TIMED_VERSION=3.6
++    export PATH="${buildPackages.qt6.qtbase}/bin:$PATH"
++    export QMAKEPATH="${qt6.qtbase.dev}:${qt6.qtdeclarative.dev}:${nativeIodata}/lib/qt-6"
++    ${buildPackages.qt6.qtbase}/bin/qmake -early \
++      "QMAKE_CC=$CC" "QMAKE_CXX=$CXX" "QMAKE_LINK=$CXX" \
++      "QMAKE_AR=$AR cqs" "QMAKE_STRIP=$STRIP" \
++      "QMAKE_PKG_CONFIG=$PKG_CONFIG"
++    runHook postConfigure
++  '';
++
++  enableParallelBuilding = true;
++
++  installFlags = [ "INSTALL_ROOT=$(out)" ];
 +
 +  meta = with lib; {
 +    description = "Nemomobile time daemon and Qt6 client libraries";
@@ -5997,7 +5752,7 @@ index 00000000..99405259
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/udev-droid-system/default.nix b/overlay/asteroidos/udev-droid-system/default.nix
 new file mode 100644
 index 00000000..a4170a61
