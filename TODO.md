@@ -2,6 +2,12 @@
 
 This document catalogs and tracks remaining hardware, runtime, packaging, and architecture issues requiring physical hardware testing, on-device debugging, or ongoing vendor HAL reverse-engineering.
 
+## 0. Packaging and Runtime Follow-ups
+
+* **Fscrypt home-directory provisioning:** `modules/fscrypt.nix` exposes `user` and `policy`, but does not provision an encrypted home. Design and validate login, recovery, existing-data migration, and filesystem handling before enabling it on a device.
+* **SensorFW upstream qmake build:** The pinned source provides qmake projects, but the current Nix cross setup fails their `qtConfig()` checks. Keep the working local CMake build until a cross-compilation setup can build the upstream project and its plugins correctly.
+* **Cross-built QML module discovery:** Check the remaining target-tool discovery warnings against the installed QML modules on Fossil Hoki. Confirm actual imports on device before treating a warning as a missing module.
+
 ---
 
 ## 1. On-Device Issues Requiring Physical Hardware Verification

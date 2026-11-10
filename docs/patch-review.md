@@ -42,7 +42,7 @@ The baseline pins AsteroidOS's current `meta-asteroid` revision, `c84c0bbd731f9d
 ## Remaining findings and validation limits
 
 1. **Fscrypt configuration is incomplete.** `modules/fscrypt.nix` exposes `user` and `policy`, but neither controls directory provisioning. Enabling the module runs filesystem setup and PAM integration; it does not encrypt the named user's home directory. Do not describe that option as an established encrypted-home implementation. A migration design must handle existing data, login, recovery, and the actual home filesystem before enabling encryption on hardware.
-2. **Other Qt 6 middleware still uses locally maintained CMake projects.** Examples include libconnman-qt, mce-qt6, ngf-qt6, mlite, and sensorfw. These remain downstream build-system substitutions and need the same comparison against pinned source and AsteroidOS recipes. Keepalive, libiodata, and timed were cross-built as part of the Fossil Hoki system; no third-party consumers beyond that system were checked.
+2. **SensorFW still uses a local CMake project.** Its pinned upstream source only provides qmake projects, but the Nix cross qmake setup fails the project's `qtConfig()` checks. The local CMake project mirrors its daemon, libraries, and plugins; it remains a downstream build-system substitution. The other previously flagged middleware packages now use the pinned upstream qmake projects and AsteroidOS recipe patches. Keepalive, libiodata, and timed were cross-built as part of the Fossil Hoki system; no third-party consumers beyond that system were checked.
 3. **Hardware remains unverified.** Mainline device trees, Aurora's static vendor boot data, graphics pacing, Bluetooth pairing, suspend/wake, audio routing, and the actual camera/keyboard UX need on-device testing. This review does not deploy or flash a watch.
 4. **Cross QML discovery warns about modules.** The full cross build cannot always run target QML discovery tools. Those warnings are not proof of missing runtime modules; packaging and the system profile must provide them, and on-device imports still need checking.
 
@@ -60,4 +60,12 @@ The baseline pins AsteroidOS's current `meta-asteroid` revision, `c84c0bbd731f9d
 - Generated `machine.conf` with `borderGestureWidth = 0.15` and `hasWlan = false`; checked the upstream-compatible sections, boolean values, and fraction. Confirmed that `borderGestureWidth = 1.5` fails option validation.
 - Ran `bash -n` on the corrected ELF audit script and reproduced the original SIGPIPE false positive with a large SONAME fixture.
 
-Follow-up changes are exported as patches 0044–0047; keyboard and camera fixes remain in patches 0021 and 0022. The root flake's unused module arguments and the ELF audit fix are direct repository edits. The feature fixes are retained in their owning patches. No review changes were deployed or published.
+The patch series has since been consolidated and reorganized: the launch-cache and middleware packaging work is in patch 0044, the Hoki display refresh and MCU timepiece work are in patches 0048 and 0049, and keyboard and camera fixes remain in patches 0021 and 0022. The 2026-11-10 follow-up below records the current replay and build results. No review changes were deployed or published.
+
+## 2026-11-10 follow-up
+
+- Replaced handwritten CMake descriptions for libconnman-qt, mce-qt6, ngf-qt6, and mlite with their pinned upstream Qt 6 qmake projects. Reused AsteroidOS's pinned mlite and libngf-qt recipe patches and kept Nix install paths. Removed mlite's now-unused local CMake file.
+- Kept sensorfw on its local CMake project because the Nix qmake cross setup fails the upstream project's `qtConfig()` checks.
+- Cross-built the four restored qmake packages for Fossil Hoki and checked that their libraries, pkg-config files, and QML plugins install under `/lib` and `/lib/qt-6/qml` as expected. Rebuilt the Fossil Hoki system successfully with those packages.
+- Moved `0013-msm-fb-refresher-update-to-AsteroidOS-source.patch` from mobile-nixos upstream candidates to our customizations: the refresher supports the legacy-kernel path, which mobile-nixos upstream currently does not accept.
+- Replayed the categorized patch series after these changes. It applies cleanly and reproduces the committed Mobile NixOS worktree tree exactly.
