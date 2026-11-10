@@ -31,19 +31,28 @@ info "Checking out base upstream commit $UPSTREAM_COMMIT..."
 git -C "$WORK_DIR" fetch origin "$UPSTREAM_COMMIT" 2>/dev/null || true
 git -C "$WORK_DIR" checkout -B "$BRANCH_NAME" "$UPSTREAM_COMMIT"
 
-info "Applying patchset from $PATCHES_DIR..."
+info "Applying categorized patchset from $PATCHES_DIR..."
 
 PATCH_COUNT=0
-for patch in "$PATCHES_DIR"/*.patch; do
-    [ -f "$patch" ] || continue
-    patch_name="$(basename "$patch")"
-    info "Applying $patch_name..."
-    if ! git -C "$WORK_DIR" am --3way --ignore-whitespace "$patch"; then
-        error "Failed to apply patch: $patch_name"
-        error "Resolve conflict in $WORK_DIR and run 'git am --continue', or run 'git am --abort'."
-        exit 1
-    fi
-    PATCH_COUNT=$((PATCH_COUNT + 1))
+for category in \
+    00-mobile-nixos-upstream-candidates \
+    10-asteroidos-upstream-nightly \
+    20-our-customizations-apps \
+    25-asteroidos-upstream-nightly-apps \
+    30-our-customizations-devices \
+    40-our-experimental-customizations \
+    50-upstream-unmerged-development; do
+    for patch in "$PATCHES_DIR/$category"/*.patch; do
+        [ -f "$patch" ] || continue
+        patch_name="$(basename "$patch")"
+        info "Applying $category/$patch_name..."
+        if ! git -C "$WORK_DIR" am --3way --ignore-whitespace "$patch"; then
+            error "Failed to apply patch: $category/$patch_name"
+            error "Resolve conflict in $WORK_DIR and run 'git am --continue', or run 'git am --abort'."
+            exit 1
+        fi
+        PATCH_COUNT=$((PATCH_COUNT + 1))
+    done
 done
 
 success "Successfully applied $PATCH_COUNT patches to $WORK_DIR on branch $BRANCH_NAME."
