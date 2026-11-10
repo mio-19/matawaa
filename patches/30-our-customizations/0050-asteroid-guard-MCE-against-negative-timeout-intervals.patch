@@ -1,0 +1,93 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Matawaa <noreply@localhost>
+Date: Tue, 10 Nov 2026 20:23:45 +1100
+Subject: [PATCH 1/1] asteroid: guard MCE against negative timeout intervals
+
+---
+ overlay/asteroidos/mce/default.nix            |  1 +
+ ...09-reject-negative-timeout-intervals.patch | 64 +++++++++++++++++++
+ 2 files changed, 65 insertions(+)
+ create mode 100644 overlay/asteroidos/mce/patches/0009-reject-negative-timeout-intervals.patch
+
+diff --git a/overlay/asteroidos/mce/default.nix b/overlay/asteroidos/mce/default.nix
+index 129f9bfc..ef0625fd 100644
+--- a/overlay/asteroidos/mce/default.nix
++++ b/overlay/asteroidos/mce/default.nix
+@@ -62,6 +62,7 @@ stdenv.mkDerivation {
+     # five seconds to one. Restore upstream timing so LPM_ON does not immediately
+     # fall through to a fully blank display on Hoki.
+     ./patches/0008-restore-upstream-ambient-timeouts.patch
++    ./patches/0009-reject-negative-timeout-intervals.patch
+   ];
+ 
+   postPatch = ''
+diff --git a/overlay/asteroidos/mce/patches/0009-reject-negative-timeout-intervals.patch b/overlay/asteroidos/mce/patches/0009-reject-negative-timeout-intervals.patch
+new file mode 100644
+index 00000000..0f097254
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0009-reject-negative-timeout-intervals.patch
+@@ -0,0 +1,64 @@
++From: Matawaa <noreply@localhost>
++Subject: [PATCH] mce: reject negative timeout intervals
++
++MCE stores configurable timeouts as signed integers, while
++g_timeout_add_seconds() accepts an unsigned interval. A negative setting
++therefore becomes a multi-century timer and can overflow ppoll()'s timeout
++on 32-bit watches. Treat negative values as disabled and log their source.
++
++---
++diff --git a/modules/display.c b/modules/display.c
++index f33ec64..5934fc1 100644
++--- a/modules/display.c
+++++ b/modules/display.c
++@@ -4060,6 +4060,15 @@ static void mdy_blanking_schedule_dim(void)
++ 
++     mce_log(LL_DEBUG, "DIM timer scheduled @ %d secs", dim_timeout);
++ 
+++    /* A negative setting means the timeout is disabled. Do not pass it to
+++     * g_timeout_add_seconds(): its unsigned interval would wrap to a huge
+++     * timeout, which can overflow ppoll() on 32-bit systems. */
+++    if( dim_timeout < 0 ) {
+++        mce_log(LL_WARN, "ignoring negative display dim timeout: %d",
+++                dim_timeout);
+++        goto EXIT;
+++    }
+++
++     /* Setup new timeout */
++     mdy_blanking_dim_cb_id = g_timeout_add_seconds(dim_timeout,
++                                                    mdy_blanking_dim_cb, NULL);
++@@ -4315,6 +4324,14 @@ static void mdy_blanking_schedule_lpm_off(void)
++     if( mdy_disp_never_blank )
++         goto EXIT;
++ 
+++    /* A negative setting means the timeout is disabled. Do not pass it to
+++     * g_timeout_add_seconds(): its unsigned interval would wrap to a huge
+++     * timeout, which can overflow ppoll() on 32-bit systems. */
+++    if( timeout < 0 ) {
+++        mce_log(LL_WARN, "ignoring negative LPM blank timeout: %d", timeout);
+++        goto EXIT;
+++    }
+++
++     /* Setup new timeout */
++     mce_log(LL_DEBUG, "LPM-BLANK timer scheduled @ %d secs", timeout);
++     mdy_blanking_lpm_off_cb_id =
++diff --git a/modules/keypad.c b/modules/keypad.c
++index 930612a..f85cd6c 100644
++--- a/modules/keypad.c
+++++ b/modules/keypad.c
++@@ -583,6 +583,15 @@ static void setup_key_backlight_timeout(void)
++ {
++ 	cancel_key_backlight_timeout();
++ 
+++	/* A negative setting disables automatic backlight shutoff. Passing it
+++	 * to g_timeout_add_seconds() would convert it to a huge unsigned value,
+++	 * which can overflow ppoll() on 32-bit systems. */
+++	if (key_backlight_timeout < 0) {
+++		mce_log(LL_WARN, "ignoring negative key backlight timeout: %d",
+++			key_backlight_timeout);
+++		return;
+++	}
+++
++ 	/* Setup a new timeout */
++ 	key_backlight_timeout_cb_id =
++ 		g_timeout_add_seconds(key_backlight_timeout,
