@@ -4,10 +4,10 @@ Date: Mon, 9 Nov 2026 10:55:56 +1100
 Subject: [PATCH] oppo-beluga: add vendor kernel and Android initialization
 
 ---
- devices/oppo-beluga/android-init.nix   | 172 +++++++++++++++++++++
- devices/oppo-beluga/default.nix        | 206 +++++++++++++++++++++++++
- devices/oppo-beluga/kernel/default.nix | 112 ++++++++++++++
- 3 files changed, 490 insertions(+)
+ devices/oppo-beluga/android-init.nix   | 172 +++++++++++++++++++
+ devices/oppo-beluga/default.nix        | 222 +++++++++++++++++++++++++
+ devices/oppo-beluga/kernel/default.nix | 112 +++++++++++++
+ 3 files changed, 506 insertions(+)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/default.nix
  create mode 100644 devices/oppo-beluga/kernel/default.nix
@@ -192,10 +192,10 @@ index 00000000..9a0019aa
 +}
 diff --git a/devices/oppo-beluga/default.nix b/devices/oppo-beluga/default.nix
 new file mode 100644
-index 00000000..3b27c639
+index 00000000..9d194e2e
 --- /dev/null
 +++ b/devices/oppo-beluga/default.nix
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,222 @@
 +{
 +  config,
 +  lib,
@@ -238,6 +238,22 @@ index 00000000..3b27c639
 +  };
 +
 +  mobile.boot.stage-1.kernel.package = pkgs.callPackage ./kernel { };
++
++  # The Beluga vendor kernel is built-in only (isModular = false) and ships no
++  # lib/modules tree. NixOS still aggregates a module tree and then runs depmod
++  # over it, which fails on the empty directory with "kernel version is .".
++  # Provide the versioned hint files that the aggregator and initrd closure
++  # expect so a non-modular kernel yields an empty, valid module tree.
++  system.modulesTree = lib.mkForce [
++    (pkgs.runCommand "oppo-beluga-kernel-modules" { } ''
++      version="${config.boot.kernelPackages.kernel.modDirVersion}"
++      mkdir -p "$out/lib/modules/$version"
++      touch "$out/lib/modules/$version/modules.order"
++      touch "$out/lib/modules/$version/modules.builtin"
++      touch "$out/lib/modules/$version/modules.builtin.modinfo"
++      touch "$out/lib/modules/$version/modules.cer"
++    '')
++  ];
 +
 +  mobile.system.android = {
 +    device_name = "beluga";
