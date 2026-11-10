@@ -131,6 +131,13 @@ was built, staged through SSH port 2222 and rebooted on 2026-11-10. MCE entered
 remained active without restarts. During the latter session, the camera launch
 produced the reported white screen before the display dimmed at 14:01:33 and
 entered AOD at 14:01:48. At 14:06 the camera process was gone and MCE was still
-in AOD. No camera QML error or crash was present in the captured logs, so the
-white camera frame's root cause remains unconfirmed; the AOD handoff and
-post-AOD black transition are separate display behavior.
+in AOD. A later launch captured a QML creation error: `IconButton` instances
+were assigned the unsupported `icon` property, preventing the camera page from
+loading. Those bindings now use AsteroidOS's `iconName` property. The corrected
+package was built and deployed in `/nix/store/2m0w5gcsxsgjqhgkv5nwp5lv5a5w7k6l-nixos-system-nixos-26.11pre-git`;
+a post-reboot launch showed the waiting-for-phone UI without the QML error.
+The source has no translation catalog, so Qt logs a failed `en_GB` catalog
+lookup; visible camera status strings are literal English and do not depend on
+that catalog. A follow-up larger, bold waiting label built in
+`/nix/store/afv7xd9ligj4zgr3ks2zl7x27ks7vhjm-nixos-system-nixos-26.11pre-git`,
+but could not be transferred because the SSH tunnel stopped responding.
