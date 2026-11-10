@@ -9,15 +9,15 @@ Subject: [PATCH] asteroid: restore upstream launch cache and reuse recipe
  overlay/asteroidos/default.nix                |   7 +-
  overlay/asteroidos/libconnman-qt/default.nix  | 108 +++-------------
  .../asteroidos/mapplauncherd-qt/default.nix   |  92 +++++++++++++
- overlay/asteroidos/mce-qt6/default.nix        |  71 +++-------
+ overlay/asteroidos/mce-qt6/default.nix        |  74 ++++------
  overlay/asteroidos/mce/default.nix            |   4 +
  ...08-restore-upstream-ambient-timeouts.patch |  16 +++
  overlay/asteroidos/mlite/CMakeLists.txt       | 122 ------------------
- overlay/asteroidos/mlite/default.nix          |  39 ++++--
- overlay/asteroidos/ngf-qt6/default.nix        |  74 ++++-------
+ overlay/asteroidos/mlite/default.nix          |  44 ++++++-
+ overlay/asteroidos/ngf-qt6/default.nix        |  80 ++++++++----
  overlay/asteroidos/qml-asteroid/default.nix   |  78 +++--------
- overlay/asteroidos/sensorfw/default.nix       |   4 +-
- 12 files changed, 241 insertions(+), 411 deletions(-)
+ overlay/asteroidos/sensorfw/default.nix       |   2 ++
+ 13 files changed, 261 insertions(+), 407 deletions(-)
  create mode 100644 overlay/asteroidos/mapplauncherd-qt/default.nix
  create mode 100644 overlay/asteroidos/mce/patches/0008-restore-upstream-ambient-timeouts.patch
  delete mode 100644 overlay/asteroidos/mlite/CMakeLists.txt
@@ -361,7 +361,7 @@ index 00000000..d3856a23
 +  };
 +})
 diff --git a/overlay/asteroidos/mce-qt6/default.nix b/overlay/asteroidos/mce-qt6/default.nix
-index 05416955..5ab36034 100644
+index 05416955..eb946caa 100644
 --- a/overlay/asteroidos/mce-qt6/default.nix
 +++ b/overlay/asteroidos/mce-qt6/default.nix
 @@ -4,7 +4,6 @@
@@ -380,7 +380,7 @@ index 05416955..5ab36034 100644
      pkg-config
    ];
  
-@@ -36,65 +34,32 @@ stdenv.mkDerivation {
+@@ -36,65 +34,37 @@ stdenv.mkDerivation {
      mce-dev
    ];
  
@@ -424,7 +424,12 @@ index 05416955..5ab36034 100644
 -    exec_prefix=''${prefix}
 -    libdir=''${prefix}/lib
 -    includedir=''${prefix}/include/mce-qt6
--
++    substituteInPlace lib/lib.pro \
++      --replace-fail '$$[QT_INSTALL_LIBS]' '/lib'
++    substituteInPlace plugin/plugin.pro \
++      --replace-fail '$$[QT_INSTALL_QML]' '/lib/qt-6/qml'
++  '';
+ 
 -    Name: mce-qt6
 -    Description: Qt bindings for mce
 -    Version: 1.5.1
@@ -432,16 +437,6 @@ index 05416955..5ab36034 100644
 -    Libs: -L''${libdir} -lmce-qt6
 -    Cflags: -I''${includedir}
 -    EOF
-+    substituteInPlace lib/lib.pro \
-+      --replace-fail '$$[QT_INSTALL_LIBS]' '/lib' \
-+      --replace-fail '/usr/include/mce-qt6' '/include/mce-qt6'
-+    substituteInPlace plugin/plugin.pro \
-+      --replace-fail '$$[QT_INSTALL_QML]' '/lib/qt-6/qml'
-   '';
- 
--  preConfigure = ''
--    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -N -c QMceRequestProxy -p request_interface.h:request_interface.cpp lib/dbus/com.nokia.mce.request.xml
--    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -N -c QMceSignalProxy -p signal_interface.h:signal_interface.cpp lib/dbus/com.nokia.mce.signal.xml
 +  configurePhase = ''
 +    runHook preConfigure
 +    export PATH="${buildPackages.qt6.qtbase}/bin:$PATH"
@@ -449,13 +444,22 @@ index 05416955..5ab36034 100644
 +    ${buildPackages.qt6.qtbase}/bin/qmake -early \
 +      "QMAKE_CC=$CC" "QMAKE_CXX=$CXX" "QMAKE_LINK=$CXX" \
 +      "QMAKE_AR=$AR cqs" "QMAKE_STRIP=$STRIP" \
-+      "QMAKE_PKG_CONFIG=$PKG_CONFIG"
++      "QMAKE_PKG_CONFIG=$PKG_CONFIG" PREFIX=$out
 +    runHook postConfigure
    '';
  
+-  preConfigure = ''
+-    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -N -c QMceRequestProxy -p request_interface.h:request_interface.cpp lib/dbus/com.nokia.mce.request.xml
+-    ${buildPackages.qt6.qtbase}/bin/qdbusxml2cpp -N -c QMceSignalProxy -p signal_interface.h:signal_interface.cpp lib/dbus/com.nokia.mce.signal.xml
 +  enableParallelBuilding = true;
 +  installFlags = [ "INSTALL_ROOT=$(out)" ];
 +
++  postInstall = ''
++    mkdir -p "$out/include"
++    mv "$out$out/include/mce-qt6" "$out/include/"
++    rm -rf "$out$out"
+   '';
+ 
    meta = with lib; {
      description = "Qt6 client library and bindings for Mode Control Entity";
      homepage = "https://github.com/sailfishos/libmce-qt";
@@ -630,7 +634,7 @@ index b82207f8..00000000
 -    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 -)
 diff --git a/overlay/asteroidos/mlite/default.nix b/overlay/asteroidos/mlite/default.nix
-index 1206bcae..331c4cc1 100644
+index 1206bcae..b70a2495 100644
 --- a/overlay/asteroidos/mlite/default.nix
 +++ b/overlay/asteroidos/mlite/default.nix
 @@ -5,11 +5,12 @@
@@ -661,7 +665,13 @@ index 1206bcae..331c4cc1 100644
    strictDeps = true;
  
    postPatch = ''
-@@ -30,19 +38,12 @@ stdenv.mkDerivation {
+@@ -30,20 +38,18 @@ stdenv.mkDerivation {
++    substituteInPlace src/src.pro \
++      --replace-fail '$$[QT_INSTALL_LIBS]' '/lib' \
++      --replace-fail '/usr/include/mlite' '/include/mlite'
++    substituteInPlace src/mlite6.pc.in \
++      --replace-fail 'prefix=/usr' "prefix=$out"
+     substituteInPlace src/mdesktopentry.cpp \
        --replace-fail '"/usr/share/translations"' '"/run/current-system/sw/share/translations"' \
        --replace-fail '!translator->load(QLocale(), catalog, "-", "/run/current-system/sw/share/translations")' \
                       '(!translator->load(QLocale(), catalog, "-", "/run/current-system/sw/share/translations") && !translator->load(QLocale("en_GB"), catalog, "-", "/run/current-system/sw/share/translations"))'
@@ -714,7 +724,7 @@ index 1206bcae..331c4cc1 100644
    };
  }
 diff --git a/overlay/asteroidos/ngf-qt6/default.nix b/overlay/asteroidos/ngf-qt6/default.nix
-index 06bf7395..b7acca79 100644
+index 06bf7395..0726dbe2 100644
 --- a/overlay/asteroidos/ngf-qt6/default.nix
 +++ b/overlay/asteroidos/ngf-qt6/default.nix
 @@ -4,10 +4,10 @@
@@ -743,7 +753,7 @@ index 06bf7395..b7acca79 100644
      pkg-config
    ];
  
-@@ -34,63 +35,32 @@ stdenv.mkDerivation {
+@@ -34,63 +35,40 @@ stdenv.mkDerivation {
      qt6.qtdeclarative
    ];
  
@@ -774,7 +784,26 @@ index 06bf7395..b7acca79 100644
 -    install(FILES ''${HEADERS} DESTINATION include/ngf-qt6)
 -    configure_file(ngf-qt6.pc.in ngf-qt6.pc @ONLY)
 -    install(FILES ''${CMAKE_CURRENT_BINARY_DIR}/ngf-qt6.pc DESTINATION lib/pkgconfig)
--
++    # Qt 6 feedback is not packaged by this nixpkgs revision.
++    substituteInPlace libngf-qt.pro \
++      --replace-fail 'SUBDIRS += src declarative feedback' 'SUBDIRS += src declarative'
++    substituteInPlace src/src.pro \
++      --replace-fail '$$[QT_INSTALL_LIBS]' '/lib'
++    substituteInPlace declarative/declarative.pro \
++      --replace-fail '$$[QT_INSTALL_QML]' '/lib/qt-6/qml'
++  '';
++
++  configurePhase = ''
++    runHook preConfigure
++    export PATH="${buildPackages.qt6.qtbase}/bin:$PATH"
++    export QMAKEPATH="${qt6.qtbase.dev}:${qt6.qtdeclarative.dev}"
++    ${buildPackages.qt6.qtbase}/bin/qmake -early \
++      "QMAKE_CC=$CC" "QMAKE_CXX=$CXX" "QMAKE_LINK=$CXX" \
++      "QMAKE_AR=$AR cqs" "QMAKE_STRIP=$STRIP" \
++      "QMAKE_PKG_CONFIG=$PKG_CONFIG" PREFIX=$out
++    runHook postConfigure
++  '';
+ 
 -    add_library(ngf-declarative MODULE
 -      declarative/src/plugin.cpp
 -      declarative/src/declarativengfevent.cpp
@@ -790,12 +819,8 @@ index 06bf7395..b7acca79 100644
 -    exec_prefix=''${prefix}
 -    libdir=''${prefix}/lib
 -    includedir=''${prefix}/include/ngf-qt6
-+    substituteInPlace lib/lib.pro \
-+      --replace-fail '$$[QT_INSTALL_LIBS]' '/lib' \
-+      --replace-fail '/usr/include/ngf-qt6' '/include/ngf-qt6'
-+    substituteInPlace declarative/declarative.pro \
-+      --replace-fail '$$[QT_INSTALL_QML]' '/lib/qt-6/qml'
-+  '';
++  enableParallelBuilding = true;
++  installFlags = [ "INSTALL_ROOT=$(out)" ];
  
 -    Name: ngf-qt6
 -    Description: Qt client library for NGF daemon
@@ -804,20 +829,12 @@ index 06bf7395..b7acca79 100644
 -    Libs: -L''${libdir} -lngf-qt6
 -    Cflags: -I''${includedir}
 -    EOF
-+  configurePhase = ''
-+    runHook preConfigure
-+    export PATH="${buildPackages.qt6.qtbase}/bin:$PATH"
-+    export QMAKEPATH="${qt6.qtbase.dev}:${qt6.qtdeclarative.dev}"
-+    ${buildPackages.qt6.qtbase}/bin/qmake -early \
-+      "QMAKE_CC=$CC" "QMAKE_CXX=$CXX" "QMAKE_LINK=$CXX" \
-+      "QMAKE_AR=$AR cqs" "QMAKE_STRIP=$STRIP" \
-+      "QMAKE_PKG_CONFIG=$PKG_CONFIG" PREFIX=$out
-+    runHook postConfigure
++  postInstall = ''
++    mkdir -p "$out/include"
++    mv "$out$out/include/ngf-qt6" "$out/include/"
++    rm -rf "$out$out"
    '';
  
-+  enableParallelBuilding = true;
-+  installFlags = [ "INSTALL_ROOT=$(out)" ];
-+
    meta = with lib; {
      description = "Qt6 client library and Nemo.Ngf QML plugin for Non-Graphic Feedback daemon";
      homepage = "https://github.com/sailfishos/libngf-qt";
@@ -947,26 +964,10 @@ index db13a9a2..4df50532 100644
 -})
 +}
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
-index 6aca4bcc..c72464e7 100644
+index 6aca4bcc..691be304 100644
 --- a/overlay/asteroidos/sensorfw/default.nix
 +++ b/overlay/asteroidos/sensorfw/default.nix
-@@ -5,7 +5,6 @@
-   lib,
-   stdenv,
-   fetchFromGitHub,
--  cmake,
-   pkg-config,
-   qt6,
-   systemd,
-@@ -39,7 +38,6 @@ stdenv.mkDerivation {
-   dontWrapQtApps = true;
- 
-   nativeBuildInputs = [
--    cmake
-     pkg-config
-   ];
- 
-@@ -52,6 +50,8 @@ stdenv.mkDerivation {
+@@ -52,6 +52,8 @@ stdenv.mkDerivation {
    ];
  
    # Upstream only ships qmake project files; CMakeLists.txt mirrors them.
@@ -975,3 +976,13 @@ index 6aca4bcc..c72464e7 100644
    postPatch = ''
      cp ${./CMakeLists.txt} CMakeLists.txt
    '';
+diff --git a/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
+index 214fc9e5..c82b3079 100644
+--- a/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
++++ b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
+@@ -37,1 +37,5 @@ stdenv.mkDerivation {
++  preConfigure = ''
++    export PKG_CONFIG_PATH="${mlite}/lib/pkgconfig:$PKG_CONFIG_PATH"
++  '';
++
+   cmakeFlags = [
