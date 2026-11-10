@@ -145,7 +145,7 @@ index 264328c9..1df885eb 100644
      pkg-config
    ];
  
-@@ -35,101 +33,25 @@ stdenv.mkDerivation {
+@@ -35,101 +33,26 @@ stdenv.mkDerivation {
      qt6.qtdeclarative
    ];
  
@@ -236,6 +236,7 @@ index 264328c9..1df885eb 100644
 -    includedir=''${prefix}/include/connman-qt6
 +    sed -i 's|/usr/include|/include|g' libconnman-qt/libconnman-qt.pro
 +    sed -i 's|$$\[QT_INSTALL_QML\]|/lib/qt-6/qml|g' plugin/plugin.pro
++    substituteInPlace libconnman-qt/libconnman-qt.pro --replace-fail '$$[QT_INSTALL_LIBS]' '/lib'
 +  '';
  
 -    Name: connman-qt6

@@ -629,7 +629,7 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +      }
 +      // lib.optionalAttrs isLegacy {
 +        LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
-+        LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
++        LD_LIBRARY_PATH = "${pkgs.libhybris}/lib:${pkgs.asteroid.libconnman-qt}/lib";
 +      };
 +
 +      # Upstream asteroid-alarmclock installs share/systemd/user/alarmpresenter.service
@@ -720,7 +720,7 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +          // lib.optionalAttrs isLegacy {
 +            QT_WAYLAND_SERVER_BUFFER_INTEGRATION = "libhybris-egl-server";
 +            LD_PRELOAD = "${pkgs.libhybris}/lib/libEGL.so.1 ${pkgs.libhybris}/lib/libGLESv2.so.2";
-+            LD_LIBRARY_PATH = "${pkgs.libhybris}/lib";
++            LD_LIBRARY_PATH = "${pkgs.libhybris}/lib:${pkgs.asteroid.libconnman-qt}/lib";
 +          }
 +          // lib.optionalAttrs (!isLegacy) {
 +            QT_QPA_EGLFS_INTEGRATION = "eglfs_kms";
