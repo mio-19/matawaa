@@ -16,6 +16,11 @@ fallback is used by the new mode: rejected low-power transitions are logged.
 The Hoki user-service environment sets the new flag on OTA upgrades as well as
 new images; existing `/var/lib/environment/compositor` files can survive an OTA.
 
+MCE's AsteroidOS ambient patch reduces both timeouts around `LPM_OFF` from five
+seconds to one. Hoki now restores AsteroidOS's five-second defaults, giving the
+ambient and proximity blanking transitions the upstream dwell time instead of
+the one-second sequence that coincided with the reported black-screen event.
+
 Upstream ambient implementation:
 [meta-asteroid ambient patch](https://github.com/AsteroidOS/meta-asteroid/blob/c84c0bbd731f9dfa3b04295bac239dd7fa64c722/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0001-Add-ambient-mode-display-support.patch).
 

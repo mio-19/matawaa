@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 10 Nov 2026 12:18:26 +1100
+Subject: [PATCH] mce: restore upstream ambient display timeouts
+
+---
+ overlay/asteroidos/mce/default.nix               |  4 ++++
+ .../0008-restore-upstream-ambient-timeouts.patch | 16 ++++++++++++++++
+ 2 files changed, 20 insertions(+)
+ create mode 100644 overlay/asteroidos/mce/patches/0008-restore-upstream-ambient-timeouts.patch
+
+diff --git a/overlay/asteroidos/mce/default.nix b/overlay/asteroidos/mce/default.nix
+index 00a69c32..129f9bfc 100644
+--- a/overlay/asteroidos/mce/default.nix
++++ b/overlay/asteroidos/mce/default.nix
+@@ -58,6 +58,10 @@ stdenv.mkDerivation {
+     "${metaAsteroidSrc}/recipes-nemomobile/mce/mce/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch"
+     "${metaAsteroidSrc}/recipes-nemomobile/mce/mce/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch"
+     "${metaAsteroidSrc}/recipes-nemomobile/mce/mce/0007-powerkey-Also-suspend-on-palm-reports.patch"
++    # The ambient-mode patch changes these AsteroidOS upstream defaults from
++    # five seconds to one. Restore upstream timing so LPM_ON does not immediately
++    # fall through to a fully blank display on Hoki.
++    ./patches/0008-restore-upstream-ambient-timeouts.patch
+   ];
+ 
+   postPatch = ''
+diff --git a/overlay/asteroidos/mce/patches/0008-restore-upstream-ambient-timeouts.patch b/overlay/asteroidos/mce/patches/0008-restore-upstream-ambient-timeouts.patch
+new file mode 100644
+index 00000000..4d19c9f1
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0008-restore-upstream-ambient-timeouts.patch
+@@ -0,0 +1,16 @@
++From: Matawaa <noreply@localhost>
++Subject: [PATCH] mce: restore upstream ambient display timeouts
++
++AsteroidOS sets five seconds for both transitions around LPM_OFF. Its
++ambient-mode patch reduces them to one second, which makes the Hoki display
++drop out of ambient mode almost immediately after entering it. Keep the
++upstream five-second interval.
++
++--- a/modules/display.h
+++++ b/modules/display.h
++@@ -386 +386 @@
++-# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   1
+++# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   5
++@@ -394 +394 @@
++-# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_OFF_TIMEOUT  1
+++# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_OFF_TIMEOUT  5
