@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Add committed worktree changes to the categorized Mobile NixOS patch series."""
+"""Append committed worktree changes to the categorized Mobile NixOS series."""
 
 from __future__ import annotations
 
@@ -11,17 +11,13 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import NoReturn
+
+sys.dont_write_bytecode = True
+
+from patch_series import discover_categories, patches_in_order
 
 
-CATEGORIES = (
-    "00-mobile-nixos-upstream-candidates",
-    "10-asteroidos-upstream-nightly",
-    "20-our-customizations-apps",
-    "25-asteroidos-upstream-nightly-apps",
-    "30-our-customizations-devices",
-    "40-our-experimental-customizations",
-    "50-upstream-unmerged-development",
-)
 PATCH_RE = re.compile(r"^(?P<number>\d{4,})-(?P<subject>.+)\.patch$")
 
 
@@ -37,97 +33,111 @@ def run(command: list[str], *, cwd: Path | None = None) -> str:
     return result.stdout.strip()
 
 
-def fail(message: str) -> "NoReturn":
+def fail(message: str) -> NoReturn:
     print(f"[ERROR] {message}", file=sys.stderr)
     raise SystemExit(1)
+
+
+def patch_baseline_tree(
+    work: Path,
+    upstream: str,
+    ordered_patches: list[tuple[str, Path]],
+) -> str:
+    """Replay the current series in a disposable clone and return its tree ID."""
+    with tempfile.TemporaryDirectory(prefix="matawaa-patch-baseline-") as temp_name:
+        replay = Path(temp_name) / "mobile-nixos"
+        try:
+            run(["git", "clone", "--quiet", "--shared", str(work), str(replay)])
+            run(["git", "checkout", "--quiet", "-B", "patch-series-baseline", upstream], cwd=replay)
+        except subprocess.CalledProcessError as exc:
+            detail = exc.stderr.strip() if exc.stderr else str(exc)
+            fail(f"Could not prepare a disposable upstream worktree: {detail}")
+
+        for category, patch in ordered_patches:
+            result = subprocess.run(
+                ["git", "am", "--3way", "--ignore-whitespace", str(patch)],
+                cwd=replay,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if result.returncode != 0:
+                subprocess.run(["git", "am", "--abort"], cwd=replay, capture_output=True)
+                detail = (result.stderr or result.stdout).strip()
+                fail(f"Existing patch does not replay ({category}/{patch.name}): {detail}")
+        try:
+            return run(["git", "rev-parse", "HEAD^{tree}"], cwd=replay)
+        except subprocess.CalledProcessError as exc:
+            fail(f"Could not read the replayed patch tree ({exc}).")
 
 
 def main() -> int:
     root = Path(__file__).resolve().parent.parent
     work = root / "work" / "mobile-nixos"
     patches = root / "patches"
-    state_path = patches / ".rebuild-state.json"
-
-    parser = argparse.ArgumentParser(
-        description=(
-            "Append new committed changes to the categorized patch series. "
-            "Existing consolidated patches and their categories are retained."
-        )
-    )
-    parser.add_argument(
-        "--category",
-        choices=CATEGORIES,
-        help="category for all new commits (required when there are new commits)",
-    )
-    args = parser.parse_args()
 
     if not (work / ".git").exists():
         fail(f"Working repository not found at {work}. Run scripts/applyPatches.sh first.")
-    if not state_path.is_file():
-        fail(f"Patch baseline metadata is missing: {state_path}")
 
     try:
         lock = json.loads((root / "flake.lock").read_text())
         upstream = lock["nodes"]["mobile-nixos"]["locked"]["rev"]
-        state = json.loads(state_path.read_text())
-        head = run(["git", "rev-parse", "HEAD"], cwd=work)
-        tree = run(["git", "rev-parse", "HEAD^{tree}"], cwd=work)
         dirty = run(["git", "status", "--porcelain"], cwd=work)
-    except (OSError, KeyError, json.JSONDecodeError, subprocess.CalledProcessError) as exc:
-        fail(f"Could not read patch/worktree state ({exc}).")
+        categories = discover_categories(patches)
+        ordered_patches = patches_in_order(patches, categories)
+    except (OSError, KeyError, json.JSONDecodeError, subprocess.CalledProcessError, ValueError) as exc:
+        fail(f"Could not read patch/worktree configuration ({exc}).")
 
     if dirty:
         fail(f"Commit or discard worktree changes before rebuilding: {work}")
-    if state.get("upstream_commit") != upstream:
-        fail("The locked Mobile NixOS revision changed; rebuild the patch baseline first.")
-    if state.get("version") != 1:
-        fail("Unsupported patch rebuild-state version.")
+    if not ordered_patches:
+        fail(f"No .patch files found in category folders under {patches}.")
 
-    baseline = state.get("source_commit")
-    baseline_tree = state.get("source_tree")
-    if not baseline or not baseline_tree:
-        fail("Patch rebuild-state is incomplete.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Append new committed changes to the categorized patch series. "
+            "Existing patches and their folder assignments are retained."
+        )
+    )
+    parser.add_argument(
+        "--category",
+        choices=categories,
+        help="folder for new commits (required when the worktree has new commits)",
+    )
+    args = parser.parse_args()
 
-    # applyPatches.sh creates fresh commits from the patch files, so its HEAD
-    # differs from the original source history. Matching tree IDs safely adopts
-    # that equivalent history as the new baseline.
-    same_tree = tree == baseline_tree
-    if same_tree:
-        state["source_commit"] = head
-        state["source_tree"] = tree
-        state_path.write_text(json.dumps(state, indent=2) + "\n")
-        print("[SUCCESS] Categorized patches already match the worktree; baseline synchronized.")
-        return 0
-
-    is_descendant = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", baseline, "HEAD"], cwd=work
-    ).returncode == 0
-    if not is_descendant:
+    print("[INFO] Replaying categorized patches to locate their source-tree baseline...", flush=True)
+    baseline_tree = patch_baseline_tree(work, upstream, ordered_patches)
+    try:
+        history = run(["git", "log", "--format=%H%x09%T", "HEAD"], cwd=work)
+        baseline_commit = next(
+            commit
+            for line in history.splitlines()
+            for commit, commit_tree in [line.split("\t", 1)]
+            if commit_tree == baseline_tree
+        )
+        head = run(["git", "rev-parse", "HEAD"], cwd=work)
+        count = int(
+            run(["git", "rev-list", "--count", f"{baseline_commit}..HEAD"], cwd=work)
+        )
+    except (subprocess.CalledProcessError, StopIteration, ValueError) as exc:
         fail(
-            "The worktree has diverged from the recorded patch baseline. "
-            "Restore the baseline or apply the categorized patches into a fresh worktree."
+            "The worktree history does not contain the tree produced by the current patch "
+            f"folders ({exc}). Apply the current series before rebuilding."
         )
 
-    try:
-        count = int(run(["git", "rev-list", "--count", f"{baseline}..HEAD"], cwd=work))
-    except subprocess.CalledProcessError as exc:
-        fail(f"Could not inspect commits after the patch baseline ({exc}).")
     if count == 0:
-        fail("Worktree tree changed without any new commits.")
+        print("[SUCCESS] Categorized patches already match the worktree.")
+        return 0
     if args.category is None:
         fail(
-            f"Found {count} new commit(s). Choose their category with --category CATEGORY; "
-            "the existing 43 consolidated patches will remain untouched."
+            f"Found {count} new commit(s). Choose their destination folder with "
+            "--category FOLDER."
         )
-
-    for category in CATEGORIES:
-        if not (patches / category).is_dir():
-            fail(f"Expected patch category directory is missing: {patches / category}")
 
     existing_numbers = [
         int(match.group("number"))
-        for category in CATEGORIES
-        for patch in (patches / category).glob("*.patch")
+        for _, patch in ordered_patches
         if (match := PATCH_RE.match(patch.name))
     ]
     next_number = max(existing_numbers, default=0) + 1
@@ -140,12 +150,12 @@ def main() -> int:
                 [
                     "git", "format-patch", "--zero-commit", "--numbered",
                     "--no-signature", "--filename-max-length=110", "-o", str(temp),
-                    f"{baseline}..HEAD",
+                    f"{baseline_commit}..HEAD",
                 ],
                 cwd=work,
             )
         except subprocess.CalledProcessError as exc:
-            fail(f"git format-patch failed ({exc}).")
+            fail(f"git format-patch failed ({exc.stderr.strip()}).")
 
         exported = sorted(temp.glob("*.patch"))
         if len(exported) != count:
@@ -159,24 +169,19 @@ def main() -> int:
             if not match:
                 fail(f"Unexpected format-patch filename: {patch.name}")
             name = f"{next_number + index:04d}-{match.group('subject')}.patch"
-            destination = staged / name
-            shutil.copy2(patch, destination)
+            shutil.copy2(patch, staged / name)
             names.append(name)
 
         target_dir = patches / args.category
         for name in names:
-            destination = target_dir / name
-            if destination.exists():
-                fail(f"Refusing to overwrite existing patch: {destination}")
+            if (target_dir / name).exists():
+                fail(f"Refusing to overwrite existing patch: {target_dir / name}")
         for name in names:
             shutil.copy2(staged / name, target_dir / name)
 
-    state["source_commit"] = head
-    state["source_tree"] = tree
-    state_path.write_text(json.dumps(state, indent=2) + "\n")
     for name in names:
         print(f"  {args.category}/{name}")
-    print(f"[SUCCESS] Added {count} patch(es); existing categories and patches were preserved.")
+    print(f"[SUCCESS] Added {count} patch(es); existing categorized patches were preserved.")
     return 0
 
 

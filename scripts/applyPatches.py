@@ -9,16 +9,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True
 
-CATEGORIES = (
-    "00-mobile-nixos-upstream-candidates",
-    "10-asteroidos-upstream-nightly",
-    "20-our-customizations-apps",
-    "25-asteroidos-upstream-nightly-apps",
-    "30-our-customizations-devices",
-    "40-our-experimental-customizations",
-    "50-upstream-unmerged-development",
-)
+from patch_series import discover_categories, patches_in_order
+
 UPSTREAM_URL = "https://github.com/NixOS/mobile-nixos.git"
 BRANCH_NAME = "matawaa-work"
 
@@ -70,6 +64,11 @@ def main() -> int:
     upstream_commit = os.environ.get("UPSTREAM_COMMIT", locked_commit)
     upstream_url = os.environ.get("UPSTREAM_URL", UPSTREAM_URL)
     branch_name = os.environ.get("BRANCH_NAME", BRANCH_NAME)
+    try:
+        categories = discover_categories(patches)
+        ordered_patches = patches_in_order(patches, categories)
+    except ValueError as exc:
+        raise ApplyError(str(exc)) from exc
     work.parent.mkdir(parents=True, exist_ok=True)
 
     if not (work / ".git").exists():
@@ -100,28 +99,23 @@ def main() -> int:
 
     info(f"Applying categorized patch series from {patches}...")
     patch_count = 0
-    for category in CATEGORIES:
-        category_dir = patches / category
-        if not category_dir.is_dir():
-            raise ApplyError(f"Patch category directory is missing: {category_dir}")
-        category_patches = sorted(category_dir.glob("*.patch"))
-        for patch in category_patches:
-            relative_name = f"{category}/{patch.name}"
-            info(f"Applying {relative_name}...")
-            result = git(
-                ["-C", str(work), "am", "--3way", "--ignore-whitespace", str(patch)],
-                cwd=root,
-                check=False,
+    for category, patch in ordered_patches:
+        relative_name = f"{category}/{patch.name}"
+        info(f"Applying {relative_name}...")
+        result = git(
+            ["-C", str(work), "am", "--3way", "--ignore-whitespace", str(patch)],
+            cwd=root,
+            check=False,
+        )
+        if result.returncode != 0:
+            print(f"[ERROR] Failed to apply patch: {relative_name}", file=sys.stderr)
+            print(
+                "Resolve the conflict in work/mobile-nixos and run "
+                "'git am --continue', or run 'git am --abort'.",
+                file=sys.stderr,
             )
-            if result.returncode != 0:
-                print(f"[ERROR] Failed to apply patch: {relative_name}", file=sys.stderr)
-                print(
-                    "Resolve the conflict in work/mobile-nixos and run "
-                    "'git am --continue', or run 'git am --abort'.",
-                    file=sys.stderr,
-                )
-                return result.returncode
-            patch_count += 1
+            return result.returncode
+        patch_count += 1
 
     success(f"Applied {patch_count} patches to {work} on branch {branch_name}.")
     info("Edit and commit changes in work/mobile-nixos, then run scripts/rebuildPatches.sh.")

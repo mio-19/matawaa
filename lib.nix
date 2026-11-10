@@ -2,15 +2,12 @@ rec {
   patches =
     let
       dir = ./patches;
-      categories = [
-        "00-mobile-nixos-upstream-candidates"
-        "10-asteroidos-upstream-nightly"
-        "20-our-customizations-apps"
-        "25-asteroidos-upstream-nightly-apps"
-        "30-our-customizations-devices"
-        "40-our-experimental-customizations"
-        "50-upstream-unmerged-development"
-      ];
+      entries = builtins.readDir dir;
+      categories = builtins.sort (a: b: a < b) (
+        builtins.filter
+          (name: entries.${name} == "directory")
+          (builtins.attrNames entries)
+      );
       categoryPatches = category:
         let
           categoryDir = dir + "/${category}";
