@@ -4,11 +4,13 @@ Date: Mon, 9 Nov 2026 10:55:57 +1100
 Subject: [PATCH] examples: add AsteroidOS desktop and smartwatch system
 
 ---
- examples/asteroid/asteroid-desktop.nix | 910 +++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 920 ++++++++++++++++++++++++++
+devices/fossil-hoki/mce-keep-aod.patch | 25 +++++++++++++++++++++++++
  examples/asteroid/configuration.nix    |  43 ++
  examples/asteroid/default.nix          |  15 +
- 3 files changed, 968 insertions(+)
+ 4 files changed, 1003 insertions(+)
  create mode 100644 examples/asteroid/asteroid-desktop.nix
+create mode 100644 devices/fossil-hoki/mce-keep-aod.patch
  create mode 100644 examples/asteroid/configuration.nix
  create mode 100644 examples/asteroid/default.nix
 
@@ -17,7 +19,7 @@ new file mode 100644
 index 00000000..d684d006
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,910 @@
+@@ -0,0 +1,920 @@
 +{
 +  config,
 +  lib,
@@ -37,6 +39,16 @@ index 00000000..d684d006
 +    || config.mobile.hardware.watch.stage2-ssh.enable;
 +
 +  isLegacy = config.mobile.hardware.watch.kernel == "legacy";
++
++  # Fossil Hoki has no proximity sensor. Keep MCE in its low-power ON state
++  # after entering AOD instead of timing out to a black LPM_OFF screen.
++  mcePackage =
++    if config.mobile.device.name == "fossil-hoki" then
++      pkgs.asteroid.mce.overrideAttrs (old: {
++        patches = (old.patches or [ ]) ++ [ ../../devices/fossil-hoki/mce-keep-aod.patch ];
++      })
++    else
++      pkgs.asteroid.mce;
 +
 +  # Upstream asteroid-launcher_git.bb installs a seeded notification database
 +  # into the ceres user's privileged data directory.
@@ -133,7 +145,7 @@ index 00000000..d684d006
 +          asteroid.asteroid-btsyncd
 +          asteroid.nemo-qml-plugin-dbus
 +          asteroid.libconnman-qt
-+          asteroid.mce
++          mcePackage
 +          asteroid.ngfd
 +          asteroid.nfcd
 +          asteroid.keepalive
@@ -205,7 +217,7 @@ index 00000000..d684d006
 +        # builtin-gconf.values into /var/lib/mce. Use "C" to seed writable defaults.
 +        "d /run/mce 0755 root root -"
 +        "d /var/lib/mce 0755 root root -"
-+        "C /var/lib/mce/builtin-gconf.values 0644 root root - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
++        "C /var/lib/mce/builtin-gconf.values 0644 root root - ${mcePackage}/share/mce/builtin-gconf.values"
 +        # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
 +        "d /var/lib/connman 0755 root root -"
 +        "C+ /var/lib/connman/settings 0644 root root - ${pkgs.writeText "connman-settings" ''
@@ -338,7 +350,7 @@ index 00000000..d684d006
 +          # fails ("Cannot open `/var/run/mce/boot' for writing").
 +          RuntimeDirectory = "mce";
 +          RuntimeDirectoryMode = "0755";
-+          ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
++          ExecStart = "${mcePackage}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
 +          TimeoutSec = 2;
 +          Restart = "always";
 +          RestartSec = "1s";
@@ -556,7 +568,7 @@ index 00000000..d684d006
 +      # upstream AsteroidOS connman policy replaces connman's own one.
 +      services.dbus.packages = [
 +        pkgs.dconf
-+        pkgs.asteroid.mce
++        mcePackage
 +        pkgs.asteroid.dsme
 +        pkgs.asteroid.sensorfw
 +        pkgs.asteroid.ngfd
@@ -928,6 +940,37 @@ index 00000000..d684d006
 +    }
 +  );
 +}
+diff --git a/devices/fossil-hoki/mce-keep-aod.patch b/devices/fossil-hoki/mce-keep-aod.patch
+new file mode 100644
+index 00000000..3c172f7a
+--- /dev/null
++++ b/devices/fossil-hoki/mce-keep-aod.patch
+@@ -0,0 +1,25 @@
++From: Matawaa <noreply@localhost>
++Subject: [PATCH] mce: let Hoki remain in AOD until woken
++
++Hoki has no proximity sensor to trigger an LPM_OFF -> LPM_ON transition.
++Treat a negative LPM_ON timeout as disabled, and use that setting only for
++Fossil Hoki so the display does not drop to a black panel after five seconds
++in AOD. Other AsteroidOS devices retain the upstream five-second timeout.
++
++--- a/modules/display.h
+++++ b/modules/display.h
++@@ -380 +380 @@
++-# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   5
+++# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   -1
++--- a/modules/display.c
+++++ b/modules/display.c
++@@ -4310,2 +4310,9 @@ static void mdy_blanking_schedule_lpm_off(void)
++     if( mdy_disp_never_blank )
++         goto EXIT;
+++
+++    /* A negative timeout disables proximity blanking while in AOD. */
+++    if( timeout < 0 ) {
+++        mce_log(LL_DEBUG, "LPM-BLANK timer disabled");
+++        goto EXIT;
+++    }
+++
 diff --git a/examples/asteroid/configuration.nix b/examples/asteroid/configuration.nix
 new file mode 100644
 index 00000000..d55911c0

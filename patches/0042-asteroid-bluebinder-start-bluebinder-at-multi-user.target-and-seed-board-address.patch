@@ -21,7 +21,7 @@ diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid
 index d684d006..2bb6bac2 100644
 --- a/examples/asteroid/asteroid-desktop.nix
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -481,7 +481,7 @@ in
+@@ -491,7 +491,7 @@ in
        # Proxies the Android binder based Bluetooth HAL to BlueZ over vhci.
        systemd.services.bluebinder = {
          description = "Android binder based bluetooth proxy (vhci)";
@@ -30,7 +30,7 @@ index d684d006..2bb6bac2 100644
          after = [
            "android-init.service"
            "dbus.service"
-@@ -491,7 +491,23 @@ in
+@@ -501,7 +501,23 @@ in
            Type = "notify";
            ExecStartPre = "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_wait.sh";
            ExecStart = "${pkgs.asteroid.bluebinder}/sbin/bluebinder";

@@ -5,14 +5,14 @@ Subject: [PATCH] asteroid: package core apps camera viewfinder and music
  streaming
 
 ---
- .../apps/camera/camera-companion.patch        | 565 ++++++++++++++++++
+ .../apps/camera/camera-companion.patch        | 566 ++++++++++++++++++
  .../apps/camera/remotecamerabridge.cpp        | 130 ++++
  .../apps/camera/remotecamerabridge.h          |  61 ++
  overlay/asteroidos/apps/default.nix           | 129 ++++
  .../apps/music-ytmusic-streaming.patch        | 306 ++++++++++
  overlay/asteroidos/assets/default.nix         | 196 ++++++
  overlay/asteroidos/default.nix                |  12 +
- 7 files changed, 1399 insertions(+)
+ 7 files changed, 1400 insertions(+)
  create mode 100644 overlay/asteroidos/apps/camera/camera-companion.patch
  create mode 100644 overlay/asteroidos/apps/camera/remotecamerabridge.cpp
  create mode 100644 overlay/asteroidos/apps/camera/remotecamerabridge.h
@@ -25,7 +25,7 @@ new file mode 100644
 index 00000000..5c709868
 --- /dev/null
 +++ b/overlay/asteroidos/apps/camera/camera-companion.patch
-@@ -0,0 +1,565 @@
+@@ -0,0 +1,566 @@
 +diff --git a/CMakeLists.txt b/CMakeLists.txt
 +index a9aa7ca..f732de5 100644
 +--- a/CMakeLists.txt
@@ -102,7 +102,7 @@ index 00000000..5c709868
 +index 41a2961..573ba51 100644
 +--- a/src/main.qml
 ++++ b/src/main.qml
-+@@ -1,38 +1,472 @@
++@@ -1,38 +1,473 @@
 + /*
 +  * Copyright (C) 2019 Florent Revest <revestflo@gmail.com>
 ++ * Copyright (C) 2026 AsteroidOS
@@ -209,9 +209,10 @@ index 00000000..5c709868
 ++        wrapMode: Text.WordWrap
 ++        visible: !bridge.phoneReady
 ++        text: "Waiting for phone camera"
-++        font.pixelSize: Dims.h(0.05)
+++        font.pixelSize: Dims.h(0.075)
+++        font.bold: true
 ++        color: "white"
-++        opacity: 0.85
+++        opacity: 0.95
 ++        z: 5
 ++    }
 ++
@@ -379,7 +380,7 @@ index 00000000..5c709868
 ++        IconButton {
 ++            width: Dims.w(0.13)
 ++            height: width
-++            icon: app.isVideoMode ? "ios-videocam" : "ios-camera"
+++            iconName: app.isVideoMode ? "ios-videocam" : "ios-camera"
 ++            onClicked: {
 ++                app.isVideoMode = !app.isVideoMode
 ++                bridge.vibrate(30)
@@ -397,7 +398,7 @@ index 00000000..5c709868
 ++        IconButton {
 ++            width: Dims.w(0.13)
 ++            height: width
-++            icon: app.countdownSeconds === 0 ? "ios-timer-outline" : "ios-timer"
+++            iconName: app.countdownSeconds === 0 ? "ios-timer-outline" : "ios-timer"
 ++            onClicked: {
 ++                if (app.countdownSeconds === 0) app.countdownSeconds = 3
 ++                else if (app.countdownSeconds === 3) app.countdownSeconds = 5
@@ -412,7 +413,7 @@ index 00000000..5c709868
 ++        IconButton {
 ++            width: Dims.w(0.13)
 ++            height: width
-++            icon: "ios-flash"
+++            iconName: "ios-flash"
 ++            onClicked: {
 ++                bridge.sendCommand("torch")
 ++                bridge.vibrate(25)
@@ -435,7 +436,7 @@ index 00000000..5c709868
 ++        IconButton {
 ++            width: Dims.w(0.13)
 ++            height: width
-++            icon: "ios-reverse-camera"
+++            iconName: "ios-reverse-camera"
 ++            onClicked: {
 ++                bridge.sendCommand("flip")
 ++                bridge.vibrate(35)
@@ -447,7 +448,7 @@ index 00000000..5c709868
 ++        IconButton {
 ++            width: Dims.w(0.13)
 ++            height: width
-++            icon: "ios-add"
+++            iconName: "ios-add"
 ++            onClicked: {
 ++                bridge.sendCommand("zoom_in")
 ++                bridge.vibrate(20)
@@ -459,7 +460,7 @@ index 00000000..5c709868
 ++        IconButton {
 ++            width: Dims.w(0.13)
 ++            height: width
-++            icon: "ios-remove"
+++            iconName: "ios-remove"
 ++            onClicked: {
 ++                bridge.sendCommand("zoom_out")
 ++                bridge.vibrate(20)

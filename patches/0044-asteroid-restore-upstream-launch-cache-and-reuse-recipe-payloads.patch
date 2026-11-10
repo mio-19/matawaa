@@ -10,7 +10,8 @@ Subject: [PATCH] asteroid: restore upstream launch cache and reuse recipe
  .../asteroidos/mapplauncherd-qt/default.nix   |  92 +++
  ...-sailjaild-D-Bus-query-when-sailjail.patch |  40 --
  overlay/asteroidos/mapplauncherd/default.nix  |   4 +-
- overlay/asteroidos/mce/default.nix            |  21 +-
+ overlay/asteroidos/mce/default.nix            |  25 +-
+ .../0008-restore-upstream-ambient-timeouts.patch |  16 +
  ...tion-Adapts-the-state-machine-to-a-s.patch | 421 ------------
  ...ke-screen-when-wrist-gesture-arrives.patch | 606 ------------------
  ...-activities-in-lockscreen-mode.-aste.patch |  64 --
@@ -19,7 +20,7 @@ Subject: [PATCH] asteroid: restore upstream launch cache and reuse recipe
  ...t-ambient-mode-when-touch-is-detecte.patch |  67 --
  ...owerkey-Also-suspend-on-palm-reports.patch | 161 -----
  overlay/asteroidos/qml-asteroid/default.nix   |  78 +--
- 14 files changed, 146 insertions(+), 2084 deletions(-)
+ 15 files changed, 166 insertions(+), 2084 deletions(-)
  create mode 100644 overlay/asteroidos/mapplauncherd-qt/default.nix
  delete mode 100644 overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
  delete mode 100644 overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
@@ -29,6 +30,7 @@ Subject: [PATCH] asteroid: restore upstream launch cache and reuse recipe
  delete mode 100644 overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
  delete mode 100644 overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
  delete mode 100644 overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch
+ create mode 100644 overlay/asteroidos/mce/patches/0008-restore-upstream-ambient-timeouts.patch
 
 diff --git a/overlay/asteroidos/bluebinder/default.nix b/overlay/asteroidos/bluebinder/default.nix
 index e38bf0b5..4a4a802d 100644
@@ -313,7 +315,7 @@ index 8ce4a485..00a69c32 100644
      fetchSubmodules = true;
    };
  
-@@ -50,13 +51,13 @@ stdenv.mkDerivation (finalAttrs: {
+@@ -50,13 +51,17 @@ stdenv.mkDerivation (finalAttrs: {
    ];
  
    patches = [
@@ -331,6 +333,10 @@ index 8ce4a485..00a69c32 100644
 +    "${metaAsteroidSrc}/recipes-nemomobile/mce/mce/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch"
 +    "${metaAsteroidSrc}/recipes-nemomobile/mce/mce/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch"
 +    "${metaAsteroidSrc}/recipes-nemomobile/mce/mce/0007-powerkey-Also-suspend-on-palm-reports.patch"
++    # The ambient-mode patch changes these AsteroidOS upstream defaults from
++    # five seconds to one. Restore upstream timing so LPM_ON does not immediately
++    # fall through to a fully blank display on Hoki.
++    ./patches/0008-restore-upstream-ambient-timeouts.patch
    ];
  
    postPatch = ''
@@ -2336,6 +2342,28 @@ index 30575249..00000000
 -     {
 -         .datapipe = &ngfd_event_request_pipe,
 -         .input_cb = pwrkey_datapipe_ngfd_event_request_cb,
+diff --git a/overlay/asteroidos/mce/patches/0008-restore-upstream-ambient-timeouts.patch b/overlay/asteroidos/mce/patches/0008-restore-upstream-ambient-timeouts.patch
+new file mode 100644
+index 00000000..4d19c9f1
+--- /dev/null
++++ b/overlay/asteroidos/mce/patches/0008-restore-upstream-ambient-timeouts.patch
+@@ -0,0 +1,16 @@
++From: Matawaa <noreply@localhost>
++Subject: [PATCH] mce: restore upstream ambient display timeouts
++
++AsteroidOS sets five seconds for both transitions around LPM_OFF. Its
++ambient-mode patch reduces them to one second, which makes the Hoki display
++drop out of ambient mode almost immediately after entering it. Keep the
++upstream five-second interval.
++
++--- a/modules/display.h
+++++ b/modules/display.h
++@@ -386 +386 @@
++-# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   1
+++# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   5
++@@ -394 +394 @@
++-# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_OFF_TIMEOUT  1
+++# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_OFF_TIMEOUT  5
 diff --git a/overlay/asteroidos/qml-asteroid/default.nix b/overlay/asteroidos/qml-asteroid/default.nix
 index db13a9a2..4df50532 100644
 --- a/overlay/asteroidos/qml-asteroid/default.nix

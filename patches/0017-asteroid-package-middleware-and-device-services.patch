@@ -11,7 +11,7 @@ Subject: [PATCH] asteroid: package middleware and device services
  overlay/asteroidos/default.nix                | 113 ++++
  overlay/asteroidos/dsme/default.nix           | 107 ++++
  overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
- overlay/asteroidos/keepalive/default.nix      |  93 +++
+ overlay/asteroidos/keepalive/default.nix      | 104 ++++
  .../patches/0001-Disable-tests.patch          |  23 +
  .../keepalive/patches/0002-Fix-build.patch    |  23 +
  overlay/asteroidos/libconnman-qt/default.nix  | 139 ++++
@@ -55,7 +55,7 @@ Subject: [PATCH] asteroid: package middleware and device services
  .../asteroidos/udev-droid-system/default.nix  |  24 +
  overlay/asteroidos/usb-moded-dev/default.nix  |  42 ++
  overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
- 51 files changed, 5503 insertions(+)
+ 51 files changed, 5514 insertions(+)
  create mode 100644 overlay/asteroidos/accounts-qt/default.nix
  create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
  create mode 100644 overlay/asteroidos/amber-mpris/default.nix
@@ -784,7 +784,7 @@ new file mode 100644
 index 00000000..77bda95d
 --- /dev/null
 +++ b/overlay/asteroidos/keepalive/default.nix
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,104 @@
 +# Nemo keepalive background activity scheduling library and QML plugin
 +# Upstream repository: https://github.com/sailfishos/nemo-keepalive
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/blob/master/recipes-nemomobile/nemo-keepalive/nemo-keepalive_git.bb
@@ -813,6 +813,13 @@ index 00000000..77bda95d
 +
 +  strictDeps = true;
 +  dontWrapQtApps = true;
++
++  # Runtime examples must not retain native Qt or the cross compiler, including
++  # through debug info in files installed outside the standard fixup paths.
++  disallowedReferences = [
++    buildPackages.qt6.qtbase
++    stdenv.cc.cc
++  ];
 +
 +  patches = [
 +    "${metaAsteroidSrc}/recipes-nemomobile/nemo-keepalive/nemo-keepalive/0001-Disable-tests.patch"
@@ -845,6 +852,10 @@ index 00000000..77bda95d
 +      --replace-fail 'INSTALLS += target develheaders pkgconfig' 'INSTALLS += target develheaders'
 +    substituteInPlace plugin/plugin.pro \
 +      --replace-fail '$$[QT_INSTALL_QML]' '/lib/qt-6/qml'
++    for project in examples/*/*.pro; do
++      substituteInPlace "$project" \
++        --replace-fail '$$[QT_INSTALL_BINS]' '/bin'
++    done
 +    substituteInPlace keepalive.pro \
 +      --replace-fail '$$[QT_INSTALL_EXAMPLES]/keepalive' '/share/qt-6/examples/keepalive'
 +  '';
