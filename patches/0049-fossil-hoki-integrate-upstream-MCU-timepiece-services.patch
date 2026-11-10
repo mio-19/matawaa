@@ -1,0 +1,214 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 10 Nov 2026 11:36:16 +1100
+Subject: [PATCH] fossil-hoki: integrate upstream MCU timepiece services
+
+---
+ devices/fossil-hoki/default.nix               |  1 +
+ devices/fossil-hoki/timepiece.nix             | 65 +++++++++++++++++++
+ .../asteroid-seconddisplay/default.nix        | 52 +++++++++++++++
+ overlay/asteroidos/default.nix                |  2 +
+ .../asteroidos/kernel-timezone/default.nix    | 38 +++++++++++
+ 5 files changed, 158 insertions(+)
+ create mode 100644 devices/fossil-hoki/timepiece.nix
+ create mode 100644 overlay/asteroidos/asteroid-seconddisplay/default.nix
+ create mode 100644 overlay/asteroidos/kernel-timezone/default.nix
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index 9019a3a4..9182f45f 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -49,6 +49,7 @@ in
+     ./android-init.nix
+     ./wlan.nix
+     ./audio-modules.nix
++    ./timepiece.nix
+   ];
+ 
+   mobile.device.name = "fossil-hoki";
+diff --git a/devices/fossil-hoki/timepiece.nix b/devices/fossil-hoki/timepiece.nix
+new file mode 100644
+index 00000000..e2460f6e
+--- /dev/null
++++ b/devices/fossil-hoki/timepiece.nix
+@@ -0,0 +1,65 @@
++# Upstream Hoki timepiece mode hands the panel to the BG MCU and powers Linux
++# off. It is an explicit action, never an idle/suspend hook.
++# https://github.com/MagneFire/asteroid-coprocessor/pull/3
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++
++{
++  config = lib.mkIf config.services.asteroid-desktop.enable {
++    environment.systemPackages = [ pkgs.asteroid.asteroid-seconddisplay ];
++    services.dbus.packages = [ pkgs.asteroid.asteroid-seconddisplay ];
++    systemd.packages = [ pkgs.asteroid.asteroid-seconddisplay ];
++    systemd.user.services.asteroid-seconddisplayd = {
++      wantedBy = [ "default.target" ];
++      after = [ "android-boot-completed.service" ];
++      unitConfig.ConditionUser = "!root";
++    };
++    systemd.user.services.asteroid-seconddisplay-sync-time.unitConfig.ConditionUser = "!root";
++    systemd.user.timers.asteroid-seconddisplay-sync-time.wantedBy = [ "timers.target" ];
++
++    # Bionic and the Sidekick HAL read the kernel offset rather than /etc/localtime.
++    # Use the upstream C helper; refresh periodically to cover DST changes too.
++    # Avoid OnClockChange: upstream review notes it also fires on every resume.
++    # https://github.com/AsteroidOS/meta-asteroid/pull/332
++    systemd.services.kernel-timezone = {
++      description = "Set the kernel time zone for Android HALs";
++      wantedBy = [ "multi-user.target" ];
++      after = [ "local-fs.target" ];
++      before = [
++        "android-init.service"
++        "shutdown.target"
++      ];
++      conflicts = [ "shutdown.target" ];
++      # android-init is pulled into basic.target. A normal service's implicit
++      # After=basic.target would form an ordering cycle here.
++      unitConfig = {
++        DefaultDependencies = false;
++        ConditionPathExists = "/etc/localtime";
++      };
++      serviceConfig = {
++        Type = "oneshot";
++        ExecStart = "${pkgs.asteroid.kernel-timezone}/bin/kernel-timezone";
++      };
++    };
++    systemd.timers.kernel-timezone = {
++      wantedBy = [ "timers.target" ];
++      timerConfig = {
++        OnTimezoneChange = true;
++        OnCalendar = "hourly";
++      };
++    };
++
++    # The desktop session is started through linger and may not count as active.
++    security.polkit.extraConfig = ''
++      polkit.addRule(function(action, subject) {
++        if (action.id == "org.freedesktop.login1.power-off" && subject.user == "ceres") {
++          return polkit.Result.YES;
++        }
++      });
++    '';
++  };
++}
+diff --git a/overlay/asteroidos/asteroid-seconddisplay/default.nix b/overlay/asteroidos/asteroid-seconddisplay/default.nix
+new file mode 100644
+index 00000000..73e79f24
+--- /dev/null
++++ b/overlay/asteroidos/asteroid-seconddisplay/default.nix
+@@ -0,0 +1,52 @@
++# Hoki backend from the upstream author's timepiece-mode branch:
++# https://github.com/MagneFire/asteroid-coprocessor/pull/3
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++  cmake,
++  pkg-config,
++  qt6,
++  libgbinder,
++  glib,
++  mlite,
++}:
++
++stdenv.mkDerivation {
++  pname = "asteroid-seconddisplay";
++  version = "1.0.0-unstable-2026-10-04";
++
++  src = fetchFromGitHub {
++    owner = "MagneFire";
++    repo = "asteroid-coprocessor";
++    rev = "976d3432347e2f67d23e3de7baac60a852ae823f";
++    hash = "sha256-5qAIA+UcV8Iwu70gBN6fxM4BS2QY9yHlc4KtG5jWOYQ=";
++  };
++
++  strictDeps = true;
++  nativeBuildInputs = [
++    cmake
++    pkg-config
++    qt6.wrapQtAppsHook
++  ];
++  buildInputs = [
++    qt6.qtbase
++    libgbinder
++    glib
++    mlite
++  ];
++
++  # Mobile NixOS prefixes device names with the manufacturer.
++  postPatch = ''
++    substituteInPlace src/backend.cpp \
++      --replace-fail 'machine == "hoki"' '(machine == "hoki" || machine == "fossil-hoki")'
++  '';
++
++  meta = {
++    description = "AsteroidOS coprocessor clock and timepiece daemon";
++    homepage = "https://github.com/MagneFire/asteroid-coprocessor";
++    license = lib.licenses.gpl3Only;
++    platforms = lib.platforms.linux;
++    mainProgram = "asteroid-seconddisplay";
++  };
++}
+diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
+index 0a93fbb9..98b8eb9c 100644
+--- a/overlay/asteroidos/default.nix
++++ b/overlay/asteroidos/default.nix
+@@ -23,6 +23,8 @@ rec {
+   # Device features shipped by upstream meta-hoki (IMAGE_INSTALL) and asteroid-image.
+   udev-droid-system = callPackage ./udev-droid-system { inherit metaAsteroidSrc; };
+   swclock-offset = callPackage ./swclock-offset { };
++  kernel-timezone = callPackage ./kernel-timezone { };
++  asteroid-seconddisplay = callPackage ./asteroid-seconddisplay { inherit mlite; };
+   bluebinder = callPackage ./bluebinder { inherit metaAsteroidSrc; };
+   ngfd = callPackage ./ngfd { inherit metaAsteroidSrc mce-dev; };
+   libncicore = callPackage ./libncicore { inherit metaAsteroidSrc; };
+diff --git a/overlay/asteroidos/kernel-timezone/default.nix b/overlay/asteroidos/kernel-timezone/default.nix
+new file mode 100644
+index 00000000..99e8b3f7
+--- /dev/null
++++ b/overlay/asteroidos/kernel-timezone/default.nix
+@@ -0,0 +1,38 @@
++# Reuse the upstream helper, not a second implementation of Android's offset.
++# https://github.com/AsteroidOS/meta-asteroid/pull/332
++{
++  lib,
++  stdenv,
++  fetchFromGitHub,
++}:
++
++stdenv.mkDerivation {
++  pname = "kernel-timezone";
++  version = "0-unstable-2026-10-04";
++  src = fetchFromGitHub {
++    owner = "MagneFire";
++    repo = "meta-asteroid";
++    rev = "3ca9e1e419fa8db58adb0c6bfd55a260e861b51c";
++    hash = "sha256-ENnckIS9LjlIEQjP8DNTWobg9fEKLndPq6MdRLcaVJU=";
++  };
++  sourceRoot = "source/recipes-core/kernel-timezone/kernel-timezone";
++  strictDeps = true;
++  dontConfigure = true;
++  buildPhase = ''
++    runHook preBuild
++    $CC $CFLAGS kernel-timezone.c -o kernel-timezone $LDFLAGS
++    runHook postBuild
++  '';
++  installPhase = ''
++    runHook preInstall
++    install -Dm755 kernel-timezone "$out/bin/kernel-timezone"
++    runHook postInstall
++  '';
++  meta = {
++    description = "Synchronize the kernel time zone for Android HALs";
++    homepage = "https://github.com/AsteroidOS/meta-asteroid/pull/332";
++    license = lib.licenses.gpl3Only;
++    platforms = lib.platforms.linux;
++    mainProgram = "kernel-timezone";
++  };
++}

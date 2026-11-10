@@ -1,0 +1,155 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 10 Nov 2026 11:33:29 +1100
+Subject: [PATCH] hwcomposer: refresh Hoki ambient frames in low-power doze
+
+---
+ devices/fossil-hoki/default.nix               |  9 +-
+ .../ambient-doze-update.patch                 | 97 +++++++++++++++++++
+ .../qt6-qpa-hwcomposer-plugin/default.nix     |  2 +
+ 3 files changed, 107 insertions(+), 1 deletion(-)
+ create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/ambient-doze-update.patch
+
+diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
+index a6a6e41d..9019a3a4 100644
+--- a/devices/fossil-hoki/default.nix
++++ b/devices/fossil-hoki/default.nix
+@@ -377,7 +377,8 @@ in
+     cp ${pkgs.writeText "20-device.conf" ''
+       LIPSTICK_OPTIONS="-plugin evdevkeyboard:/dev/input/event4:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevkeyboard:/dev/input/event0:keymap=${pkgs.asteroid.assets.keymaps}/share/qt6/keymaps/keys.qmap -plugin evdevmouse:/dev/input/event1"
+       QPA_HWC_FORCE_GLES=1
+-      QPA_HWC2_FORCE_DOZE_UPDATE=1
++      # Refresh ambient frames without switching to full ON mode.
++      QPA_HWC2_DOZE_UPDATE=1
+       QT_OPENGL_NO_BGRA=1
+       ${lib.optionalString debugBuild ''
+         QT_DEBUG_PLUGINS=1
+@@ -389,6 +390,12 @@ in
+     ''} ./var/lib/environment/compositor/qt6-hidpi.conf
+   '';
+ 
++  # Apply the display policy on profile upgrades too: /var/lib/environment is
++  # populated by the image builder and persists across OTA deployments.
++  systemd.user.services.asteroid-launcher = lib.mkIf config.services.asteroid-desktop.enable {
++    environment.QPA_HWC2_DOZE_UPDATE = "1";
++  };
++
+   # Symlink modem and bluetooth partition firmware into /lib/firmware
+   # once /vendor/firmware_mnt and /vendor/bt_firmware are mounted.
+   systemd.services.firmware-mount-links-hoki = {
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/ambient-doze-update.patch b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/ambient-doze-update.patch
+new file mode 100644
+index 00000000..cd0a8dc8
+--- /dev/null
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/ambient-doze-update.patch
+@@ -0,0 +1,97 @@
++diff --git a/hwcomposer/hwcomposer_backend.cpp b/hwcomposer/hwcomposer_backend.cpp
++index f20f99e..72ff1bd 100644
++--- a/hwcomposer/hwcomposer_backend.cpp
+++++ b/hwcomposer/hwcomposer_backend.cpp
++@@ -57,7 +57,7 @@ extern "C" void *android_dlsym(void *handle, const char *symbol);
++ extern "C" int android_dlclose(void *handle);
++ 
++ HwComposerBackend::HwComposerBackend(hw_module_t *hwc_module, void *libmsf)
++-    : hwc_module(hwc_module), libminisf(libmsf)
+++    : m_ambientMode(false), hwc_module(hwc_module), pwr_module(nullptr), libminisf(libmsf)
++ {
++ }
++ 
++diff --git a/hwcomposer/hwcomposer_backend_v20.cpp b/hwcomposer/hwcomposer_backend_v20.cpp
++index e62082c..d4b1145 100644
++--- a/hwcomposer/hwcomposer_backend_v20.cpp
+++++ b/hwcomposer/hwcomposer_backend_v20.cpp
++@@ -45,6 +45,7 @@
++ 
++ #include <string>
++ #include <QtCore/QElapsedTimer>
+++#include <QtCore/qscopeguard.h>
++ #include <QtCore/QTimerEvent>
++ #include <QtCore/QCoreApplication>
++ #include <private/qwindow_p.h>
++@@ -167,6 +168,7 @@ class HWC2Window : public HWComposerNativeWindow
++         bool m_syncBeforeSet;
++         HwComposerBackend_v20 *m_backend;
++         bool m_dozeWorkaround;
+++    bool m_dozeUpdate;
++     protected:
++         void present(HWComposerNativeWindowBuffer *buffer);
++ 
++@@ -193,6 +195,7 @@ HWC2Window::HWC2Window(unsigned int width, unsigned int height,
++     setBufferCount(bufferCount);
++     m_syncBeforeSet = qEnvironmentVariableIsSet("QPA_HWC_SYNC_BEFORE_SET");
++     m_dozeWorkaround = qEnvironmentVariableIsSet("QPA_HWC2_FORCE_DOZE_UPDATE");
+++    m_dozeUpdate = qEnvironmentVariableIsSet("QPA_HWC2_DOZE_UPDATE");
++ }
++ 
++ HWC2Window::~HWC2Window()
++@@ -226,10 +229,29 @@ void HWC2Window::present(HWComposerNativeWindowBuffer *buffer)
++         acquireFenceFd = -1;
++     }
++ 
++-    // Some devices don't support updating the display while it's in doze mode,
++-    // transition the display temporarily on to update it.
++-    if (m_dozeWorkaround && m_backend->isDozing()) {
++-        hwc2_compat_display_set_power_mode(hwcDisplay, HWC2_POWER_MODE_ON);
+++    // DOZE accepts updates without returning to normal interactive brightness.
+++    // Keep the upstream ON workaround available for other vendor HALs.
+++    const bool updatingDoze = (m_dozeUpdate || m_dozeWorkaround) && m_backend->isDozing();
+++    const auto restoreDoze = qScopeGuard([&] {
+++        if (updatingDoze && m_backend->isDozing()) {
+++            const auto result = hwc2_compat_display_set_power_mode(
+++                hwcDisplay, HWC2_POWER_MODE_DOZE_SUSPEND);
+++            if (result != HWC2_ERROR_NONE)
+++                qWarning("hwc: restore DOZE_SUSPEND failed: %s (%d)", hwcErrorName(result), result);
+++            else if (hwcDebugEnabled())
+++                qDebug("hwc: ambient update restored DOZE_SUSPEND");
+++        }
+++    });
+++    if (updatingDoze) {
+++        const int mode = m_dozeUpdate ? HWC2_POWER_MODE_DOZE : HWC2_POWER_MODE_ON;
+++        error = hwc2_compat_display_set_power_mode(hwcDisplay, mode);
+++        if (error != HWC2_ERROR_NONE) {
+++            qWarning("hwc: ambient update power mode %d failed: %s (%d), frame dropped",
+++                     mode, hwcErrorName(error), error);
+++            return;
+++        }
+++        if (hwcDebugEnabled())
+++            qDebug("hwc: ambient update in power mode %d", mode);
++     }
++ 
++     error = hwc2_compat_display_validate(hwcDisplay, &numTypes,
++@@ -293,9 +315,10 @@ void HWC2Window::present(HWComposerNativeWindowBuffer *buffer)
++     if (hwcDebugEnabled() && (presentIndex < 5 || (presentIndex % 300) == 0))
++         qDebug("hwc: present #%d done, fence=%d", presentIndex, presentFence);
++ 
++-    if (m_dozeWorkaround && m_backend->isDozing()) {
++-        hwc2_compat_display_set_power_mode(hwcDisplay, HWC2_POWER_MODE_DOZE_SUSPEND);
++-    }
+++    // The current frame must reach the panel before suspending refresh. Waiting
+++    // only on lastPresentFence waits for the previous frame and races this one.
+++    if (updatingDoze && presentFence != -1 && sync_wait(presentFence, 1000) < 0)
+++        qWarning("hwc: ambient present fence did not signal within 1000 ms");
++ }
++ 
++ int HwComposerBackend_v20::composerSequenceId = 0;
++@@ -307,6 +330,7 @@ HwComposerBackend_v20::HwComposerBackend_v20(hw_module_t *hwc_module, power_modu
++     , hwc2_primary_display(NULL)
++     , hwc2_primary_layer(NULL)
++     , m_displayOff(true)
+++    , m_dozing(false)
++ {
++     procs = new HwcProcs_v20();
++     procs->on_vsync_received = hwc2_callback_vsync;
+diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+index c5ec137a..4b28ebad 100644
+--- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
++++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
+@@ -69,6 +69,8 @@ stdenv.mkDerivation {
+     "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0006-v10-Fix-refresh-rate-fallback-unit.patch"
+     "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0007-v10-Make-updates-request-driven-and-vsync-paced.patch"
+     ./hwc-present-diagnostics.patch
++    # Keep ambient updates in low-power DOZE and restore suspend on errors.
++    ./ambient-doze-update.patch
+   ];
+ 
+   strictDeps = true;
