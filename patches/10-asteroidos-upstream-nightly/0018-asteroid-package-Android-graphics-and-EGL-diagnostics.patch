@@ -41,7 +41,7 @@ index b21365b0..9ec5b3eb 100644
    amber-mpris = callPackage ./amber-mpris { };
    mlite = callPackage ./mlite { };
    libconnman-qt = callPackage ./libconnman-qt { };
-@@ -84,6 +94,8 @@ rec {
+@@ -85,6 +95,8 @@ rec {
  
    # Device state machine daemon MCE talks to.
    # Upstream: https://github.com/sailfishos/dsme

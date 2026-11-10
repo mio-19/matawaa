@@ -25,7 +25,7 @@ diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index adefb02d..1b12cbde 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -172,12 +172,19 @@ rec {
+@@ -173,12 +173,19 @@ rec {
      tdlib = if pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform then pkgs.tdlib else null;
    };
  

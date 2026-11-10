@@ -29,7 +29,7 @@ diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index 2277c2ce..adefb02d 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -165,12 +165,19 @@ rec {
+@@ -166,12 +166,19 @@ rec {
      inherit (pkgs) wpewebkit;
    };
  

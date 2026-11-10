@@ -1698,7 +1698,7 @@ diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index 6cbaf356..88205f61 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -173,4 +173,10 @@ rec {
+@@ -174,4 +174,10 @@ rec {
  
    virtualkeyboard = callPackage ./virtualkeyboard { inherit noUsrShareHook; };
  

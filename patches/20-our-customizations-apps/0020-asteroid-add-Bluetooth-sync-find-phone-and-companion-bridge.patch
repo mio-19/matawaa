@@ -878,7 +878,7 @@ diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index 16227de4..262d4cf2 100644
 --- a/overlay/asteroidos/default.nix
 +++ b/overlay/asteroidos/default.nix
-@@ -155,4 +155,8 @@ rec {
+@@ -156,4 +156,8 @@ rec {
        ;
    };
  
