@@ -15,20 +15,19 @@ The patch series might be regarded as the real commit history, whereas the git c
 Build the AsteroidOS image from the patched checkout:
 
 ```sh
-./script/applyPatches.sh
+./scripts/applyPatches.sh
 nix-build work/mobile-nixos/examples/asteroid --argstr device fossil-hoki -A outputs.default
 ```
 
 ## Devices, Linux Kernel
 
-+ Planned: pixel watch 2, supported kernel
++ google-aurora (Pixel Watch 2): 5.15.144 vendor kernel and configuration are packaged; unverified on hardware
 
 
 ## TODO
 
 + move hoki hardcoded partitions to better places
 + asteriod os usbnet adb modes
-+ legacy kernel's device's image: just override systemd to systemd257 so every systemd become systemd257 in the system, also after this we can simplify some nix code
 
 ## Device: hoki (Fossil Gen 6)
 
