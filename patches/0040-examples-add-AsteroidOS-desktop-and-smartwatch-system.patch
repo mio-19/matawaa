@@ -4,22 +4,18 @@ Date: Mon, 9 Nov 2026 10:55:57 +1100
 Subject: [PATCH] examples: add AsteroidOS desktop and smartwatch system
 
 ---
- examples/asteroid/asteroid-desktop.nix | 920 ++++++++++++++++++++++++++
-devices/fossil-hoki/mce-keep-aod.patch | 25 +++++++++++++++++++++++++
- examples/asteroid/configuration.nix    |  43 ++
- examples/asteroid/default.nix          |  15 +
- 4 files changed, 1003 insertions(+)
- create mode 100644 examples/asteroid/asteroid-desktop.nix
-create mode 100644 devices/fossil-hoki/mce-keep-aod.patch
- create mode 100644 examples/asteroid/configuration.nix
- create mode 100644 examples/asteroid/default.nix
+ examples/asteroid/asteroid-desktop.nix                     |  936 ++++++++++++++++++++++++++++++++++++++++++
+ devices/fossil-hoki/mce-keep-aod.patch                     |   25 ++++++++++
+ examples/asteroid/configuration.nix                        |   43 +++++++++++++
+ examples/asteroid/default.nix                              |   15 ++++++++
+4 files changed, 1019 insertions(+)
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
-index 00000000..d684d006
+index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdffc0e2636f
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,920 @@
+@@ -0,0 +1,936 @@
 +{
 +  config,
 +  lib,
@@ -513,7 +509,7 @@ index 00000000..d684d006
 +      # Proxies the Android binder based Bluetooth HAL to BlueZ over vhci.
 +      systemd.services.bluebinder = {
 +        description = "Android binder based bluetooth proxy (vhci)";
-+        wantedBy = [ "graphical.target" ];
++        wantedBy = [ "multi-user.target" ];
 +        after = [
 +          "android-init.service"
 +          "dbus.service"
@@ -523,7 +519,23 @@ index 00000000..d684d006
 +          Type = "notify";
 +          ExecStartPre = "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_wait.sh";
 +          ExecStart = "${pkgs.asteroid.bluebinder}/sbin/bluebinder";
-+          ExecStartPost = "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_post.sh";
++          # The vendor property ro.vendor.bt.bdaddr_path points at
++          # /mnt/vendor/persist/bdaddr.ini, which hoki does not have; the
++          # controller address is stored in /persist/btmac.ini instead, so
++          # bluebinder_post.sh always failed to populate board-address. Seed it
++          # from the file that exists on this device; the upstream script then
++          # takes its early-exit path.
++          ExecStartPost = [
++            "-${pkgs.writeShellScript "bluebinder-board-address" ''
++              if [ -f /var/lib/bluetooth/board-address ]; then exit 0; fi
++              if [ -f /persist/btmac.ini ]; then
++                ${pkgs.coreutils}/bin/mkdir -p /var/lib/bluetooth
++                ${pkgs.coreutils}/bin/tr -d '\r\n' < /persist/btmac.ini > /var/lib/bluetooth/board-address
++                ${pkgs.coreutils}/bin/chmod 644 /var/lib/bluetooth/board-address
++              fi
++            ''}"
++            "-${pkgs.asteroid.bluebinder}/libexec/bluebinder_post.sh"
++          ];
 +          Restart = "always";
 +          TimeoutStartSec = 60;
 +        };

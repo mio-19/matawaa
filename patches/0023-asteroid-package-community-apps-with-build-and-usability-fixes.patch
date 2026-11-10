@@ -5,16 +5,12 @@ Subject: [PATCH] asteroid: package community apps with build and usability
  fixes
 
 ---
- .../beatfork-tack-improvements.patch          | 449 ++++++++++
- overlay/asteroidos/community-apps/default.nix | 384 +++++++++
- .../map-comaps-improvements.patch             | 814 ++++++++++++++++++
- .../community-apps/weatherfetch-gcc16.patch   |  11 +
- overlay/asteroidos/default.nix                |   6 +
- 5 files changed, 1664 insertions(+)
- create mode 100644 overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
- create mode 100644 overlay/asteroidos/community-apps/default.nix
- create mode 100644 overlay/asteroidos/community-apps/map-comaps-improvements.patch
- create mode 100644 overlay/asteroidos/community-apps/weatherfetch-gcc16.patch
+ ...eroidos/community-apps/beatfork-tack-improvements.patch |  449 ++++++++++++++++++++++++++++++++++++++++++
+ overlay/asteroidos/community-apps/default.nix              |  384 +++++++++++++++++++++++++++++++++++++++
+ ...asteroidos/community-apps/map-comaps-improvements.patch |  814 ++++++++++++++++++++++++++++++++++++++++++
+ overlay/asteroidos/community-apps/weatherfetch-gcc16.patch |   11 +++++++
+ overlay/asteroidos/default.nix                             |    6 +++++
+5 files changed, 1664 insertions(+)
 
 diff --git a/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch b/overlay/asteroidos/community-apps/beatfork-tack-improvements.patch
 new file mode 100644
@@ -473,7 +469,7 @@ index 00000000..3887693a
 +         function onCurrentIndexChanged() {
 diff --git a/overlay/asteroidos/community-apps/default.nix b/overlay/asteroidos/community-apps/default.nix
 new file mode 100644
-index 00000000..1c6b5f86
+index 0000000000000000000000000000000000000000..27c88d9c269f48816842d95b56299f064c301b1b
 --- /dev/null
 +++ b/overlay/asteroidos/community-apps/default.nix
 @@ -0,0 +1,384 @@
@@ -497,7 +493,7 @@ index 00000000..1c6b5f86
 +      owner = "AsteroidOS";
 +      repo = "unofficial-watchfaces";
 +      rev = "7d1d2673922c1e6a8d8d0650032795ee2bd19683";
-+      sha256 = "047jyapyc3h7vgi4apgkgw76116z76mb1n2z71j11mi9x8y3x72a";
++      hash = "sha256-Spw+POop1hBkOF/YsKo534RgDn/zXUXi2wcO5q/y8hA=";
 +    };
 +
 +    installPhase = ''
@@ -521,7 +517,7 @@ index 00000000..1c6b5f86
 +    repo = "asteroid-blaster";
 +    desc = "Tilt-controlled asteroid shooting arcade frenzy for AsteroidOS smartwatches";
 +    rev = "7947938807d5de4ea7cb918b0241377aac9d3216";
-+    sha256 = "1vsndy01pwc333zs2c4lp4rcj4qvgmgpq0lc574h27dgkjqkphl1";
++    hash = "sha256-gcI7sZyvHQHJKYwCfF99GxPJMrmUMKH/GIPxG4BvVu8=";
 +    extraBuildInputs = [
 +      qt6.qtsensors
 +      qt6.qtshadertools
@@ -534,7 +530,7 @@ index 00000000..1c6b5f86
 +    repo = "asteroid-dodger";
 +    desc = "Tilt-controlled asteroid survival game for AsteroidOS smartwatches";
 +    rev = "9643d40db9c609a006ed89a87dc1afd907492af1";
-+    sha256 = "098igv2yaj3pjkiklkzmby8wlr3zmrbb8rmv0f3l1x6n56dv5096";
++    hash = "sha256-JoGymynW9ECHA7tmtFauf2TKkV/1TzrjlHdI5cV+ESU=";
 +    extraBuildInputs = [
 +      qt6.qtsensors
 +      qt6.qtshadertools
@@ -545,7 +541,7 @@ index 00000000..1c6b5f86
 +    name = "sensorlogd";
 +    desc = "Background sensor logging daemon and QML plugin for health metrics on AsteroidOS";
 +    rev = "bdc9f0bb0fd6ef39f08fb01697d95cb2b98c86b6";
-+    sha256 = "1lb5m8g4k8sq9j9kynmffmzfj6q98rnwzbi7dr1i8fs6iq12a1ri";
++    hash = "sha256-MQclAo5GOxRDbieuz21GCRvpfnWuWj+TTFijSR6qZdE=";
 +    # The wearable sensor types (QHrmSensor, QStepCounterSensor, …) come from
 +    # Qt Sensors itself: the upstream AsteroidOS patches are applied to
 +    # qt6.qtsensors in overlay/cross-compile.nix. No in-tree mock headers here.
@@ -560,7 +556,7 @@ index 00000000..1c6b5f86
 +    name = "health";
 +    desc = "Step counter, heart rate monitor, and wellness tracker for AsteroidOS";
 +    rev = "c85390fb9dd643f9b58e73bf698833ed7727b89f";
-+    sha256 = "1kk8y094sva6y3hnw0lbrk1liacpnfqknbrlv6hsry9fwgdxv3kq";
++    hash = "sha256-eI7d2+Mu+ayh2TQvO7Gzl6lIw8yLAm7h8EZtTRLwaM4=";
 +    extraBuildInputs = [
 +      qt6.qtsensors
 +      mlite
@@ -573,7 +569,7 @@ index 00000000..1c6b5f86
 +    name = "map";
 +    desc = "Touch and GPS map viewer for AsteroidOS smartwatches";
 +    rev = "8263b2175843e83c32baee2eec5380559db2b735";
-+    sha256 = "0f9rfbkr42fpa5f1bj3w9b8hwp1qn9v9zy7rwrjr10m1c5q64c7h";
++    hash = "sha256-8DBicGGhgpBl5vn4n3ayOFwO0Up8yBVcUdcJkudyOTk=";
 +    patches = [
 +      ./map-comaps-improvements.patch
 +    ];
@@ -589,7 +585,7 @@ index 00000000..1c6b5f86
 +    repo = "asteroid-qmltester";
 +    desc = "Interactive developer QML viewer and testing workbench on AsteroidOS";
 +    rev = "b397ebfa77025ddbf093fa4cbab7d5d218cc8624";
-+    sha256 = "0szlc78av6d94bpzgbc0lwwf5z921b87agpjg0nw1x80asz8xwbp";
++    hash = "sha256-d/GOvlYA9cAtePI+ddAKIv3iOKeArffvIqmZrdBh9Gs=";
 +  };
 +
 +  skedaddle = mkAsteroidApp {
@@ -598,7 +594,7 @@ index 00000000..1c6b5f86
 +    repo = "asteroid-skedaddle";
 +    desc = "Outdoor exercise and running activity tracker with GPX recording";
 +    rev = "f5620c7b0c6f7ca06e2ee483ed2a0377204b6682";
-+    sha256 = "0v07y2fzh1zvnsnsg7b77fjpv9mq1sn4lc0k050pyf7yziy6liya";
++    hash = "sha256-ykdqfPz+OH9BARMwSqwOuKZ9pTtnnaettvsH+J3wB2w=";
 +    extraBuildInputs = [
 +      qt6.qtpositioning
 +      espeak-classic
@@ -611,7 +607,7 @@ index 00000000..1c6b5f86
 +    repo = "asteroid-weatherfetch";
 +    desc = "Direct internet weather forecast fetcher for AsteroidOS";
 +    rev = "70044bb4904d22f521fa7eb7448d5007bd863f97";
-+    sha256 = "04m1shcw9a36dpa5ibw5728c6d1vqiah9djlr79fq51c12sy7fvl";
++    hash = "sha256-dLvjtQgsFOzSyVS2BFXEOzTDkDiFr1jUbWaoxBnUoRI=";
 +    patches = [
 +      ./weatherfetch-gcc16.patch
 +    ];
@@ -629,7 +625,7 @@ index 00000000..1c6b5f86
 +    repo = "asteroid-beatfork";
 +    desc = "Metronome and chromatic tuning fork app for smartwatches";
 +    rev = "e3fbc5dd6da40868e0f338c9a0d3f6e877afca25";
-+    sha256 = "1s4n5qfqximi05szksjbl806rpd37j3q7245z1iip5rrnlbkc7m2";
++    hash = "sha256-oh42F7U5lxtj+IWIg4c8o91sAKJL6vl1AbHGjh0ulug=";
 +    patches = [
 +      ./beatfork-tack-improvements.patch
 +    ];
@@ -649,7 +645,7 @@ index 00000000..1c6b5f86
 +    repo = "benchymark";
 +    desc = "Benchmark tool for AsteroidOS smartwatches";
 +    rev = "11e90920e76e6c62fe1076d4c3927b81b1154e96";
-+    sha256 = "0x3c5rm2b8b8cfq7a1kl1699lmn88id70zmrsqzf53bxiv1ms8x4";
++    hash = "sha256-pCNdw459jeI+1rl+cFpEyFaakgl0BnWwY2ihJWoubHQ=";
 +    postPatch = ''
 +      for phase in src/phases/CloudLight.qml src/phases/CloudHeavy.qml; do
 +        substituteInPlace "$phase" \
@@ -670,7 +666,7 @@ index 00000000..1c6b5f86
 +      owner = "moWerk";
 +      repo = "asteroid-docking-bay";
 +      rev = "37503828b30c4061a815b10887c46b548137b34f";
-+      sha256 = "0g8x6v27ni3zqwir2sif7a0csb78adii47g4y4mnqm3vfklknnp1";
++      hash = "sha256-4Vo76XR7VGwr8eQdEmNT6CzNgDouapEjx39Ee8Q2HT0=";
 +    };
 +
 +    postPatch = ''
@@ -711,7 +707,7 @@ index 00000000..1c6b5f86
 +    owner = "moWerk";
 +    desc = "Solar elevation, daylight tracker, and sundial calculator for smartwatches";
 +    rev = "612fd6b1e9229cbacb5f724bc21e239cd034f632";
-+    sha256 = "11khf2f2fj2vgvrc7m95n13ac7f09phi1x07xf5g12rwc09yw648";
++    hash = "sha256-iBjuE2A8i/CK6wf0EOFNwB2mRrAl1cPyfltIJ5xwcIY=";
 +    extraBuildInputs = [
 +      qt6.qtpositioning
 +    ];
@@ -723,7 +719,7 @@ index 00000000..1c6b5f86
 +    owner = "moWerk";
 +    desc = "Artificial horizon and spirit level bubble display for smartwatches";
 +    rev = "3339b36ab549e11949f3399e49ced07e1035ee96";
-+    sha256 = "1gvy5nkgdr62f1aqss6sxbzlwc4n74r3xa82ymvyml0ccnp80iql";
++    hash = "sha256-FEeArmUM0Op39QKpPjI5ljBO/+raaI1VcMLk9qYtfr8=";
 +    extraBuildInputs = [
 +      qt6.qtsensors
 +    ];
@@ -735,7 +731,7 @@ index 00000000..1c6b5f86
 +    owner = "moWerk";
 +    desc = "Fast-paced space arcade memory and reflex matching game for smartwatches";
 +    rev = "3a597047d1e4021d8eddf715e4c6e110c04080d1";
-+    sha256 = "043jmqf4hb4fci13ikn88r32cr0r280jy16kaik43k7cnnacbgzv";
++    hash = "sha256-+7/FlLXszEFmVNMELwESGWQmRkbIzjhCZI4sSByuchA=";
 +  };
 +
 +  # Stroboscope and visual flasher: https://github.com/moWerk/asteroid-pulsar
@@ -744,7 +740,7 @@ index 00000000..1c6b5f86
 +    owner = "moWerk";
 +    desc = "Stroboscope and pulsing visual flasher tool for smartwatches";
 +    rev = "a7b9339bc6ba882ec0717a45e2edddc1e304cd84";
-+    sha256 = "10ddg0ig5nmx7mczxxbw67qpawqv04261y8fmm92dzm1b4qb59yz";
++    hash = "sha256-36eyMFmh/iZSrQ75YAQBG3N18TF89f5ZPb3a8iJ4rYE=";
 +  };
 +
 +  # RAG dataset and design specification: https://github.com/moWerk/asteroid-rag
@@ -756,7 +752,7 @@ index 00000000..1c6b5f86
 +      owner = "moWerk";
 +      repo = "asteroid-rag";
 +      rev = "0eaf32483ac17a69ee2ce79524c2d8704fcce619";
-+      sha256 = "0s9zh7cqhwzbh99xwd812bfc7xz64axwaagbzg926mi4yz87h5cx";
++      hash = "sha256-nRV40PckViPS++spxbsi5vfD3BIBNd5TgutziNmBP2k=";
 +    };
 +
 +    dontBuild = true;
@@ -782,7 +778,7 @@ index 00000000..1c6b5f86
 +    owner = "moWerk";
 +    desc = "Simple and handy checklist and shopping list app for smartwatches";
 +    rev = "c0eea7e655611d060071fa213a64fa03f03de0ff";
-+    sha256 = "0mgvbhp6spahhp2jz94k7id9l18axk0blnl4rpcgngbfqg7awqgd";
++    hash = "sha256-7WGuzsNuPfvYzYRausDsCgWaWjyTpC/FhVBdbS5c+1U=";
 +  };
 +
 +  # Mechanical watch timegrapher: https://github.com/moWerk/asteroid-toolwatch
@@ -791,7 +787,7 @@ index 00000000..1c6b5f86
 +    owner = "moWerk";
 +    desc = "Mechanical watch accuracy checker and timegrapher tool for smartwatches";
 +    rev = "07b6675ae6e4734fee7971d4f4a22a9637f5f1a9";
-+    sha256 = "0jd3nj6pi9by5i8rpalsmpj63yiqjqqri6fz5v45lhis4add0p0v";
++    hash = "sha256-G1zQmiI6QlrILt+ZmDGWOPph5K2aqptRLH6leI20o0k=";
 +  };
 +
 +  # Lunar lander retro thruster game: https://github.com/moWerk/asteroid-touchdown
@@ -800,7 +796,7 @@ index 00000000..1c6b5f86
 +    owner = "moWerk";
 +    desc = "Lunar lander retro thruster landing game for smartwatches";
 +    rev = "660a26f3bd06846766c0114357c06fa195081c6c";
-+    sha256 = "1h47612wf7zfb76glg78099xysvidpln71pmjyafi1ras81jfvk3";
++    hash = "sha256-Y24nA9Iqh+iUl/WGY+ltcWvfUwLoPPrMWe4fx0Uwh8A=";
 +    extraBuildInputs = [
 +      qt6.qtsensors
 +    ];
@@ -814,14 +810,14 @@ index 00000000..1c6b5f86
 +    repo = "asteroid-hack";
 +    desc = "Keystroke injection and penetration testing utility for AsteroidOS";
 +    rev = "b2af485c78e26e18e950e3e064584b0765c163e5";
-+    sha256 = "1cf0vrc9s3s72p0b3iyrjjmy0zd4rmvpyhlzjhfbi4yn590ylkkk";
++    hash = "sha256-c07qQSrWk7gclJ9Cf3fNpH3gq5TZx7HAFUcPnVjewLE=";
 +    postPatch = ''
 +      substituteInPlace CMakeLists.txt \
-+        --replace "find_package(AsteroidApp REQUIRED)" "find_package(AsteroidApp6 REQUIRED)" \
-+        --replace "include(AsteroidCMakeSettings)" "include(Asteroid6CMakeSettings)" \
-+        --replace "include(AsteroidTranslations)" "include(Asteroid6Translations)"
++        --replace-fail "find_package(AsteroidApp REQUIRED)" "find_package(AsteroidApp6 REQUIRED)" \
++        --replace-fail "include(AsteroidCMakeSettings)" "include(Asteroid6CMakeSettings)" \
++        --replace-fail "include(AsteroidTranslations)" "include(Asteroid6Translations)"
 +      substituteInPlace src/CMakeLists.txt \
-+        --replace "AsteroidApp" "Asteroid::AsteroidApp6"
++        --replace-fail "AsteroidApp" "Asteroid::AsteroidApp6"
 +    '';
 +    postBuild = ''
 +      $CC $CFLAGS $LDFLAGS ../src/utilities/keyboard_interface.c -o keyboard_interface

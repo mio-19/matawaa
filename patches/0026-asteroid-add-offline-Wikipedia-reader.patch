@@ -4,36 +4,22 @@ Date: Mon, 9 Nov 2026 10:55:54 +1100
 Subject: [PATCH] asteroid: add offline Wikipedia reader
 
 ---
- overlay/asteroidos/default.nix                |   9 +-
- overlay/asteroidos/kiwix/CMakeLists.txt       |  58 +++
- overlay/asteroidos/kiwix/default.nix          |  86 +++++
- overlay/asteroidos/kiwix/kiwix.svg            |  43 +++
- .../kiwix/org.kiwix.desktop.desktop           |  11 +
- overlay/asteroidos/kiwix/src/main.cpp         |  43 +++
- .../asteroidos/kiwix/src/qml/ArticlePage.qml  | 125 +++++++
- .../asteroidos/kiwix/src/qml/LibraryPage.qml  | 169 +++++++++
- .../asteroidos/kiwix/src/qml/SearchPage.qml   | 167 +++++++++
- overlay/asteroidos/kiwix/src/qml/main.qml     |  39 ++
- overlay/asteroidos/kiwix/src/resources.qrc    |   8 +
- .../asteroidos/kiwix/src/zimimageprovider.cpp |  47 +++
- .../asteroidos/kiwix/src/zimimageprovider.h   |  20 ++
- overlay/asteroidos/kiwix/src/zimmanager.cpp   | 338 ++++++++++++++++++
- overlay/asteroidos/kiwix/src/zimmanager.h     |  89 +++++
- 15 files changed, 1251 insertions(+), 1 deletion(-)
- create mode 100644 overlay/asteroidos/kiwix/CMakeLists.txt
- create mode 100644 overlay/asteroidos/kiwix/default.nix
- create mode 100644 overlay/asteroidos/kiwix/kiwix.svg
- create mode 100644 overlay/asteroidos/kiwix/org.kiwix.desktop.desktop
- create mode 100644 overlay/asteroidos/kiwix/src/main.cpp
- create mode 100644 overlay/asteroidos/kiwix/src/qml/ArticlePage.qml
- create mode 100644 overlay/asteroidos/kiwix/src/qml/LibraryPage.qml
- create mode 100644 overlay/asteroidos/kiwix/src/qml/SearchPage.qml
- create mode 100644 overlay/asteroidos/kiwix/src/qml/main.qml
- create mode 100644 overlay/asteroidos/kiwix/src/resources.qrc
- create mode 100644 overlay/asteroidos/kiwix/src/zimimageprovider.cpp
- create mode 100644 overlay/asteroidos/kiwix/src/zimimageprovider.h
- create mode 100644 overlay/asteroidos/kiwix/src/zimmanager.cpp
- create mode 100644 overlay/asteroidos/kiwix/src/zimmanager.h
+ overlay/asteroidos/default.nix                             |    9 +++++-
+ overlay/asteroidos/kiwix/CMakeLists.txt                    |   58 +++++++++++++++
+ overlay/asteroidos/kiwix/default.nix                       |   86 +++++++++++++++++++
+ overlay/asteroidos/kiwix/kiwix.svg                         |   43 +++++++++++++
+ overlay/asteroidos/kiwix/org.kiwix.desktop.desktop         |   11 +++++++
+ overlay/asteroidos/kiwix/src/main.cpp                      |   43 +++++++++++++
+ overlay/asteroidos/kiwix/src/qml/ArticlePage.qml           |  125 ++++++++++++++++++++++
+ overlay/asteroidos/kiwix/src/qml/LibraryPage.qml           |  169 ++++++++++++++++++++++++++
+ overlay/asteroidos/kiwix/src/qml/SearchPage.qml            |  167 ++++++++++++++++++++++++++
+ overlay/asteroidos/kiwix/src/qml/main.qml                  |   39 ++++++++++++
+ overlay/asteroidos/kiwix/src/resources.qrc                 |    8 ++++++
+ overlay/asteroidos/kiwix/src/zimimageprovider.cpp          |   47 ++++++++++++++
+ overlay/asteroidos/kiwix/src/zimimageprovider.h            |   20 +++++++++
+ overlay/asteroidos/kiwix/src/zimmanager.cpp                |  338 +++++++++++++++++++++++++++++++++++++
+ overlay/asteroidos/kiwix/src/zimmanager.h                  |   89 +++++++++++++++++++
+15 files changed, 1251 insertions(+), 1 deletions(-)
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index adefb02d..1b12cbde 100644
@@ -126,7 +112,7 @@ index 00000000..714b9bc7
 +)
 diff --git a/overlay/asteroidos/kiwix/default.nix b/overlay/asteroidos/kiwix/default.nix
 new file mode 100644
-index 00000000..2581bb4b
+index 0000000000000000000000000000000000000000..b912bc6fdef953e31d06c7838e6bae81d5aa893a
 --- /dev/null
 +++ b/overlay/asteroidos/kiwix/default.nix
 @@ -0,0 +1,86 @@
@@ -146,7 +132,7 @@ index 00000000..2581bb4b
 +let
 +  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
 +in
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "asteroid-kiwix";
 +  version = "2.0.0";
 +
@@ -215,7 +201,7 @@ index 00000000..2581bb4b
 +    platforms = platforms.linux;
 +    mainProgram = "asteroid-kiwix";
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/kiwix/kiwix.svg b/overlay/asteroidos/kiwix/kiwix.svg
 new file mode 100644
 index 00000000..ec2029ed

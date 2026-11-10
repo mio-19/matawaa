@@ -4,26 +4,17 @@ Date: Mon, 9 Nov 2026 10:55:51 +1100
 Subject: [PATCH] asteroid: package launcher and Nemo QML plugins
 
 ---
- .../asteroid-launcher/circlemask-qrc.patch    |  15 ++
- .../asteroidos/asteroid-launcher/default.nix  | 151 ++++++++++++++++++
- .../display-on-startup.patch                  |  44 +++++
- .../asteroid-launcher/find-phone.patch        |  60 +++++++
- .../org.nemomobile.compositor.conf            |  28 ++++
- .../qml-boot-diagnostics.patch                | 109 +++++++++++++
- .../splash-no-opacitymask.patch               |  54 +++++++
- overlay/asteroidos/default.nix                |  18 +++
- .../nemo-qml-plugin-configuration/default.nix |  69 ++++++++
- .../nemo-qml-plugin-dbus/default.nix          |  80 ++++++++++
- 10 files changed, 628 insertions(+)
- create mode 100644 overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
- create mode 100644 overlay/asteroidos/asteroid-launcher/default.nix
- create mode 100644 overlay/asteroidos/asteroid-launcher/display-on-startup.patch
- create mode 100644 overlay/asteroidos/asteroid-launcher/find-phone.patch
- create mode 100644 overlay/asteroidos/asteroid-launcher/org.nemomobile.compositor.conf
- create mode 100644 overlay/asteroidos/asteroid-launcher/qml-boot-diagnostics.patch
- create mode 100644 overlay/asteroidos/asteroid-launcher/splash-no-opacitymask.patch
- create mode 100644 overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
- create mode 100644 overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
+ overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch  |   15 ++++++++
+ overlay/asteroidos/asteroid-launcher/default.nix           |  151 +++++++++++++++++++++++++
+ ...y/asteroidos/asteroid-launcher/display-on-startup.patch |   44 +++++++++++++
+ overlay/asteroidos/asteroid-launcher/find-phone.patch      |   60 +++++++++++++++
+ ...roidos/asteroid-launcher/org.nemomobile.compositor.conf |   28 +++++++++++
+ ...asteroidos/asteroid-launcher/qml-boot-diagnostics.patch |  109 +++++++++++++++++++++
+ ...steroidos/asteroid-launcher/splash-no-opacitymask.patch |   54 +++++++++++++++
+ overlay/asteroidos/default.nix                             |   18 ++++++++
+ ...ay/asteroidos/nemo-qml-plugin-configuration/default.nix |   69 +++++++++++++++++
+ overlay/asteroidos/nemo-qml-plugin-dbus/default.nix        |   80 ++++++++++++++++++
+10 files changed, 628 insertions(+)
 
 diff --git a/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch b/overlay/asteroidos/asteroid-launcher/circlemask-qrc.patch
 new file mode 100644
@@ -48,7 +39,7 @@ index 00000000..d8a0670d
 + }
 diff --git a/overlay/asteroidos/asteroid-launcher/default.nix b/overlay/asteroidos/asteroid-launcher/default.nix
 new file mode 100644
-index 00000000..34a7fd1e
+index 0000000000000000000000000000000000000000..04736a1f3ce4f804ae0b88edf1459c7bc8e0e527
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-launcher/default.nix
 @@ -0,0 +1,151 @@
@@ -80,7 +71,7 @@ index 00000000..34a7fd1e
 +let
 +  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
 +in
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "asteroid-launcher";
 +  version = "nightly";
 +
@@ -88,7 +79,7 @@ index 00000000..34a7fd1e
 +    owner = "AsteroidOS";
 +    repo = "asteroid-launcher";
 +    rev = "29f4257ec9835ead090c8157e46948c769081ed2";
-+    sha256 = "1c7swnsqxsrfdhdim9rbq4d33ivxskkck4yz8hmridfwdzzpiv53";
++    hash = "sha256-o+x4/2/ctZgrRN+TyebUfccxGsErpxobbC7rjrXl+rA=";
 +  };
 +
 +  strictDeps = true;
@@ -202,7 +193,7 @@ index 00000000..34a7fd1e
 +    mainProgram = "asteroid-launcher";
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/asteroid-launcher/display-on-startup.patch b/overlay/asteroidos/asteroid-launcher/display-on-startup.patch
 new file mode 100644
 index 00000000..6d842685
@@ -561,7 +552,7 @@ index 9ec5b3eb..16227de4 100644
    mce-dev = callPackage ./mce-dev { };
 diff --git a/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
 new file mode 100644
-index 00000000..214fc9e5
+index 0000000000000000000000000000000000000000..10b929b7692ab5ffb23c138e335130462b52cd5c
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-configuration/default.nix
 @@ -0,0 +1,69 @@
@@ -576,7 +567,7 @@ index 00000000..214fc9e5
 +  mlite,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "nemo-qml-plugin-configuration";
 +  version = "nightly";
 +
@@ -633,10 +624,10 @@ index 00000000..214fc9e5
 +    license = licenses.bsd3;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
 new file mode 100644
-index 00000000..9cad05fc
+index 0000000000000000000000000000000000000000..483b2a43747be509cbd609350d1021a5d10b1123
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-dbus/default.nix
 @@ -0,0 +1,80 @@
@@ -650,7 +641,7 @@ index 00000000..9cad05fc
 +  buildPackages,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "nemo-qml-plugin-dbus";
 +  version = "2.1.39";
 +
@@ -658,7 +649,7 @@ index 00000000..9cad05fc
 +    owner = "sailfishos";
 +    repo = "nemo-qml-plugin-dbus";
 +    rev = "df6e2415fe70e1844067f93b3216ca0442f17c8e";
-+    sha256 = "0s7v5v4jixl07psb0y9wkq2zj168pr29v1g7fwyj5wjn9m76xrjc";
++    hash = "sha256-TOZuTk1W8iI9d+eFnUS+yAT5BZ48ebD0PYD2KMku+2g=";
 +  };
 +
 +  strictDeps = true;
@@ -719,4 +710,4 @@ index 00000000..9cad05fc
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}

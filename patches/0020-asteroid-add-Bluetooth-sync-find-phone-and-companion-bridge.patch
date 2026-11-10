@@ -4,24 +4,16 @@ Date: Mon, 9 Nov 2026 10:55:51 +1100
 Subject: [PATCH] asteroid: add Bluetooth sync find-phone and companion bridge
 
 ---
- .../asteroid-btsyncd/app-bridge.patch         |  73 +++++
- .../asteroid-btsyncd/appbridgeservice.cpp     | 300 ++++++++++++++++++
- .../asteroid-btsyncd/appbridgeservice.h       |  86 +++++
- .../asteroid-btsyncd/camera-shutter.sh        |  19 ++
- .../asteroidos/asteroid-btsyncd/default.nix   |  85 +++++
- .../asteroid-btsyncd/find-phone.patch         | 195 ++++++++++++
- .../asteroidos/asteroid-btsyncd/find-phone.sh |  37 +++
- .../org.asteroidos.btsyncd.conf               |  16 +
- overlay/asteroidos/default.nix                |   4 +
- 9 files changed, 815 insertions(+)
- create mode 100644 overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
- create mode 100644 overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp
- create mode 100644 overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h
- create mode 100644 overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh
- create mode 100644 overlay/asteroidos/asteroid-btsyncd/default.nix
- create mode 100644 overlay/asteroidos/asteroid-btsyncd/find-phone.patch
- create mode 100644 overlay/asteroidos/asteroid-btsyncd/find-phone.sh
- create mode 100644 overlay/asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf
+ overlay/asteroidos/asteroid-btsyncd/app-bridge.patch       |   73 +++++++++++++++++
+ overlay/asteroidos/asteroid-btsyncd/appbridgeservice.cpp   |  300 +++++++++++++++++++++++++++++++++++
+ overlay/asteroidos/asteroid-btsyncd/appbridgeservice.h     |   86 +++++++++++++++++++
+ overlay/asteroidos/asteroid-btsyncd/camera-shutter.sh      |   19 +++++++++
+ overlay/asteroidos/asteroid-btsyncd/default.nix            |   85 ++++++++++++++++++
+ overlay/asteroidos/asteroid-btsyncd/find-phone.patch       |  195 ++++++++++++++++++++++++++++
+ overlay/asteroidos/asteroid-btsyncd/find-phone.sh          |   37 ++++++++++++
+ ...asteroidos/asteroid-btsyncd/org.asteroidos.btsyncd.conf |   16 ++++++++
+ overlay/asteroidos/default.nix                             |    4 ++++
+9 files changed, 815 insertions(+)
 
 diff --git a/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch b/overlay/asteroidos/asteroid-btsyncd/app-bridge.patch
 new file mode 100644
@@ -527,7 +519,7 @@ index 00000000..843b7162
 +exec busctl --system call "$DEST" "$OBJECT" "$INTERFACE" sendMessage sss "org.asteroidos.camera" "$ACTION" ""
 diff --git a/overlay/asteroidos/asteroid-btsyncd/default.nix b/overlay/asteroidos/asteroid-btsyncd/default.nix
 new file mode 100644
-index 00000000..770dc95b
+index 0000000000000000000000000000000000000000..e2801ae8fc4d04c4a5ba30e393860643ccb155c1
 --- /dev/null
 +++ b/overlay/asteroidos/asteroid-btsyncd/default.nix
 @@ -0,0 +1,85 @@
@@ -549,7 +541,7 @@ index 00000000..770dc95b
 +let
 +  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
 +in
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "asteroid-btsyncd";
 +  version = "nightly";
 +
@@ -557,7 +549,7 @@ index 00000000..770dc95b
 +    owner = "AsteroidOS";
 +    repo = "asteroid-btsyncd";
 +    rev = "e14fbcd9a157f0988204e874b03f6f800f89d645";
-+    sha256 = "15vpd3y817gz8j1d7f56k5g1y3747grsjqc5z7b896n7rs2p8ijc";
++    hash = "sha256-TEZ0hc7HmoTW+YVhqfM75AwfXpmmuNOCRP+dgPxod5c=";
 +  };
 +
 +  strictDeps = true;
@@ -615,7 +607,7 @@ index 00000000..770dc95b
 +    license = licenses.gpl3Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/asteroid-btsyncd/find-phone.patch b/overlay/asteroidos/asteroid-btsyncd/find-phone.patch
 new file mode 100644
 index 00000000..b8c94be0

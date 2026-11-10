@@ -4,24 +4,16 @@ Date: Mon, 9 Nov 2026 10:55:52 +1100
 Subject: [PATCH] asteroid: add WebKit browser for wearables
 
 ---
- overlay/asteroidos/browser/CMakeLists.txt     |  54 +++
- .../browser/asteroid-browser.desktop          |  12 +
- .../asteroidos/browser/asteroid-browser.svg   |  22 +
- overlay/asteroidos/browser/default.nix        |  52 +++
- overlay/asteroidos/browser/portal.html        | 237 +++++++++++
- overlay/asteroidos/browser/src/main.c         | 388 ++++++++++++++++++
- overlay/asteroidos/default.nix                |   8 +-
- overlay/asteroidos/wpewebkit-qt/default.nix   |  70 ++++
- overlay/wpewebkit/default.nix                 | 163 ++++++++
- 9 files changed, 1005 insertions(+), 1 deletion(-)
- create mode 100644 overlay/asteroidos/browser/CMakeLists.txt
- create mode 100644 overlay/asteroidos/browser/asteroid-browser.desktop
- create mode 100644 overlay/asteroidos/browser/asteroid-browser.svg
- create mode 100644 overlay/asteroidos/browser/default.nix
- create mode 100644 overlay/asteroidos/browser/portal.html
- create mode 100644 overlay/asteroidos/browser/src/main.c
- create mode 100644 overlay/asteroidos/wpewebkit-qt/default.nix
- create mode 100644 overlay/wpewebkit/default.nix
+ overlay/asteroidos/browser/CMakeLists.txt                  |   54 +++++++++++++++
+ overlay/asteroidos/browser/asteroid-browser.desktop        |   12 +++++++
+ overlay/asteroidos/browser/asteroid-browser.svg            |   22 +++++++++
+ overlay/asteroidos/browser/default.nix                     |   52 ++++++++++++++
+ overlay/asteroidos/browser/portal.html                     |  237 +++++++++++++++++++++++++++++++
+ overlay/asteroidos/browser/src/main.c                      |  388 +++++++++++++++++++++++++++++++++++++++
+ overlay/asteroidos/default.nix                             |    8 +++++-
+ overlay/asteroidos/wpewebkit-qt/default.nix                |   70 +++++++++++++++++
+ overlay/wpewebkit/default.nix                              |  163 ++++++++++++++++++++++++++
+9 files changed, 1005 insertions(+), 1 deletions(-)
 
 diff --git a/overlay/asteroidos/browser/CMakeLists.txt b/overlay/asteroidos/browser/CMakeLists.txt
 new file mode 100644
@@ -131,7 +123,7 @@ index 00000000..6ce8f579
 +</svg>
 diff --git a/overlay/asteroidos/browser/default.nix b/overlay/asteroidos/browser/default.nix
 new file mode 100644
-index 00000000..fe875e78
+index 0000000000000000000000000000000000000000..1e6e93571568a8d68f453494fd70fb27e446aec3
 --- /dev/null
 +++ b/overlay/asteroidos/browser/default.nix
 @@ -0,0 +1,52 @@
@@ -149,7 +141,7 @@ index 00000000..fe875e78
 +  glib,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "asteroid-browser";
 +  version = "1.0.0";
 +
@@ -186,7 +178,7 @@ index 00000000..fe875e78
 +    platforms = platforms.linux;
 +    mainProgram = "asteroid-browser";
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/browser/portal.html b/overlay/asteroidos/browser/portal.html
 new file mode 100644
 index 00000000..1924bbc8
@@ -850,7 +842,7 @@ index 88205f61..2277c2ce 100644
    assets = (callPackage ./assets { inherit metaAsteroidSrc; }) // {
 diff --git a/overlay/asteroidos/wpewebkit-qt/default.nix b/overlay/asteroidos/wpewebkit-qt/default.nix
 new file mode 100644
-index 00000000..e2a9aedc
+index 0000000000000000000000000000000000000000..aa7f6706e394845e38334493d86358770767f0f1
 --- /dev/null
 +++ b/overlay/asteroidos/wpewebkit-qt/default.nix
 @@ -0,0 +1,70 @@
@@ -876,7 +868,7 @@ index 00000000..e2a9aedc
 +let
 +  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
 +in
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "wpewebkit-qt";
 +  version = "0.1.0-unstable-2024-05-18";
 +
@@ -884,7 +876,7 @@ index 00000000..e2a9aedc
 +    owner = "nowrep";
 +    repo = "wpewebkit-qt";
 +    rev = "4632cb569d6e79c54dd4df17fd9bba297ad76974";
-+    sha256 = "04c12bacrf5py7rhrzs3hvxj79g7c43wylhrbgkbp5nqirq7m6yr";
++    hash = "sha256-2Zt6cI7YlrvmWxlSzwdh56Uj+4ZD/wzz8be4zNQSgRE=";
 +  };
 +
 +  strictDeps = true;
@@ -923,7 +915,7 @@ index 00000000..e2a9aedc
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/wpewebkit/default.nix b/overlay/wpewebkit/default.nix
 new file mode 100644
 index 00000000..bfc7ecb0

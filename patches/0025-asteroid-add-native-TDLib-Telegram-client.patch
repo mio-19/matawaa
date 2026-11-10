@@ -4,44 +4,26 @@ Date: Mon, 9 Nov 2026 10:55:53 +1100
 Subject: [PATCH] asteroid: add native TDLib Telegram client
 
 ---
- overlay/asteroidos/default.nix                |   9 +-
- overlay/asteroidos/telegram/CMakeLists.txt    |  58 ++
- .../telegram/asteroid-telegram.desktop        |   9 +
- .../asteroidos/telegram/asteroid-telegram.svg |  10 +
- overlay/asteroidos/telegram/default.nix       |  83 +++
- overlay/asteroidos/telegram/src/chatmodel.cpp | 171 +++++
- overlay/asteroidos/telegram/src/chatmodel.h   |  63 ++
- overlay/asteroidos/telegram/src/main.cpp      |  30 +
- .../asteroidos/telegram/src/messagemodel.cpp  |  81 +++
- .../asteroidos/telegram/src/messagemodel.h    |  51 ++
- .../telegram/src/qml/ChatViewPage.qml         | 250 +++++++
- .../asteroidos/telegram/src/qml/ChatsPage.qml | 292 ++++++++
- .../asteroidos/telegram/src/qml/LoginPage.qml | 310 ++++++++
- .../telegram/src/qml/QuickRepliesPage.qml     | 119 +++
- .../telegram/src/qml/SettingsPage.qml         | 204 ++++++
- overlay/asteroidos/telegram/src/qml/main.qml  |  45 ++
- overlay/asteroidos/telegram/src/resources.qrc |  11 +
- .../telegram/src/telegramclient.cpp           | 688 ++++++++++++++++++
- .../asteroidos/telegram/src/telegramclient.h  | 165 +++++
- 19 files changed, 2648 insertions(+), 1 deletion(-)
- create mode 100644 overlay/asteroidos/telegram/CMakeLists.txt
- create mode 100644 overlay/asteroidos/telegram/asteroid-telegram.desktop
- create mode 100644 overlay/asteroidos/telegram/asteroid-telegram.svg
- create mode 100644 overlay/asteroidos/telegram/default.nix
- create mode 100644 overlay/asteroidos/telegram/src/chatmodel.cpp
- create mode 100644 overlay/asteroidos/telegram/src/chatmodel.h
- create mode 100644 overlay/asteroidos/telegram/src/main.cpp
- create mode 100644 overlay/asteroidos/telegram/src/messagemodel.cpp
- create mode 100644 overlay/asteroidos/telegram/src/messagemodel.h
- create mode 100644 overlay/asteroidos/telegram/src/qml/ChatViewPage.qml
- create mode 100644 overlay/asteroidos/telegram/src/qml/ChatsPage.qml
- create mode 100644 overlay/asteroidos/telegram/src/qml/LoginPage.qml
- create mode 100644 overlay/asteroidos/telegram/src/qml/QuickRepliesPage.qml
- create mode 100644 overlay/asteroidos/telegram/src/qml/SettingsPage.qml
- create mode 100644 overlay/asteroidos/telegram/src/qml/main.qml
- create mode 100644 overlay/asteroidos/telegram/src/resources.qrc
- create mode 100644 overlay/asteroidos/telegram/src/telegramclient.cpp
- create mode 100644 overlay/asteroidos/telegram/src/telegramclient.h
+ overlay/asteroidos/default.nix                             |    9 +++++-
+ overlay/asteroidos/telegram/CMakeLists.txt                 |   58 +++++++++++++++
+ overlay/asteroidos/telegram/asteroid-telegram.desktop      |    9 ++++++
+ overlay/asteroidos/telegram/asteroid-telegram.svg          |   10 ++++++
+ overlay/asteroidos/telegram/default.nix                    |   83 ++++++++++++++++++
+ overlay/asteroidos/telegram/src/chatmodel.cpp              |  171 ++++++++++++++++++++++++++
+ overlay/asteroidos/telegram/src/chatmodel.h                |   63 ++++++++++++++++
+ overlay/asteroidos/telegram/src/main.cpp                   |   30 +++++++++++
+ overlay/asteroidos/telegram/src/messagemodel.cpp           |   81 ++++++++++++++++++
+ overlay/asteroidos/telegram/src/messagemodel.h             |   51 ++++++++++++++
+ overlay/asteroidos/telegram/src/qml/ChatViewPage.qml       |  250 ++++++++++++++++++++++++++++++++
+ overlay/asteroidos/telegram/src/qml/ChatsPage.qml          |  292 ++++++++++++++++++++++++++++++++++
+ overlay/asteroidos/telegram/src/qml/LoginPage.qml          |  310 +++++++++++++++++++++++++++++++++++
+ overlay/asteroidos/telegram/src/qml/QuickRepliesPage.qml   |  119 ++++++++++++++++++++++
+ overlay/asteroidos/telegram/src/qml/SettingsPage.qml       |  204 +++++++++++++++++++++++++++++
+ overlay/asteroidos/telegram/src/qml/main.qml               |   45 +++++++++++++
+ overlay/asteroidos/telegram/src/resources.qrc              |   11 +++++++
+ overlay/asteroidos/telegram/src/telegramclient.cpp         |  688 ++++++++++++++++++++++++++++++++++++++++++
+ overlay/asteroidos/telegram/src/telegramclient.h           |  165 ++++++++++++++++++++++++++
+19 files changed, 2648 insertions(+), 1 deletions(-)
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index 2277c2ce..adefb02d 100644
@@ -165,7 +147,7 @@ index 00000000..f7d66167
 +</svg>
 diff --git a/overlay/asteroidos/telegram/default.nix b/overlay/asteroidos/telegram/default.nix
 new file mode 100644
-index 00000000..19044600
+index 0000000000000000000000000000000000000000..d8f64f200e95ce1eddba65d19f235dda2a22da10
 --- /dev/null
 +++ b/overlay/asteroidos/telegram/default.nix
 @@ -0,0 +1,83 @@
@@ -182,7 +164,7 @@ index 00000000..19044600
 +  buildPackages,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "asteroid-telegram";
 +  version = "1.0.0";
 +
@@ -251,7 +233,7 @@ index 00000000..19044600
 +    mainProgram = "asteroid-telegram";
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/telegram/src/chatmodel.cpp b/overlay/asteroidos/telegram/src/chatmodel.cpp
 new file mode 100644
 index 00000000..860523e3

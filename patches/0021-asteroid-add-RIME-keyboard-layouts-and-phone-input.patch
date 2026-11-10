@@ -4,38 +4,23 @@ Date: Mon, 9 Nov 2026 10:55:52 +1100
 Subject: [PATCH] asteroid: add RIME keyboard layouts and phone input
 
 ---
- overlay/asteroidos/default.nix                |   2 +
- .../0001-add-rime-plugin-and-layouts.patch    |  52 +++
- .../asteroidos/virtualkeyboard/default.nix    |  92 ++++++
- .../virtualkeyboard/layouts/en_GB/main.qml    | 127 +++++++
- .../virtualkeyboard/layouts/en_GB/symbols.qml |  54 +++
- .../virtualkeyboard/layouts/en_US/main.qml    | 127 +++++++
- .../virtualkeyboard/layouts/en_US/symbols.qml |  54 +++
- .../virtualkeyboard/layouts/phone/main.qml    | 135 ++++++++
- .../virtualkeyboard/layouts/zh_CN/main.qml    | 130 ++++++++
- .../virtualkeyboard/layouts/zh_CN/symbols.qml |  54 +++
- .../virtualkeyboard/layouts/zh_HK/main.qml    | 131 ++++++++
- .../virtualkeyboard/layouts/zh_TW/main.qml    | 131 ++++++++
- .../virtualkeyboard/phoneinputbridge.cpp      |  86 +++++
- .../virtualkeyboard/phoneinputbridge.h        |  46 +++
- .../virtualkeyboard/rimeinputmethod.cpp       | 312 ++++++++++++++++++
- .../virtualkeyboard/rimeinputmethod.h         |  68 ++++
- 16 files changed, 1601 insertions(+)
- create mode 100644 overlay/asteroidos/virtualkeyboard/0001-add-rime-plugin-and-layouts.patch
- create mode 100644 overlay/asteroidos/virtualkeyboard/default.nix
- create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_GB/main.qml
- create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_GB/symbols.qml
- create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_US/main.qml
- create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/en_US/symbols.qml
- create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/phone/main.qml
- create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml
- create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml
- create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml
- create mode 100644 overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml
- create mode 100644 overlay/asteroidos/virtualkeyboard/phoneinputbridge.cpp
- create mode 100644 overlay/asteroidos/virtualkeyboard/phoneinputbridge.h
- create mode 100644 overlay/asteroidos/virtualkeyboard/rimeinputmethod.cpp
- create mode 100644 overlay/asteroidos/virtualkeyboard/rimeinputmethod.h
+ overlay/asteroidos/default.nix                             |    2 +++
+ .../virtualkeyboard/0001-add-rime-plugin-and-layouts.patch |   52 ++++++++++++++
+ overlay/asteroidos/virtualkeyboard/default.nix             |   79 ++++++++++++++++++
+ overlay/asteroidos/virtualkeyboard/layouts/en_GB/main.qml  |  127 +++++++++++++++++++++++
+ ...ay/asteroidos/virtualkeyboard/layouts/en_GB/symbols.qml |   54 +++++++++++++++
+ overlay/asteroidos/virtualkeyboard/layouts/en_US/main.qml  |  127 +++++++++++++++++++++++
+ ...ay/asteroidos/virtualkeyboard/layouts/en_US/symbols.qml |   54 +++++++++++++++
+ overlay/asteroidos/virtualkeyboard/layouts/phone/main.qml  |  135 +++++++++++++++++++++++
+ overlay/asteroidos/virtualkeyboard/layouts/zh_CN/main.qml  |  130 +++++++++++++++++++++++
+ ...ay/asteroidos/virtualkeyboard/layouts/zh_CN/symbols.qml |   54 +++++++++++++++
+ overlay/asteroidos/virtualkeyboard/layouts/zh_HK/main.qml  |  131 +++++++++++++++++++++++
+ overlay/asteroidos/virtualkeyboard/layouts/zh_TW/main.qml  |  131 +++++++++++++++++++++++
+ overlay/asteroidos/virtualkeyboard/phoneinputbridge.cpp    |   86 +++++++++++++++++++
+ overlay/asteroidos/virtualkeyboard/phoneinputbridge.h      |   46 ++++++++++++++
+ overlay/asteroidos/virtualkeyboard/rimeinputmethod.cpp     |  312 +++++++++++++++++++++++++++++++++++
+ overlay/asteroidos/virtualkeyboard/rimeinputmethod.h       |   68 ++++++++++++++++
+16 files changed, 1588 insertions(+)
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 index 262d4cf2..ceed388d 100644
@@ -108,10 +93,10 @@ index 00000000..8bb79c6b
 ++install(DIRECTORY images/ DESTINATION "${CMAKE_INSTALL_LIBDIR}/qml/QtQuick/VirtualKeyboard/Styles/watch/images")
 diff --git a/overlay/asteroidos/virtualkeyboard/default.nix b/overlay/asteroidos/virtualkeyboard/default.nix
 new file mode 100644
-index 00000000..315cdafe
+index 0000000000000000000000000000000000000000..9ad1a161a816d346c7346f4b6b7927817e43a520
 --- /dev/null
 +++ b/overlay/asteroidos/virtualkeyboard/default.nix
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,79 @@
 +{
 +  lib,
 +  stdenv,
@@ -125,7 +110,7 @@ index 00000000..315cdafe
 +  noUsrShareHook,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "asteroid-virtualkeyboard";
 +  version = "2.1.0";
 +
@@ -133,7 +118,7 @@ index 00000000..315cdafe
 +    owner = "AsteroidOS";
 +    repo = "asteroid-virtualkeyboard";
 +    rev = "666743fc42eaa02b9f82155ff3aff3a40e0d45ac";
-+    sha256 = "0yw1xq315p7q7illjpq92cs0060lrw94bfk8ywc7fbrr1gmkmvjf";
++    hash = "sha256-Tu466ws5L3cY92i6RRLPFBgANBMJX0lpPPjcEgbugXs=";
 +  };
 +
 +  patches = [
@@ -157,7 +142,6 @@ index 00000000..315cdafe
 +    cmake
 +    pkg-config
 +    qt6.wrapQtAppsHook
-+    buildPackages.librime
 +    noUsrShareHook
 +  ];
 +
@@ -178,32 +162,20 @@ index 00000000..315cdafe
 +    "-DQt6ShaderToolsTools_DIR=${buildPackages.qt6.qtshadertools}/lib/cmake/Qt6ShaderToolsTools"
 +  ];
 +
-+  # Pre-deploy common Chinese schemas (Pinyin, Shuangpin, Wubi, Cangjie, Stroke, Bopomofo, Jyutping)
-+  # Upstream: https://github.com/rime/librime
++  # Reuse nixpkgs' compiled schemas and dictionaries instead of redeploying
++  # them locally with ignored errors.
 +  postInstall = ''
-+    mkdir -p $out/share/rime-data/build
-+    cp -r ${rime-data}/share/rime-data/* $out/share/rime-data/
-+
-+    # Run rime_deployer on host buildPlatform to compile binary tables
-+    mkdir -p build-deploy/user build-deploy/staging
-+    ${buildPackages.librime}/bin/rime_deployer --add-schema \
-+      luna_pinyin double_pinyin wubi86 cangjie5 stroke bopomofo jyutping \
-+      build-deploy/user $out/share/rime-data
-+
-+    ${buildPackages.librime}/bin/rime_deployer --build \
-+      build-deploy/user $out/share/rime-data build-deploy/staging || true
-+
-+    cp -n build-deploy/staging/* $out/share/rime-data/build/ 2>/dev/null || true
-+    cp -n build-deploy/staging/* $out/share/rime-data/ 2>/dev/null || true
++    mkdir -p "$out/share/rime-data"
++    cp -r ${rime-data}/share/rime-data/. "$out/share/rime-data/"
 +  '';
 +
 +  meta = with lib; {
 +    description = "AsteroidOS on-screen virtual keyboard with watch style, layouts, and integrated RIME input method engine";
 +    homepage = "https://asteroidos.org/";
-+    license = licenses.gpl3Plus;
++    license = licenses.gpl3Only;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/virtualkeyboard/layouts/en_GB/main.qml b/overlay/asteroidos/virtualkeyboard/layouts/en_GB/main.qml
 new file mode 100644
 index 00000000..81489b12

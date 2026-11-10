@@ -4,17 +4,16 @@ Date: Mon, 9 Nov 2026 10:55:46 +1100
 Subject: [PATCH] modules: add AsteroidOS machine configuration
 
 ---
- modules/asteroid-config.nix | 42 +++++++++++++++++++++++++++++++++++++
- modules/module-list.nix     |  1 +
- 2 files changed, 43 insertions(+)
- create mode 100644 modules/asteroid-config.nix
+ modules/asteroid-config.nix                                |   41 +++++++++++++
+ modules/module-list.nix                                    |    1 ++
+2 files changed, 42 insertions(+)
 
 diff --git a/modules/asteroid-config.nix b/modules/asteroid-config.nix
 new file mode 100644
-index 00000000..dc08f497
+index 0000000000000000000000000000000000000000..422aec0f7298912217258f89eed6f3ba7427aae7
 --- /dev/null
 +++ b/modules/asteroid-config.nix
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,41 @@
 +{
 +  config,
 +  lib,
@@ -23,7 +22,7 @@ index 00000000..dc08f497
 +}:
 +
 +let
-+  inherit (lib) mkDefault mkIf;
++  inherit (lib) mkIf;
 +  screenCfg = config.mobile.hardware.screen;
 +  watchCfg = config.mobile.hardware.watch;
 +  devName =
@@ -34,23 +33,22 @@ index 00000000..dc08f497
 +
 +  # Generates standard /etc/asteroid/machine.conf expected by AsteroidOS launcher,
 +  # qml-asteroid, and applications.
-+  machineConf = pkgs.writeText "machine.conf" ''
-+    [Display]
-+    FLAT_TIRE=${toString screenCfg.chinHeight}
-+    ${
-+      lib.optionalString (
-+        watchCfg.borderGestureWidth != null
-+      ) "BORDER_GESTURE_WIDTH=${toString watchCfg.borderGestureWidth}\n"
-+    }ROUND=${if screenCfg.shape == "round" || screenCfg.shape == "chin" then "true" else "false"}
-+    NEEDS_BURN_IN_PROTECTION=${if watchCfg.burnInProtection then "true" else "false"}
++  machineConf = (pkgs.formats.ini { }).generate "machine.conf" {
++    Display = {
++      FLAT_TIRE = screenCfg.chinHeight;
++      ROUND = screenCfg.shape == "round" || screenCfg.shape == "chin";
++      NEEDS_BURN_IN_PROTECTION = watchCfg.burnInProtection;
++    }
++    // lib.optionalAttrs (watchCfg.borderGestureWidth != null) {
++      BORDER_GESTURE_WIDTH = watchCfg.borderGestureWidth;
++    };
++    Capabilities = {
++      HAS_WLAN = watchCfg.hasWlan;
++      HAS_SPEAKER = watchCfg.hasSpeaker;
++    };
++    Identity.MACHINE = devName;
++  };
 +
-+    [Capabilities]
-+    HAS_WLAN=true
-+    HAS_SPEAKER=${if watchCfg.hasSpeaker then "true" else "false"}
-+
-+    [Identity]
-+    MACHINE=${devName}
-+  '';
 +in
 +{
 +  config = mkIf (config.mobile.enable && watchCfg.enable) {

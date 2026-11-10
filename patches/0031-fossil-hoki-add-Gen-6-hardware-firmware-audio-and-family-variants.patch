@@ -5,41 +5,24 @@ Subject: [PATCH] fossil-hoki: add Gen 6 hardware firmware audio and family
  variants
 
 ---
- devices/fossil-firefish/default.nix           |  56 ++
- devices/fossil-hoki/android-init.nix          | 224 +++++++
- devices/fossil-hoki/android-system-data.nix   |  28 +
- devices/fossil-hoki/audio-modules.nix         | 122 ++++
- devices/fossil-hoki/default.nix               | 588 ++++++++++++++++++
- devices/fossil-hoki/gps_xtra.ini              |   2 +
- .../hwcomposer-allocation-diagnostics.patch   |  31 +
- devices/fossil-hoki/hybris-android.nix        |  32 +
- devices/fossil-hoki/hybris.nix                |  47 ++
- devices/fossil-hoki/tfa9890.cnt.base64        |  93 +++
- devices/fossil-hoki/wlan-firmware-hoki.sh     |  42 ++
- devices/fossil-hoki/wlan.nix                  | 112 ++++
- ...co_profile-fix-use-of-adapter-before.patch |  30 +
- ...C-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |  25 +
- devices/fossil-hoki/wlan/wakelock.h           |   3 +
- devices/fossil-ray/default.nix                |  56 ++
- devices/fossil-triggerfish/default.nix        |  56 ++
- 17 files changed, 1547 insertions(+)
- create mode 100644 devices/fossil-firefish/default.nix
- create mode 100644 devices/fossil-hoki/android-init.nix
- create mode 100644 devices/fossil-hoki/android-system-data.nix
- create mode 100644 devices/fossil-hoki/audio-modules.nix
- create mode 100644 devices/fossil-hoki/default.nix
- create mode 100644 devices/fossil-hoki/gps_xtra.ini
- create mode 100644 devices/fossil-hoki/hwcomposer-allocation-diagnostics.patch
- create mode 100644 devices/fossil-hoki/hybris-android.nix
- create mode 100644 devices/fossil-hoki/hybris.nix
- create mode 100644 devices/fossil-hoki/tfa9890.cnt.base64
- create mode 100644 devices/fossil-hoki/wlan-firmware-hoki.sh
- create mode 100644 devices/fossil-hoki/wlan.nix
- create mode 100644 devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
- create mode 100644 devices/fossil-hoki/wlan/0002-Makefile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch
- create mode 100644 devices/fossil-hoki/wlan/wakelock.h
- create mode 100644 devices/fossil-ray/default.nix
- create mode 100644 devices/fossil-triggerfish/default.nix
+ devices/fossil-firefish/default.nix                        |   56 +++++++++++++++
+ devices/fossil-hoki/android-init.nix                       |  232 ++++++++++++++++++++++++++++++
+ devices/fossil-hoki/android-system-data.nix                |   28 +++++++++++
+ devices/fossil-hoki/audio-modules.nix                      |  122 ++++++++++++++++++++++
+ devices/fossil-hoki/default.nix                            |  588 ++++++++++++++++++++++++++++++++++++++++++
+ devices/fossil-hoki/gps_xtra.ini                           |    2 +++
+ ...ces/fossil-hoki/hwcomposer-allocation-diagnostics.patch |   31 +++++++++++
+ devices/fossil-hoki/hybris-android.nix                     |   32 +++++++++++
+ devices/fossil-hoki/hybris.nix                             |   47 ++++++++++++++
+ devices/fossil-hoki/tfa9890.cnt.base64                     |   93 +++++++++++++++++++
+ devices/fossil-hoki/wlan-firmware-hoki.sh                  |   42 +++++++++++++
+ devices/fossil-hoki/wlan.nix                               |  114 +++++++++++++++++++++
+ ..._process_bt_sco_profile-fix-use-of-adapter-before.patch |   30 +++++++++++
+ ...efile-quote-CC-LD-AR-OBJCOPY-STRIP-in-nested-make.patch |   25 ++++++++++
+ devices/fossil-hoki/wlan/wakelock.h                        |    3 +++
+ devices/fossil-ray/default.nix                             |   56 +++++++++++++++
+ devices/fossil-triggerfish/default.nix                     |   56 +++++++++++++++
+17 files changed, 1557 insertions(+)
 
 diff --git a/devices/fossil-firefish/default.nix b/devices/fossil-firefish/default.nix
 new file mode 100644
@@ -105,10 +88,10 @@ index 00000000..b8605a4c
 +}
 diff --git a/devices/fossil-hoki/android-init.nix b/devices/fossil-hoki/android-init.nix
 new file mode 100644
-index 00000000..43d21df0
+index 0000000000000000000000000000000000000000..14061645223aee82b61956c8a5c8bebf7bd4e2bf
 --- /dev/null
 +++ b/devices/fossil-hoki/android-init.nix
-@@ -0,0 +1,224 @@
+@@ -0,0 +1,232 @@
 +{
 +  lib,
 +  pkgs,
@@ -214,6 +197,14 @@ index 00000000..43d21df0
 +    unitConfig.Conflicts = [ "shutdown.target" ];
 +    serviceConfig = {
 +      Type = "simple";
++      # Android init's shutdown waits for the vendor modem to acknowledge
++      # power-down, which never happens on this device (bgcom_dev
++      # "Time out on modem down event", then pil-q6v5-mss "halt timeout").
++      # Without a bound the stop job sits for the default 90 s, so a reboot
++      # looks hung on a blank screen until systemd finally SIGKILLs the
++      # whole Android cgroup. Bound it instead; the kernel gets the same
++      # SIGKILLed init either way, just 75 s sooner.
++      TimeoutStopSec = "15s";
 +      ExecStartPre = pkgs.writeShellScript "android-init-pre" ''
 +        ln_force() {
 +          local target="$1"
@@ -1374,10 +1365,10 @@ index 00000000..95d80bb2
 +modprobe wlan
 diff --git a/devices/fossil-hoki/wlan.nix b/devices/fossil-hoki/wlan.nix
 new file mode 100644
-index 00000000..18d05338
+index 0000000000000000000000000000000000000000..10b15f15f085354c96c4e0dafe93a6b041b4afc1
 --- /dev/null
 +++ b/devices/fossil-hoki/wlan.nix
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,114 @@
 +{
 +  config,
 +  lib,
@@ -1485,10 +1476,12 @@ index 00000000..18d05338
 +  };
 +in
 +{
-+  # wlan-firmware-hoki.sh symlinks the vendor firmware and opens
-+  # /dev/wcnss_wlan before this module is loaded.
++  # wlan-firmware-hoki.sh symlinks the vendor firmware, powers WCNSS up and
++  # loads this module itself. Do not also list it in boot.kernelModules:
++  # systemd-modules-load runs before those symlinks exist, so the prima probe
++  # waits ~10 s for WCNSS, fails with "No such device", and holds
++  # sysinit.target (and therefore the whole boot) for that time.
 +  boot.extraModulePackages = [ wlanModule ];
-+  boot.kernelModules = [ "wlan" ];
 +}
 diff --git a/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch b/devices/fossil-hoki/wlan/0001-hdd_process_bt_sco_profile-fix-use-of-adapter-before.patch
 new file mode 100644

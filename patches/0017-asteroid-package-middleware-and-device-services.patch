@@ -4,108 +4,58 @@ Date: Mon, 9 Nov 2026 10:55:51 +1100
 Subject: [PATCH] asteroid: package middleware and device services
 
 ---
- overlay/asteroidos/accounts-qt/default.nix    |  85 +++
- overlay/asteroidos/amber-mpris/CMakeLists.txt | 128 ++++
- overlay/asteroidos/amber-mpris/default.nix    |  54 ++
- overlay/asteroidos/bluebinder/default.nix     |  81 +++
- overlay/asteroidos/default.nix                | 113 ++++
- overlay/asteroidos/dsme/default.nix           | 107 ++++
- overlay/asteroidos/kcalendarcore/default.nix  |  51 ++
- overlay/asteroidos/keepalive/default.nix      | 104 ++++
- .../patches/0001-Disable-tests.patch          |  23 +
- .../keepalive/patches/0002-Fix-build.patch    |  23 +
- overlay/asteroidos/libconnman-qt/default.nix  | 139 ++++
- overlay/asteroidos/libdsme/default.nix        |  82 +++
- overlay/asteroidos/libiodata/default.nix      |  71 ++
- overlay/asteroidos/libiphb/default.nix        |  54 ++
- overlay/asteroidos/libncicore/default.nix     |  71 ++
- overlay/asteroidos/libnciplugin/default.nix   |  90 +++
- overlay/asteroidos/libnfcdef/default.nix      |  71 ++
- overlay/asteroidos/libngf/default.nix         |  53 ++
- ...-sailjaild-D-Bus-query-when-sailjail.patch |  40 ++
- .../0003-invoker-fallback-dlopen-so.patch     |  69 ++
- overlay/asteroidos/mapplauncherd/default.nix  |  59 ++
- overlay/asteroidos/mce-dev/default.nix        |  41 ++
- .../mce-plugin-libhybris/default.nix          |  69 ++
- overlay/asteroidos/mce-qt6/default.nix        | 100 +++
- overlay/asteroidos/mce/builtin-gconf.values   |   6 +
- overlay/asteroidos/mce/default.nix            | 107 ++++
- overlay/asteroidos/mce/mce.service            |  17 +
- ...tion-Adapts-the-state-machine-to-a-s.patch | 421 ++++++++++++
- ...ke-screen-when-wrist-gesture-arrives.patch | 606 ++++++++++++++++++
- ...-activities-in-lockscreen-mode.-aste.patch |  64 ++
- ...pt-low-power-mode-to-allow-for-actua.patch | 574 +++++++++++++++++
- ...t-for-compositor-when-sending-enable.patch |  61 ++
- ...t-ambient-mode-when-touch-is-detecte.patch |  67 ++
- ...owerkey-Also-suspend-on-palm-reports.patch | 161 +++++
- overlay/asteroidos/mkcal/default.nix          |  60 ++
- overlay/asteroidos/mlite/CMakeLists.txt       | 122 ++++
- overlay/asteroidos/mlite/default.nix          |  62 ++
- .../nemo-qml-plugin-alarms/default.nix        | 135 ++++
- .../nemo-qml-plugin-calendar/default.nix      |  94 +++
- .../nemo-qml-plugin-notifications/default.nix | 121 ++++
- overlay/asteroidos/nfcd/default.nix           | 197 ++++++
- overlay/asteroidos/ngf-qt6/default.nix        |  96 +++
- .../0005-gst-sink-fallback-to-alsasink.patch  |  22 +
- overlay/asteroidos/ngfd/default.nix           | 113 ++++
- overlay/asteroidos/sensorfw/CMakeLists.txt    | 264 ++++++++
- overlay/asteroidos/sensorfw/default.nix       |  71 ++
- overlay/asteroidos/swclock-offset/default.nix |  30 +
- overlay/asteroidos/timed-qt6/default.nix      | 109 ++++
- .../asteroidos/udev-droid-system/default.nix  |  24 +
- overlay/asteroidos/usb-moded-dev/default.nix  |  42 ++
- overlay/asteroidos/usb-moded-qt6/default.nix  |  90 +++
- 51 files changed, 5514 insertions(+)
- create mode 100644 overlay/asteroidos/accounts-qt/default.nix
- create mode 100644 overlay/asteroidos/amber-mpris/CMakeLists.txt
- create mode 100644 overlay/asteroidos/amber-mpris/default.nix
- create mode 100644 overlay/asteroidos/bluebinder/default.nix
- create mode 100644 overlay/asteroidos/dsme/default.nix
- create mode 100644 overlay/asteroidos/kcalendarcore/default.nix
- create mode 100644 overlay/asteroidos/keepalive/default.nix
- create mode 100644 overlay/asteroidos/keepalive/patches/0001-Disable-tests.patch
- create mode 100644 overlay/asteroidos/keepalive/patches/0002-Fix-build.patch
- create mode 100644 overlay/asteroidos/libconnman-qt/default.nix
- create mode 100644 overlay/asteroidos/libdsme/default.nix
- create mode 100644 overlay/asteroidos/libiodata/default.nix
- create mode 100644 overlay/asteroidos/libiphb/default.nix
- create mode 100644 overlay/asteroidos/libncicore/default.nix
- create mode 100644 overlay/asteroidos/libnciplugin/default.nix
- create mode 100644 overlay/asteroidos/libnfcdef/default.nix
- create mode 100644 overlay/asteroidos/libngf/default.nix
- create mode 100644 overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
- create mode 100644 overlay/asteroidos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch
- create mode 100644 overlay/asteroidos/mapplauncherd/default.nix
- create mode 100644 overlay/asteroidos/mce-dev/default.nix
- create mode 100644 overlay/asteroidos/mce-plugin-libhybris/default.nix
- create mode 100644 overlay/asteroidos/mce-qt6/default.nix
- create mode 100644 overlay/asteroidos/mce/builtin-gconf.values
- create mode 100644 overlay/asteroidos/mce/default.nix
- create mode 100644 overlay/asteroidos/mce/mce.service
- create mode 100644 overlay/asteroidos/mce/patches/0001-Double-tap-emulation-Adapts-the-state-machine-to-a-s.patch
- create mode 100644 overlay/asteroidos/mce/patches/0002-tilt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch
- create mode 100644 overlay/asteroidos/mce/patches/0003-inactivity-Allow-activities-in-lockscreen-mode.-aste.patch
- create mode 100644 overlay/asteroidos/mce/patches/0004-Ambient-mode-Adapt-low-power-mode-to-allow-for-actua.patch
- create mode 100644 overlay/asteroidos/mce/patches/0005-Ambient-Mode-Wait-for-compositor-when-sending-enable.patch
- create mode 100644 overlay/asteroidos/mce/patches/0006-Ambient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch
- create mode 100644 overlay/asteroidos/mce/patches/0007-powerkey-Also-suspend-on-palm-reports.patch
- create mode 100644 overlay/asteroidos/mkcal/default.nix
- create mode 100644 overlay/asteroidos/mlite/CMakeLists.txt
- create mode 100644 overlay/asteroidos/mlite/default.nix
- create mode 100644 overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
- create mode 100644 overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
- create mode 100644 overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
- create mode 100644 overlay/asteroidos/nfcd/default.nix
- create mode 100644 overlay/asteroidos/ngf-qt6/default.nix
- create mode 100644 overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch
- create mode 100644 overlay/asteroidos/ngfd/default.nix
- create mode 100644 overlay/asteroidos/sensorfw/CMakeLists.txt
- create mode 100644 overlay/asteroidos/sensorfw/default.nix
- create mode 100644 overlay/asteroidos/swclock-offset/default.nix
- create mode 100644 overlay/asteroidos/timed-qt6/default.nix
- create mode 100644 overlay/asteroidos/udev-droid-system/default.nix
- create mode 100644 overlay/asteroidos/usb-moded-dev/default.nix
- create mode 100644 overlay/asteroidos/usb-moded-qt6/default.nix
+ overlay/asteroidos/accounts-qt/default.nix                 |   85 ++++++++++++++++++
+ overlay/asteroidos/amber-mpris/CMakeLists.txt              |  128 +++++++++++++++++++++++
+ overlay/asteroidos/amber-mpris/default.nix                 |   54 +++++++++++++++
+ overlay/asteroidos/bluebinder/default.nix                  |   81 ++++++++++++++++++
+ overlay/asteroidos/default.nix                             |  113 +++++++++++++++++++++
+ overlay/asteroidos/dsme/default.nix                        |  105 ++++++++++++++++++++
+ overlay/asteroidos/kcalendarcore/default.nix               |   51 ++++++++++++++
+ overlay/asteroidos/keepalive/default.nix                   |  104 ++++++++++++++++++++
+ ...y/asteroidos/keepalive/patches/0001-Disable-tests.patch |   23 ++++++++++
+ overlay/asteroidos/keepalive/patches/0002-Fix-build.patch  |   23 ++++++++++
+ overlay/asteroidos/libconnman-qt/default.nix               |  139 ++++++++++++++++++++++++
+ overlay/asteroidos/libdsme/default.nix                     |   82 ++++++++++++++++++
+ overlay/asteroidos/libiodata/default.nix                   |   71 +++++++++++++++++
+ overlay/asteroidos/libiphb/default.nix                     |   54 +++++++++++++++
+ overlay/asteroidos/libncicore/default.nix                  |   71 +++++++++++++++++
+ overlay/asteroidos/libnciplugin/default.nix                |   90 +++++++++++++++++++
+ overlay/asteroidos/libnfcdef/default.nix                   |   71 +++++++++++++++++
+ overlay/asteroidos/libngf/default.nix                      |   53 +++++++++++++++
+ ...oker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch |   40 +++++++++++++
+ ...dos/mapplauncherd/0003-invoker-fallback-dlopen-so.patch |   69 +++++++++++++++++
+ overlay/asteroidos/mapplauncherd/default.nix               |   59 +++++++++++++++
+ overlay/asteroidos/mce-dev/default.nix                     |   41 +++++++++++++
+ overlay/asteroidos/mce-plugin-libhybris/default.nix        |   69 +++++++++++++++++
+ overlay/asteroidos/mce-qt6/default.nix                     |  100 ++++++++++++++++++++
+ overlay/asteroidos/mce/builtin-gconf.values                |    6 +++++
+ overlay/asteroidos/mce/default.nix                         |  107 +++++++++++++++++++++
+ overlay/asteroidos/mce/mce.service                         |   17 ++++++++
+ ...ble-tap-emulation-Adapts-the-state-machine-to-a-s.patch |  421 +++++++++++++++++++++++++++++++++++++++++
+ ...lt-to-wake-Wake-screen-when-wrist-gesture-arrives.patch |  606 ++++++++++++++++++++++++++++++++++++++++++
+ ...ctivity-Allow-activities-in-lockscreen-mode.-aste.patch |   64 ++++++++++++++++
+ ...ient-mode-Adapt-low-power-mode-to-allow-for-actua.patch |  574 ++++++++++++++++++++++++++++++++++++++++++
+ ...ient-Mode-Wait-for-compositor-when-sending-enable.patch |   61 ++++++++++++++++
+ ...ient-Mode-Exit-ambient-mode-when-touch-is-detecte.patch |   67 ++++++++++++++++
+ ...atches/0007-powerkey-Also-suspend-on-palm-reports.patch |  161 +++++++++++++++++++++++++
+ overlay/asteroidos/mkcal/default.nix                       |   60 +++++++++++++++
+ overlay/asteroidos/mlite/CMakeLists.txt                    |  122 ++++++++++++++++++++++
+ overlay/asteroidos/mlite/default.nix                       |   62 ++++++++++++++++
+ overlay/asteroidos/nemo-qml-plugin-alarms/default.nix      |  135 +++++++++++++++++++++++
+ overlay/asteroidos/nemo-qml-plugin-calendar/default.nix    |   94 +++++++++++++++++++
+ ...ay/asteroidos/nemo-qml-plugin-notifications/default.nix |  121 ++++++++++++++++++++++
+ overlay/asteroidos/nfcd/default.nix                        |  197 ++++++++++++++++++++++++++++
+ overlay/asteroidos/ngf-qt6/default.nix                     |   96 ++++++++++++++++++++
+ ...steroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch |   22 +++++++++
+ overlay/asteroidos/ngfd/default.nix                        |  113 +++++++++++++++++++++
+ overlay/asteroidos/sensorfw/CMakeLists.txt                 |  264 ++++++++++++++++++++++++++++++++
+ overlay/asteroidos/sensorfw/default.nix                    |   71 +++++++++++++++++
+ overlay/asteroidos/swclock-offset/default.nix              |   30 +++++++++++
+ overlay/asteroidos/timed-qt6/default.nix                   |  109 +++++++++++++++++++++
+ overlay/asteroidos/udev-droid-system/default.nix           |   24 ++++++++++
+ overlay/asteroidos/usb-moded-dev/default.nix               |   42 +++++++++++++
+ overlay/asteroidos/usb-moded-qt6/default.nix               |   90 +++++++++++++++++++
+51 files changed, 5512 insertions(+)
 
 diff --git a/overlay/asteroidos/accounts-qt/default.nix b/overlay/asteroidos/accounts-qt/default.nix
 new file mode 100644
@@ -334,7 +284,7 @@ index 00000000..03a35cfe
 +)
 diff --git a/overlay/asteroidos/amber-mpris/default.nix b/overlay/asteroidos/amber-mpris/default.nix
 new file mode 100644
-index 00000000..bcdd9f13
+index 0000000000000000000000000000000000000000..f38be0d3849a5ee8f6259ea45458c663bd14c979
 --- /dev/null
 +++ b/overlay/asteroidos/amber-mpris/default.nix
 @@ -0,0 +1,54 @@
@@ -351,7 +301,7 @@ index 00000000..bcdd9f13
 +  buildPackages,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "amber-mpris";
 +  version = "nightly";
 +
@@ -391,7 +341,7 @@ index 00000000..bcdd9f13
 +    license = licenses.lgpl21Only;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/bluebinder/default.nix b/overlay/asteroidos/bluebinder/default.nix
 new file mode 100644
 index 00000000..e38bf0b5
@@ -611,10 +561,10 @@ index 7ce4a083..46307a2d 100644
  }
 diff --git a/overlay/asteroidos/dsme/default.nix b/overlay/asteroidos/dsme/default.nix
 new file mode 100644
-index 00000000..49c4f3f1
+index 0000000000000000000000000000000000000000..3ef76646fd5192fbc9aae153210a1959f29a2ea7
 --- /dev/null
 +++ b/overlay/asteroidos/dsme/default.nix
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,105 @@
 +# Nemomobile DSME (device state machine daemon) with AsteroidOS patches
 +# Upstream repository: https://github.com/sailfishos/dsme
 +# Packaging reference in AsteroidOS: https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-nemomobile/dsme
@@ -622,8 +572,6 @@ index 00000000..49c4f3f1
 +  lib,
 +  stdenv,
 +  fetchgit,
-+  fetchpatch,
-+  fetchurl,
 +  autoreconfHook,
 +  pkg-config,
 +  glib,
@@ -638,7 +586,7 @@ index 00000000..49c4f3f1
 +  metaAsteroidSrc,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "dsme";
 +  version = "0.84.7";
 +
@@ -721,10 +669,10 @@ index 00000000..49c4f3f1
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/kcalendarcore/default.nix b/overlay/asteroidos/kcalendarcore/default.nix
 new file mode 100644
-index 00000000..9b875b0d
+index 0000000000000000000000000000000000000000..c4294dcf38eee35f75ebaa202e59ab6cf508ff85
 --- /dev/null
 +++ b/overlay/asteroidos/kcalendarcore/default.nix
 @@ -0,0 +1,51 @@
@@ -742,7 +690,7 @@ index 00000000..9b875b0d
 +  libical,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "kcalendarcore";
 +  version = "1.0.0";
 +
@@ -750,7 +698,7 @@ index 00000000..9b875b0d
 +    owner = "sailfishos-mirror";
 +    repo = "kcalendarcore";
 +    rev = "fdbaae49832ef2154d0c7e05825ff410660fcbf4";
-+    sha256 = "0ipjk8w9jbbd1s4lwrh56pk6v7bfxy6ni6a7308vynw03fr4dc3n";
++    hash = "sha256-drBGshuAW78RGEeZaI3vbp1t5jUFZk6JDm0tmTia8kY=";
 +  };
 +
 +  strictDeps = true;
@@ -778,10 +726,10 @@ index 00000000..9b875b0d
 +    license = licenses.lgpl2Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/keepalive/default.nix b/overlay/asteroidos/keepalive/default.nix
 new file mode 100644
-index 00000000..77bda95d
+index 0000000000000000000000000000000000000000..d83dcfabf6dd84064459967df8ffc70f6861f73d
 --- /dev/null
 +++ b/overlay/asteroidos/keepalive/default.nix
 @@ -0,0 +1,104 @@
@@ -808,7 +756,7 @@ index 00000000..77bda95d
 +    owner = "sailfishos";
 +    repo = "nemo-keepalive";
 +    rev = "c38d05b5ebc871dc36561abaf9bbf1dfb8438e83";
-+    sha256 = "02dw2z212cjajk98dk2xc6nf3f9j2pz5qnpgmrcmkfddm9kcnf70";
++    hash = "sha256-4DjLZqqtuVlZru9aXP4VMrnhrGFdzIbSlEoyEcQXvAk=";
 +  };
 +
 +  strictDeps = true;
@@ -949,7 +897,7 @@ index 00000000..a430a281
 +     displayblanking.cpp \
 diff --git a/overlay/asteroidos/libconnman-qt/default.nix b/overlay/asteroidos/libconnman-qt/default.nix
 new file mode 100644
-index 00000000..092765a4
+index 0000000000000000000000000000000000000000..264328c999ee1064ad6d9f68c13fe754a3fadfbe
 --- /dev/null
 +++ b/overlay/asteroidos/libconnman-qt/default.nix
 @@ -0,0 +1,139 @@
@@ -966,7 +914,7 @@ index 00000000..092765a4
 +  buildPackages,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "libconnman-qt";
 +  version = "1.3.3";
 +
@@ -974,7 +922,7 @@ index 00000000..092765a4
 +    owner = "sailfishos";
 +    repo = "libconnman-qt";
 +    rev = "6b5ad435bbe9cb306324fc5d09a3624543e2ff63";
-+    sha256 = "0dwrbiy8zi18i3y7ars54gnszvmzkyjv856505vz322faiazbdxi";
++    hash = "sha256-sbf1VVROiPF3AcUUtKWfv+6v7SNFZ3X8iCjEj3xcmTc=";
 +  };
 +
 +  strictDeps = true;
@@ -1091,10 +1039,10 @@ index 00000000..092765a4
 +    license = licenses.asl20;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/libdsme/default.nix b/overlay/asteroidos/libdsme/default.nix
 new file mode 100644
-index 00000000..2278e470
+index 0000000000000000000000000000000000000000..0599b9f4a714de4580f5a4c841ea8c333040fe58
 --- /dev/null
 +++ b/overlay/asteroidos/libdsme/default.nix
 @@ -0,0 +1,82 @@
@@ -1109,7 +1057,7 @@ index 00000000..2278e470
 +  glib,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "libdsme";
 +  version = "0.67.0";
 +
@@ -1117,7 +1065,7 @@ index 00000000..2278e470
 +    owner = "sailfishos";
 +    repo = "libdsme";
 +    rev = "67e57c5e90e37d4a53cf3ea4dae028444c62c8e8";
-+    sha256 = "0cydr03c2qyaq1z231ahqfzydaib4qgi9l78mrb60ji56gg9q95v";
++    hash = "sha256-uySc3jMlSmBWrujQFB8mK6rmv8NQhSF+wMpjwQbIzTM=";
 +  };
 +
 +  strictDeps = true;
@@ -1179,10 +1127,10 @@ index 00000000..2278e470
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/libiodata/default.nix b/overlay/asteroidos/libiodata/default.nix
 new file mode 100644
-index 00000000..308b398c
+index 0000000000000000000000000000000000000000..96ec6a9cd36df7f12660ed91329b2b5e170a7188
 --- /dev/null
 +++ b/overlay/asteroidos/libiodata/default.nix
 @@ -0,0 +1,71 @@
@@ -1208,7 +1156,7 @@ index 00000000..308b398c
 +    owner = "sailfishos";
 +    repo = "libiodata";
 +    rev = "85517a9f2103e461cbb69dc195335df73b7a8b7e";
-+    sha256 = "0d7k5db04npqygawsbq0sf05r3a0q90b0hksg83c55qdqz9kp1kv";
++    hash = "sha256-e4Y708cNl8IGenpCsEDCQI1cgNMAL83V8/haAlYr8zQ=";
 +  };
 +
 +  strictDeps = true;
@@ -1259,7 +1207,7 @@ index 00000000..308b398c
 +}
 diff --git a/overlay/asteroidos/libiphb/default.nix b/overlay/asteroidos/libiphb/default.nix
 new file mode 100644
-index 00000000..6da52c87
+index 0000000000000000000000000000000000000000..3f1d106bf992a1e596c8e353a7c1b541d0fb1d21
 --- /dev/null
 +++ b/overlay/asteroidos/libiphb/default.nix
 @@ -0,0 +1,54 @@
@@ -1278,7 +1226,7 @@ index 00000000..6da52c87
 +  libdsme,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "libiphb";
 +  version = "1.2.8";
 +
@@ -1286,7 +1234,7 @@ index 00000000..6da52c87
 +    owner = "sailfishos";
 +    repo = "libiphb";
 +    rev = "69f059da35fdd7aa72e38a5f7c596631a2f839cc";
-+    sha256 = "1pr94wna8lr7505667zhc7gc36d05nhfd71fmmxiq46xfd9hjlh2";
++    hash = "sha256-AlIJU3PdEBx7rS6c5qAtoJnB3mHwH2MKKCdTpCwnKd8=";
 +  };
 +
 +  strictDeps = true;
@@ -1316,7 +1264,7 @@ index 00000000..6da52c87
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/libncicore/default.nix b/overlay/asteroidos/libncicore/default.nix
 new file mode 100644
 index 00000000..180de45a
@@ -1569,7 +1517,7 @@ index 00000000..b3eda168
 +}
 diff --git a/overlay/asteroidos/libngf/default.nix b/overlay/asteroidos/libngf/default.nix
 new file mode 100644
-index 00000000..a2f16428
+index 0000000000000000000000000000000000000000..7c1cc28e2ad346aa768cdd33df1528fd9f1a86e5
 --- /dev/null
 +++ b/overlay/asteroidos/libngf/default.nix
 @@ -0,0 +1,53 @@
@@ -1587,7 +1535,7 @@ index 00000000..a2f16428
 +  dbus-glib,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "libngf";
 +  version = "0.24.0";
 +
@@ -1595,7 +1543,7 @@ index 00000000..a2f16428
 +    owner = "sailfishos";
 +    repo = "libngf";
 +    rev = "89ab179ea85ccd8202a0dbac119855f5f1321163";
-+    sha256 = "1ch66jvs2p0zk9y70vcgzzkd0wf6q0bbvlk1mfr3hsvxr99x4il5";
++    hash = "sha256-hUbSU8p9aziyq2HSvRbAxnHQ5v+PbXB8mh9cobc0BrI=";
 +  };
 +
 +  strictDeps = true;
@@ -1625,7 +1573,7 @@ index 00000000..a2f16428
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch b/overlay/asteroidos/mapplauncherd/0002-invoker-skip-the-sailjaild-D-Bus-query-when-sailjail.patch
 new file mode 100644
 index 00000000..0597e987
@@ -1936,7 +1884,7 @@ index 00000000..6066dc34
 +}
 diff --git a/overlay/asteroidos/mce-qt6/default.nix b/overlay/asteroidos/mce-qt6/default.nix
 new file mode 100644
-index 00000000..3e1c5c4d
+index 0000000000000000000000000000000000000000..05416955b36f4523466ba4042690ddd4973425d8
 --- /dev/null
 +++ b/overlay/asteroidos/mce-qt6/default.nix
 @@ -0,0 +1,100 @@
@@ -1953,7 +1901,7 @@ index 00000000..3e1c5c4d
 +  buildPackages,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "mce-qt6";
 +  version = "nightly";
 +
@@ -1961,7 +1909,7 @@ index 00000000..3e1c5c4d
 +    owner = "sailfishos";
 +    repo = "libmce-qt";
 +    rev = "7fb63aa8258fd96bf121fa4f28c03aa43f7dc703";
-+    sha256 = "sha256-fWEI0eisU5mPcPNt8EdB3blrOqTREjGDysCjf0FaRLU=";
++    hash = "sha256-fWEI0eisU5mPcPNt8EdB3blrOqTREjGDysCjf0FaRLU=";
 +  };
 +
 +  strictDeps = true;
@@ -2039,7 +1987,7 @@ index 00000000..3e1c5c4d
 +    license = licenses.lgpl21Only;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/mce/builtin-gconf.values b/overlay/asteroidos/mce/builtin-gconf.values
 new file mode 100644
 index 00000000..abd88e6d
@@ -4186,7 +4134,7 @@ index 00000000..30575249
 +         .input_cb = pwrkey_datapipe_ngfd_event_request_cb,
 diff --git a/overlay/asteroidos/mkcal/default.nix b/overlay/asteroidos/mkcal/default.nix
 new file mode 100644
-index 00000000..07fc7975
+index 0000000000000000000000000000000000000000..1d65f8db73cdaa8ab7178b715db72704ff82fad7
 --- /dev/null
 +++ b/overlay/asteroidos/mkcal/default.nix
 @@ -0,0 +1,60 @@
@@ -4207,7 +4155,7 @@ index 00000000..07fc7975
 +  timed-qt6,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "mkcal";
 +  version = "0.7.22";
 +
@@ -4215,7 +4163,7 @@ index 00000000..07fc7975
 +    owner = "sailfishos";
 +    repo = "mkcal";
 +    rev = "4687242710462999b4f55fd82104e2aee53f9fdf";
-+    sha256 = "006ivpzg33bisdwz6hzwr45ay2qydyrr2wh9knq8yfhx5ygnsbjh";
++    hash = "sha256-UC5tny8dOo+wnQlykbNvHguvCsn8Q/N503GN8f7d0QA=";
 +  };
 +
 +  strictDeps = true;
@@ -4249,7 +4197,7 @@ index 00000000..07fc7975
 +    license = licenses.lgpl2Only;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/mlite/CMakeLists.txt b/overlay/asteroidos/mlite/CMakeLists.txt
 new file mode 100644
 index 00000000..b82207f8
@@ -4380,7 +4328,7 @@ index 00000000..b82207f8
 +)
 diff --git a/overlay/asteroidos/mlite/default.nix b/overlay/asteroidos/mlite/default.nix
 new file mode 100644
-index 00000000..f856fb47
+index 0000000000000000000000000000000000000000..1206bcaede25cef94bda4617828652e4f615457a
 --- /dev/null
 +++ b/overlay/asteroidos/mlite/default.nix
 @@ -0,0 +1,62 @@
@@ -4398,7 +4346,7 @@ index 00000000..f856fb47
 +  glib,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "mlite";
 +  version = "nightly";
 +
@@ -4445,10 +4393,10 @@ index 00000000..f856fb47
 +    license = licenses.lgpl21Only;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
 new file mode 100644
-index 00000000..261c3149
+index 0000000000000000000000000000000000000000..4bd75c3c491cd0cea4eaedfae702450a8de7f3a0
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-alarms/default.nix
 @@ -0,0 +1,135 @@
@@ -4466,7 +4414,7 @@ index 00000000..261c3149
 +  timed-qt6,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "nemo-qml-plugin-alarms";
 +  version = "nightly";
 +
@@ -4474,7 +4422,7 @@ index 00000000..261c3149
 +    owner = "sailfishos";
 +    repo = "nemo-qml-plugin-alarms";
 +    rev = "4377d1e31a56c763ba3e2d61137f97529281c1bd";
-+    sha256 = "07phqhlfkiq8fb10l7y1czfqnij2kda55jg5vx8ig92khzxj49gz";
++    hash = "sha256-/yUi+4dTpBdR3+XJUlSbQkaL3WfBHwrCcgjH6SjE8B4=";
 +  };
 +
 +  strictDeps = true;
@@ -4499,7 +4447,7 @@ index 00000000..261c3149
 +    # file named "exception" in the public include dir shadows the C++
 +    # standard header). alarms only includes it, never uses it.
 +    substituteInPlace src/alarmobject.cpp \
-+      --replace "#include <timed-qt6/exception>" "#include <timed-qt6/exception.h>"
++      --replace-fail "#include <timed-qt6/exception>" "#include <timed-qt6/exception.h>"
 +
 +    cat > CMakeLists.txt << 'EOF'
 +    cmake_minimum_required(VERSION 3.16)
@@ -4586,10 +4534,10 @@ index 00000000..261c3149
 +    license = licenses.bsd3;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix b/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
 new file mode 100644
-index 00000000..7111ae88
+index 0000000000000000000000000000000000000000..a21e30c9b82c0a2151e524fd29583c4119af94fe
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-calendar/default.nix
 @@ -0,0 +1,94 @@
@@ -4611,7 +4559,7 @@ index 00000000..7111ae88
 +  libiodata,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "nemo-qml-plugin-calendar";
 +  version = "0.7.8";
 +
@@ -4619,7 +4567,7 @@ index 00000000..7111ae88
 +    owner = "sailfishos";
 +    repo = "nemo-qml-plugin-calendar";
 +    rev = "8f790f1026dee5065cdc4112a273272f28d0f4f5";
-+    sha256 = "0cbhd9m5gi8a99c62g08nkhg16z2rhzkj6xb09japc82p0r8rf07";
++    hash = "sha256-B7iMMrgCsatkAqsbOT/M4pvw4LQIPGFYSgrFV2pqcDE=";
 +  };
 +
 +  strictDeps = true;
@@ -4686,10 +4634,10 @@ index 00000000..7111ae88
 +    license = licenses.bsd3;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
 new file mode 100644
-index 00000000..3b6dc415
+index 0000000000000000000000000000000000000000..b7ae2e178f419a5326a4f51367a6c09a34c314a9
 --- /dev/null
 +++ b/overlay/asteroidos/nemo-qml-plugin-notifications/default.nix
 @@ -0,0 +1,121 @@
@@ -4706,7 +4654,7 @@ index 00000000..3b6dc415
 +  buildPackages,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "nemo-qml-plugin-notifications";
 +  version = "nightly";
 +
@@ -4714,7 +4662,7 @@ index 00000000..3b6dc415
 +    owner = "sailfishos";
 +    repo = "nemo-qml-plugin-notifications";
 +    rev = "d4d0a0ce8257b90293b8df469830f0e288faeeae";
-+    sha256 = "0d12viyjigmz823d9ghkr7i1iifyl5vrkn2c98lw32kr4micb9nf";
++    hash = "sha256-zqbFYiV5isEpSkzYmXeh3sUY4skTvtSGQL++KH3cIjQ=";
 +  };
 +
 +  strictDeps = true;
@@ -4813,7 +4761,7 @@ index 00000000..3b6dc415
 +    license = licenses.bsd3;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/nfcd/default.nix b/overlay/asteroidos/nfcd/default.nix
 new file mode 100644
 index 00000000..d12414ad
@@ -5019,7 +4967,7 @@ index 00000000..d12414ad
 +}
 diff --git a/overlay/asteroidos/ngf-qt6/default.nix b/overlay/asteroidos/ngf-qt6/default.nix
 new file mode 100644
-index 00000000..d16b452f
+index 0000000000000000000000000000000000000000..06bf739595bfbdd67feafbe419173e44e3e2d197
 --- /dev/null
 +++ b/overlay/asteroidos/ngf-qt6/default.nix
 @@ -0,0 +1,96 @@
@@ -5035,7 +4983,7 @@ index 00000000..d16b452f
 +  buildPackages,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "ngf-qt6";
 +  version = "nightly";
 +
@@ -5043,7 +4991,7 @@ index 00000000..d16b452f
 +    owner = "sailfishos";
 +    repo = "libngf-qt";
 +    rev = "94caafdbc31341e9b9834199aedaa0c5f4a7bd44";
-+    sha256 = "sha256-Spg1PfS0mkLDaCaR7RZUKbne+RFLJ1SSUnIgupfYgMw=";
++    hash = "sha256-Spg1PfS0mkLDaCaR7RZUKbne+RFLJ1SSUnIgupfYgMw=";
 +  };
 +
 +  strictDeps = true;
@@ -5118,7 +5066,7 @@ index 00000000..d16b452f
 +    license = licenses.lgpl21Only;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch b/overlay/asteroidos/ngfd/0005-gst-sink-fallback-to-alsasink.patch
 new file mode 100644
 index 00000000..a4f4f863
@@ -5149,7 +5097,7 @@ index 00000000..a4f4f863
 +         N_ERROR (LOG_CAT "failed to create required elements.");
 diff --git a/overlay/asteroidos/ngfd/default.nix b/overlay/asteroidos/ngfd/default.nix
 new file mode 100644
-index 00000000..44b0f80f
+index 0000000000000000000000000000000000000000..f05731fc8d36e193fe3a5b70a5def32c79c6acb9
 --- /dev/null
 +++ b/overlay/asteroidos/ngfd/default.nix
 @@ -0,0 +1,113 @@
@@ -5186,7 +5134,7 @@ index 00000000..44b0f80f
 +    hash = "sha256-1puASaoWx56lOGv2ScYg94wkiKwFeff0lljOcVX7icg=";
 +  };
 +in
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "ngfd";
 +  version = "1.4.0";
 +
@@ -5265,7 +5213,7 @@ index 00000000..44b0f80f
 +    license = lib.licenses.lgpl21Plus;
 +    platforms = [ "armv7l-linux" ];
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/sensorfw/CMakeLists.txt b/overlay/asteroidos/sensorfw/CMakeLists.txt
 new file mode 100644
 index 00000000..6ad5cc23
@@ -5538,7 +5486,7 @@ index 00000000..6ad5cc23
 +install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sensord-qt6.pc DESTINATION lib/pkgconfig)
 diff --git a/overlay/asteroidos/sensorfw/default.nix b/overlay/asteroidos/sensorfw/default.nix
 new file mode 100644
-index 00000000..fa31860e
+index 0000000000000000000000000000000000000000..6aca4bccff517a89f6aec378b364d39a765c0432
 --- /dev/null
 +++ b/overlay/asteroidos/sensorfw/default.nix
 @@ -0,0 +1,71 @@
@@ -5558,7 +5506,7 @@ index 00000000..fa31860e
 +  metaAsteroidSrc,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "sensorfw";
 +  version = "0.15.1";
 +
@@ -5612,10 +5560,10 @@ index 00000000..fa31860e
 +    license = licenses.lgpl21Plus;
 +    platforms = platforms.linux;
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/swclock-offset/default.nix b/overlay/asteroidos/swclock-offset/default.nix
 new file mode 100644
-index 00000000..d7e91032
+index 0000000000000000000000000000000000000000..d8a153810400a1f06df492caf6a613d4a865403a
 --- /dev/null
 +++ b/overlay/asteroidos/swclock-offset/default.nix
 @@ -0,0 +1,30 @@
@@ -5624,7 +5572,7 @@ index 00000000..d7e91032
 +# offset file written at shutdown.
 +{ stdenv, fetchgit }:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "swclock-offset";
 +  version = "0.1";
 +
@@ -5648,10 +5596,10 @@ index 00000000..d7e91032
 +    description = "Synchronise time from a non-writable RTC using a cached offset";
 +    platforms = [ "armv7l-linux" ];
 +  };
-+})
++}
 diff --git a/overlay/asteroidos/timed-qt6/default.nix b/overlay/asteroidos/timed-qt6/default.nix
 new file mode 100644
-index 00000000..0179e746
+index 0000000000000000000000000000000000000000..07053b862ff2981594585ff6de418ffd9ac45c75
 --- /dev/null
 +++ b/overlay/asteroidos/timed-qt6/default.nix
 @@ -0,0 +1,109 @@
@@ -5683,7 +5631,7 @@ index 00000000..0179e746
 +    owner = "sailfishos";
 +    repo = "timed";
 +    rev = "80ea5e63cf58db616789adbfeb9cf3bfd63dddaa";
-+    sha256 = "1byd00z946q2bd6xi4s2vyxb380gh84d143jc8p8n26ifmvlpb79";
++    hash = "sha256-6axLd3XRCIsuYnKQ0AiCD6Cxut9Ck9hNWwIbkj4Aza8=";
 +  };
 +
 +  strictDeps = true;
@@ -5796,7 +5744,7 @@ index 00000000..a4170a61
 +}
 diff --git a/overlay/asteroidos/usb-moded-dev/default.nix b/overlay/asteroidos/usb-moded-dev/default.nix
 new file mode 100644
-index 00000000..6f957515
+index 0000000000000000000000000000000000000000..21b65afd5015d25220f8bbb164402779090e67a6
 --- /dev/null
 +++ b/overlay/asteroidos/usb-moded-dev/default.nix
 @@ -0,0 +1,42 @@
@@ -5817,7 +5765,7 @@ index 00000000..6f957515
 +    owner = "sailfishos";
 +    repo = "usb-moded";
 +    rev = "4b7da5afee06332ac175a5b2772a55e416756f74";
-+    sha256 = "sha256-oY952MePyRWtCKAyHJ4SpjdeTglG24d4zeYiZ5zUNcw=";
++    hash = "sha256-oY952MePyRWtCKAyHJ4SpjdeTglG24d4zeYiZ5zUNcw=";
 +  };
 +
 +  strictDeps = true;
@@ -5844,7 +5792,7 @@ index 00000000..6f957515
 +})
 diff --git a/overlay/asteroidos/usb-moded-qt6/default.nix b/overlay/asteroidos/usb-moded-qt6/default.nix
 new file mode 100644
-index 00000000..0e985634
+index 0000000000000000000000000000000000000000..97ec49d797c2b057ec29f329c9c496bd50d7a676
 --- /dev/null
 +++ b/overlay/asteroidos/usb-moded-qt6/default.nix
 @@ -0,0 +1,90 @@
@@ -5862,7 +5810,7 @@ index 00000000..0e985634
 +  usb-moded-dev,
 +}:
 +
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  pname = "usb-moded-qt6";
 +  version = "nightly";
 +
@@ -5870,7 +5818,7 @@ index 00000000..0e985634
 +    owner = "sailfishos";
 +    repo = "libusb-moded-qt";
 +    rev = "10f2bcb86e9c116ae94da668d997c09c0966388c";
-+    sha256 = "sha256-hCNbpJQz/0Vja7lZTk8zJvEYxt3jCDZoSv4XPTdbBZs=";
++    hash = "sha256-hCNbpJQz/0Vja7lZTk8zJvEYxt3jCDZoSv4XPTdbBZs=";
 +  };
 +
 +  strictDeps = true;
@@ -5937,4 +5885,4 @@ index 00000000..0e985634
 +    license = licenses.bsd3;
 +    platforms = platforms.linux;
 +  };
-+})
++}

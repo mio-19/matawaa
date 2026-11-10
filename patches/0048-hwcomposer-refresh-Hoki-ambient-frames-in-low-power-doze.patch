@@ -4,11 +4,10 @@ Date: Tue, 10 Nov 2026 11:33:29 +1100
 Subject: [PATCH] hwcomposer: refresh Hoki ambient frames in low-power doze
 
 ---
- devices/fossil-hoki/default.nix               |  9 +-
- .../ambient-doze-update.patch                 | 97 +++++++++++++++++++
- .../qt6-qpa-hwcomposer-plugin/default.nix     |  2 +
- 3 files changed, 107 insertions(+), 1 deletion(-)
- create mode 100644 overlay/asteroidos/qt6-qpa-hwcomposer-plugin/ambient-doze-update.patch
+ devices/fossil-hoki/default.nix                            |    9 +++++-
+ ...dos/qt6-qpa-hwcomposer-plugin/ambient-doze-update.patch |   97 ++++++++++++++++++++
+ overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix   |   14 ++++---
+3 files changed, 113 insertions(+), 7 deletions(-)
 
 diff --git a/devices/fossil-hoki/default.nix b/devices/fossil-hoki/default.nix
 index a6a6e41d..9019a3a4 100644
@@ -141,15 +140,40 @@ index 00000000..cd0a8dc8
 +     procs = new HwcProcs_v20();
 +     procs->on_vsync_received = hwc2_callback_vsync;
 diff --git a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-index c5ec137a..4b28ebad 100644
+index 18a7b4a346cab53577aa7bbcc19264314fb24553..4b28ebad875c6b4cb8427f97c7d5b04c892bce0e 100644
 --- a/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
 +++ b/overlay/asteroidos/qt6-qpa-hwcomposer-plugin/default.nix
-@@ -69,6 +69,8 @@ stdenv.mkDerivation {
-     "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0006-v10-Fix-refresh-rate-fallback-unit.patch"
-     "${metaAsteroidSrc}/recipes-qt/qt6/qt6-qpa-hwcomposer-plugin/0007-v10-Make-updates-request-driven-and-vsync-paced.patch"
+@@ -27,3 +27,3 @@ let
+         url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hardware.h";
+-        sha256 = "1s5f4gxmqhd4xfddwaiw9q8csjnk8fcmb02370v7xj6n100jzk05";
++        hash = "sha256-BcwvAQjWyH42OEOAVZlD00rNEE48Kt6a66RBXPsjrug=";
+       }
+@@ -33,3 +33,3 @@ let
+         url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer_defs.h";
+-        sha256 = "1far10f35b95apgqdasmpl7jgdqm51j5xjwzsgj3h59n5n1almhi";
++        hash = "sha256-EVaqgi02FTjk05/LXmQoFbcnD71Vq4bfVSWtMhwIWbk=";
+       }
+@@ -39,3 +39,3 @@ let
+         url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer.h";
+-        sha256 = "12i9w601lnsli38wnwal81zzvfr4x6ynlxhm2crd1qwhw29jwqz7";
++        hash = "sha256-52Muk+CQ49AyExV2ar3pJLv9f0BUccvRiFRbGoDhKYo=";
+       }
+@@ -45,3 +45,3 @@ let
+         url = "https://raw.githubusercontent.com/aosp-mirror/platform_hardware_libhardware/android-10.0.0_r1/include/hardware/hwcomposer2.h";
+-        sha256 = "0f2vp1mqvn7psvx0xhdfspxjf07f4gr42wprkv1l8n5llfxqklgd";
++        hash = "sha256-7dGJu6O0WETDnvlyQfIj7gAn+9WuwQ761vfYjWu4Wzg=";
+       }
+@@ -50,3 +50,3 @@ let
+ in
+-stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
+   pname = "qt6-qpa-hwcomposer-plugin";
+@@ -71,2 +71,4 @@ stdenv.mkDerivation (finalAttrs: {
      ./hwc-present-diagnostics.patch
 +    # Keep ambient updates in low-power DOZE and restore suspend on errors.
 +    ./ambient-doze-update.patch
    ];
- 
-   strictDeps = true;
+@@ -255,2 +257,2 @@ stdenv.mkDerivation (finalAttrs: {
+   };
+-})
++}

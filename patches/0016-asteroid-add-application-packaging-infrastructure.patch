@@ -4,17 +4,13 @@ Date: Mon, 9 Nov 2026 10:55:49 +1100
 Subject: [PATCH] asteroid: add application packaging infrastructure
 
 ---
- overlay/asteroidos/default.nix               |  15 +++
- overlay/asteroidos/lib/mk-asteroid-app.nix   | 115 +++++++++++++++++
- overlay/asteroidos/lib/no-usr-share-hook.nix |   5 +
- overlay/asteroidos/lib/no-usr-share-hook.sh  |  30 +++++
- overlay/asteroidos/qml-asteroid/default.nix  | 124 +++++++++++++++++++
- 5 files changed, 289 insertions(+)
- create mode 100644 overlay/asteroidos/default.nix
- create mode 100644 overlay/asteroidos/lib/mk-asteroid-app.nix
- create mode 100644 overlay/asteroidos/lib/no-usr-share-hook.nix
- create mode 100644 overlay/asteroidos/lib/no-usr-share-hook.sh
- create mode 100644 overlay/asteroidos/qml-asteroid/default.nix
+ overlay/asteroidos/default.nix                             |   15 ++++++++
+ overlay/asteroidos/lib/mk-asteroid-app.nix                 |  121 ++++++++++++++++++++++
+ overlay/asteroidos/lib/no-usr-share-hook.nix               |    5 ++++
+ overlay/asteroidos/lib/no-usr-share-hook.sh                |   30 +++++++++++
+ overlay/asteroidos/qml-asteroid/default.nix                |  124 ++++++++++++++++++++++
+ overlay/asteroidos/lib/generate-desktop.nix                |   41 +++++++++++++
+6 files changed, 336 insertions(+)
 
 diff --git a/overlay/asteroidos/default.nix b/overlay/asteroidos/default.nix
 new file mode 100644
@@ -39,10 +35,10 @@ index 00000000..7ce4a083
 +}
 diff --git a/overlay/asteroidos/lib/mk-asteroid-app.nix b/overlay/asteroidos/lib/mk-asteroid-app.nix
 new file mode 100644
-index 00000000..fa056167
+index 0000000000000000000000000000000000000000..d479c8b09044393b309ec91c9e3056da06184973
 --- /dev/null
 +++ b/overlay/asteroidos/lib/mk-asteroid-app.nix
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,121 @@
 +# Unified builder for AsteroidOS smartwatch applications
 +# Inspired by Nixpkgs mkKdeDerivation: https://github.com/NixOS/nixpkgs/blob/master/pkgs/kde/lib/mk-kde-derivation.nix
 +{
@@ -73,15 +69,20 @@ index 00000000..fa056167
 +  extraBuildInputs ? [ ],
 +  patches ? [ ],
 +  postPatch ? "",
++  postBuild ? "",
++  postInstall ? "",
++  postFixup ? "",
 +  cmakeFlags ? [ ],
 +  meta ? { },
-+  ...
 +}:
 +
 +let
 +  isCross = !stdenv.buildPlatform.canExecute stdenv.hostPlatform;
++  generateDesktop = buildPackages.callPackage ./generate-desktop.nix {
++    inherit (qml-asteroid) src;
++  };
 +in
-+stdenv.mkDerivation (finalAttrs: {
++stdenv.mkDerivation {
 +  inherit pname version;
 +
 +  src =
@@ -94,7 +95,7 @@ index 00000000..fa056167
 +      });
 +
 +  strictDeps = true;
-+  inherit patches;
++  inherit patches postBuild postInstall;
 +
 +  postPatch = ''
 +    # CMake install destinations must stay relative to CMAKE_INSTALL_PREFIX.
@@ -111,7 +112,7 @@ index 00000000..fa056167
 +    kdePackages.extra-cmake-modules
 +    pkg-config
 +    qt6.wrapQtAppsHook
-+    qml-asteroid
++    generateDesktop
 +    noUsrShareHook
 +  ]
 +  ++ lib.optionals (!isCross) [
@@ -145,7 +146,8 @@ index 00000000..fa056167
 +    if [ -d "$out/bin" ]; then
 +      find "$out/bin" -type f -exec sed -i "s|\\bexec invoker\\b|exec ${mapplauncherd}/bin/invoker|g" {} +
 +    fi
-+  '';
++  ''
++  + postFixup;
 +
 +  meta =
 +    with lib;
@@ -157,7 +159,7 @@ index 00000000..fa056167
 +      platforms = platforms.linux;
 +    }
 +    // meta;
-+})
++}
 diff --git a/overlay/asteroidos/lib/no-usr-share-hook.nix b/overlay/asteroidos/lib/no-usr-share-hook.nix
 new file mode 100644
 index 00000000..8d7c7073
@@ -335,3 +337,50 @@ index 00000000..db13a9a2
 +    platforms = platforms.linux;
 +  };
 +})
+diff --git a/overlay/asteroidos/lib/generate-desktop.nix b/overlay/asteroidos/lib/generate-desktop.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..a89bc6a2445c3fb41105c8dbc7c294d087b0fc0c
+--- /dev/null
++++ b/overlay/asteroidos/lib/generate-desktop.nix
+@@ -0,0 +1,41 @@
++# The upstream generator is a shell tool; building all of qml-asteroid for the
++# build machine is unnecessary when cross-compiling applications.
++{
++  lib,
++  stdenvNoCC,
++  makeWrapper,
++  coreutils,
++  gnugrep,
++  src,
++}:
++
++stdenvNoCC.mkDerivation {
++  pname = "asteroid-generate-desktop";
++  version = "2.1.0";
++  inherit src;
++
++  nativeBuildInputs = [ makeWrapper ];
++  dontConfigure = true;
++  dontBuild = true;
++
++  installPhase = ''
++    runHook preInstall
++    install -Dm755 generate-desktop.sh "$out/bin/asteroid-generate-desktop"
++    wrapProgram "$out/bin/asteroid-generate-desktop" \
++      --prefix PATH : ${
++        lib.makeBinPath [
++          coreutils
++          gnugrep
++        ]
++      }
++    runHook postInstall
++  '';
++
++  meta = {
++    description = "Generate translated AsteroidOS desktop entries";
++    homepage = "https://github.com/AsteroidOS/qml-asteroid";
++    license = lib.licenses.bsd3;
++    mainProgram = "asteroid-generate-desktop";
++    platforms = lib.platforms.unix;
++  };
++}

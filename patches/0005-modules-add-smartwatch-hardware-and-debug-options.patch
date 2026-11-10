@@ -4,30 +4,25 @@ Date: Mon, 9 Nov 2026 10:55:46 +1100
 Subject: [PATCH] modules: add smartwatch hardware and debug options
 
 ---
- modules/hardware-watch.nix | 196 +++++++++++++++++++++++++++++++++++++
- modules/module-list.nix    |   1 +
- 2 files changed, 197 insertions(+)
- create mode 100644 modules/hardware-watch.nix
+ modules/hardware-watch.nix                                 |  198 ++++++++++++++++++++++++++++
+ modules/module-list.nix                                    |    1 ++
+2 files changed, 199 insertions(+)
 
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
 new file mode 100644
-index 00000000..4c9a9b22
+index 0000000000000000000000000000000000000000..c6b448f2a0f5789e34470ee7cafaddc26e33dcb9
 --- /dev/null
 +++ b/modules/hardware-watch.nix
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,198 @@
 +{
 +  config,
 +  lib,
-+  pkgs,
 +  ...
 +}:
 +
 +let
 +  inherit (lib)
-+    mkDefault
-+    mkEnableOption
 +    mkIf
-+    mkMerge
 +    mkOption
 +    types
 +    ;
@@ -60,7 +55,7 @@ index 00000000..4c9a9b22
 +    };
 +
 +    chinHeight = mkOption {
-+      type = types.int;
++      type = types.ints.unsigned;
 +      default = 0;
 +      description = ''
 +        Height in pixels of the non-display cutout area at the bottom of the screen
@@ -74,7 +69,7 @@ index 00000000..4c9a9b22
 +        if
 +          watchCfg.enable && (screenCfg.shape == "round" || screenCfg.shape == "chin") && (screenCfg ? width)
 +        then
-+          screenCfg.width / 2
++          builtins.div screenCfg.width 2
 +        else
 +          0;
 +      description = ''
@@ -109,6 +104,12 @@ index 00000000..4c9a9b22
 +      '';
 +    };
 +
++    hasWlan = mkOption {
++      type = types.bool;
++      default = true;
++      description = "Whether the watch has Wi-Fi, exposed as upstream MACHINE_HAS_WLAN.";
++    };
++
 +    hasSpeaker = mkOption {
 +      type = types.bool;
 +      default = false;
@@ -120,7 +121,7 @@ index 00000000..4c9a9b22
 +    };
 +
 +    borderGestureWidth = mkOption {
-+      type = types.nullOr (types.either types.str types.float);
++      type = types.nullOr (types.numbers.between 0 1);
 +      default = null;
 +      description = ''
 +        Fraction of display width/height dedicated to border gestures (0.0 - 1.0).
