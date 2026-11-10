@@ -57,10 +57,10 @@ Nothing enters or prepares timepiece mode automatically on idle or suspend.
 ## Device validation, 2026-11-10
 
 The ARMv7 coprocessor package, timezone helper, graphics plugin and complete Hoki
-system cross-build successfully. All 49 patches replay without three-way fallback
+system cross-build successfully. All 50 patches replay without three-way fallback
 and produce the same tree as the work checkout and Nix-patched source. Static
-linkage checks pass for all 10 ELF paths matching the new daemon, helper and
-graphics plugin. The timezone/Android-init service ordering passes
+linkage checks pass for 25 ELF paths covering the new daemon, helper, graphics
+plugin and keepalive examples. The timezone/Android-init service ordering passes
 `systemd-analyze verify`. On the watch via SSH port 2222:
 
 - The daemon connects to `vendor.google_clockwork.sidekickgraphics@1.2::ISidekickGraphics/default`.
@@ -75,3 +75,31 @@ graphics plugin. The timezone/Android-init service ordering passes
 These logs establish accepted transitions and removal of the full-ON refresh
 path. Visual confirmation of clock advancement and absence of flashes is still
 needed. The MCU firmware preparation/power-off handoff has not been exercised.
+
+Deployment also exposed an earlier qmake packaging error: keepalive's three
+example binaries were installed under `$out/nix/store/<native-qt>/bin`, outside
+normal stripping/fixup directories. Their directory names and unstripped debug
+info retained native Qt and the cross compiler. The examples now install in
+`$out/bin`; normal Nix fixups remove their debug info and retain the target runtime libraries.
+The package rejects references to native Qt and the compiler to catch regressions.
+
+With that correction, the complete system closure decreases from 2.5 GiB to
+1.8 GiB and no longer depends on native Qt/ICU or the cross-binutils package
+identified during deployment. All three examples remain ARM executables in
+`bin`, with no `.debug_*` sections or nested store-prefix directory.
+
+The corrected system was deployed through SSH port 2222 using `boot` activation
+and rebooted successfully into
+`/nix/store/yvrfvwwz0r6khkr131w0ar4b9zic7359-nixos-system-nixos-26.11pre-git`.
+After reboot the launcher and MCU daemon are active with zero restarts, system
+and ceres-user failed-unit lists are empty, capabilities remain `3`, and MCU time
+synchronization succeeds. The new graphics plugin is mapped and
+`QPA_HWC2_DOZE_UPDATE=1` is present without a temporary service override. The old
+ON flag may remain in persistent compositor files, but the new DOZE flag takes
+precedence. The timezone helper sets `0 -> -660` during boot before Android init.
+
+A post-reboot wake/sleep cycle succeeds. The 11:59 ambient refresh uses DOZE and
+restores DOZE_SUSPEND with no UNBLANK event or launcher restart. The MCU daemon
+also remains active without restarts. Temporary deployment/verification wake
+locks have been released. Visual confirmation and the explicit MCU power-off
+handoff remain the validation limits described above.

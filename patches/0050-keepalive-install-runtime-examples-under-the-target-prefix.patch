@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 10 Nov 2026 11:53:29 +1100
+Subject: [PATCH] keepalive: install runtime examples under the target prefix
+
+---
+ overlay/asteroidos/keepalive/default.nix | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/overlay/asteroidos/keepalive/default.nix b/overlay/asteroidos/keepalive/default.nix
+index 5f6b5dfd..d83dcfab 100644
+--- a/overlay/asteroidos/keepalive/default.nix
++++ b/overlay/asteroidos/keepalive/default.nix
+@@ -27,6 +27,13 @@ stdenv.mkDerivation {
+   strictDeps = true;
+   dontWrapQtApps = true;
+ 
++  # Runtime examples must not retain native Qt or the cross compiler, including
++  # through debug info in files installed outside the standard fixup paths.
++  disallowedReferences = [
++    buildPackages.qt6.qtbase
++    stdenv.cc.cc
++  ];
++
+   patches = [
+     "${metaAsteroidSrc}/recipes-nemomobile/nemo-keepalive/nemo-keepalive/0001-Disable-tests.patch"
+     "${metaAsteroidSrc}/recipes-nemomobile/nemo-keepalive/nemo-keepalive/0002-Fix-build.patch"
+@@ -58,6 +65,10 @@ stdenv.mkDerivation {
+       --replace-fail 'INSTALLS += target develheaders pkgconfig' 'INSTALLS += target develheaders'
+     substituteInPlace plugin/plugin.pro \
+       --replace-fail '$$[QT_INSTALL_QML]' '/lib/qt-6/qml'
++    for project in examples/*/*.pro; do
++      substituteInPlace "$project" \
++        --replace-fail '$$[QT_INSTALL_BINS]' '/bin'
++    done
+     substituteInPlace keepalive.pro \
+       --replace-fail '$$[QT_INSTALL_EXAMPLES]/keepalive' '/share/qt-6/examples/keepalive'
+   '';
