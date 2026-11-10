@@ -116,3 +116,21 @@ daemon are active without restarts. MCE remained in `LPM_ON` for about five
 seconds, then entered `LPM_OFF`; the kernel logged framebuffer suspend and no
 `FB_BLANK_UNBLANK` during that transition. Visual confirmation of the AOD
 remaining visible through this low-power transition is still required.
+
+
+The Hoki-specific MCE policy disables the `LPM_ON` to `LPM_OFF` proximity
+timeout because this watch has no proximity sensor to wake it back into AOD.
+Touch or the power key still wakes the interactive display. The ON-to-DIM and
+DIM-to-AOD idle timers remain at their AsteroidOS defaults, so AOD begins after
+normal inactivity; the watch now stays in AOD rather than going black five
+seconds later. This override is Hoki-only.
+
+The Hoki system `/nix/store/8scndwrgzqmclvc1k71sx974j13ij825-nixos-system-nixos-26.11pre-git`
+was built, staged through SSH port 2222 and rebooted on 2026-11-10. MCE entered
+`LPM_ON` at 13:59:56 and again at 14:01:48, with no following `LPM_OFF`; MCE
+remained active without restarts. During the latter session, the camera launch
+produced the reported white screen before the display dimmed at 14:01:33 and
+entered AOD at 14:01:48. At 14:06 the camera process was gone and MCE was still
+in AOD. No camera QML error or crash was present in the captured logs, so the
+white camera frame's root cause remains unconfirmed; the AOD handoff and
+post-AOD black transition are separate display behavior.

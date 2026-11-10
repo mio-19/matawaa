@@ -1,0 +1,101 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Mio <mio@mio19.uk>
+Date: Tue, 10 Nov 2026 13:56:43 +1100
+Subject: [PATCH] fossil-hoki: keep MCE in AOD until wake
+
+---
+ devices/fossil-hoki/mce-keep-aod.patch | 27 ++++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix | 18 +++++++++++++----
+ 2 files changed, 41 insertions(+), 4 deletions(-)
+ create mode 100644 devices/fossil-hoki/mce-keep-aod.patch
+
+diff --git a/devices/fossil-hoki/mce-keep-aod.patch b/devices/fossil-hoki/mce-keep-aod.patch
+new file mode 100644
+index 00000000..7ac88ff0
+--- /dev/null
++++ b/devices/fossil-hoki/mce-keep-aod.patch
+@@ -0,0 +1,27 @@
++From: Matawaa <noreply@localhost>
++Subject: [PATCH] mce: let Hoki remain in AOD until woken
++
++Hoki has no proximity sensor to trigger an LPM_OFF -> LPM_ON transition.
++Treat a negative LPM_ON timeout as disabled, and use that setting only for
++Fossil Hoki so the display does not drop to a black panel after five seconds
++in AOD. Other AsteroidOS devices retain the upstream five-second timeout.
++
++--- a/modules/display.h
+++++ b/modules/display.h
++@@ -380 +380 @@
++-# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   5
+++# define MCE_DEFAULT_DISPLAY_BLANK_FROM_LPM_ON_TIMEOUT   -1
++--- a/modules/display.c
+++++ b/modules/display.c
++@@ -4310,6 +4310,12 @@ static void mdy_blanking_schedule_lpm_off(void)
++     if( mdy_disp_never_blank )
++         goto EXIT;
++ 
+++    /* A negative timeout disables proximity blanking while in AOD. */
+++    if( timeout < 0 ) {
+++        mce_log(LL_DEBUG, "LPM-BLANK timer disabled");
+++        goto EXIT;
+++    }
+++
++     /* Setup new timeout */
++     mce_log(LL_DEBUG, "LPM-BLANK timer scheduled @ %d secs", timeout);
+diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
+index 2bb6bac2..1c2993bc 100644
+--- a/examples/asteroid/asteroid-desktop.nix
++++ b/examples/asteroid/asteroid-desktop.nix
+@@ -18,6 +18,16 @@ let
+ 
+   isLegacy = config.mobile.hardware.watch.kernel == "legacy";
+ 
++  # Fossil Hoki has no proximity sensor. Keep MCE in its low-power ON state
++  # after entering AOD instead of timing out to a black LPM_OFF screen.
++  mcePackage =
++    if config.mobile.device.name == "fossil-hoki" then
++      pkgs.asteroid.mce.overrideAttrs (old: {
++        patches = (old.patches or [ ]) ++ [ ../../devices/fossil-hoki/mce-keep-aod.patch ];
++      })
++    else
++      pkgs.asteroid.mce;
++
+   # Upstream asteroid-launcher_git.bb installs a seeded notification database
+   # into the ceres user's privileged data directory.
+   # https://github.com/AsteroidOS/meta-asteroid/tree/master/recipes-asteroid/asteroid-launcher/asteroid-launcher/Notifications
+@@ -113,7 +123,7 @@ in
+           asteroid.asteroid-btsyncd
+           asteroid.nemo-qml-plugin-dbus
+           asteroid.libconnman-qt
+-          asteroid.mce
++          mcePackage
+           asteroid.ngfd
+           asteroid.nfcd
+           asteroid.keepalive
+@@ -185,7 +195,7 @@ in
+         # builtin-gconf.values into /var/lib/mce. Use "C" to seed writable defaults.
+         "d /run/mce 0755 root root -"
+         "d /var/lib/mce 0755 root root -"
+-        "C /var/lib/mce/builtin-gconf.values 0644 root root - ${pkgs.asteroid.mce}/share/mce/builtin-gconf.values"
++        "C /var/lib/mce/builtin-gconf.values 0644 root root - ${mcePackage}/share/mce/builtin-gconf.values"
+         # Upstream connman_%.bbappend seeds /var/lib/connman/settings.
+         "d /var/lib/connman 0755 root root -"
+         "C+ /var/lib/connman/settings 0644 root root - ${pkgs.writeText "connman-settings" ''
+@@ -318,7 +328,7 @@ in
+           # fails ("Cannot open `/var/run/mce/boot' for writing").
+           RuntimeDirectory = "mce";
+           RuntimeDirectoryMode = "0755";
+-          ExecStart = "${pkgs.asteroid.mce}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
++          ExecStart = "${mcePackage}/sbin/mce --systemd${lib.optionalString debugBuild " --verbose"}";
+           TimeoutSec = 2;
+           Restart = "always";
+           RestartSec = "1s";
+@@ -552,7 +562,7 @@ in
+       # upstream AsteroidOS connman policy replaces connman's own one.
+       services.dbus.packages = [
+         pkgs.dconf
+-        pkgs.asteroid.mce
++        mcePackage
+         pkgs.asteroid.dsme
+         pkgs.asteroid.sensorfw
+         pkgs.asteroid.ngfd
