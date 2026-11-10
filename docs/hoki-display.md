@@ -108,3 +108,11 @@ restores DOZE_SUSPEND with no UNBLANK event or launcher restart. The MCU daemon
 also remains active without restarts. Temporary deployment/verification wake
 locks have been released. Visual confirmation and the explicit MCU power-off
 handoff remain the validation limits described above.
+
+After the MCE timeout correction, the new system
+`/nix/store/rjhn4da0w5hljjhc0sy4zh0v9f2mv0ds-nixos-system-nixos-26.11pre-git`
+was staged through port 2222 and rebooted. The launcher, MCE and second-display
+daemon are active without restarts. MCE remained in `LPM_ON` for about five
+seconds, then entered `LPM_OFF`; the kernel logged framebuffer suspend and no
+`FB_BLANK_UNBLANK` during that transition. Visual confirmation of the AOD
+remaining visible through this low-power transition is still required.
