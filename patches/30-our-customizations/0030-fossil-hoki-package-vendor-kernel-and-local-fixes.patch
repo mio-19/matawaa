@@ -6,7 +6,7 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
 ---
  ...d-pm_qos_remove_request-with-active-.patch |  40 ++
  .../fossil-hoki/kernel/90_dtbs-install.patch  |  29 +
- devices/fossil-hoki/kernel/default.nix        | 298 +++++++++
+ devices/fossil-hoki/kernel/default.nix        | 344 ++++++++++
  devices/fossil-hoki/kernel/defconfig.patch    |  48 ++
  .../stable/linux-4.14.206-207.patch.patch     |  30 +
  .../stable/linux-4.14.214-215.patch.patch     |  66 ++
@@ -17,7 +17,27 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  .../stable/linux-4.14.225-226.patch.patch     |  26 +
  .../stable/linux-4.14.226-227.patch.patch     |  11 +
  .../stable/linux-4.14.228-229.patch.patch     |  18 +
- 13 files changed, 1238 insertions(+)
+ .../stable/linux-4.14.235-236.patch.patch     |  44 ++
+ .../stable/linux-4.14.236-237.patch.patch     |  37 ++
+ .../stable/linux-4.14.237-238.patch.patch     |  19 +
+ .../stable/linux-4.14.238-239.patch.patch     |  18 +
+ .../stable/linux-4.14.239-240.patch.patch     | 169 +++++
+ .../stable/linux-4.14.240-241.patch.patch     |  24 +
+ .../stable/linux-4.14.241-242.patch.patch     |  31 +
+ .../stable/linux-4.14.244-245.patch.patch     |  21 +
+ .../stable/linux-4.14.246-247.patch.patch     |  61 ++
+ .../kernel/stable/vendor-235-236.patch        |  32 +
+ .../kernel/stable/vendor-236-237.patch        |  13 +
+ .../kernel/stable/vendor-237-238.patch        |  14 +
+ .../kernel/stable/vendor-238-239.patch        |  13 +
+ .../kernel/stable/vendor-239-240.patch        |  75 +++
+ .../kernel/stable/vendor-240-241.patch        |  15 +
+ .../kernel/stable/vendor-241-242.patch        |  26 +
+ .../kernel/stable/vendor-244-245.patch        |  12 +
+ .../kernel/stable/vendor-245-246.patch        |  34 +
+ .../kernel/stable/vendor-246-247.patch        |  42 ++
+ .../kernel/stable/vendor-249-250.patch        |  14 +
+ 33 files changed, 1998 insertions(+)
  create mode 100644 devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
  create mode 100644 devices/fossil-hoki/kernel/90_dtbs-install.patch
  create mode 100644 devices/fossil-hoki/kernel/default.nix
@@ -31,6 +51,26 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.225-226.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.226-227.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.228-229.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.235-236.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.236-237.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.237-238.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.238-239.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.239-240.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.240-241.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.241-242.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.244-245.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.246-247.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-235-236.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-236-237.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-237-238.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-238-239.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-239-240.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-240-241.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-241-242.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-244-245.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-245-246.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-246-247.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-249-250.patch
 
 diff --git a/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch b/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
 new file mode 100644
@@ -115,10 +155,10 @@ index 00000000..1cd6dc69
 + 	$(foreach DIR, $(DTSSUBDIR), $(Q)$(MAKE) $(build)=$(boot)/dts/$(DIR) MACHINE=$(MACHINE) dtbs)
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
-index 00000000..3c29d4d5
+index 00000000..a93e2a1e
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/default.nix
-@@ -0,0 +1,298 @@
+@@ -0,0 +1,344 @@
 +{
 +  mobile-nixos,
 +  stdenv,
@@ -238,7 +278,7 @@ index 00000000..3c29d4d5
 +        cp "${name}" "$out"
 +      '';
 +
-+  # Incremental stable patches, 4.14.206 through 4.14.235.
++  # Incremental stable patches, 4.14.206 through 4.14.250.
 +  stablePatches = [
 +    # The vendor tree already carries the perf-core and Intel PT fixes; only
 +    # syncookies still needs the vendor's sock_net() argument.
@@ -348,6 +388,39 @@ index 00000000..3c29d4d5
 +      "drivers/usb/dwc3/gadget.c"
 +      "net/tipc/socket.c"
 +    ])
++    (stableIncr "235-236" "sha256-nz1clvvXUhokl9Tz4aoBAPbrOUGFEf5lwT/D12pZyfY=" [
++      "net/nfc/llcp_sock.c"
++    ])
++    (stableIncr "236-237" "sha256-5WEFBOouhP3PCi/P4OqtQ2UXQv+it9SvkpSbNOJPqZQ=" [ ])
++    (stableIncr "237-238" "sha256-aLlwG6sny/cRkzCfzd0VCjBt+gmkFs8DWsU5NT029VU=" [
++      "arch/arm64/kernel/perf_event.c"
++      "drivers/usb/dwc3/core.c"
++    ])
++    (stableIncr "238-239" "sha256-abO6bFA9mqNbfU30POY2Ka2IXQul7mhSLQTnodWqMog=" [
++      "drivers/xen/events/events_base.c"
++    ])
++    (stableIncr "239-240" "sha256-FM2Xjvgpcg1DocRuyiOkaOYx9hNERNtGuCMsmKXFu7Y=" [
++      "drivers/usb/gadget/function/f_fs.c"
++      "fs/crypto/fname.c"
++    ])
++    (stableIncr "240-241" "sha256-/A/YgnzVCf06A6pGEjH56piaQkkzsf6y6i5jYUWeMUI=" [ ])
++    (stableIncr "241-242" "sha256-/4vdpFxsOfG9AF1nAVXLCExoUn3TVDZRh0vkEXhwWj0=" [ ])
++    (stableIncr "242-243" "sha256-wt8Zem52MVA/dEfiZUQEmmM0B2sKKdIMtMy1rowTNiM=" [ ])
++    (stableIncr "243-244" "sha256-ypwYNlBxZbZVCRjezFp22uh/Fh72eixo9slk0WCz0kQ=" [ ])
++    (stableIncr "244-245" "sha256-2YZY9YZDNJRkjARr+E8TdDd065rliIuW82Tjde7OA0Y=" [ ])
++    (stableIncr "245-246" "sha256-Pj9lW8vFCA8ZMC7TmIbbne3PfURzOr7sFCAV94TRYso=" [
++      "drivers/usb/dwc3/gadget.c"
++    ])
++    (stableIncr "246-247" "sha256-5wdWzd0HQggRIfmzOh4zB4k73sIVdrtO+aQ1dFagKnI=" [
++      "drivers/clk/clk.c"
++      "fs/f2fs/segment.c"
++    ])
++    (stableIncr "247-248" "sha256-EqiD8wlaNJHDYlZKd496f+F/triI78akIpJb4sQ3cCA=" [ ])
++    (stableIncr "248-249" "sha256-k8BNaK5Cdo7AZjSm3w0m2RBPa0DWfXBxCqFlVytUBgk=" [
++      "arch/arm64/mm/proc.S"
++      "kernel/sched/cpufreq_schedutil.c"
++    ])
++    (stableIncr "249-250" "sha256-AEBv3KamCUUmdtaE+ZyJmQhh8OhoG/MycJNgYqHOdbw=" [ ])
 +  ];
 +
 +  # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
@@ -364,13 +437,13 @@ index 00000000..3c29d4d5
 +in
 +
 +kernel-builder-gcc8 {
-+  version = "4.14.235";
++  version = "4.14.250";
 +  inherit configfile;
 +
 +  # The vendor tree claims 4.14.206 and every incremental patch's Makefile hunk
 +  # is dropped above, so the version is set here instead of 24 times over.
 +  postPatch = ''
-+    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 235/' Makefile
++    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 250/' Makefile
 +  '';
 +
 +  src = fetchFromGitHub {
@@ -382,6 +455,19 @@ index 00000000..3c29d4d5
 +
 +  patches =
 +    stablePatches
++    ++ [
++      ./stable/vendor-235-236.patch
++      ./stable/vendor-236-237.patch
++      ./stable/vendor-237-238.patch
++      ./stable/vendor-238-239.patch
++      ./stable/vendor-239-240.patch
++      ./stable/vendor-240-241.patch
++      ./stable/vendor-241-242.patch
++      ./stable/vendor-244-245.patch
++      ./stable/vendor-245-246.patch
++      ./stable/vendor-246-247.patch
++      ./stable/vendor-249-250.patch
++    ]
 +    ++ [
 +      (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
 +      (upstreamPatch "0002-mmc-Fix-embedded_sdio_data-duplicate-definition.patch" "0h7d3pxz8di2rh257kmc83iwcpf8xmrqhbqq4an2vclfdhyr297j")
@@ -1348,3 +1434,837 @@ index 00000000..bb140386
 + -	return skb->dev->mtu + skb->dev->hard_header_len;
 + -}
 + +#define BPF_SKB_MAX_LEN SKB_MAX_ALLOC
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.235-236.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.235-236.patch.patch
+new file mode 100644
+index 00000000..14a254b8
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.235-236.patch.patch
+@@ -0,0 +1,44 @@
++--- a/linux-4.14.235-236.patch
+++++ b/linux-4.14.235-236.patch
++@@ -513,19 +513,6 @@
++  #define BPF_ALU_SANITIZE		(BPF_ALU_SANITIZE_SRC | \
++  					 BPF_ALU_SANITIZE_DST)
++  
++-diff --git a/include/linux/usb/usbnet.h b/include/linux/usb/usbnet.h
++-index e87a805cbfeff..5df465dc7af8a 100644
++---- a/include/linux/usb/usbnet.h
++-+++ b/include/linux/usb/usbnet.h
++-@@ -82,6 +82,8 @@ struct usbnet {
++- #		define EVENT_LINK_CHANGE	11
++- #		define EVENT_SET_RX_MODE	12
++- #		define EVENT_NO_IP_ALIGN	13
++-+	u32			rx_speed;	/* in bps - NOT Mbps */
++-+	u32			tx_speed;	/* in bps - NOT Mbps */
++- };
++- 
++- static inline struct usb_driver *driver_of(struct usb_interface *intf)
++ diff --git a/include/net/caif/caif_dev.h b/include/net/caif/caif_dev.h
++ index 028b754ae9b17..0baf2e21a533f 100644
++ --- a/include/net/caif/caif_dev.h
++@@ -1167,21 +1154,6 @@
++  	struct sched_domain *this_sd;
++  	u64 avg_cost, avg_idle;
++  	u64 time, cost;
++-@@ -5809,11 +5810,11 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
++- 
++- 	time = local_clock();
++- 
++--	for_each_cpu_wrap(cpu, sched_domain_span(sd), target) {
++-+	cpumask_and(cpus, sched_domain_span(sd), &p->cpus_allowed);
++-+
++-+	for_each_cpu_wrap(cpu, cpus, target) {
++- 		if (!--nr)
++- 			return -1;
++--		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
++--			continue;
++- 		if (idle_cpu(cpu))
++- 			break;
++- 	}
++ diff --git a/mm/hugetlb.c b/mm/hugetlb.c
++ index e59e0f7ed5620..0dc181290d1fb 100644
++ --- a/mm/hugetlb.c
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.236-237.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.236-237.patch.patch
+new file mode 100644
+index 00000000..fff86f7d
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.236-237.patch.patch
+@@ -0,0 +1,37 @@
++--- a/linux-4.14.236-237.patch
+++++ b/linux-4.14.236-237.patch
++@@ -756,19 +756,6 @@
++  	if (status)
++  		goto fail;
++  
++-diff --git a/drivers/usb/gadget/function/f_serial.c b/drivers/usb/gadget/function/f_serial.c
++-index cb00ada21d9c2..e1efb69c80bad 100644
++---- a/drivers/usb/gadget/function/f_serial.c
++-+++ b/drivers/usb/gadget/function/f_serial.c
++-@@ -236,7 +236,7 @@ static int gser_bind(struct usb_configuration *c, struct usb_function *f)
++- 	gser_ss_out_desc.bEndpointAddress = gser_fs_out_desc.bEndpointAddress;
++- 
++- 	status = usb_assign_descriptors(f, gser_fs_function, gser_hs_function,
++--			gser_ss_function, NULL);
++-+			gser_ss_function, gser_ss_function);
++- 	if (status)
++- 		goto fail;
++- 	dev_dbg(&cdev->gadget->dev, "generic ttyGS%d: %s speed IN/%s OUT/%s\n",
++ diff --git a/drivers/usb/gadget/function/f_sourcesink.c b/drivers/usb/gadget/function/f_sourcesink.c
++ index 6e9d958004a0d..1c5745f7abea1 100644
++ --- a/drivers/usb/gadget/function/f_sourcesink.c
++@@ -1134,14 +1121,6 @@
++ index bc32ed4a4cf32..58e7eefe4dbff 100644
++ --- a/kernel/workqueue.c
++ +++ b/kernel/workqueue.c
++-@@ -49,6 +49,7 @@
++- #include <linux/moduleparam.h>
++- #include <linux/uaccess.h>
++- #include <linux/nmi.h>
++-+#include <linux/kvm_para.h>
++- 
++- #include "workqueue_internal.h"
++- 
++ @@ -5465,6 +5466,7 @@ static void wq_watchdog_timer_fn(unsigned long data)
++  {
++  	unsigned long thresh = READ_ONCE(wq_watchdog_thresh) * HZ;
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.237-238.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.237-238.patch.patch
+new file mode 100644
+index 00000000..8fc40837
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.237-238.patch.patch
+@@ -0,0 +1,19 @@
++--- a/linux-4.14.237-238.patch
+++++ b/linux-4.14.237-238.patch
++@@ -2063,16 +2063,6 @@
++ index 8f298f27f6ecf..cf5c4d2f68c1a 100644
++ --- a/net/ipv4/udp.c
++ +++ b/net/ipv4/udp.c
++-@@ -2337,6 +2337,9 @@ void udp_destroy_sock(struct sock *sk)
++- {
++- 	struct udp_sock *up = udp_sk(sk);
++- 	bool slow = lock_sock_fast(sk);
++-+
++-+	/* protects from races with udp_abort() */
++-+	sock_set_flag(sk, SOCK_DEAD);
++- 	udp_flush_pending_frames(sk);
++- 	unlock_sock_fast(sk, slow);
++- 	if (static_key_false(&udp_encap_needed) && up->encap_type) {
++ @@ -2570,10 +2573,17 @@ int udp_abort(struct sock *sk, int err)
++  {
++  	lock_sock(sk);
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.238-239.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.238-239.patch.patch
+new file mode 100644
+index 00000000..45dcafa6
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.238-239.patch.patch
+@@ -0,0 +1,18 @@
++--- a/linux-4.14.238-239.patch
+++++ b/linux-4.14.238-239.patch
++@@ -769,15 +769,6 @@
++  }
++  
++  /**
++-@@ -1644,7 +1651,7 @@ bool try_to_unmap(struct page *page, enum ttu_flags flags)
++- 	struct rmap_walk_control rwc = {
++- 		.rmap_one = try_to_unmap_one,
++- 		.arg = (void *)flags,
++--		.done = page_mapcount_is_zero,
++-+		.done = page_not_mapped,
++- 		.anon_lock = page_lock_anon_vma_read,
++- 	};
++- 
++ @@ -1665,14 +1672,15 @@ bool try_to_unmap(struct page *page, enum ttu_flags flags)
++  	else
++  		rmap_walk(page, &rwc);
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.239-240.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.239-240.patch.patch
+new file mode 100644
+index 00000000..ea8e8e43
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.239-240.patch.patch
+@@ -0,0 +1,169 @@
++--- a/linux-4.14.239-240.patch
+++++ b/linux-4.14.239-240.patch
++@@ -3541,27 +3541,6 @@
++  	free_irq(sp->irq, (void *)sp);
++  error_request_irq:
++  	iounmap(sp->base_address);
++-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
++-index fa2c75c19e51c..bf66df6f0efbc 100644
++---- a/drivers/mmc/core/core.c
++-+++ b/drivers/mmc/core/core.c
++-@@ -992,11 +992,14 @@ int mmc_execute_tuning(struct mmc_card *card)
++- 
++- 	err = host->ops->execute_tuning(host, opcode);
++- 
++--	if (err)
++-+	if (err) {
++- 		pr_err("%s: tuning execution failed: %d\n",
++- 			mmc_hostname(host), err);
++--	else
++-+	} else {
++-+		host->retune_now = 0;
++-+		host->need_retune = 0;
++- 		mmc_retune_enable(host);
++-+	}
++- 
++- 	return err;
++- }
++ diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
++ index 188df3d02d142..942dc358b9fd7 100644
++ --- a/drivers/mmc/core/sd.c
++@@ -6148,16 +6127,6 @@
++  /**
++   * __mark_inode_dirty -	internal function
++   *
++-@@ -2163,9 +2146,6 @@ void __mark_inode_dirty(struct inode *inode, int flags)
++- 	    (dirtytime && (inode->i_state & I_DIRTY_INODE)))
++- 		return;
++- 
++--	if (unlikely(block_dump))
++--		block_dump___mark_inode_dirty(inode);
++--
++- 	spin_lock(&inode->i_lock);
++- 	if (dirtytime && (inode->i_state & I_DIRTY_INODE))
++- 		goto out_unlock_inode;
++ diff --git a/fs/fuse/dev.c b/fs/fuse/dev.c
++ index cfc19140f2a07..b6f2a10663a08 100644
++ --- a/fs/fuse/dev.c
++@@ -6582,14 +6551,6 @@
++ index e1d10629022a5..f3b231cb6b657 100644
++ --- a/kernel/cpu.c
++ +++ b/kernel/cpu.c
++-@@ -30,6 +30,7 @@
++- #include <linux/relay.h>
++- #include <linux/slab.h>
++- #include <linux/percpu-rwsem.h>
++-+#include <linux/cpuset.h>
++- 
++- #include <trace/events/power.h>
++- #define CREATE_TRACE_POINTS
++ @@ -771,6 +772,52 @@ void __init cpuhp_threads_init(void)
++  	kthread_unpark(this_cpu_read(cpuhp_state.thread));
++  }
++@@ -6651,14 +6612,6 @@
++  	return ret;
++  }
++  
++-@@ -1145,6 +1193,7 @@ static int _cpu_up(unsigned int cpu, int tasks_frozen, enum cpuhp_state target)
++- out:
++- 	cpus_write_unlock();
++- 	arch_smt_update();
++-+	cpu_up_down_serialize_trainwrecks(tasks_frozen);
++- 	return ret;
++- }
++- 
++ diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
++ index 0cc67bc0666e4..552104837845f 100644
++ --- a/kernel/trace/trace.c
++@@ -7670,30 +7623,6 @@
++  	if (attrs[XFRMA_SA_EXTRA_FLAGS])
++  		x->props.extra_flags = nla_get_u32(attrs[XFRMA_SA_EXTRA_FLAGS]);
++  
++-@@ -586,23 +600,9 @@ static struct xfrm_state *xfrm_state_construct(struct net *net,
++- 				   attrs[XFRMA_ALG_COMP])))
++- 		goto error;
++- 
++--	if (attrs[XFRMA_ENCAP]) {
++--		x->encap = kmemdup(nla_data(attrs[XFRMA_ENCAP]),
++--				   sizeof(*x->encap), GFP_KERNEL);
++--		if (x->encap == NULL)
++--			goto error;
++--	}
++--
++- 	if (attrs[XFRMA_TFCPAD])
++- 		x->tfcpad = nla_get_u32(attrs[XFRMA_TFCPAD]);
++- 
++--	if (attrs[XFRMA_COADDR]) {
++--		x->coaddr = kmemdup(nla_data(attrs[XFRMA_COADDR]),
++--				    sizeof(*x->coaddr), GFP_KERNEL);
++--		if (x->coaddr == NULL)
++--			goto error;
++--	}
++--
++- 	xfrm_mark_get(attrs, &x->mark);
++- 
++- 	if (attrs[XFRMA_OUTPUT_MARK])
++ diff --git a/samples/bpf/xdp_redirect_user.c b/samples/bpf/xdp_redirect_user.c
++ index 4475d837bf2c2..bd9fa7a55a30d 100644
++ --- a/samples/bpf/xdp_redirect_user.c
++@@ -7705,60 +7634,6 @@
++ -	return 0;
++ +	return ret;
++  }
++-diff --git a/security/selinux/avc.c b/security/selinux/avc.c
++-index 23f387b30ece6..af70b4210f994 100644
++---- a/security/selinux/avc.c
++-+++ b/security/selinux/avc.c
++-@@ -346,26 +346,27 @@ static struct avc_xperms_decision_node
++- 	struct avc_xperms_decision_node *xpd_node;
++- 	struct extended_perms_decision *xpd;
++- 
++--	xpd_node = kmem_cache_zalloc(avc_xperms_decision_cachep, GFP_NOWAIT);
++-+	xpd_node = kmem_cache_zalloc(avc_xperms_decision_cachep,
++-+				     GFP_NOWAIT | __GFP_NOWARN);
++- 	if (!xpd_node)
++- 		return NULL;
++- 
++- 	xpd = &xpd_node->xpd;
++- 	if (which & XPERMS_ALLOWED) {
++- 		xpd->allowed = kmem_cache_zalloc(avc_xperms_data_cachep,
++--						GFP_NOWAIT);
++-+						GFP_NOWAIT | __GFP_NOWARN);
++- 		if (!xpd->allowed)
++- 			goto error;
++- 	}
++- 	if (which & XPERMS_AUDITALLOW) {
++- 		xpd->auditallow = kmem_cache_zalloc(avc_xperms_data_cachep,
++--						GFP_NOWAIT);
++-+						GFP_NOWAIT | __GFP_NOWARN);
++- 		if (!xpd->auditallow)
++- 			goto error;
++- 	}
++- 	if (which & XPERMS_DONTAUDIT) {
++- 		xpd->dontaudit = kmem_cache_zalloc(avc_xperms_data_cachep,
++--						GFP_NOWAIT);
++-+						GFP_NOWAIT | __GFP_NOWARN);
++- 		if (!xpd->dontaudit)
++- 			goto error;
++- 	}
++-@@ -393,7 +394,7 @@ static struct avc_xperms_node *avc_xperms_alloc(void)
++- {
++- 	struct avc_xperms_node *xp_node;
++- 
++--	xp_node = kmem_cache_zalloc(avc_xperms_cachep, GFP_NOWAIT);
++-+	xp_node = kmem_cache_zalloc(avc_xperms_cachep, GFP_NOWAIT | __GFP_NOWARN);
++- 	if (!xp_node)
++- 		return xp_node;
++- 	INIT_LIST_HEAD(&xp_node->xpd_head);
++-@@ -546,7 +547,7 @@ static struct avc_node *avc_alloc_node(void)
++- {
++- 	struct avc_node *node;
++- 
++--	node = kmem_cache_zalloc(avc_node_cachep, GFP_NOWAIT);
++-+	node = kmem_cache_zalloc(avc_node_cachep, GFP_NOWAIT | __GFP_NOWARN);
++- 	if (!node)
++- 		goto out;
++- 
++ diff --git a/security/smack/smackfs.c b/security/smack/smackfs.c
++ index 4f8c1a272df07..009e83ee2d002 100644
++ --- a/security/smack/smackfs.c
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.240-241.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.240-241.patch.patch
+new file mode 100644
+index 00000000..306a4654
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.240-241.patch.patch
+@@ -0,0 +1,24 @@
++--- a/linux-4.14.240-241.patch
+++++ b/linux-4.14.240-241.patch
++@@ -1617,21 +1617,6 @@
++  /*
++   * Disable the hub-initiated U1/U2 idle timeouts, and disable device-initiated
++   * U1/U2 entry.
++-diff --git a/drivers/usb/core/quirks.c b/drivers/usb/core/quirks.c
++-index 3dfd584a1ef3d..2ca6ed207e26e 100644
++---- a/drivers/usb/core/quirks.c
++-+++ b/drivers/usb/core/quirks.c
++-@@ -325,10 +325,6 @@ static const struct usb_device_id usb_quirk_list[] = {
++- 	/* DJI CineSSD */
++- 	{ USB_DEVICE(0x2ca3, 0x0031), .driver_info = USB_QUIRK_NO_LPM },
++- 
++--	/* Fibocom L850-GL LTE Modem */
++--	{ USB_DEVICE(0x2cb7, 0x0007), .driver_info =
++--			USB_QUIRK_IGNORE_REMOTE_WAKEUP },
++--
++- 	/* INTEL VALUE SSD */
++- 	{ USB_DEVICE(0x8086, 0xf1a5), .driver_info = USB_QUIRK_RESET_RESUME },
++- 
++ diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
++ index 6790c0a181235..f1edc5727000c 100644
++ --- a/drivers/usb/dwc2/gadget.c
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.241-242.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.241-242.patch.patch
+new file mode 100644
+index 00000000..736ca8e7
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.241-242.patch.patch
+@@ -0,0 +1,31 @@
++--- a/linux-4.14.241-242.patch
+++++ b/linux-4.14.241-242.patch
++@@ -806,28 +806,6 @@
++ index 48afea1b8b4e5..ca68826d84495 100644
++ --- a/include/linux/virtio_net.h
++ +++ b/include/linux/virtio_net.h
++-@@ -65,14 +65,18 @@ static inline int virtio_net_hdr_to_skb(struct sk_buff *skb,
++- 	skb_reset_mac_header(skb);
++- 
++- 	if (hdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
++--		u16 start = __virtio16_to_cpu(little_endian, hdr->csum_start);
++--		u16 off = __virtio16_to_cpu(little_endian, hdr->csum_offset);
++-+		u32 start = __virtio16_to_cpu(little_endian, hdr->csum_start);
++-+		u32 off = __virtio16_to_cpu(little_endian, hdr->csum_offset);
++-+		u32 needed = start + max_t(u32, thlen, off + sizeof(__sum16));
++-+
++-+		if (!pskb_may_pull(skb, needed))
++-+			return -EINVAL;
++- 
++- 		if (!skb_partial_csum_set(skb, start, off))
++- 			return -EINVAL;
++- 
++- 		p_off = skb_transport_offset(skb) + thlen;
++--		if (p_off > skb_headlen(skb))
++-+		if (!pskb_may_pull(skb, p_off))
++- 			return -EINVAL;
++- 	} else {
++- 		/* gso packets without NEEDS_CSUM do not set transport_offset.
++ @@ -100,14 +104,14 @@ retry:
++  			}
++  
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.244-245.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.244-245.patch.patch
+new file mode 100644
+index 00000000..d18d3240
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.244-245.patch.patch
+@@ -0,0 +1,21 @@
++--- a/linux-4.14.244-245.patch
+++++ b/linux-4.14.244-245.patch
++@@ -1679,18 +1679,6 @@
++  
++  /*
++   * Now umount can handle mount points as well as block devices.
++-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
++-index c9790b2cdf34e..45fe7295051fd 100644
++---- a/include/asm-generic/vmlinux.lds.h
++-+++ b/include/asm-generic/vmlinux.lds.h
++-@@ -465,6 +465,7 @@
++- 		*(.text.unknown .text.unknown.*)			\
++- 		*(.text..refcount)					\
++- 		*(.ref.text)						\
++-+		*(.text.asan.* .text.tsan.*)				\
++- 	MEM_KEEP(init.text)						\
++- 	MEM_KEEP(exit.text)						\
++- 
++ diff --git a/include/linux/device.h b/include/linux/device.h
++ index 0b2e67014a833..fab5798a47fdb 100644
++ --- a/include/linux/device.h
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.246-247.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.246-247.patch.patch
+new file mode 100644
+index 00000000..51682917
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.246-247.patch.patch
+@@ -0,0 +1,61 @@
++--- a/linux-4.14.246-247.patch
+++++ b/linux-4.14.246-247.patch
++@@ -4584,19 +4584,6 @@
++   * Tegra:	 1   4   8  14		16   8   4   1	PORT_TEGRA
++   */
++  #define UART_FCR_R_TRIG_00	0x00
++-diff --git a/kernel/events/core.c b/kernel/events/core.c
++-index 1aa094c5dedb4..236e7900e3fca 100644
++---- a/kernel/events/core.c
++-+++ b/kernel/events/core.c
++-@@ -8435,7 +8435,7 @@ static void perf_event_addr_filters_apply(struct perf_event *event)
++- 	if (!ifh->nr_file_filters)
++- 		return;
++- 
++--	mm = get_task_mm(event->ctx->task);
++-+	mm = get_task_mm(task);
++- 	if (!mm)
++- 		goto restart;
++- 
++ diff --git a/kernel/fork.c b/kernel/fork.c
++ index 783eae426a866..5e44c062244f4 100644
++ --- a/kernel/fork.c
++@@ -5331,15 +5318,6 @@
++ index f14de4b6d639d..58e839e2ce1d3 100644
++ --- a/net/ipv6/netfilter/nf_socket_ipv6.c
++ +++ b/net/ipv6/netfilter/nf_socket_ipv6.c
++-@@ -104,7 +104,7 @@ struct sock *nf_sk_lookup_slow_v6(struct net *net, const struct sk_buff *skb,
++- {
++- 	__be16 uninitialized_var(dport), uninitialized_var(sport);
++- 	const struct in6_addr *daddr = NULL, *saddr = NULL;
++--	struct ipv6hdr *iph = ipv6_hdr(skb);
++-+	struct ipv6hdr *iph = ipv6_hdr(skb), ipv6_var;
++- 	struct sk_buff *data_skb = NULL;
++- 	int doff = 0;
++- 	int thoff = 0, tproto;
++ @@ -134,8 +134,6 @@ struct sock *nf_sk_lookup_slow_v6(struct net *net, const struct sk_buff *skb,
++  			thoff + sizeof(*hp);
++  
++@@ -5349,22 +5327,6 @@
++  		if (extract_icmp6_fields(skb, thoff, &tproto, &saddr, &daddr,
++  					 &sport, &dport, &ipv6_var))
++  			return NULL;
++-diff --git a/net/l2tp/l2tp_core.c b/net/l2tp/l2tp_core.c
++-index 36512fbea1309..84d5650239d92 100644
++---- a/net/l2tp/l2tp_core.c
++-+++ b/net/l2tp/l2tp_core.c
++-@@ -994,8 +994,10 @@ static int l2tp_udp_recv_core(struct l2tp_tunnel *tunnel, struct sk_buff *skb,
++- 	}
++- 
++- 	if (tunnel->version == L2TP_HDR_VER_3 &&
++--	    l2tp_v3_ensure_opt_in_linear(session, skb, &ptr, &optr))
++-+	    l2tp_v3_ensure_opt_in_linear(session, skb, &ptr, &optr)) {
++-+		l2tp_session_dec_refcount(session);
++- 		goto error;
++-+	}
++- 
++- 	l2tp_recv_common(session, skb, ptr, optr, hdrflags, length, payload_hook);
++- 	l2tp_session_dec_refcount(session);
++ diff --git a/net/mac80211/tx.c b/net/mac80211/tx.c
++ index c7e8935224c02..e7b63ba8c184b 100644
++ --- a/net/mac80211/tx.c
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-235-236.patch b/devices/fossil-hoki/kernel/stable/vendor-235-236.patch
+new file mode 100644
+index 00000000..2b8d9986
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-235-236.patch
+@@ -0,0 +1,32 @@
++diff --git a/include/linux/usb/usbnet.h b/include/linux/usb/usbnet.h
++index b9a51cb..b2a768d 100644
++--- a/include/linux/usb/usbnet.h
+++++ b/include/linux/usb/usbnet.h
++@@ -87,6 +87,8 @@ struct usbnet {
++ 
++ 	void			*ipc_log_ctxt;
++ 	int			netdev_id;
+++	u32			rx_speed;	/* in bps - NOT Mbps */
+++	u32			tx_speed;	/* in bps - NOT Mbps */
++ };
++ 
++ static inline struct usb_driver *driver_of(struct usb_interface *intf)
++diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
++index 88be682..aa09915 100644
++--- a/kernel/sched/fair.c
+++++ b/kernel/sched/fair.c
++@@ -7170,11 +7170,11 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
++ 
++ 	time = local_clock();
++ 
++-	for_each_cpu_wrap(cpu, sched_domain_span(sd), target) {
+++	cpumask_and(cpus, sched_domain_span(sd), &p->cpus_allowed);
+++
+++	for_each_cpu_wrap(cpu, cpus, target) {
++ 		if (!--nr)
++ 			return -1;
++-		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
++-			continue;
++ 		if (cpu_isolated(cpu))
++ 			continue;
++ 		if (idle_cpu(cpu))
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-236-237.patch b/devices/fossil-hoki/kernel/stable/vendor-236-237.patch
+new file mode 100644
+index 00000000..f1b76560
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-236-237.patch
+@@ -0,0 +1,13 @@
++diff --git a/drivers/usb/gadget/function/f_serial.c b/drivers/usb/gadget/function/f_serial.c
++index 14b9cdf..e10ed0e 100644
++--- a/drivers/usb/gadget/function/f_serial.c
+++++ b/drivers/usb/gadget/function/f_serial.c
++@@ -665,7 +665,7 @@ static int gser_bind(struct usb_configuration *c, struct usb_function *f)
++ 	}
++ 
++ 	status = usb_assign_descriptors(f, gser_fs_function, gser_hs_function,
++-			gser_ss_function, NULL);
+++			gser_ss_function, gser_ss_function);
++ 	if (status)
++ 		goto fail;
++ 	dev_dbg(&cdev->gadget->dev, "generic ttyGS%d: %s speed IN/%s OUT/%s\n",
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-237-238.patch b/devices/fossil-hoki/kernel/stable/vendor-237-238.patch
+new file mode 100644
+index 00000000..76c0d198
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-237-238.patch
+@@ -0,0 +1,14 @@
++diff --git a/net/ipv4/udp.c b/net/ipv4/udp.c
++index bf57378..4945d72 100644
++--- a/net/ipv4/udp.c
+++++ b/net/ipv4/udp.c
++@@ -2426,6 +2426,9 @@ void udp_destroy_sock(struct sock *sk)
++ {
++ 	struct udp_sock *up = udp_sk(sk);
++ 	bool slow = lock_sock_fast(sk);
+++
+++	/* protects from races with udp_abort() */
+++	sock_set_flag(sk, SOCK_DEAD);
++ 	udp_flush_pending_frames(sk);
++ 	unlock_sock_fast(sk, slow);
++ 	if (static_key_false(&udp_encap_needed)) {
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-238-239.patch b/devices/fossil-hoki/kernel/stable/vendor-238-239.patch
+new file mode 100644
+index 00000000..dee012a6
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-238-239.patch
+@@ -0,0 +1,13 @@
++diff --git a/mm/rmap.c b/mm/rmap.c
++index 9bb235c..de67415 100644
++--- a/mm/rmap.c
+++++ b/mm/rmap.c
++@@ -1654,7 +1654,7 @@ bool try_to_unmap(struct page *page, enum ttu_flags flags,
++ 	struct rmap_walk_control rwc = {
++ 		.rmap_one = try_to_unmap_one,
++ 		.arg = (void *)flags,
++-		.done = page_mapcount_is_zero,
+++		.done = page_not_mapped,
++ 		.anon_lock = page_lock_anon_vma_read,
++ 		.target_vma = vma,
++ 	};
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-239-240.patch b/devices/fossil-hoki/kernel/stable/vendor-239-240.patch
+new file mode 100644
+index 00000000..204aff2f
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-239-240.patch
+@@ -0,0 +1,75 @@
++diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
++index dda6a6e..d7f335f 100644
++--- a/drivers/mmc/core/core.c
+++++ b/drivers/mmc/core/core.c
++@@ -2453,11 +2453,14 @@ int mmc_execute_tuning(struct mmc_card *card)
++ 	err = host->ops->execute_tuning(host, opcode);
++ 	mmc_host_clk_release(host);
++ 
++-	if (err)
+++	if (err) {
++ 		pr_err("%s: tuning execution failed: %d\n",
++ 			mmc_hostname(host), err);
++-	else
+++	} else {
+++		host->retune_now = 0;
+++		host->need_retune = 0;
++ 		mmc_retune_enable(host);
+++	}
++ 
++ 	return err;
++ }
++diff --git a/fs/fs-writeback.c b/fs/fs-writeback.c
++index 1b15e32..89afb46 100644
++--- a/fs/fs-writeback.c
+++++ b/fs/fs-writeback.c
++@@ -2146,9 +2146,6 @@ void __mark_inode_dirty(struct inode *inode, int flags)
++ 	    (dirtytime && (inode->i_state & I_DIRTY_INODE)))
++ 		return;
++ 
++-	if (unlikely(block_dump > 1))
++-		block_dump___mark_inode_dirty(inode);
++-
++ 	spin_lock(&inode->i_lock);
++ 	if (dirtytime && (inode->i_state & I_DIRTY_INODE))
++ 		goto out_unlock_inode;
++diff --git a/kernel/cpu.c b/kernel/cpu.c
++index 56b5130..b23639e 100644
++--- a/kernel/cpu.c
+++++ b/kernel/cpu.c
++@@ -1221,6 +1221,7 @@ static int _cpu_up(unsigned int cpu, int tasks_frozen, enum cpuhp_state target)
++ 	trace_cpuhp_latency(cpu, 1, start_time, ret);
++ 	cpus_write_unlock();
++ 	arch_smt_update();
+++	cpu_up_down_serialize_trainwrecks(tasks_frozen);
++ 	return ret;
++ }
++ 
++diff --git a/net/xfrm/xfrm_user.c b/net/xfrm/xfrm_user.c
++index c96fce0..6709538 100644
++--- a/net/xfrm/xfrm_user.c
+++++ b/net/xfrm/xfrm_user.c
++@@ -613,23 +613,9 @@ static struct xfrm_state *xfrm_state_construct(struct net *net,
++ 				   attrs[XFRMA_ALG_COMP])))
++ 		goto error;
++ 
++-	if (attrs[XFRMA_ENCAP]) {
++-		x->encap = kmemdup(nla_data(attrs[XFRMA_ENCAP]),
++-				   sizeof(*x->encap), GFP_KERNEL);
++-		if (x->encap == NULL)
++-			goto error;
++-	}
++-
++ 	if (attrs[XFRMA_TFCPAD])
++ 		x->tfcpad = nla_get_u32(attrs[XFRMA_TFCPAD]);
++ 
++-	if (attrs[XFRMA_COADDR]) {
++-		x->coaddr = kmemdup(nla_data(attrs[XFRMA_COADDR]),
++-				    sizeof(*x->coaddr), GFP_KERNEL);
++-		if (x->coaddr == NULL)
++-			goto error;
++-	}
++-
++ 	xfrm_mark_get(attrs, &x->mark);
++ 
++ 	xfrm_smark_init(attrs, &x->props.smark);
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-240-241.patch b/devices/fossil-hoki/kernel/stable/vendor-240-241.patch
+new file mode 100644
+index 00000000..f054d1e8
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-240-241.patch
+@@ -0,0 +1,15 @@
++diff --git a/drivers/usb/core/quirks.c b/drivers/usb/core/quirks.c
++index d869bd3..184c7d2 100644
++--- a/drivers/usb/core/quirks.c
+++++ b/drivers/usb/core/quirks.c
++@@ -331,10 +331,6 @@ static const struct usb_device_id usb_quirk_list[] = {
++ 	/* Galaxy series, misc. (MTP mode) */
++ 	{ USB_DEVICE(0x04e8, 0x6860), .driver_info = USB_QUIRK_NO_LPM },
++ 
++-	/* Fibocom L850-GL LTE Modem */
++-	{ USB_DEVICE(0x2cb7, 0x0007), .driver_info =
++-			USB_QUIRK_IGNORE_REMOTE_WAKEUP },
++-
++ 	/* INTEL VALUE SSD */
++ 	{ USB_DEVICE(0x8086, 0xf1a5), .driver_info = USB_QUIRK_RESET_RESUME },
++ 
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-241-242.patch b/devices/fossil-hoki/kernel/stable/vendor-241-242.patch
+new file mode 100644
+index 00000000..9b1256ad
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-241-242.patch
+@@ -0,0 +1,26 @@
++diff --git a/include/linux/virtio_net.h b/include/linux/virtio_net.h
++index c159ea2..9378f0c 100644
++--- a/include/linux/virtio_net.h
+++++ b/include/linux/virtio_net.h
++@@ -63,14 +63,18 @@ static inline int virtio_net_hdr_to_skb(struct sk_buff *skb,
++ 	}
++ 
++ 	if (hdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
++-		u16 start = __virtio16_to_cpu(little_endian, hdr->csum_start);
++-		u16 off = __virtio16_to_cpu(little_endian, hdr->csum_offset);
+++		u32 start = __virtio16_to_cpu(little_endian, hdr->csum_start);
+++		u32 off = __virtio16_to_cpu(little_endian, hdr->csum_offset);
+++		u32 needed = start + max_t(u32, thlen, off + sizeof(__sum16));
+++
+++		if (!pskb_may_pull(skb, needed))
+++			return -EINVAL;
++ 
++ 		if (!skb_partial_csum_set(skb, start, off))
++ 			return -EINVAL;
++ 
++ 		p_off = skb_transport_offset(skb) + thlen;
++-		if (p_off > skb_headlen(skb))
+++		if (!pskb_may_pull(skb, p_off))
++ 			return -EINVAL;
++ 	} else {
++ 		/* gso packets without NEEDS_CSUM do not set transport_offset.
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-244-245.patch b/devices/fossil-hoki/kernel/stable/vendor-244-245.patch
+new file mode 100644
+index 00000000..edca85cd
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-244-245.patch
+@@ -0,0 +1,12 @@
++diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
++index 8993466..f57bcbe 100644
++--- a/include/asm-generic/vmlinux.lds.h
+++++ b/include/asm-generic/vmlinux.lds.h
++@@ -469,6 +469,7 @@
++ 		*(.text..ftrace)					\
++ 		*(TEXT_CFI_MAIN) 					\
++ 		*(.ref.text)						\
+++		*(.text.asan.* .text.tsan.*)				\
++ 	MEM_KEEP(init.text)						\
++ 	MEM_KEEP(exit.text)						\
++ 
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-245-246.patch b/devices/fossil-hoki/kernel/stable/vendor-245-246.patch
+new file mode 100644
+index 00000000..8875dd60
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-245-246.patch
+@@ -0,0 +1,34 @@
++diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
++index 0283517..8a4c7c2 100644
++--- a/drivers/usb/dwc3/gadget.c
+++++ b/drivers/usb/dwc3/gadget.c
++@@ -1252,7 +1252,6 @@ static struct dwc3_trb *dwc3_ep_prev_trb(struct dwc3_ep *dep, u8 index)
++ 
++ static u32 dwc3_calc_trbs_left(struct dwc3_ep *dep)
++ {
++-	struct dwc3_trb		*tmp;
++ 	u8			trbs_left;
++ 
++ 	/*
++@@ -1263,8 +1262,11 @@ static u32 dwc3_calc_trbs_left(struct dwc3_ep *dep)
++ 	 * more transfers in our ring.
++ 	 */
++ 	if (dep->trb_enqueue == dep->trb_dequeue) {
++-		tmp = dwc3_ep_prev_trb(dep, dep->trb_enqueue);
++-		if (!tmp || tmp->ctrl & DWC3_TRB_CTRL_HWO)
+++		/*
+++		 * If there is any request remained in the started_list at
+++		 * this point, that means there is no TRB available.
+++		 */
+++		if (!list_empty(&dep->started_list))
++ 			return 0;
++ 
++ 		return DWC3_TRB_NUM - 1;
++@@ -2558,6 +2560,7 @@ static int __dwc3_gadget_start(struct dwc3 *dwc)
++ 	dwc->ep0state = EP0_SETUP_PHASE;
++ 	dwc->ep0_bounced = false;
++ 	dwc->link_state = DWC3_LINK_STATE_SS_DIS;
+++	dwc->delayed_status = false;
++ 	dwc3_ep0_out_start(dwc);
++ 
++ 	dwc3_gadget_enable_irq(dwc);
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-246-247.patch b/devices/fossil-hoki/kernel/stable/vendor-246-247.patch
+new file mode 100644
+index 00000000..330e70e1
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-246-247.patch
+@@ -0,0 +1,42 @@
++diff --git a/kernel/events/core.c b/kernel/events/core.c
++index eecd095..1f9c09e 100644
++--- a/kernel/events/core.c
+++++ b/kernel/events/core.c
++@@ -8644,7 +8644,7 @@ static void perf_event_addr_filters_apply(struct perf_event *event)
++ 		return;
++ 
++ 	if (ifh->nr_file_filters) {
++-		mm = get_task_mm(event->ctx->task);
+++		mm = get_task_mm(task);
++ 		if (!mm)
++ 			goto restart;
++ 
++diff --git a/net/ipv6/netfilter/nf_socket_ipv6.c b/net/ipv6/netfilter/nf_socket_ipv6.c
++index 72b923e..3cf0f23 100644
++--- a/net/ipv6/netfilter/nf_socket_ipv6.c
+++++ b/net/ipv6/netfilter/nf_socket_ipv6.c
++@@ -105,7 +105,7 @@ struct sock *nf_sk_lookup_slow_v6(struct net *net, const struct sk_buff *skb,
++ 	struct sock *sk = skb->sk;
++ 	__be16 uninitialized_var(dport), uninitialized_var(sport);
++ 	const struct in6_addr *daddr = NULL, *saddr = NULL;
++-	struct ipv6hdr *iph = ipv6_hdr(skb);
+++	struct ipv6hdr *iph = ipv6_hdr(skb), ipv6_var;
++ 	struct sk_buff *data_skb = NULL;
++ 	int doff = 0;
++ 	int thoff = 0, tproto;
++diff --git a/net/l2tp/l2tp_core.c b/net/l2tp/l2tp_core.c
++index a8aee0d..b164b08 100644
++--- a/net/l2tp/l2tp_core.c
+++++ b/net/l2tp/l2tp_core.c
++@@ -986,8 +986,10 @@ static int l2tp_udp_recv_core(struct l2tp_tunnel *tunnel, struct sk_buff *skb)
++ 	}
++ 
++ 	if (tunnel->version == L2TP_HDR_VER_3 &&
++-	    l2tp_v3_ensure_opt_in_linear(session, skb, &ptr, &optr))
+++	    l2tp_v3_ensure_opt_in_linear(session, skb, &ptr, &optr)) {
+++		l2tp_session_dec_refcount(session);
++ 		goto error;
+++	}
++ 
++ 	l2tp_recv_common(session, skb, ptr, optr, hdrflags, length);
++ 	l2tp_session_dec_refcount(session);
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-249-250.patch b/devices/fossil-hoki/kernel/stable/vendor-249-250.patch
+new file mode 100644
+index 00000000..078839d8
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-249-250.patch
+@@ -0,0 +1,14 @@
++diff --git a/drivers/soc/qcom/event_timer.c b/drivers/soc/qcom/event_timer.c
++index d50d68c4a..c1f1552da 100644
++--- a/drivers/soc/qcom/event_timer.c
+++++ b/drivers/soc/qcom/event_timer.c
++@@ -51,8 +51,7 @@ struct hrtimer_info {
++ static DEFINE_PER_CPU(struct hrtimer_info, per_cpu_hrtimer);
++ 
++ static DEFINE_PER_CPU(struct timerqueue_head, timer_head) = {
++-	.head = RB_ROOT,
++-	.next = NULL,
+++	.rb_root = RB_ROOT_CACHED,
++ };
++ 
++ static DEFINE_SPINLOCK(event_timer_lock);
