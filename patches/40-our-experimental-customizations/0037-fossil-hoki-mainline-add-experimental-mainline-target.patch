@@ -4,11 +4,11 @@ Date: Mon, 9 Nov 2026 10:55:57 +1100
 Subject: [PATCH] fossil-hoki-mainline: add experimental mainline target
 
 ---
- devices/fossil-hoki-mainline/README.md        |    46 +
- devices/fossil-hoki-mainline/default.nix      |   131 +
- .../fossil-hoki-mainline/kernel/default.nix   |    19 +
+ devices/fossil-hoki-mainline/README.md        |    47 +
+ devices/fossil-hoki-mainline/default.nix      |   132 +
+ .../fossil-hoki-mainline/kernel/default.nix   |    16 +
  devices/fossil-hoki-mainline/sda429-hoki.dts  | 11753 ++++++++++++++++
- 4 files changed, 11949 insertions(+)
+ 4 files changed, 11948 insertions(+)
  create mode 100644 devices/fossil-hoki-mainline/README.md
  create mode 100644 devices/fossil-hoki-mainline/default.nix
  create mode 100644 devices/fossil-hoki-mainline/kernel/default.nix
@@ -16,10 +16,10 @@ Subject: [PATCH] fossil-hoki-mainline: add experimental mainline target
 
 diff --git a/devices/fossil-hoki-mainline/README.md b/devices/fossil-hoki-mainline/README.md
 new file mode 100644
-index 00000000..2c5ea433
+index 00000000..a26227de
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/README.md
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,47 @@
 +# Fossil Gen 6 (fossil-hoki) Mainline Target
 +
 +## Device Specifications
@@ -30,6 +30,7 @@ index 00000000..2c5ea433
 +- **GPU:** Qualcomm Adreno 504
 +- **Display:** 416 x 416 circular AMOLED (1.28")
 +- **Memory / Storage:** 1GB RAM / 8GB eMMC
++- **Userspace ABI:** AArch64 (`aarch64-linux`)
 +
 +## Mainline Bring-up References
 +- **Nura / postmarketOS Wiki:** [Fossil Gen 6 (fossil-hoki)](https://wiki.nura.eco/wiki/Fossil_Gen_6_(fossil-hoki))
@@ -68,10 +69,10 @@ index 00000000..2c5ea433
 +   - When using `lk2nd` secondary bootloader, flash a dummy DTBO image (`dtbo-fossil-hoki.img`) to `dtbo`.
 diff --git a/devices/fossil-hoki-mainline/default.nix b/devices/fossil-hoki-mainline/default.nix
 new file mode 100644
-index 00000000..5fe70d70
+index 00000000..69593422
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/default.nix
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,132 @@
 +{
 +  config,
 +  lib,
@@ -102,7 +103,8 @@ index 00000000..5fe70d70
 +{
 +  imports = [ ../families/asteroidos.nix ];
 +
-+  nixpkgs.hostPlatform = "armv7l-linux";
++  nixpkgs.hostPlatform = "aarch64-linux";
++  mobile.system.system = "aarch64-linux";
 +
 +  mobile.device = {
 +    name = "fossil-hoki-mainline";
@@ -115,7 +117,7 @@ index 00000000..5fe70d70
 +
 +  mobile.hardware = {
 +    # Qualcomm Snapdragon Wear 4100+ (SDA429W / SDM429W), Cortex-A53.
-+    # Userspace stays on the 32-bit armv7l Android ABI for memory efficiency.
++    # The Cortex-A53 kernel and userspace both use the 64-bit AArch64 ABI.
 +    soc = "qualcomm-sda429w";
 +    ram = 1024;
 +    screen = {
@@ -155,7 +157,7 @@ index 00000000..5fe70d70
 +      pagesize = "4096";
 +    };
 +    appendDTB = [
-+      "dtbs/sda429-hoki.dtb"
++      "dtbs/qcom/sda429-hoki.dtb"
 +    ];
 +  };
 +
@@ -205,12 +207,11 @@ index 00000000..5fe70d70
 +}
 diff --git a/devices/fossil-hoki-mainline/kernel/default.nix b/devices/fossil-hoki-mainline/kernel/default.nix
 new file mode 100644
-index 00000000..7a12c9b3
+index 00000000..bfc3ddb7
 --- /dev/null
 +++ b/devices/fossil-hoki-mainline/kernel/default.nix
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,16 @@
 +{
-+  lib,
 +  linuxPackages_6_18,
 +  ...
 +}:
@@ -218,14 +219,12 @@ index 00000000..7a12c9b3
 +let
 +  hokiDts = ../sda429-hoki.dts;
 +in
-+# The nixpkgs armv7 multiplatform kernel already has ARCH_QCOM=y,
-+# ARM_APPENDED_DTB=y, ARM_ATAG_DTB_COMPAT=y, DRM_MSM=m, DRM_SIMPLEDRM=y,
-+# SYSFB_SIMPLEFB=y, USB_CONFIGFS=m, and PSTORE=y enabled in multi_v7_defconfig.
-+# We append the tailored hoki DTS to the upstream Qualcomm DTS Makefile.
++# Build the AArch64 mainline kernel and add the tailored Hoki DTS to its
++# Qualcomm device tree Makefile.
 +linuxPackages_6_18.kernel.overrideAttrs (old: {
 +  postPatch = (old.postPatch or "") + ''
-+    install -Dm644 ${hokiDts} arch/arm/boot/dts/qcom/sda429-hoki.dts
-+    printf '%s\n' 'dtb-$(CONFIG_ARCH_QCOM) += sda429-hoki.dtb' >> arch/arm/boot/dts/qcom/Makefile
++    install -Dm644 ${hokiDts} arch/arm64/boot/dts/qcom/sda429-hoki.dts
++    printf '%s\n' 'dtb-$(CONFIG_ARCH_QCOM) += sda429-hoki.dtb' >> arch/arm64/boot/dts/qcom/Makefile
 +  '';
 +})
 diff --git a/devices/fossil-hoki-mainline/sda429-hoki.dts b/devices/fossil-hoki-mainline/sda429-hoki.dts

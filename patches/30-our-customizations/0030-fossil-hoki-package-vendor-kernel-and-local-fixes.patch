@@ -6,7 +6,7 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
 ---
  ...d-pm_qos_remove_request-with-active-.patch |  40 ++
  .../fossil-hoki/kernel/90_dtbs-install.patch  |  29 +
- devices/fossil-hoki/kernel/default.nix        | 407 +++++++++++
+ devices/fossil-hoki/kernel/default.nix        | 679 ++++++++++++++++++
  devices/fossil-hoki/kernel/defconfig.patch    |  48 ++
  .../kernel/linux-4.14.206-207.patch.patch     | 228 ++++++
  .../kernel/linux-4.14.209-210.patch.patch     |  28 +
@@ -14,8 +14,8 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  .../kernel/linux-4.14.212-213.patch.patch     |  99 +++
  .../kernel/linux-4.14.213-214.patch.patch     |  40 ++
  .../kernel/linux-4.14.214-215.patch.patch     | 148 ++++
- .../kernel/linux-4.14.217-218.patch.patch     | 669 ++++++++++++++++++
- 11 files changed, 1888 insertions(+)
+ .../kernel/linux-4.14.217-218.patch.patch     | 669 +++++++++++++++++
+ 11 files changed, 2160 insertions(+)
  create mode 100644 devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
  create mode 100644 devices/fossil-hoki/kernel/90_dtbs-install.patch
  create mode 100644 devices/fossil-hoki/kernel/default.nix
@@ -111,10 +111,10 @@ index 00000000..1cd6dc69
 + 	$(foreach DIR, $(DTSSUBDIR), $(Q)$(MAKE) $(build)=$(boot)/dts/$(DIR) MACHINE=$(MACHINE) dtbs)
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
-index 00000000..7cf592ad
+index 00000000..f6332115
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/default.nix
-@@ -0,0 +1,407 @@
+@@ -0,0 +1,679 @@
 +{
 +  mobile-nixos,
 +  stdenv,
@@ -122,8 +122,10 @@ index 00000000..7cf592ad
 +  fetchFromGitHub,
 +  fetchpatch,
 +  fetchurl,
++  lib,
 +  runCommand,
 +  xz,
++  enableDroidspacesBackports ? false,
 +  ...
 +}:
 +
@@ -164,6 +166,15 @@ index 00000000..7cf592ad
 +  kernel-builder-gcc8 = mobile-nixos.kernel-builder.override {
 +    stdenv = stdenvGcc8;
 +  };
++
++  droidspacesBackports = fetchFromGitHub {
++    owner = "Droidspaces";
++    repo = "droidspaces-backports";
++    rev = "be24159e5cc264b4491f5416d8efd9504031c42b";
++    hash = "sha256-3UpOt71tgYrGyCfOyAgN9CMewFT6uO4UhCvhyVo/82Y=";
++  };
++
++  droidspacesPatch = name: "${droidspacesBackports}/kernel-4.14-series/${name}";
 +
 +  # Upstream AsteroidOS defconfig for Fossil Gen 6 (hoki):
 +  # https://github.com/AsteroidOS/meta-smartwatch/blob/master/meta-hoki/recipes-kernel/linux/linux-hoki/defconfig
@@ -456,6 +467,246 @@ index 00000000..7cf592ad
 +        ' "$TMPDIR/linux-4.14.222-223.patch" > "$out"
 +      '';
 +
++  # Incremental 4.14.223 -> 4.14.224 stable patch. Adapt context in
++  # arch/arm64/kernel/module.lds (no prior NOLOAD), zram_drv.c (vendor dedup
++  # fields after pages_compacted), and virtgpu_vq.c (vendor nents local).
++  stablePatch224 =
++    runCommand "linux-4.14.223-224.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.223-224.xz";
++          hash = "sha256-UbUHudX6fUQTRyfBZX10QK4thg/j3WCBs8EkWo432nM=";
++        };
++      }
++      ''
++        xz -dc "$src" > "$TMPDIR/linux-4.14.223-224.patch"
++        awk '
++          /^diff --git / {
++            file = $3
++            skip = (file == "a/Makefile")
++          }
++          skip { next }
++          file == "a/arch/arm64/kernel/module.lds" && /^-\t/ {
++            sub(/ \(NOLOAD\)/, "")
++          }
++          file == "a/drivers/block/zram/zram_drv.c" {
++            if (/^-\t\t\tpool_stats\.pages_compacted\);$/) {
++              print "-\t\t\tpool_stats.pages_compacted,"
++              next
++            }
++            if (/^\+\t\t\tatomic_long_read\(&pool_stats\.pages_compacted\)\);$/) {
++              print "+\t\t\tatomic_long_read(&pool_stats.pages_compacted),"
++              next
++            }
++            if (/^ \tup_read\(&zram->init_lock\);$/) {
++              print " \t\t\tzram_dedup_dup_size(zram),"
++              print " \t\t\tzram_dedup_meta_size(zram),"
++              print " \t\t\t(u64)atomic64_read(&zram->stats.huge_pages));"
++              next
++            }
++            if (/^ $/ || /^ \treturn ret;$/) {
++              next
++            }
++          }
++          file == "a/drivers/gpu/drm/virtio/virtgpu_vq.c" {
++            if (/^@@ -865,9 \+865,9 @@/) {
++              print "@@ -1045,8 +1045,8 @@ int virtio_gpu_object_attach(struct virtio_gpu_device *vgdev,"
++              next
++            }
++            if (/^-\tents = kmalloc_array\(obj->pages->nents,$/) {
++              print "-\tents = kmalloc_array(nents, sizeof(struct virtio_gpu_mem_entry),"
++              next
++            }
++            if (/^-\t\t\t     sizeof\(struct virtio_gpu_mem_entry\),$/) {
++              next
++            }
++            if (/^\+\tents = kvmalloc_array\(obj->pages->nents,$/) {
++              print "+\tents = kvmalloc_array(nents, sizeof(struct virtio_gpu_mem_entry),"
++              next
++            }
++            if (/^\+\t\t\t      sizeof\(struct virtio_gpu_mem_entry\),$/) {
++              next
++            }
++          }
++          { print }
++        ' "$TMPDIR/linux-4.14.223-224.patch" > "$out"
++      '';
++
++  # Incremental 4.14.224 -> 4.14.225 stable patch. Adapt dm-table.c context
++  # around the vendor's dm_calculate_supported_crypto_modes call.
++  stablePatch225 =
++    runCommand "linux-4.14.224-225.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.224-225.xz";
++          hash = "sha256-VT4JuHYUVMInEgVhdse6n3NplM6xi66rH7Sbn0eEqaY=";
++        };
++      }
++      ''
++        xz -dc "$src" > "$TMPDIR/linux-4.14.224-225.patch"
++        awk '
++          /^diff --git / { skip = ($0 ~ /a\/Makefile /) }
++          skip { next }
++          /^@@ -1852,32 \+1820,35 @@/ {
++            print "@@ -1852,34 +1820,37 @@ void dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,"
++            next
++          }
++          /^ \tdm_table_verify_integrity\(t\);$/ {
++            print
++            print " "
++            print " \tdm_calculate_supported_crypto_modes(t, q);"
++            next
++          }
++          { print }
++        ' "$TMPDIR/linux-4.14.224-225.patch" > "$out"
++      '';
++
++  # Incremental 4.14.225 -> 4.14.226 stable patch. In dwmac4_lib.c, the vendor
++  # tree delegates per-channel stop to dwmac4_dma_stop_tx_chan; drop the unused
++  # local variable along with the GMAC_CONFIG_TE clear.
++  stablePatch226 =
++    runCommand "linux-4.14.225-226.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.225-226.xz";
++          hash = "sha256-OOzkf8fO/lc6cg0YzZYoz9kMm6FakwDBSdZm4C1nqbc=";
++        };
++      }
++      ''
++        xz -dc "$src" > "$TMPDIR/linux-4.14.225-226.patch"
++        awk '
++          /^diff --git / {
++            file = $3
++            skip = (file == "a/Makefile")
++          }
++          skip { next }
++          file == "a/drivers/net/ethernet/stmicro/stmmac/dwmac4_lib.c" {
++            if (/^@@ /) {
++              print "@@ -75,11 +75,5 @@ void dwmac4_dma_stop_tx(void __iomem *ioaddr, u32 chan)"
++              print " {"
++              print "-\tu32 value = 0;"
++              print "-"
++              print " \tdwmac4_dma_stop_tx_chan(ioaddr, chan);"
++              print "-"
++              print "-\tvalue = readl(ioaddr + GMAC_CONFIG);"
++              print "-\tvalue &= ~GMAC_CONFIG_TE;"
++              print "-\twritel(value, ioaddr + GMAC_CONFIG);"
++              print " }"
++              print " "
++              print " void dwmac4_dma_start_rx_chan(void __iomem *ioaddr, u32 chan)"
++              skip = 1
++              next
++            }
++          }
++          { print }
++        ' "$TMPDIR/linux-4.14.225-226.patch" > "$out"
++      '';
++
++  # Incremental 4.14.226 -> 4.14.227 stable patch. The vendor tree already
++  # carries the qcom-spmi-vadc LR_MUX2_BAT_ID scale, the configfs usb_string_copy
++  # fix, and its own qrtr_endpoint_post fragment/backup allocation, and takes an
++  # extra lblk out-parameter on ext4_find_entry.
++  stablePatch227 =
++    runCommand "linux-4.14.226-227.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.226-227.xz";
++          hash = "sha256-mn15m0XsgIMyLIE3mucuBDIb+fl7zEHdNB3tWs0NPBo=";
++        };
++      }
++      ''
++        xz -dc "$src" > "$TMPDIR/linux-4.14.226-227.patch"
++        awk '
++          /^diff --git / {
++            file = $3
++            skip = ($0 ~ /a\/(Makefile|drivers\/iio\/adc\/qcom-spmi-vadc\.c|drivers\/usb\/gadget\/configfs\.c|net\/qrtr\/qrtr\.c) /)
++          }
++          skip { next }
++          file == "a/fs/ext4/namei.c" && /ext4_find_entry/ {
++            sub(/NULL\);$/, "NULL, NULL);")
++          }
++          { print }
++        ' "$TMPDIR/linux-4.14.226-227.patch" > "$out"
++      '';
++
++  # Incremental 4.14.227 -> 4.14.228 stable patch. The vendor msm_drv.c already
++  # guards against NULL ddev/priv in msm_pdev_shutdown.
++  stablePatch228 =
++    runCommand "linux-4.14.227-228.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.227-228.xz";
++          hash = "sha256-AveGb5kR31JESWYH98KpuQvnP/W6D3FxDeiSHir4pkk=";
++        };
++      }
++      ''
++        xz -dc "$src" > "$TMPDIR/linux-4.14.227-228.patch"
++        awk '
++          /^diff --git / {
++            skip = ($0 ~ /a\/(Makefile|drivers\/gpu\/drm\/msm\/msm_drv\.c) /)
++          }
++          !skip { print }
++        ' "$TMPDIR/linux-4.14.227-228.patch" > "$out"
++      '';
++
++  # Incremental 4.14.228 -> 4.14.229 stable patch. Adapt __bpf_skb_max_len
++  # removal to include the vendor tree's skb_at_tc_ingress check.
++  stablePatch229 =
++    runCommand "linux-4.14.228-229.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.228-229.xz";
++          hash = "sha256-RL/vEgXgI/0FLTCWGzM0DB66cDLKsAS3cASahqkNM/I=";
++        };
++      }
++      ''
++        xz -dc "$src" > "$TMPDIR/linux-4.14.228-229.patch"
++        awk '
++          /^diff --git / {
++            file = $3
++            skip = (file == "a/Makefile")
++          }
++          skip { next }
++          file == "a/net/core/filter.c" {
++            if (/^@@ -2279,17 \+2279,14 @@/) {
++              print "@@ -2279,19 +2279,14 @@ static int bpf_skb_net_shrink(struct sk_buff *skb, u32 len_diff)"
++              next
++            }
++            if (/^-\treturn skb->dev->mtu \+ skb->dev->hard_header_len;$/) {
++              print "-\tif (skb_at_tc_ingress(skb) || !skb->dev)"
++              print "-\t\treturn SKB_MAX_ALLOC;"
++              print
++              next
++            }
++          }
++          { print }
++        ' "$TMPDIR/linux-4.14.228-229.patch" > "$out"
++      '';
++
++  # Incremental 4.14.229 -> 4.14.230 stable patch.
++  stablePatch230 =
++    runCommand "linux-4.14.229-230.patch"
++      {
++        nativeBuildInputs = [ xz ];
++        src = fetchurl {
++          url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.229-230.xz";
++          hash = "sha256-iBMDu/Om8HVm6TbKZ9MpVHl1m9nSK2jbqY+xDuhO9FM=";
++        };
++      }
++      ''
++        xz -dc "$src" > "$TMPDIR/linux-4.14.229-230.patch"
++        awk '
++          /^diff --git / { skip = ($0 ~ /a\/Makefile /) }
++          !skip { print }
++        ' "$TMPDIR/linux-4.14.229-230.patch" > "$out"
++      '';
++
 +  # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
 +  # Btrfs filesystem support, and transparent Zstandard/XXHash compression.
 +  configfile =
@@ -470,11 +721,11 @@ index 00000000..7cf592ad
 +in
 +
 +kernel-builder-gcc8 {
-+  version = "4.14.223";
++  version = "4.14.230";
 +  inherit configfile;
 +
 +  postPatch = ''
-+    sed -i 's/^SUBLEVEL = 214$/SUBLEVEL = 223/' Makefile
++    sed -i 's/^SUBLEVEL = 214$/SUBLEVEL = 230/' Makefile
 +  '';
 +
 +  src = fetchFromGitHub {
@@ -502,6 +753,13 @@ index 00000000..7cf592ad
 +    stablePatch221
 +    stablePatch222
 +    stablePatch223
++    stablePatch224
++    stablePatch225
++    stablePatch226
++    stablePatch227
++    stablePatch228
++    stablePatch229
++    stablePatch230
 +    (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
 +    (upstreamPatch "0002-mmc-Fix-embedded_sdio_data-duplicate-definition.patch" "0h7d3pxz8di2rh257kmc83iwcpf8xmrqhbqq4an2vclfdhyr297j")
 +    (upstreamPatch "0003-video-fbdev-msm-Provide-mdss_dsi_switch_page.patch" "1igqg795cvr81w948k4dj8nrbzc2pz5bg6gdp68jfplm2hcs4nch")
@@ -510,7 +768,21 @@ index 00000000..7cf592ad
 +    (upstreamPatch "0006-ARM-8933-1-replace-Sun-Solaris-style-flag-on-section.patch" "0vcplkfqgfb8qyalls4bk55y46vij0a9jaak0shxncyf8a4yfx74")
 +    ./0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
 +    ./90_dtbs-install.patch
-+  ];
++  ]
++  ++ lib.optionals enableDroidspacesBackports (
++    map droidspacesPatch [
++      "0001-pidfd-add-P_PIDFD-to-waitid.patch"
++      "0002-fork-don-t-check-parent_tidptr-with-CLONE_PIDFD.patch"
++      "0003-net-introduce-SO_BINDTOIFINDEX-sockopt.patch"
++      "0004-statx-add-mount-ID.patch"
++      "0005-statx-add-mount_root.patch"
++      "0006-utimensat-AT_EMPTY_PATH-support.patch"
++      "0007-vfs-add-faccessat2-syscall.patch"
++      "0008-open-add-close_range.patch"
++      "0009-arch-wire-up-close_range.patch"
++      "0010-rtnetlink-accept-nexthop-message-types-and-multicast.patch"
++    ]
++  );
 +
 +  isModular = false;
 +

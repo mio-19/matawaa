@@ -9,7 +9,7 @@ Subject: [PATCH] fossil-hoki: add Gen 6 hardware firmware audio and family
  devices/fossil-hoki/android-init.nix                       |  232 ++++++++++++++++++++++++++++++
  devices/fossil-hoki/android-system-data.nix                |   28 +++++++++++
  devices/fossil-hoki/audio-modules.nix                      |  122 ++++++++++++++++++++++
- devices/fossil-hoki/default.nix                            |  588 ++++++++++++++++++++++++++++++++++++++++++
+ devices/fossil-hoki/default.nix                            |  590 ++++++++++++++++++++++++++++++++++++++++++
  devices/fossil-hoki/gps_xtra.ini                           |    2 +++
  ...ces/fossil-hoki/hwcomposer-allocation-diagnostics.patch |   31 +++++++++++
  devices/fossil-hoki/hybris-android.nix                     |   32 +++++++++++
@@ -22,7 +22,7 @@ Subject: [PATCH] fossil-hoki: add Gen 6 hardware firmware audio and family
  devices/fossil-hoki/wlan/wakelock.h                        |    3 +++
  devices/fossil-ray/default.nix                             |   56 +++++++++++++++
  devices/fossil-triggerfish/default.nix                     |   56 +++++++++++++++
-17 files changed, 1557 insertions(+)
+17 files changed, 1559 insertions(+)
 
 diff --git a/devices/fossil-firefish/default.nix b/devices/fossil-firefish/default.nix
 new file mode 100644
@@ -491,7 +491,7 @@ new file mode 100644
 index 00000000..a6a6e41d
 --- /dev/null
 +++ b/devices/fossil-hoki/default.nix
-@@ -0,0 +1,588 @@
+@@ -0,0 +1,590 @@
 +{
 +  config,
 +  lib,
@@ -588,7 +588,9 @@ index 00000000..a6a6e41d
 +  };
 +
 +  mobile.boot.stage-1 = {
-+    kernel.package = pkgs.callPackage ./kernel { };
++    kernel.package = pkgs.callPackage ./kernel {
++      enableDroidspacesBackports = config.mobile.hardware.watch.kernel == "legacy-backports";
++    };
 +  };
 +
 +  mobile.system.android = {

@@ -4,16 +4,16 @@ Date: Mon, 9 Nov 2026 10:55:55 +1100
 Subject: [PATCH] devices: add shared AsteroidOS family and debug integration
 
 ---
- devices/families/asteroidos.nix | 325 ++++++++++++++++++++++++++++++++
- 1 file changed, 325 insertions(+)
+ devices/families/asteroidos.nix | 329 ++++++++++++++++++++++++++++++++
+ 1 file changed, 329 insertions(+)
  create mode 100644 devices/families/asteroidos.nix
 
 diff --git a/devices/families/asteroidos.nix b/devices/families/asteroidos.nix
 new file mode 100644
-index 00000000..892a862b
+index 00000000..d872bf98
 --- /dev/null
 +++ b/devices/families/asteroidos.nix
-@@ -0,0 +1,325 @@
+@@ -0,0 +1,329 @@
 +{
 +  config,
 +  options,
@@ -31,12 +31,12 @@ index 00000000..892a862b
 +  journalCfg = config.mobile.hardware.watch.stage2-save-logs;
 +  stage2SshCfg = config.mobile.hardware.watch.stage2-ssh;
 +  debugNetwork = cfg.enable || stage2SshCfg.enable;
++  kernelMode = config.mobile.hardware.watch.kernel;
 +in
 +{
-+  # Legacy smartwatch kernels (Linux 4.x) lack STATX_MNT_ID, close_range, and modern
-+  # cgroup/pidfd APIs required by systemd >= 261. Override systemd and udev system-wide
-+  # to systemd 257 for all consumers on legacy watch targets (without polluting buildPackages).
-+  nixpkgs.overlays = lib.mkIf (config.mobile.hardware.watch.kernel == "legacy") (
++  # Only the default legacy mode overrides systemd. The backports mode uses
++  # the unmodified current systemd and udev from nixpkgs.
++  nixpkgs.overlays = lib.mkIf (kernelMode == "legacy-systemd257") (
 +    lib.mkAfter [
 +      (
 +        final: super:
@@ -57,6 +57,10 @@ index 00000000..892a862b
 +    {
 +      assertion = !(cfg.enable && stage2SshCfg.enable);
 +      message = "mobile.hardware.watch.stage1-pause-debug and mobile.hardware.watch.stage2-ssh are mutually exclusive.";
++    }
++    {
++      assertion = kernelMode != "legacy-backports" || config.mobile.device.name == "fossil-hoki";
++      message = "Droidspaces kernel backports are currently integrated only for fossil-hoki.";
 +    }
 +  ];
 +

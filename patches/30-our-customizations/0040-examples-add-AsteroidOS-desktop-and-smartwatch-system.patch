@@ -4,18 +4,18 @@ Date: Mon, 9 Nov 2026 10:55:57 +1100
 Subject: [PATCH] examples: add AsteroidOS desktop and smartwatch system
 
 ---
- examples/asteroid/asteroid-desktop.nix                     |  936 ++++++++++++++++++++++++++++++++++++++++++
+ examples/asteroid/asteroid-desktop.nix                     |  943 ++++++++++++++++++++++++++++++++++++++++++
  devices/fossil-hoki/mce-keep-aod.patch                     |   25 ++++++++++
  examples/asteroid/configuration.nix                        |   43 +++++++++++++
  examples/asteroid/default.nix                              |   15 ++++++++
-4 files changed, 1019 insertions(+)
+4 files changed, 1026 insertions(+)
 
 diff --git a/examples/asteroid/asteroid-desktop.nix b/examples/asteroid/asteroid-desktop.nix
 new file mode 100644
 index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdffc0e2636f
 --- /dev/null
 +++ b/examples/asteroid/asteroid-desktop.nix
-@@ -0,0 +1,936 @@
+@@ -0,0 +1,943 @@
 +{
 +  config,
 +  lib,
@@ -34,7 +34,7 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +    || config.mobile.hardware.watch.stage2-save-logs.enable
 +    || config.mobile.hardware.watch.stage2-ssh.enable;
 +
-+  isLegacy = config.mobile.hardware.watch.kernel == "legacy";
++  isLegacy = config.mobile.hardware.watch.kernel != "modern";
 +
 +  # Fossil Hoki has no proximity sensor. Keep MCE in its low-power ON state
 +  # after entering AOD instead of timing out to a black LPM_OFF screen.
@@ -142,8 +142,6 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +          asteroid.nemo-qml-plugin-dbus
 +          asteroid.libconnman-qt
 +          mcePackage
-+          asteroid.ngfd
-+          asteroid.nfcd
 +          asteroid.keepalive
 +          asteroid.nemo-qml-plugin-calendar
 +          asteroid.nemo-qml-plugin-alarms
@@ -178,6 +176,13 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +          asteroid.apps.telegram
 +          asteroid.apps.kiwix
 +        ]
++        ++ lib.optionals isLegacy (
++          with pkgs.asteroid;
++          [
++            ngfd
++            nfcd
++          ]
++        )
 +        ++ lib.optionals cfg.browser.enable [
 +          asteroid.apps.browser
 +        ]
@@ -469,12 +474,12 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +
 +      # Upstream meta-hoki IMAGE_INSTALL: udev-droid-system.
 +      # Android-style /dev/block/platform/.../by-name links for the vendor HALs.
-+      services.udev.packages = [ pkgs.asteroid.udev-droid-system ];
++      services.udev.packages = lib.optionals isLegacy [ pkgs.asteroid.udev-droid-system ];
 +
 +      # Upstream meta-hoki IMAGE_INSTALL: swclock-offset.
 +      # hoki's RTC is not writable; the offset between RTC and system clock is
 +      # cached at shutdown and re-applied at boot.
-+      systemd.services.swclock-offset-boot = {
++      systemd.services.swclock-offset-boot = mkIf isLegacy {
 +        description = "Set system time from the cached RTC offset";
 +        wantedBy = [ "sysinit.target" ];
 +        before = [
@@ -492,7 +497,7 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +          ExecStart = "${pkgs.asteroid.swclock-offset}/bin/swclock-offset-boot";
 +        };
 +      };
-+      systemd.services.swclock-offset-shutdown = {
++      systemd.services.swclock-offset-shutdown = mkIf isLegacy {
 +        description = "Cache the RTC offset before shutdown";
 +        wantedBy = [ "shutdown.target" ];
 +        before = [ "shutdown.target" ];
@@ -507,7 +512,7 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +
 +      # Upstream meta-hoki IMAGE_INSTALL: bluebinder.
 +      # Proxies the Android binder based Bluetooth HAL to BlueZ over vhci.
-+      systemd.services.bluebinder = {
++      systemd.services.bluebinder = mkIf isLegacy {
 +        description = "Android binder based bluetooth proxy (vhci)";
 +        wantedBy = [ "multi-user.target" ];
 +        after = [
@@ -544,7 +549,7 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +      # Upstream meta-hoki IMAGE_INSTALL: nfcd + nfcd-binder-plugin + nfcd-mce-plugin.
 +      # Provides org.sailfishos.nfc.daemon over D-Bus and talks to the Android
 +      # hardware.nxp.nfc@1.0 / android.hardware.nfc@1.1 HIDL HAL via libgbinder.
-+      systemd.services.nfcd = {
++      systemd.services.nfcd = mkIf isLegacy {
 +        description = "NFC daemon";
 +        wantedBy = [ "multi-user.target" ];
 +        requires = [ "dbus.service" ];
@@ -583,10 +588,12 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +        mcePackage
 +        pkgs.asteroid.dsme
 +        pkgs.asteroid.sensorfw
-+        pkgs.asteroid.ngfd
-+        pkgs.asteroid.nfcd
 +        pkgs.asteroid.timed-qt6
 +        connmanDbusPolicy
++      ]
++      ++ lib.optionals isLegacy [
++        pkgs.asteroid.ngfd
++        pkgs.asteroid.nfcd
 +      ];
 +
 +      # Upstream timed_git.bb installs timed.rc into /etc.
@@ -672,7 +679,7 @@ index 0000000000000000000000000000000000000000..1c2993bcdcf96f91a0e38a99f981bdff
 +
 +      # Upstream meta-asteroid: ngfd, the non graphical feedback daemon.
 +      # Haptics/sounds are requested through D-Bus by the launcher and apps.
-+      systemd.user.services.ngfd = {
++      systemd.user.services.ngfd = mkIf isLegacy {
 +        description = "Non Graphical Feedback Daemon";
 +        wantedBy = [ "default.target" ];
 +        requires = [ "dbus.socket" ];

@@ -93,7 +93,7 @@ index eaf350c9..1b0bfed1 100644
        mobile.kernel.structuredConfig = [
          (helpers: with helpers; {
 diff --git a/modules/hardware-qualcomm.nix b/modules/hardware-qualcomm.nix
-index 0959687f..43b980ea 100644
+index 0959687f..b5693638 100644
 --- a/modules/hardware-qualcomm.nix
 +++ b/modules/hardware-qualcomm.nix
 @@ -20,6 +20,12 @@ let
@@ -152,7 +152,7 @@ index 0959687f..43b980ea 100644
      }
 +    {
 +      mobile = mkIf cfg.qualcomm-sda429w.enable {
-+        system.system = "armv7l-linux";
++        system.system = mkDefault "armv7l-linux";
 +      };
 +    }
 +    {

@@ -4,16 +4,16 @@ Date: Mon, 9 Nov 2026 10:55:46 +1100
 Subject: [PATCH] modules: add smartwatch hardware and debug options
 
 ---
- modules/hardware-watch.nix                                 |  198 ++++++++++++++++++++++++++++
+ modules/hardware-watch.nix                                 |  200 ++++++++++++++++++++++++++++
  modules/module-list.nix                                    |    1 ++
-2 files changed, 199 insertions(+)
+2 files changed, 201 insertions(+)
 
 diff --git a/modules/hardware-watch.nix b/modules/hardware-watch.nix
 new file mode 100644
 index 0000000000000000000000000000000000000000..c6b448f2a0f5789e34470ee7cafaddc26e33dcb9
 --- /dev/null
 +++ b/modules/hardware-watch.nix
-@@ -0,0 +1,198 @@
+@@ -0,0 +1,200 @@
 +{
 +  config,
 +  lib,
@@ -157,14 +157,16 @@ index 0000000000000000000000000000000000000000..c6b448f2a0f5789e34470ee7cafaddc2
 +
 +    kernel = mkOption {
 +      type = types.enum [
-+        "legacy"
 +        "modern"
++        "legacy-systemd257"
++        "legacy-backports"
 +      ];
-+      default = "legacy";
++      default = "legacy-systemd257";
 +      description = ''
-+        Watch kernel generation. "legacy" uses the vendor 4.14 kernel and the
-+        old systemd 257 package; "modern" uses the mainline kernel and the
-+        current systemd package.
++        Kernel and systemd combination. "modern" uses a mainline kernel and
++        current systemd. "legacy-systemd257" uses a vendor kernel and systemd
++        257. "legacy-backports" applies Droidspaces kernel backports and uses
++        the unmodified current systemd from nixpkgs.
 +      '';
 +    };
 +
