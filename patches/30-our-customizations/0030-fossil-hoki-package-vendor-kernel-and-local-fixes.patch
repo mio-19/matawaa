@@ -6,7 +6,7 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
 ---
  ...d-pm_qos_remove_request-with-active-.patch |  40 ++
  .../fossil-hoki/kernel/90_dtbs-install.patch  |  29 +
- devices/fossil-hoki/kernel/default.nix        | 269 ++++++++
+ devices/fossil-hoki/kernel/default.nix        | 298 +++++++++
  devices/fossil-hoki/kernel/defconfig.patch    |  48 ++
  .../stable/linux-4.14.206-207.patch.patch     |  30 +
  .../stable/linux-4.14.214-215.patch.patch     |  66 ++
@@ -17,7 +17,7 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  .../stable/linux-4.14.225-226.patch.patch     |  26 +
  .../stable/linux-4.14.226-227.patch.patch     |  11 +
  .../stable/linux-4.14.228-229.patch.patch     |  18 +
- 13 files changed, 1209 insertions(+)
+ 13 files changed, 1238 insertions(+)
  create mode 100644 devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
  create mode 100644 devices/fossil-hoki/kernel/90_dtbs-install.patch
  create mode 100644 devices/fossil-hoki/kernel/default.nix
@@ -115,10 +115,10 @@ index 00000000..1cd6dc69
 + 	$(foreach DIR, $(DTSSUBDIR), $(Q)$(MAKE) $(build)=$(boot)/dts/$(DIR) MACHINE=$(MACHINE) dtbs)
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
-index 00000000..67d73d65
+index 00000000..3c29d4d5
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/default.nix
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,298 @@
 +{
 +  mobile-nixos,
 +  stdenv,
@@ -238,7 +238,7 @@ index 00000000..67d73d65
 +        cp "${name}" "$out"
 +      '';
 +
-+  # Incremental stable patches, 4.14.206 through 4.14.230.
++  # Incremental stable patches, 4.14.206 through 4.14.235.
 +  stablePatches = [
 +    # The vendor tree already carries the perf-core and Intel PT fixes; only
 +    # syncookies still needs the vendor's sock_net() argument.
@@ -319,6 +319,35 @@ index 00000000..67d73d65
 +    # check.
 +    (stableIncr "228-229" "sha256-RL/vEgXgI/0FLTCWGzM0DB66cDLKsAS3cASahqkNM/I=" [ ])
 +    (stableIncr "229-230" "sha256-iBMDu/Om8HVm6TbKZ9MpVHl1m9nSK2jbqY+xDuhO9FM=" [ ])
++    # The vendor tree already has the ext4 rename bail-out, its usbip vudc was
++    # rewritten around kthread_get_run, and its arm64 alternative.h places the
++    # .org directives differently (this device is built for armv7l).
++    (stableIncr "231-232" "sha256-p1W2eMItt4Xo5HlT9jTjVQpxu4k7Z0bJFe1g0O7w0Yo=" [
++      "arch/arm64/include/asm/alternative.h"
++      "drivers/usb/usbip/vudc_sysfs.c"
++      "fs/ext4/namei.c"
++    ])
++    # Vendor already carries the hub debounce change, the dwc3 link-state
++    # wakeup rework, f_uac1 option validation, the usb_string_copy fix,
++    # USB_AUDIO_IFACE_UNUSED, the mmc power cycle after a failed CMD11, and its
++    # own nfc llcp error paths.
++    (stableIncr "232-233" "sha256-UulKIYdVhrMyHuS8YZIlNU5E5/RXaYgeaBMCtf18F4I=" [
++      "drivers/mmc/core/core.c"
++      "drivers/usb/core/hub.c"
++      "drivers/usb/dwc3/gadget.c"
++      "drivers/usb/gadget/config.c"
++      "drivers/usb/gadget/function/f_uac1.c"
++      "drivers/usb/usbip/vudc_sysfs.c"
++      "net/nfc/llcp_sock.c"
++      "sound/usb/usbaudio.h"
++    ])
++    (stableIncr "233-234" "sha256-uHMi63C+rkgGksoAtvLBm9dQDFqmDrrf+WjG3SXk9qU=" [ ])
++    # Vendor already enables DEVTEN_EOPFEN for 2.30a and frees the dequeued
++    # tipc skb.
++    (stableIncr "234-235" "sha256-8SM9mKHj8j6mSn+WeUXoVmmAx4kPHRqiBmRyVWUBBdk=" [
++      "drivers/usb/dwc3/gadget.c"
++      "net/tipc/socket.c"
++    ])
 +  ];
 +
 +  # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
@@ -335,13 +364,13 @@ index 00000000..67d73d65
 +in
 +
 +kernel-builder-gcc8 {
-+  version = "4.14.230";
++  version = "4.14.235";
 +  inherit configfile;
 +
 +  # The vendor tree claims 4.14.206 and every incremental patch's Makefile hunk
 +  # is dropped above, so the version is set here instead of 24 times over.
 +  postPatch = ''
-+    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 230/' Makefile
++    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 235/' Makefile
 +  '';
 +
 +  src = fetchFromGitHub {
