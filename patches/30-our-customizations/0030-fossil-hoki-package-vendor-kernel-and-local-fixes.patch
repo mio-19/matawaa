@@ -1,16 +1,16 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From b35435c172e3cca21c90b552b441c75fe784b752 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
-Date: Mon, 9 Nov 2026 10:55:55 +1100
+Date: Thu, 12 Nov 2026 17:08:39 +1100
 Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
 
 ---
- ...d-pm_qos_remove_request-with-active-.patch |  40 ++
+ ...d-pm_qos_remove_request-with-active-.patch |  40 +
  .../fossil-hoki/kernel/90_dtbs-install.patch  |  29 +
- devices/fossil-hoki/kernel/default.nix        | 344 ++++++++++
+ devices/fossil-hoki/kernel/default.nix        | 708 ++++++++++++++++++
  devices/fossil-hoki/kernel/defconfig.patch    |  48 ++
  .../stable/linux-4.14.206-207.patch.patch     |  30 +
  .../stable/linux-4.14.214-215.patch.patch     |  66 ++
- .../stable/linux-4.14.217-218.patch.patch     | 589 ++++++++++++++++++
+ .../stable/linux-4.14.217-218.patch.patch     | 589 +++++++++++++++
  .../stable/linux-4.14.221-222.patch.patch     |  15 +
  .../stable/linux-4.14.223-224.patch.patch     |  48 ++
  .../stable/linux-4.14.224-225.patch.patch     |  20 +
@@ -18,7 +18,7 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  .../stable/linux-4.14.226-227.patch.patch     |  11 +
  .../stable/linux-4.14.228-229.patch.patch     |  18 +
  .../stable/linux-4.14.235-236.patch.patch     |  44 ++
- .../stable/linux-4.14.236-237.patch.patch     |  37 ++
+ .../stable/linux-4.14.236-237.patch.patch     |  37 +
  .../stable/linux-4.14.237-238.patch.patch     |  19 +
  .../stable/linux-4.14.238-239.patch.patch     |  18 +
  .../stable/linux-4.14.239-240.patch.patch     | 169 +++++
@@ -26,18 +26,31 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  .../stable/linux-4.14.241-242.patch.patch     |  31 +
  .../stable/linux-4.14.244-245.patch.patch     |  21 +
  .../stable/linux-4.14.246-247.patch.patch     |  61 ++
+ .../stable/linux-4.14.252-253.patch.patch     |  18 +
+ .../stable/linux-4.14.256-257.patch.patch     |  45 ++
+ .../stable/linux-4.14.258-259.patch.patch     |  27 +
+ .../stable/linux-4.14.274-275.patch.patch     |  24 +
+ .../stable/linux-4.14.277-278.patch.patch     |  22 +
+ .../stable/linux-4.14.291-292.patch.patch     |  29 +
+ .../stable/linux-4.14.295-296.patch.patch     |  45 ++
+ .../stable/linux-4.14.304-305.patch.patch     |  33 +
+ .../stable/linux-4.14.325-326.patch.patch     |  70 ++
  .../kernel/stable/vendor-235-236.patch        |  32 +
  .../kernel/stable/vendor-236-237.patch        |  13 +
  .../kernel/stable/vendor-237-238.patch        |  14 +
  .../kernel/stable/vendor-238-239.patch        |  13 +
- .../kernel/stable/vendor-239-240.patch        |  75 +++
+ .../kernel/stable/vendor-239-240.patch        |  75 ++
  .../kernel/stable/vendor-240-241.patch        |  15 +
  .../kernel/stable/vendor-241-242.patch        |  26 +
  .../kernel/stable/vendor-244-245.patch        |  12 +
  .../kernel/stable/vendor-245-246.patch        |  34 +
  .../kernel/stable/vendor-246-247.patch        |  42 ++
  .../kernel/stable/vendor-249-250.patch        |  14 +
- 33 files changed, 1998 insertions(+)
+ .../kernel/stable/vendor-256-257.patch        |  64 ++
+ .../kernel/stable/vendor-270-271.patch        | 232 ++++++
+ .../kernel/stable/vendor-284-285.patch        | 233 ++++++
+ .../kernel/stable/vendor-298-299.patch        |  15 +
+ 46 files changed, 3219 insertions(+)
  create mode 100644 devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
  create mode 100644 devices/fossil-hoki/kernel/90_dtbs-install.patch
  create mode 100644 devices/fossil-hoki/kernel/default.nix
@@ -60,6 +73,15 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.241-242.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.244-245.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.246-247.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.252-253.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.256-257.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.258-259.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.274-275.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.277-278.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.291-292.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.295-296.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.304-305.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.325-326.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/vendor-235-236.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/vendor-236-237.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/vendor-237-238.patch
@@ -71,6 +93,10 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  create mode 100644 devices/fossil-hoki/kernel/stable/vendor-245-246.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/vendor-246-247.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/vendor-249-250.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-256-257.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-270-271.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-284-285.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/vendor-298-299.patch
 
 diff --git a/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch b/devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
 new file mode 100644
@@ -155,10 +181,10 @@ index 00000000..1cd6dc69
 + 	$(foreach DIR, $(DTSSUBDIR), $(Q)$(MAKE) $(build)=$(boot)/dts/$(DIR) MACHINE=$(MACHINE) dtbs)
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
-index 00000000..a93e2a1e
+index 00000000..07ee8cd4
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/default.nix
-@@ -0,0 +1,344 @@
+@@ -0,0 +1,708 @@
 +{
 +  mobile-nixos,
 +  stdenv,
@@ -257,10 +283,17 @@ index 00000000..a93e2a1e
 +      (
 +        {
 +          nativeBuildInputs = [ xz ];
-+          src = fetchurl {
-+            url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.${range}.xz";
-+            inherit hash;
-+          };
++          src =
++            let
++              local = ./stable/linux-4.14.${range}.patch.xz;
++            in
++            if builtins.pathExists local then
++              local
++            else
++              fetchurl {
++                url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.14.${range}.xz";
++                inherit hash;
++              };
 +          inherit droppedFiles;
 +        }
 +        // lib.optionalAttrs hasAdaptation { inherit adaptation; }
@@ -278,7 +311,7 @@ index 00000000..a93e2a1e
 +        cp "${name}" "$out"
 +      '';
 +
-+  # Incremental stable patches, 4.14.206 through 4.14.250.
++  # Incremental stable patches, 4.14.206 through 4.14.336.
 +  stablePatches = [
 +    # The vendor tree already carries the perf-core and Intel PT fixes; only
 +    # syncookies still needs the vendor's sock_net() argument.
@@ -421,6 +454,358 @@ index 00000000..a93e2a1e
 +      "kernel/sched/cpufreq_schedutil.c"
 +    ])
 +    (stableIncr "249-250" "sha256-AEBv3KamCUUmdtaE+ZyJmQhh8OhoG/MycJNgYqHOdbw=" [ ])
++    (stableIncr "250-251" "sha256-YiSRItRyPpd9ESE2NWAcnERjPAVGEH7uFxwMPvLC2Ow=" [ ])
++    (stableIncr "251-252" "sha256-YBBJ63If92f0xz/n3eGqDIJaLbKVUErrKlrzdUP44Jk=" [
++      "drivers/usb/host/xhci-ring.c"
++    ])
++    (stableIncr "252-253" "sha256-KjVCZACtV6NQ5sI7IqhWxG/Xa+n9lXlBk870Awj8bTA=" [ ])
++    (stableIncr "253-254" "sha256-AhON15NQNSB+ZGsqNnNycUtYPvslaCy3RKFUvsnrqzE=" [
++      "arch/arm/Makefile"
++    ])
++    (stableIncr "254-255" "sha256-DAwaxjzbN1/y+abw0HBxI+EgBFVaUQxWconvmZqYMGo=" [ ])
++    (stableIncr "255-256" "sha256-Wv5zrdEZCazaO4JP4d49NQPl8c6hRjfOZdStjl3xSK8=" [
++      "drivers/android/binder.c"
++      "drivers/gpu/drm/msm/msm_gem.c"
++      "drivers/net/wireless/ath/ath10k/mac.c"
++      "include/linux/lsm_hooks.h"
++      "include/linux/security.h"
++      "kernel/power/swap.c"
++      "mm/oom_kill.c"
++      "security/apparmor/label.c"
++      "security/integrity/evm/evm_main.c"
++      "security/security.c"
++      "security/selinux/hooks.c"
++      "security/smack/smackfs.c"
++    ])
++    (stableIncr "256-257" "sha256-yc0xVV9oCoEDpWYRGZxpcJk3AcdrFAJZNykEBiFiNUU=" [
++      "arch/parisc/install.sh"
++      "drivers/usb/host/xhci-ring.c"
++      "fs/file_table.c"
++    ])
++    (stableIncr "257-258" "sha256-F1X51Xp7b1f89kjImlolIDQBikRYnqAO91LnjYGFgDM=" [
++      "drivers/usb/gadget/composite.c"
++    ])
++    (stableIncr "258-259" "sha256-Sh4fkCY4723mVtQA4S+KBv8GquuUk/lj3a10n3FVBzQ=" [
++      "arch/Kconfig"
++      "drivers/usb/gadget/composite.c"
++    ])
++    (stableIncr "259-260" "sha256-SYrTB0Uc4egFR+QyUoIS+O+oYN8U6VPuyTNxQy3cQ0w=" [
++      "drivers/usb/gadget/function/u_ether.c"
++    ])
++    (stableIncr "260-261" "sha256-sx58U8gJZifC+OHyqnVZIcUSpHFgXGwY+SQFW5u1rxI=" [
++      "drivers/android/binder_alloc.c"
++    ])
++    (stableIncr "261-262" "sha256-bYZ8XiGObYXPbkjESkfHNlbyYEVXizOEMiPG0m4HfSM=" [ ])
++    (stableIncr "262-263" "sha256-mP8/dDBLX29st7biq9h9Ty/V+p3tr0+rz9G0LcqEGRk=" [
++      "drivers/char/random.c"
++      "drivers/media/dvb-core/dmxdev.c"
++      "drivers/mmc/core/sdio.c"
++      "drivers/usb/gadget/function/f_fs.c"
++      "sound/core/pcm.c"
++    ])
++    (stableIncr "263-264" "sha256-8RybeHvn1qDYSc7Pt1CN8YudGMXuA8Fk9+QrGwpPUOo=" [ ])
++    (stableIncr "264-265" "sha256-PwSCyGjrcRiA3FzwKVwlmPmFS1JZ0wtgIA8Oo5eoz9s=" [
++      "kernel/power/wakelock.c"
++    ])
++    (stableIncr "265-266" "sha256-mlLTyfYrexx4fZFOYy8pw4JjvIVgb74bldhL50nc/aA=" [ ])
++    (stableIncr "266-267" "sha256-DVMaUjjK/ZxLemcvLCPgggiUe5djPn2HzBTOABKE2NY=" [
++      "drivers/usb/dwc3/gadget.c"
++      "drivers/usb/gadget/composite.c"
++      "drivers/usb/gadget/function/f_fs.c"
++      "init/Kconfig"
++    ])
++    (stableIncr "267-268" "sha256-r5hz3igv7NylxGuvmDi9ex1L7loMErXKa0irpMVgwXQ=" [ ])
++    (stableIncr "268-269" "sha256-OHqwBapq5ViPcB41UaJtL7PIqBZUE7cC7sRO49VkCtE=" [
++      "drivers/usb/dwc3/gadget.c"
++      "drivers/usb/gadget/function/rndis.c"
++      "drivers/usb/gadget/function/rndis.h"
++    ])
++    (stableIncr "269-270" "sha256-JNMNeF+Ft5KNte98z4ktEqBMVjuaBIA+HogV2UZz8WU=" [
++      "net/ipv6/ip6_output.c"
++    ])
++    (stableIncr "270-271" "sha256-d5LJXmpy2EKj9IW7fuur3jZG9WsUVFCL6X7S4yptBy4=" [
++      "arch/arm/include/asm/spectre.h"
++      "arch/arm/kernel/spectre.c"
++      "arch/arm/kernel/traps.c"
++    ])
++    (stableIncr "271-272" "sha256-O0l7opPUE/glnc5qhuthF1TNDQbD7S+l2QEpUXl/26M=" [
++      "arch/arm/include/asm/spectre.h"
++    ])
++    (stableIncr "272-273" "sha256-2tPgRS+RpgIXR0k3aE6kd8ap6d+gQ0J7wWC0v0r5K5g=" [ ])
++    (stableIncr "273-274" "sha256-p0tFbMY+rTmOd7WrFI0b6Rq4VfDWlVSn+9VhYFGlXLY=" [
++      "drivers/nfc/st21nfca/se.c"
++      "include/net/sock.h"
++      "net/ipv6/ip6_output.c"
++      "include/net/esp.h"
++      "net/core/sock.c"
++    ])
++    (stableIncr "274-275" "sha256-7cTWwloqrfbLIGWdmDfyQWv8eB947V2zPj91OZ9yDJU=" [
++      "Documentation/arm64/silicon-errata.txt"
++      "arch/arm64/Kconfig"
++      "arch/arm64/include/asm/cpucaps.h"
++      "arch/arm64/include/asm/cputype.h"
++      "arch/arm64/include/asm/vectors.h"
++      "arch/arm64/kernel/cpu_errata.c"
++    ])
++    (stableIncr "275-276" "sha256-VhdqUydrC1ibu/QoOuJyT5jkFErrQavYc0Ndre5HCjI=" [
++      "drivers/clk/qcom/clk-rcg2.c"
++      "drivers/mmc/core/host.c"
++      "drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c"
++      "include/net/xfrm.h"
++      "mm/mempolicy.c"
++      "net/key/af_key.c"
++      "net/xfrm/xfrm_policy.c"
++      "net/xfrm/xfrm_user.c"
++    ])
++    (stableIncr "276-277" "sha256-hm8LuD0tGrLVoOpCak4P/4NQ9h6z7C6QqZp7yjYosC4=" [ ])
++    (stableIncr "277-278" "sha256-u1RYtBL0dOQ1e5rfryUJRpsP4Qkif6MY/iEDvirXJnM=" [
++      "drivers/usb/core/quirks.c"
++      "drivers/usb/host/xhci-ring.c"
++    ])
++    (stableIncr "278-279" "sha256-adgBFMHTl5GwI/Pn+yK7QpZi96J5GzcIsKWgoAApKeo=" [ ])
++    (stableIncr "279-280" "sha256-Sg1UeDfh5DxHuRpC0SV7DszSZ6b6oJDU+2surjlOy8A=" [
++      "include/linux/netdev_features.h"
++    ])
++    (stableIncr "280-281" "sha256-mz2hZEUp4sPIU/X/wf0tKgcObDVhbp/T0jmabViRO14=" [
++      "drivers/mmc/core/mmc_ops.c"
++    ])
++    (stableIncr "281-282" "sha256-nkebvTEjqUImtK4orBbUwLV7fEasGwa4jgUsVw3JYJc=" [
++      "drivers/md/dm-verity-target.c"
++    ])
++    (stableIncr "282-283" "sha256-89xxgsZPDbzCroWSp0rMQpkZnw1piTtc4KjGftvrh60=" [
++      "drivers/extcon/extcon.c"
++      "drivers/mailbox/mailbox.c"
++      "drivers/nfc/st21nfca/se.c"
++      "drivers/tty/serial/msm_serial.c"
++      "drivers/usb/core/quirks.c"
++      "fs/ext4/namei.c"
++      "fs/fat/fatent.c"
++      "include/linux/mailbox_controller.h"
++    ])
++    (stableIncr "283-284" "sha256-IoMJCNtkenu5vsCFoCRok8Jyb/Y3zRlBaAAEpa+pgEI=" [
++      "Documentation/admin-guide/hw-vuln/processor_mmio_stale_data.rst"
++    ])
++    (stableIncr "284-285" "sha256-5Iws9aUlVI6QoyE15ymdGnXCsghA63EVyxZA5WXnKkI=" [
++      "crypto/chacha20_generic.c"
++      "drivers/char/Kconfig"
++      "drivers/char/random.c"
++      "drivers/of/fdt.c"
++      "drivers/usb/gadget/function/u_ether.c"
++      "fs/ext4/namei.c"
++      "include/crypto/blake2s.h"
++      "include/crypto/chacha20.h"
++      "include/crypto/internal/blake2s.h"
++      "init/main.c"
++      "kernel/cpu.c"
++      "lib/chacha20.c"
++      "lib/crypto/Makefile"
++      "lib/crypto/blake2s-generic.c"
++      "lib/crypto/blake2s-selftest.c"
++      "lib/crypto/blake2s.c"
++      "include/trace/events/random.h"
++      "lib/Makefile"
++    ])
++    (stableIncr "285-286" "sha256-NQjzr5D9zChJU01JcJ7Te5nW75nehP/r1Pw9pQwVNEg=" [
++      "drivers/char/random.c"
++      "drivers/of/fdt.c"
++    ])
++    (stableIncr "286-287" "sha256-3FQ/eCP7C0SrBOkaG+8EvqqV/r9SptFMV+bfAVKKZUE=" [ ])
++    (stableIncr "287-288" "sha256-k8uOSBMINDeT8gOl7/Wt7wW10LmiCwoX1FCk8qOLJS8=" [
++      "include/net/esp.h"
++    ])
++    (stableIncr "288-289" "sha256-gMwUdgjN91JLWs+zQhX9S0D/I5QNQ8PtOpf8ufXYZkw=" [
++      "drivers/usb/dwc3/gadget.c"
++      "drivers/usb/host/xhci.c"
++      "drivers/usb/host/xhci.h"
++      "kernel/signal.c"
++    ])
++    (stableIncr "289-290" "sha256-lt/SnChkT1r1lO/JKD3jvkwfsDXT+0iVCBwhxDIP5ZE=" [
++      "drivers/char/random.c"
++    ])
++    (stableIncr "290-291" "sha256-BtBkUDiN2ToFY7RWiR+3ZfVQr9Jr5TavDXaGChDGTXw=" [
++      "drivers/scsi/ufs/ufshcd-pltfrm.c"
++      "fs/ext4/namei.c"
++    ])
++    (stableIncr "291-292" "sha256-CsIVhgGfwz1yJFOeClARq0At/oU7n9kfHiuKqLrI0/c=" [
++      "Documentation/admin-guide/hw-vuln/processor_mmio_stale_data.rst"
++      "arch/arm64/include/asm/mmu.h"
++      "arch/arm64/kernel/setup.c"
++      "net/key/af_key.c"
++    ])
++    (stableIncr "292-293" "sha256-H64GmxL+Iz2ZiujEwxzkOFXPZdMMkODGW1akowtQbMo=" [
++      "drivers/usb/dwc3/core.c"
++      "drivers/usb/host/xhci.c"
++      "net/netfilter/nf_conntrack_irc.c"
++    ])
++    (stableIncr "293-294" "sha256-sO59TXZuqQurfoPdTBnghtuhrnti6JUcyFZkcrl6PDY=" [ ])
++    (stableIncr "294-295" "sha256-Vrxo0SpLwnRjlewXUib2431e7SOiBRzEp93NhBrXwhk=" [
++      "net/netfilter/nf_conntrack_irc.c"
++    ])
++    (stableIncr "295-296" "sha256-pPiHngmjgpNtJa4rLzuf6fgl2dIa+quq4vSjtic7SLE=" [
++      "arch/powerpc/boot/dts/fsl/e500v1_power_isa.dtsi"
++      "drivers/char/random.c"
++      "drivers/rpmsg/qcom_glink_native.c"
++      "drivers/rpmsg/qcom_smd.c"
++      "fs/f2fs/extent_cache.c"
++      "fs/nilfs2/segment.c"
++    ])
++    (stableIncr "296-297" "sha256-1cx/d0Kq29nGJHCxQyURU7GG0eBhdtiN3Jlg0+rhi9A=" [ ])
++    (stableIncr "297-298" "sha256-Q/xH6AFmQVUwYeaCMpn4fsfnR7lOOKcgPRAUoVjlsLg=" [
++      "Documentation/arm64/silicon-errata.txt"
++      "arch/arm64/include/asm/cpucaps.h"
++      "arch/arm64/kernel/cpu_errata.c"
++      "drivers/mmc/core/sdio_bus.c"
++    ])
++    (stableIncr "298-299" "sha256-oiSFliOjlXVAt3zOmfH9Og8ZId1buAmujuuiRv9ykzQ=" [
++      "include/linux/const.h"
++      "include/net/udp.h"
++    ])
++    (stableIncr "299-300" "sha256-b6uaH3iIWZzDtA88h2JpSuTr/ZZbNSDQcY2H/JtXmng=" [ ])
++    (stableIncr "300-301" "sha256-x0DMF2Vci9tx6aec+BDwyrU7iXqsf5rDhSkoptb+t38=" [
++      "arch/arm64/kernel/cpu_errata.c"
++      "drivers/mmc/host/sdhci.c"
++      "drivers/mmc/host/sdhci.h"
++    ])
++    (stableIncr "301-302" "sha256-wuGFzp45xxIEYnbTGvP9ggeHKBG5xxGRvQBgavEeU3I=" [
++      "tools/testing/selftests/rcutorture/bin/mkinitrd.sh"
++    ])
++    (stableIncr "302-303" "sha256-MbpcFiTcVu3O4hZ6cMQ1oSdFCBQFPWuTBYSGSVFnwyM=" [
++      "drivers/base/dd.c"
++      "drivers/net/ethernet/stmicro/stmmac/stmmac_hwtstamp.c"
++      "drivers/net/ethernet/stmicro/stmmac/stmmac_ptp.h"
++      "drivers/power/supply/power_supply_core.c"
++    ])
++    (stableIncr "303-304" "sha256-YH9nn9rswWo43Q9JJKTLC0drQUEcA8LSCucv5/k9JPQ=" [ ])
++    (stableIncr "304-305" "sha256-z7oHZ6oSPQMfFq+ZCd96GhMqtqA7rd7uKN5judDiXGU=" [
++      "Documentation/ABI/testing/sysfs-kernel-oops_count"
++      "Documentation/ABI/testing/sysfs-kernel-warn_count"
++      "drivers/edac/edac_device.c"
++      "drivers/usb/gadget/function/f_fs.c"
++      "kernel/panic.c"
++      "kernel/sched/core.c"
++    ])
++    (stableIncr "305-306" "sha256-g9M2E+3LivlVIFWCoW1qfGh2/Z565p/oAficWcIfXnE=" [
++      "drivers/mmc/core/sdio_bus.c"
++      "drivers/usb/core/quirks.c"
++      "drivers/usb/gadget/function/f_fs.c"
++      "tools/virtio/linux/build_bug.h"
++      "tools/virtio/linux/cpumask.h"
++      "tools/virtio/linux/gfp.h"
++      "tools/virtio/linux/kmsan.h"
++      "tools/virtio/linux/topology.h"
++    ])
++    (stableIncr "306-307" "sha256-7gU0Sns0W0wb7tnbcuDcfWG0DCecVWjCe8uU9K1Cicg=" [
++      "arch/powerpc/boot/dts/fsl/qoriq-fman3-0-10g-2.dtsi"
++      "arch/powerpc/boot/dts/fsl/qoriq-fman3-0-10g-3.dtsi"
++    ])
++    (stableIncr "307-308" "sha256-e36V+tFcfpPH8iScGQDgHb+mPYJpQzBFjHY5jI6JQTk=" [
++      "drivers/mtd/ubi/wl.c"
++      "fs/f2fs/inline.c"
++    ])
++    (stableIncr "308-309" "sha256-1Nj4LwRodgWgHwTKnIKYB9INaM9hajNrVOGn0keSK7E=" [ ])
++    (stableIncr "309-310" "sha256-4m2jPx694e/gdlBleJmC81fgdzEMfbl1p4X9oUZMl7g=" [
++      "fs/ext4/namei.c"
++    ])
++    (stableIncr "310-311" "sha256-FKDRKlnJmIs1cFME32yC0CZ8AlaSKfgsTzRrGwwBFUo=" [
++      "fs/ext4/page-io.c"
++    ])
++    (stableIncr "311-312" "sha256-Gkueyxd/sHJjen8FnfGmDbftQuVodW3wxaK4OlGcWLE=" [
++      "arch/riscv/include/uapi/asm/setup.h"
++      "fs/ext4/inode.c"
++    ])
++    (stableIncr "312-313" "sha256-h92vBSg12YG4HPhBeJtfp97P13HMD+ONL2JAMmdFf+w=" [ ])
++    (stableIncr "313-314" "sha256-h90JhLKI3ty0VSgD7Za3zL7FUgUp28O3X0Azr236xms=" [
++      "net/ipv6/udp.c"
++      "tools/testing/selftests/sigaltstack/current_stack_pointer.h"
++      "net/ipv6/udplite.c"
++      "include/net/udplite.h"
++      "net/ipv4/udplite.c"
++    ])
++    (stableIncr "314-315" "sha256-CiNNd/9noQ8Tzd+ZeHfFtj2R/q3ptd7thmnkNU4BI0I=" [
++      "drivers/usb/dwc3/core.c"
++    ])
++    (stableIncr "315-316" "sha256-U0YplesOW3/1D0C26vQg6bkfcDRUiyaPAsbOQ6lFz6E=" [ ])
++    (stableIncr "316-317" "sha256-ZvW0OirGGN78FbSURkJvatqXi0x/J6GIxhC+tqjH5gQ=" [
++      "drivers/usb/gadget/function/f_fs.c"
++    ])
++    (stableIncr "317-318" "sha256-ZDCbB7OV/6N6XaP7jDrJVtWKPLJOvlZnrCzb6jWqxE8=" [
++      "include/net/pkt_sched.h"
++      "net/sched/cls_api.c"
++    ])
++    (stableIncr "318-319" "sha256-54myI9iTGmloMMbPrCvFkrfnsLIHyOexY+XJyExFBWA=" [
++      "drivers/mmc/core/block.c"
++      "net/core/dev.c"
++      "include/linux/netdevice.h"
++    ])
++    (stableIncr "319-320" "sha256-Z7t4V6tiw/4hFkDdICGNWM+dmoCZ9cRfy1f+BHVVse0=" [
++      "arch/arm64/include/asm/sysreg.h"
++    ])
++    (stableIncr "320-321" "sha256-EZE0xkQCPY+M5BLFVycvVNbOb1OfegxoMI0twWrYgcU=" [
++      "Documentation/admin-guide/hw-vuln/gather_data_sampling.rst"
++      "init/main.c"
++      "arch/arm/Kconfig"
++      "arch/arm/include/asm/bugs.h"
++      "arch/arm/kernel/bugs.c"
++    ])
++    (stableIncr "321-322" "sha256-Z01KwrSHsgV4Ax2Vs7OUfT8xn1FzgdS1TVHJ32f/5TY=" [
++      "kernel/events/core.c"
++      "mm/mempolicy.c"
++      "net/ipv4/netfilter/nf_socket_ipv4.c"
++      "net/ipv6/netfilter/nf_socket_ipv6.c"
++      "tools/perf/tests/shell/test_uprobe_from_different_cu.sh"
++    ])
++    (stableIncr "322-323" "sha256-ynHvzyqlzEi6jkWYnZz9o3J1vYEnmZkvt6JOnX31oGc=" [
++      "drivers/usb/dwc3/gadget.c"
++      "net/ipv6/ndisc.c"
++    ])
++    (stableIncr "323-324" "sha256-TrLcfG1iLBHs71WN6bOSnncsMJtj4N5xRbIevidIEBo=" [
++      "drivers/android/binder.c"
++      "drivers/android/binder_alloc.c"
++      "drivers/android/binder_alloc.h"
++    ])
++    (stableIncr "324-325" "sha256-afHZtwmqGWZDH51VuLBur+V0sF/j7L+EkRIDgB/kraI=" [ ])
++    (stableIncr "325-326" "sha256-vx1X/+k3PlIpTdDAqHCYVtkM9ayM7mfZ4JlEjUn1m78=" [
++      "drivers/devfreq/devfreq.c"
++      "fs/nilfs2/segment.c"
++      "lib/ubsan.h"
++    ])
++    (stableIncr "326-327" "sha256-sZKwnT+HTnScSos6ou2ZIYsxySyQejcQ/ZUAB+EVoJY=" [
++      "fs/ext4/namei.c"
++    ])
++    (stableIncr "327-328" "sha256-3+SW9NlluqecB38PnmKUWctUBJ7+6xtZOixhQT8HvnI=" [
++      "include/linux/perf_event.h"
++      "kernel/events/core.c"
++    ])
++    (stableIncr "328-329" "sha256-9/haCHrDojcy6eevZtF4751gSd4nIH4APq1jCOFI5IY=" [
++      "arch/arm/boot/bootp/init.S"
++      "arch/arm/boot/compressed/big-endian.S"
++      "arch/arm/boot/compressed/head.S"
++      "arch/arm/boot/compressed/piggy.S"
++      "arch/arm/mm/proc-v7.S"
++      "drivers/rpmsg/qcom_glink_native.c"
++      "fs/f2fs/gc.c"
++      "kernel/events/core.c"
++    ])
++    (stableIncr "329-330" "sha256-yCoG23Ip3YtxpEn8EG02HfR1I1M/RldsJBq8gmDwZ64=" [
++      "drivers/clk/qcom/clk-rcg2.c"
++      "drivers/thermal/thermal_core.c"
++      "drivers/tty/tty_jobctrl.c"
++    ])
++    (stableIncr "330-331" "sha256-2g/C0GE9Wja9Mk8gdRFsTtulum7WxZ5QrDDUhU9dPTs=" [
++      "include/linux/pwm.h"
++    ])
++    (stableIncr "331-332" "sha256-wUziz5O8onzu8rreIfFyQbjSo+P8xjS9p/GturYiDfI=" [
++      "drivers/md/dm-verity-target.c"
++      "drivers/usb/dwc3/core.c"
++    ])
++    (stableIncr "332-333" "sha256-IESb+kow48icboZtPGfOWIUvY54xZqQdSRqJNuDgjI0=" [ ])
++    (stableIncr "333-334" "sha256-imt/lGQqx+sWJGCroLFwitZ0ID/YLFmJxdnOYscg2ew=" [ ])
++    (stableIncr "334-335" "sha256-ca4GLdKekSvygpAGcO2/MU0usSn9JU0Fva9Qlnp5C2s=" [
++      "net/wireless/certs/wens.hex"
++    ])
++    (stableIncr "335-336" "sha256-NRrDEN2Ofw6itjASq7FVSWQbVvBPWsrSmSo9HdYEdok=" [
++      "drivers/mmc/core/host.c"
++    ])
 +  ];
 +
 +  # Patch upstream defconfig to enable required Bluetooth protocols (RFCOMM, BNEP, HIDP),
@@ -433,17 +818,18 @@ index 00000000..a93e2a1e
 +      }
 +      ''
 +        patch -p1 -i "$patch" -o "$out" "$upstream"
++        printf '\nCONFIG_SECTION_MISMATCH_WARN_ONLY=y\n' >> "$out"
 +      '';
 +in
 +
 +kernel-builder-gcc8 {
-+  version = "4.14.250";
++  version = "4.14.336";
 +  inherit configfile;
 +
 +  # The vendor tree claims 4.14.206 and every incremental patch's Makefile hunk
 +  # is dropped above, so the version is set here instead of 24 times over.
 +  postPatch = ''
-+    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 250/' Makefile
++    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 336/' Makefile
 +  '';
 +
 +  src = fetchFromGitHub {
@@ -467,6 +853,10 @@ index 00000000..a93e2a1e
 +      ./stable/vendor-245-246.patch
 +      ./stable/vendor-246-247.patch
 +      ./stable/vendor-249-250.patch
++      ./stable/vendor-256-257.patch
++      ./stable/vendor-270-271.patch
++      ./stable/vendor-284-285.patch
++      ./stable/vendor-298-299.patch
 +    ]
 +    ++ [
 +      (upstreamPatch "0001-dts-Add-hoki-device-trees.patch" "0z3c6lbqpqmhqsy158wbpl0zcfkr94nwh42d6px309684qq4c8v2")
@@ -1912,6 +2302,373 @@ index 00000000..51682917
 + diff --git a/net/mac80211/tx.c b/net/mac80211/tx.c
 + index c7e8935224c02..e7b63ba8c184b 100644
 + --- a/net/mac80211/tx.c
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.252-253.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.252-253.patch.patch
+new file mode 100644
+index 00000000..433e0257
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.252-253.patch.patch
+@@ -0,0 +1,18 @@
++--- a/linux-4.14.252-253.patch
+++++ b/linux-4.14.252-253.patch
++@@ -1,15 +1,3 @@
++-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
++-index 89f7d0c282406..86ed77d75e4bb 100644
++---- a/arch/arm/Kconfig
++-+++ b/arch/arm/Kconfig
++-@@ -65,6 +65,7 @@ config ARM
++- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
++- 	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
++- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
++-+	select HAVE_FUTEX_CMPXCHG if FUTEX
++- 	select HAVE_GCC_PLUGINS
++- 	select HAVE_GENERIC_DMA_COHERENT
++- 	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
++ diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
++ index 60cb084a8d927..7e1acec92b508 100644
++ --- a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.256-257.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.256-257.patch.patch
+new file mode 100644
+index 00000000..b7269112
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.256-257.patch.patch
+@@ -0,0 +1,45 @@
++--- a/linux-4.14.256-257.patch
+++++ b/linux-4.14.256-257.patch
++@@ -482,19 +482,6 @@
++  #endif
++  }
++  
++-diff --git a/drivers/android/binder.c b/drivers/android/binder.c
++-index c5fd7908fc913..63bf8a7d477ba 100644
++---- a/drivers/android/binder.c
++-+++ b/drivers/android/binder.c
++-@@ -2894,7 +2894,7 @@ static void binder_transaction(struct binder_proc *proc,
++- 		t->from = thread;
++- 	else
++- 		t->from = NULL;
++--	t->sender_euid = proc->cred->euid;
++-+	t->sender_euid = task_euid(proc->tsk);
++- 	t->to_proc = target_proc;
++- 	t->to_thread = target_thread;
++- 	t->code = tr->code;
++ diff --git a/drivers/ata/sata_fsl.c b/drivers/ata/sata_fsl.c
++ index 5a94659064b40..66dd209ed70e6 100644
++ --- a/drivers/ata/sata_fsl.c
++@@ -3195,22 +3182,6 @@
++  	NL802154_IFTYPE_MONITOR,
++  	NL802154_IFTYPE_COORD,
++  
++-diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
++-index c843929e0c4fe..5db024aa00e96 100644
++---- a/include/uapi/linux/pci_regs.h
++-+++ b/include/uapi/linux/pci_regs.h
++-@@ -654,6 +654,11 @@
++- #define  PCI_EXP_LNKCAP2_SLS_8_0GB	0x00000008 /* Supported Speed 8.0GT/s */
++- #define  PCI_EXP_LNKCAP2_CROSSLINK	0x00000100 /* Crosslink supported */
++- #define PCI_EXP_LNKCTL2		48	/* Link Control 2 */
++-+#define PCI_EXP_LNKCTL2_TLS		0x000f
++-+#define PCI_EXP_LNKCTL2_TLS_2_5GT	0x0001 /* Supported Speed 2.5GT/s */
++-+#define PCI_EXP_LNKCTL2_TLS_5_0GT	0x0002 /* Supported Speed 5GT/s */
++-+#define PCI_EXP_LNKCTL2_TLS_8_0GT	0x0003 /* Supported Speed 8GT/s */
++-+#define PCI_EXP_LNKCTL2_TLS_16_0GT	0x0004 /* Supported Speed 16GT/s */
++- #define PCI_EXP_LNKSTA2		50	/* Link Status 2 */
++- #define PCI_CAP_EXP_ENDPOINT_SIZEOF_V2	52	/* v2 endpoints with link end here */
++- #define PCI_EXP_SLTCAP2		52	/* Slot Capabilities 2 */
++ diff --git a/include/xen/interface/io/ring.h b/include/xen/interface/io/ring.h
++ index 3f40501fc60b1..b39cdbc522ec7 100644
++ --- a/include/xen/interface/io/ring.h
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.258-259.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.258-259.patch.patch
+new file mode 100644
+index 00000000..a1e448d3
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.258-259.patch.patch
+@@ -0,0 +1,27 @@
++--- a/linux-4.14.258-259.patch
+++++ b/linux-4.14.258-259.patch
++@@ -1084,24 +1084,6 @@
++  	MLX4_BUILD_PTYS2ETHTOOL_CONFIG(MLX4_20GBASE_KR2, SPEED_20000,
++  				       ETHTOOL_LINK_MODE_20000baseMLD2_Full_BIT,
++  				       ETHTOOL_LINK_MODE_20000baseKR2_Full_BIT);
++-diff --git a/drivers/net/usb/lan78xx.c b/drivers/net/usb/lan78xx.c
++-index 838b6fe9dfaaf..e286188b6ea1b 100644
++---- a/drivers/net/usb/lan78xx.c
++-+++ b/drivers/net/usb/lan78xx.c
++-@@ -920,11 +920,9 @@ static int lan78xx_read_otp(struct lan78xx_net *dev, u32 offset,
++- 	ret = lan78xx_read_raw_otp(dev, 0, 1, &sig);
++- 
++- 	if (ret == 0) {
++--		if (sig == OTP_INDICATOR_1)
++--			offset = offset;
++--		else if (sig == OTP_INDICATOR_2)
++-+		if (sig == OTP_INDICATOR_2)
++- 			offset += 0x100;
++--		else
++-+		else if (sig != OTP_INDICATOR_1)
++- 			ret = -EINVAL;
++- 		if (!ret)
++- 			ret = lan78xx_read_raw_otp(dev, offset, length, data);
++ diff --git a/drivers/net/wireless/marvell/mwifiex/cmdevt.c b/drivers/net/wireless/marvell/mwifiex/cmdevt.c
++ index 0edc5d621304b..a9cee3dac97b0 100644
++ --- a/drivers/net/wireless/marvell/mwifiex/cmdevt.c
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.274-275.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.274-275.patch.patch
+new file mode 100644
+index 00000000..4a172887
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.274-275.patch.patch
+@@ -0,0 +1,24 @@
++--- a/linux-4.14.274-275.patch
+++++ b/linux-4.14.274-275.patch
++@@ -832,21 +832,6 @@
++  #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
++  DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
++  	       timer_unstable_counter_workaround);
++-@@ -381,6 +388,14 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
++- 		.read_cntvct_el0 = arm64_858921_read_cntvct_el0,
++- 	},
++- #endif
++-+#ifdef CONFIG_ARM64_ERRATUM_1188873
++-+	{
++-+		.match_type = ate_match_local_cap_id,
++-+		.id = (void *)ARM64_WORKAROUND_1188873,
++-+		.desc = "ARM erratum 1188873",
++-+		.read_cntvct_el0 = arm64_1188873_read_cntvct_el0,
++-+	},
++-+#endif
++- };
++- 
++- typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
++ diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
++ index 6366b04c7d5f4..0402668914147 100644
++ --- a/include/linux/arm-smccc.h
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.277-278.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.277-278.patch.patch
+new file mode 100644
+index 00000000..1f314751
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.277-278.patch.patch
+@@ -0,0 +1,22 @@
++--- a/linux-4.14.277-278.patch
+++++ b/linux-4.14.277-278.patch
++@@ -1404,19 +1404,6 @@
++  }
++  
++  /*
++-diff --git a/drivers/usb/gadget/configfs.c b/drivers/usb/gadget/configfs.c
++-index 8209e035e52f4..2ecb1cfa42066 100644
++---- a/drivers/usb/gadget/configfs.c
++-+++ b/drivers/usb/gadget/configfs.c
++-@@ -1411,6 +1411,8 @@ static void configfs_composite_unbind(struct usb_gadget *gadget)
++- 	usb_ep_autoconfig_reset(cdev->gadget);
++- 	spin_lock_irqsave(&gi->spinlock, flags);
++- 	cdev->gadget = NULL;
++-+	cdev->deactivations = 0;
++-+	gadget->deactivated = false;
++- 	set_gadget_data(gadget, NULL);
++- 	spin_unlock_irqrestore(&gi->spinlock, flags);
++- }
++ diff --git a/drivers/usb/gadget/function/uvc_queue.c b/drivers/usb/gadget/function/uvc_queue.c
++ index 6377e9fee6e59..dadf6e5073801 100644
++ --- a/drivers/usb/gadget/function/uvc_queue.c
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.291-292.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.291-292.patch.patch
+new file mode 100644
+index 00000000..3b35d246
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.291-292.patch.patch
+@@ -0,0 +1,29 @@
++--- a/linux-4.14.291-292.patch
+++++ b/linux-4.14.291-292.patch
++@@ -34,26 +34,6 @@
++  {
++  	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
++  	int offset;
++-@@ -889,19 +889,6 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
++- 	return dt_virt;
++- }
++- 
++--void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
++--{
++--	void *dt_virt;
++--	int size;
++--
++--	dt_virt = __fixmap_remap_fdt(dt_phys, &size, PAGE_KERNEL_RO);
++--	if (!dt_virt)
++--		return NULL;
++--
++--	memblock_reserve(dt_phys, size);
++--	return dt_virt;
++--}
++--
++- int __init arch_ioremap_pud_supported(void)
++- {
++- 	/*
++ diff --git a/arch/parisc/kernel/unaligned.c b/arch/parisc/kernel/unaligned.c
++ index b3c19ab2485ce..5a20f3eb3f859 100644
++ --- a/arch/parisc/kernel/unaligned.c
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.295-296.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.295-296.patch.patch
+new file mode 100644
+index 00000000..d573eb70
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.295-296.patch.patch
+@@ -0,0 +1,45 @@
++--- a/linux-4.14.295-296.patch
+++++ b/linux-4.14.295-296.patch
++@@ -3037,42 +3037,6 @@
++  	master->num_chipselect = sci->num_cs;
++  	master->dma_alignment = 8;
++  	master->bits_per_word_mask = SPI_BPW_MASK(32) | SPI_BPW_MASK(16) |
++-diff --git a/drivers/spmi/spmi-pmic-arb.c b/drivers/spmi/spmi-pmic-arb.c
++-index 360b8218f322c..0eb156aa4975c 100644
++---- a/drivers/spmi/spmi-pmic-arb.c
++-+++ b/drivers/spmi/spmi-pmic-arb.c
++-@@ -867,7 +867,8 @@ static int pmic_arb_read_apid_map_v5(struct spmi_pmic_arb *pmic_arb)
++- 	 * version 5, there is more than one APID mapped to each PPID.
++- 	 * The owner field for each of these mappings specifies the EE which is
++- 	 * allowed to write to the APID.  The owner of the last (highest) APID
++--	 * for a given PPID will receive interrupts from the PPID.
++-+	 * which has the IRQ owner bit set for a given PPID will receive
++-+	 * interrupts from the PPID.
++- 	 */
++- 	for (i = 0; ; i++, apidd++) {
++- 		offset = pmic_arb->ver_ops->apid_map_offset(i);
++-@@ -890,16 +891,16 @@ static int pmic_arb_read_apid_map_v5(struct spmi_pmic_arb *pmic_arb)
++- 		apid = pmic_arb->ppid_to_apid[ppid] & ~PMIC_ARB_APID_VALID;
++- 		prev_apidd = &pmic_arb->apid_data[apid];
++- 
++--		if (valid && is_irq_ee &&
++--				prev_apidd->write_ee == pmic_arb->ee) {
++-+		if (!valid || apidd->write_ee == pmic_arb->ee) {
++-+			/* First PPID mapping or one for this EE */
++-+			pmic_arb->ppid_to_apid[ppid] = i | PMIC_ARB_APID_VALID;
++-+		} else if (valid && is_irq_ee &&
++-+			   prev_apidd->write_ee == pmic_arb->ee) {
++- 			/*
++- 			 * Duplicate PPID mapping after the one for this EE;
++- 			 * override the irq owner
++- 			 */
++- 			prev_apidd->irq_ee = apidd->irq_ee;
++--		} else if (!valid || is_irq_ee) {
++--			/* First PPID mapping or duplicate for another EE */
++--			pmic_arb->ppid_to_apid[ppid] = i | PMIC_ARB_APID_VALID;
++- 		}
++- 
++- 		apidd->ppid = ppid;
++ diff --git a/drivers/thermal/intel_powerclamp.c b/drivers/thermal/intel_powerclamp.c
++ index c3293fa2bb1b3..68cc88637e068 100644
++ --- a/drivers/thermal/intel_powerclamp.c
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.304-305.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.304-305.patch.patch
+new file mode 100644
+index 00000000..f7a82f46
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.304-305.patch.patch
+@@ -0,0 +1,33 @@
++--- a/linux-4.14.304-305.patch
+++++ b/linux-4.14.304-305.patch
++@@ -1576,30 +1576,6 @@
++  	kasan_enable_current();
++  }
++  
++-diff --git a/mm/util.c b/mm/util.c
++-index 84e775f5216fe..7d80c8119dce1 100644
++---- a/mm/util.c
++-+++ b/mm/util.c
++-@@ -400,7 +400,8 @@ EXPORT_SYMBOL(vm_mmap);
++-  * __GFP_RETRY_MAYFAIL is supported, and it should be used only if kmalloc is
++-  * preferable to the vmalloc fallback, due to visible performance drawbacks.
++-  *
++-- * Any use of gfp flags outside of GFP_KERNEL should be consulted with mm people.
++-+ * Please note that any use of gfp flags outside of GFP_KERNEL is careful to not
++-+ * fall back to vmalloc.
++-  */
++- void *kvmalloc_node(size_t size, gfp_t flags, int node)
++- {
++-@@ -411,7 +412,8 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
++- 	 * vmalloc uses GFP_KERNEL for some internal allocations (e.g page tables)
++- 	 * so the given set of flags has to be compatible.
++- 	 */
++--	WARN_ON_ONCE((flags & GFP_KERNEL) != GFP_KERNEL);
++-+	if ((flags & GFP_KERNEL) != GFP_KERNEL)
++-+		return kmalloc_node(size, flags, node);
++- 
++- 	/*
++- 	 * We want to attempt a large physically contiguous block first because
++ diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
++ index 81a151ca4a245..1fd6498e3387e 100644
++ --- a/net/bluetooth/hci_core.c
+diff --git a/devices/fossil-hoki/kernel/stable/linux-4.14.325-326.patch.patch b/devices/fossil-hoki/kernel/stable/linux-4.14.325-326.patch.patch
+new file mode 100644
+index 00000000..c9d6fbaf
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/linux-4.14.325-326.patch.patch
+@@ -0,0 +1,70 @@
++--- a/linux-4.14.325-326.patch
+++++ b/linux-4.14.325-326.patch
++@@ -5255,48 +5255,6 @@
++  	if (u->sign)
++  		return -1;
++  	if (u->nlimbs > 1)
++-diff --git a/lib/ubsan.c b/lib/ubsan.c
++-index c652b4a820ccd..1e9e2ab255396 100644
++---- a/lib/ubsan.c
++-+++ b/lib/ubsan.c
++-@@ -143,11 +143,6 @@ static void val_to_string(char *str, size_t size, struct type_descriptor *type,
++- 	}
++- }
++- 
++--static bool location_is_valid(struct source_location *loc)
++--{
++--	return loc->file_name != NULL;
++--}
++--
++- static DEFINE_SPINLOCK(report_lock);
++- 
++- static void ubsan_prologue(struct source_location *location,
++-@@ -354,25 +349,6 @@ void __ubsan_handle_type_mismatch_v1(struct type_mismatch_data_v1 *data,
++- }
++- EXPORT_SYMBOL(__ubsan_handle_type_mismatch_v1);
++- 
++--void __ubsan_handle_nonnull_return(struct nonnull_return_data *data)
++--{
++--	unsigned long flags;
++--
++--	if (suppress_report(&data->location))
++--		return;
++--
++--	ubsan_prologue(&data->location, &flags);
++--
++--	pr_err("null pointer returned from function declared to never return null\n");
++--
++--	if (location_is_valid(&data->attr_location))
++--		print_source_location("returns_nonnull attribute specified in",
++--				&data->attr_location);
++--
++--	ubsan_epilogue(&flags);
++--}
++--EXPORT_SYMBOL(__ubsan_handle_nonnull_return);
++--
++- void __ubsan_handle_vla_bound_not_positive(struct vla_bound_data *data,
++- 					void *bound)
++- {
++ diff --git a/net/9p/trans_virtio.c b/net/9p/trans_virtio.c
++ index c6a46e8e9eda5..25f5caa57289b 100644
++ --- a/net/9p/trans_virtio.c
++@@ -6666,18 +6624,6 @@
++  		return !capable(CAP_SYS_RESOURCE) && !capable(CAP_SYS_ADMIN);
++  	return false;
++  }
++-diff --git a/scripts/Makefile.ubsan b/scripts/Makefile.ubsan
++-index 8fd4d44fbcd1b..b593b36ccff86 100644
++---- a/scripts/Makefile.ubsan
++-+++ b/scripts/Makefile.ubsan
++-@@ -7,7 +7,6 @@ ifdef CONFIG_UBSAN
++-       CFLAGS_UBSAN += $(call cc-option, -fsanitize=signed-integer-overflow)
++-       CFLAGS_UBSAN += $(call cc-option, -fsanitize=bounds)
++-       CFLAGS_UBSAN += $(call cc-option, -fsanitize=object-size)
++--      CFLAGS_UBSAN += $(call cc-option, -fsanitize=returns-nonnull-attribute)
++-       CFLAGS_UBSAN += $(call cc-option, -fsanitize=bool)
++-       CFLAGS_UBSAN += $(call cc-option, -fsanitize=enum)
++- 
++ diff --git a/security/keys/keyctl.c b/security/keys/keyctl.c
++ index 9394d72a77e80..9e52a3e0fc672 100644
++ --- a/security/keys/keyctl.c
 diff --git a/devices/fossil-hoki/kernel/stable/vendor-235-236.patch b/devices/fossil-hoki/kernel/stable/vendor-235-236.patch
 new file mode 100644
 index 00000000..2b8d9986
@@ -2268,3 +3025,574 @@ index 00000000..078839d8
 + };
 + 
 + static DEFINE_SPINLOCK(event_timer_lock);
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-256-257.patch b/devices/fossil-hoki/kernel/stable/vendor-256-257.patch
+new file mode 100644
+index 00000000..0a629847
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-256-257.patch
+@@ -0,0 +1,64 @@
++diff --git a/kernel/cpu.c b/kernel/cpu.c
++index f3b231cb6b657..281efe4b6cb0e 100644
++--- a/kernel/cpu.c
+++++ b/kernel/cpu.c
++@@ -31,6 +31,7 @@
++ #include <linux/slab.h>
++ #include <linux/percpu-rwsem.h>
++ #include <linux/cpuset.h>
+++#include <linux/random.h>
++ 
++ #include <trace/events/power.h>
++ #define CREATE_TRACE_POINTS
++@@ -1404,6 +1405,11 @@ static struct cpuhp_step cpuhp_bp_states[] = {
++ 		.startup.single		= perf_event_init_cpu,
++ 		.teardown.single	= perf_event_exit_cpu,
++ 	},
+++	[CPUHP_RANDOM_PREPARE] = {
+++		.name			= "random:prepare",
+++		.startup.single		= random_prepare_cpu,
+++		.teardown.single	= NULL,
+++	},
++ 	[CPUHP_WORKQUEUE_PREP] = {
++ 		.name			= "workqueue:prepare",
++ 		.startup.single		= workqueue_prepare_cpu,
++@@ -1523,6 +1529,11 @@ static struct cpuhp_step cpuhp_ap_states[] = {
++ 		.startup.single		= workqueue_online_cpu,
++ 		.teardown.single	= workqueue_offline_cpu,
++ 	},
+++	[CPUHP_AP_RANDOM_ONLINE] = {
+++		.name			= "random:online",
+++		.startup.single		= random_online_cpu,
+++		.teardown.single	= NULL,
+++	},
++ 	[CPUHP_AP_RCUTREE_ONLINE] = {
++ 		.name			= "RCU/tree:online",
++ 		.startup.single		= rcutree_online_cpu,
++diff --git a/fs/file_table.c b/fs/file_table.c
++index 61517f57f8ef7..4ceb4982ffea1 100644
++--- a/fs/file_table.c
+++++ b/fs/file_table.c
++@@ -261,9 +261,9 @@ void flush_delayed_fput(void)
++ 
++ static DECLARE_DELAYED_WORK(delayed_fput_work, delayed_fput);
++ 
++-void fput(struct file *file)
+++void fput_many(struct file *file, unsigned int refs)
++ {
++-	if (atomic_long_dec_and_test(&file->f_count)) {
+++	if (atomic_long_sub_and_test(refs, &file->f_count)) {
++ 		struct task_struct *task = current;
++ 
++ 		if (likely(!in_interrupt() && !(task->flags & PF_KTHREAD))) {
++@@ -282,6 +282,11 @@ void fput(struct file *file)
++ 	}
++ }
++ 
+++void fput(struct file *file)
+++{
+++	fput_many(file, 1);
+++}
+++
++ /*
++  * synchronous analog of fput(); for kernel threads that might be needed
++  * in some umount() (and thus can't use flush_delayed_fput() without
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-270-271.patch b/devices/fossil-hoki/kernel/stable/vendor-270-271.patch
+new file mode 100644
+index 00000000..3cfcc1fa
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-270-271.patch
+@@ -0,0 +1,232 @@
++diff --git a/arch/arm/include/asm/spectre.h b/arch/arm/include/asm/spectre.h
++new file mode 100644
++index 0000000000000..d1fa5607d3aa3
++--- /dev/null
+++++ b/arch/arm/include/asm/spectre.h
++@@ -0,0 +1,32 @@
+++/* SPDX-License-Identifier: GPL-2.0-only */
+++
+++#ifndef __ASM_SPECTRE_H
+++#define __ASM_SPECTRE_H
+++
+++enum {
+++	SPECTRE_UNAFFECTED,
+++	SPECTRE_MITIGATED,
+++	SPECTRE_VULNERABLE,
+++};
+++
+++enum {
+++	__SPECTRE_V2_METHOD_BPIALL,
+++	__SPECTRE_V2_METHOD_ICIALLU,
+++	__SPECTRE_V2_METHOD_SMC,
+++	__SPECTRE_V2_METHOD_HVC,
+++	__SPECTRE_V2_METHOD_LOOP8,
+++};
+++
+++enum {
+++	SPECTRE_V2_METHOD_BPIALL = BIT(__SPECTRE_V2_METHOD_BPIALL),
+++	SPECTRE_V2_METHOD_ICIALLU = BIT(__SPECTRE_V2_METHOD_ICIALLU),
+++	SPECTRE_V2_METHOD_SMC = BIT(__SPECTRE_V2_METHOD_SMC),
+++	SPECTRE_V2_METHOD_HVC = BIT(__SPECTRE_V2_METHOD_HVC),
+++	SPECTRE_V2_METHOD_LOOP8 = BIT(__SPECTRE_V2_METHOD_LOOP8),
+++};
+++
+++void spectre_v2_update_state(unsigned int state, unsigned int methods);
+++
+++int spectre_bhb_update_vectors(unsigned int method);
+++
+++#endif
++diff --git a/arch/arm/kernel/spectre.c b/arch/arm/kernel/spectre.c
++new file mode 100644
++index 0000000000000..0dcefc36fb7a0
++--- /dev/null
+++++ b/arch/arm/kernel/spectre.c
++@@ -0,0 +1,71 @@
+++// SPDX-License-Identifier: GPL-2.0-only
+++#include <linux/bpf.h>
+++#include <linux/cpu.h>
+++#include <linux/device.h>
+++
+++#include <asm/spectre.h>
+++
+++static bool _unprivileged_ebpf_enabled(void)
+++{
+++#ifdef CONFIG_BPF_SYSCALL
+++	return !sysctl_unprivileged_bpf_disabled;
+++#else
+++	return false;
+++#endif
+++}
+++
+++ssize_t cpu_show_spectre_v1(struct device *dev, struct device_attribute *attr,
+++			    char *buf)
+++{
+++	return sprintf(buf, "Mitigation: __user pointer sanitization\n");
+++}
+++
+++static unsigned int spectre_v2_state;
+++static unsigned int spectre_v2_methods;
+++
+++void spectre_v2_update_state(unsigned int state, unsigned int method)
+++{
+++	if (state > spectre_v2_state)
+++		spectre_v2_state = state;
+++	spectre_v2_methods |= method;
+++}
+++
+++ssize_t cpu_show_spectre_v2(struct device *dev, struct device_attribute *attr,
+++			    char *buf)
+++{
+++	const char *method;
+++
+++	if (spectre_v2_state == SPECTRE_UNAFFECTED)
+++		return sprintf(buf, "%s\n", "Not affected");
+++
+++	if (spectre_v2_state != SPECTRE_MITIGATED)
+++		return sprintf(buf, "%s\n", "Vulnerable");
+++
+++	if (_unprivileged_ebpf_enabled())
+++		return sprintf(buf, "Vulnerable: Unprivileged eBPF enabled\n");
+++
+++	switch (spectre_v2_methods) {
+++	case SPECTRE_V2_METHOD_BPIALL:
+++		method = "Branch predictor hardening";
+++		break;
+++
+++	case SPECTRE_V2_METHOD_ICIALLU:
+++		method = "I-cache invalidation";
+++		break;
+++
+++	case SPECTRE_V2_METHOD_SMC:
+++	case SPECTRE_V2_METHOD_HVC:
+++		method = "Firmware call";
+++		break;
+++
+++	case SPECTRE_V2_METHOD_LOOP8:
+++		method = "History overwrite";
+++		break;
+++
+++	default:
+++		method = "Multiple mitigations";
+++		break;
+++	}
+++
+++	return sprintf(buf, "Mitigation: %s\n", method);
+++}
++diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
++index f702f2b370521..7d81d4a1f5a9c 100644
++--- a/arch/arm/kernel/traps.c
+++++ b/arch/arm/kernel/traps.c
++@@ -33,6 +33,7 @@
++ #include <linux/atomic.h>
++ #include <asm/cacheflush.h>
++ #include <asm/exception.h>
+++#include <asm/spectre.h>
++ #include <asm/unistd.h>
++ #include <asm/traps.h>
++ #include <asm/ptrace.h>
++@@ -820,10 +821,59 @@ static inline void __init kuser_init(void *vectors)
++ }
++ #endif
++ 
+++#ifndef CONFIG_CPU_V7M
+++static void copy_from_lma(void *vma, void *lma_start, void *lma_end)
+++{
+++	memcpy(vma, lma_start, lma_end - lma_start);
+++}
+++
+++static void flush_vectors(void *vma, size_t offset, size_t size)
+++{
+++	unsigned long start = (unsigned long)vma + offset;
+++	unsigned long end = start + size;
+++
+++	flush_icache_range(start, end);
+++}
+++
+++#ifdef CONFIG_HARDEN_BRANCH_HISTORY
+++int spectre_bhb_update_vectors(unsigned int method)
+++{
+++	extern char __vectors_bhb_bpiall_start[], __vectors_bhb_bpiall_end[];
+++	extern char __vectors_bhb_loop8_start[], __vectors_bhb_loop8_end[];
+++	void *vec_start, *vec_end;
+++
+++	if (system_state > SYSTEM_SCHEDULING) {
+++		pr_err("CPU%u: Spectre BHB workaround too late - system vulnerable\n",
+++		       smp_processor_id());
+++		return SPECTRE_VULNERABLE;
+++	}
+++
+++	switch (method) {
+++	case SPECTRE_V2_METHOD_LOOP8:
+++		vec_start = __vectors_bhb_loop8_start;
+++		vec_end = __vectors_bhb_loop8_end;
+++		break;
+++
+++	case SPECTRE_V2_METHOD_BPIALL:
+++		vec_start = __vectors_bhb_bpiall_start;
+++		vec_end = __vectors_bhb_bpiall_end;
+++		break;
+++
+++	default:
+++		pr_err("CPU%u: unknown Spectre BHB state %d\n",
+++		       smp_processor_id(), method);
+++		return SPECTRE_VULNERABLE;
+++	}
+++
+++	copy_from_lma(vectors_page, vec_start, vec_end);
+++	flush_vectors(vectors_page, 0, vec_end - vec_start);
+++
+++	return SPECTRE_MITIGATED;
+++}
+++#endif
+++
++ void __init early_trap_init(void *vectors_base)
++ {
++-#ifndef CONFIG_CPU_V7M
++-	unsigned long vectors = (unsigned long)vectors_base;
++ 	extern char __stubs_start[], __stubs_end[];
++ 	extern char __vectors_start[], __vectors_end[];
++ 	unsigned i;
++@@ -844,17 +894,20 @@ void __init early_trap_init(void *vectors_base)
++ 	 * into the vector page, mapped at 0xffff0000, and ensure these
++ 	 * are visible to the instruction stream.
++ 	 */
++-	memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
++-	memcpy((void *)vectors + 0x1000, __stubs_start, __stubs_end - __stubs_start);
+++	copy_from_lma(vectors_base, __vectors_start, __vectors_end);
+++	copy_from_lma(vectors_base + 0x1000, __stubs_start, __stubs_end);
++ 
++ 	kuser_init(vectors_base);
++ 
++-	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+++	flush_vectors(vectors_base, 0, PAGE_SIZE * 2);
+++}
++ #else /* ifndef CONFIG_CPU_V7M */
+++void __init early_trap_init(void *vectors_base)
+++{
++ 	/*
++ 	 * on V7-M there is no need to copy the vector table to a dedicated
++ 	 * memory area. The address is configurable and so a table in the kernel
++ 	 * image can be used.
++ 	 */
++-#endif
++ }
+++#endif
++diff --git a/arch/arm/include/asm/spectre.h b/arch/arm/include/asm/spectre.h
++index d1fa5607d3aa3..85f9e538fb325 100644
++--- a/arch/arm/include/asm/spectre.h
+++++ b/arch/arm/include/asm/spectre.h
++@@ -25,7 +25,13 @@ enum {
++ 	SPECTRE_V2_METHOD_LOOP8 = BIT(__SPECTRE_V2_METHOD_LOOP8),
++ };
++ 
+++#ifdef CONFIG_GENERIC_CPU_VULNERABILITIES
++ void spectre_v2_update_state(unsigned int state, unsigned int methods);
+++#else
+++static inline void spectre_v2_update_state(unsigned int state,
+++					   unsigned int methods)
+++{}
+++#endif
++ 
++ int spectre_bhb_update_vectors(unsigned int method);
++ 
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-284-285.patch b/devices/fossil-hoki/kernel/stable/vendor-284-285.patch
+new file mode 100644
+index 00000000..8bbae661
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-284-285.patch
+@@ -0,0 +1,233 @@
++--- a/include/linux/random.h	2026-11-12 14:15:23.002286469 +1100
+++++ b/include/linux/random.h	2026-11-12 14:15:22.998286486 +1100
++@@ -12,6 +12,12 @@
++ 
++ struct notifier_block;
++ 
+++struct random_ready_callback {
+++	struct list_head list;
+++	void (*func)(struct random_ready_callback *rdy);
+++	struct module *owner;
+++};
+++
++ void add_device_randomness(const void *buf, size_t len);
++ void __init add_bootloader_randomness(const void *buf, size_t len);
++ void add_input_randomness(unsigned int type, unsigned int code,
++@@ -66,6 +72,8 @@
++ 
++ int __init random_init(const char *command_line);
++ bool rng_is_initialized(void);
+++int add_random_ready_callback(struct random_ready_callback *rdy);
+++void del_random_ready_callback(struct random_ready_callback *rdy);
++ int wait_for_random_bytes(void);
++ int register_random_ready_notifier(struct notifier_block *nb);
++ int unregister_random_ready_notifier(struct notifier_block *nb);
++--- a/drivers/char/random.c	1970-01-01 10:00:01.000000000 +1000
+++++ b/drivers/char/random.c	2026-11-12 14:42:15.628676349 +1100
++@@ -104,7 +104,7 @@
++  * There are three exported interfaces; the first is one designed to
++  * be used from within the kernel:
++  *
++- * 	void get_random_bytes(void *buf, int nbytes);
+++ * 	void get_random_bytes(void *buf, size_t nbytes);
++  *
++  * This interface will return the requested number of random bytes,
++  * and place it in the requested buffer.
++@@ -131,7 +131,7 @@
++  *	void add_device_randomness(const void *buf, unsigned int size);
++  * 	void add_input_randomness(unsigned int type, unsigned int code,
++  *                                unsigned int value);
++- *	void add_interrupt_randomness(int irq, int irq_flags);
+++ *	void add_interrupt_randomness(int irq);
++  * 	void add_disk_randomness(struct gendisk *disk);
++  *
++  * add_device_randomness() is for adding data to the random pool that
++@@ -247,6 +247,7 @@
++ #include <linux/slab.h>
++ #include <linux/random.h>
++ #include <linux/poll.h>
+++#include <linux/notifier.h>
++ #include <linux/init.h>
++ #include <linux/fs.h>
++ #include <linux/genhd.h>
++@@ -436,7 +437,9 @@
++ static void _crng_backtrack_protect(struct crng_state *crng,
++ 				    __u8 tmp[CHACHA_BLOCK_SIZE], int used);
++ static void process_random_ready_list(void);
++-static void _get_random_bytes(void *buf, int nbytes);
+++static RAW_NOTIFIER_HEAD(random_ready_chain);
+++static DEFINE_SPINLOCK(random_ready_chain_lock);
+++static void _get_random_bytes(void *buf, size_t nbytes);
++ 
++ static struct ratelimit_state unseeded_warning =
++ 	RATELIMIT_STATE_INIT("warn_unseeded_randomness", HZ, 3);
++@@ -634,6 +637,8 @@
++ 		module_put(owner);
++ 	}
++ 	spin_unlock_irqrestore(&random_ready_list_lock, flags);
+++
+++	raw_notifier_call_chain(&random_ready_chain, 0, NULL);
++ }
++ 
++ /*
++@@ -1220,7 +1225,7 @@
++ 	return *ptr;
++ }
++ 
++-void add_interrupt_randomness(int irq, int irq_flags)
+++void add_interrupt_randomness(int irq)
++ {
++ 	struct entropy_store	*r;
++ 	struct fast_pool	*fast_pool = this_cpu_ptr(&irq_randomness);
++@@ -1612,7 +1617,7 @@
++  * wait_for_random_bytes() should be called and return 0 at least once
++  * at any point prior.
++  */
++-static void _get_random_bytes(void *buf, int nbytes)
+++static void _get_random_bytes(void *buf, size_t nbytes)
++ {
++ 	__u8 tmp[CHACHA_BLOCK_SIZE] __aligned(4);
++ 
++@@ -1633,7 +1638,7 @@
++ 	memzero_explicit(tmp, sizeof(tmp));
++ }
++ 
++-void get_random_bytes(void *buf, int nbytes)
+++void get_random_bytes(void *buf, size_t nbytes)
++ {
++ 	static void *previous;
++ 
++@@ -1728,14 +1733,15 @@
++  * only if we're willing to trust the hardware manufacturer not to
++  * have put in a back door.
++  */
++-void get_random_bytes_arch(void *buf, int nbytes)
+++size_t __must_check get_random_bytes_arch(void *buf, size_t nbytes)
++ {
+++	size_t orig = nbytes;
++ 	char *p = buf;
++ 
++ 	trace_get_random_bytes_arch(nbytes, _RET_IP_);
++ 	while (nbytes) {
++ 		unsigned long v;
++-		int chunk = min(nbytes, (int)sizeof(unsigned long));
+++		size_t chunk = min(nbytes, sizeof(unsigned long));
++ 
++ 		if (!arch_get_random_long(&v))
++ 			break;
++@@ -1747,6 +1753,7 @@
++ 
++ 	if (nbytes)
++ 		get_random_bytes(p, nbytes);
+++	return orig - nbytes;
++ }
++ EXPORT_SYMBOL(get_random_bytes_arch);
++ 
++@@ -2272,44 +2279,11 @@
++ 	}
++ }
++ 
++-/**
++- * randomize_page - Generate a random, page aligned address
++- * @start:	The smallest acceptable address the caller will take.
++- * @range:	The size of the area, starting at @start, within which the
++- *		random address must fall.
++- *
++- * If @start + @range would overflow, @range is capped.
++- *
++- * NOTE: Historical use of randomize_range, which this replaces, presumed that
++- * @start was already page aligned.  We now align it regardless.
++- *
++- * Return: A page aligned address within [start, start + range).  On error,
++- * @start is returned.
++- */
++-unsigned long
++-randomize_page(unsigned long start, unsigned long range)
++-{
++-	if (!PAGE_ALIGNED(start)) {
++-		range -= PAGE_ALIGN(start) - start;
++-		start = PAGE_ALIGN(start);
++-	}
++-
++-	if (start > ULONG_MAX - range)
++-		range = ULONG_MAX - start;
++-
++-	range >>= PAGE_SHIFT;
++-
++-	if (range == 0)
++-		return start;
++-
++-	return start + (get_random_long() % range << PAGE_SHIFT);
++-}
++-
++ /* Interface for in-kernel drivers of true hardware RNGs.
++  * Those devices may produce endless random bits and will be throttled
++  * when our pool is full.
++  */
++-void add_hwgenerator_randomness(const char *buffer, size_t count,
+++void add_hwgenerator_randomness(const void *buffer, size_t count,
++ 				size_t entropy)
++ {
++ 	struct entropy_store *poolp = &input_pool;
++@@ -2329,3 +2303,54 @@
++ 	credit_entropy_bits(poolp, entropy);
++ }
++ EXPORT_SYMBOL_GPL(add_hwgenerator_randomness);
+++
+++
+++#ifdef CONFIG_SMP
+++int __cold random_prepare_cpu(unsigned int cpu)
+++{
+++	return 0;
+++}
+++int __cold random_online_cpu(unsigned int cpu)
+++{
+++	return 0;
+++}
+++#endif
+++
+++bool rng_is_initialized(void)
+++{
+++	return crng_ready();
+++}
+++EXPORT_SYMBOL(rng_is_initialized);
+++
+++int __init random_init(const char *command_line)
+++{
+++	return 0;
+++}
+++
+++int __cold register_random_ready_notifier(struct notifier_block *nb)
+++{
+++	unsigned long flags;
+++	int ret = -EALREADY;
+++
+++	if (crng_ready())
+++		return ret;
+++
+++	spin_lock_irqsave(&random_ready_chain_lock, flags);
+++	if (!crng_ready())
+++		ret = raw_notifier_chain_register(&random_ready_chain, nb);
+++	spin_unlock_irqrestore(&random_ready_chain_lock, flags);
+++	return ret;
+++}
+++EXPORT_SYMBOL(register_random_ready_notifier);
+++
+++int __cold unregister_random_ready_notifier(struct notifier_block *nb)
+++{
+++	unsigned long flags;
+++	int ret;
+++
+++	spin_lock_irqsave(&random_ready_chain_lock, flags);
+++	ret = raw_notifier_chain_unregister(&random_ready_chain, nb);
+++	spin_unlock_irqrestore(&random_ready_chain_lock, flags);
+++	return ret;
+++}
+++EXPORT_SYMBOL(unregister_random_ready_notifier);
++--- a/drivers/soc/qcom/early_random.c
+++++ b/drivers/soc/qcom/early_random.c
++@@ -12,6 +12,7 @@
++ #include <linux/kernel.h>
++ #include <linux/hw_random.h>
+++#include <linux/random.h>
++ #include <linux/io.h>
+diff --git a/devices/fossil-hoki/kernel/stable/vendor-298-299.patch b/devices/fossil-hoki/kernel/stable/vendor-298-299.patch
+new file mode 100644
+index 00000000..dcc4eb4c
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/vendor-298-299.patch
+@@ -0,0 +1,15 @@
++diff --git a/include/linux/const.h b/include/linux/const.h
++new file mode 100644
++index 0000000000000..7b55a55f59112
++--- /dev/null
+++++ b/include/linux/const.h
++@@ -0,0 +1,9 @@
+++#ifndef _LINUX_CONST_H
+++#define _LINUX_CONST_H
+++
+++#include <uapi/linux/const.h>
+++
+++#define UL(x)		(_UL(x))
+++#define ULL(x)		(_ULL(x))
+++
+++#endif /* _LINUX_CONST_H */
+-- 
+2.56.0
+
