@@ -2803,8 +2803,8 @@ index 00000000..d12414ad
 +  nfcdBinderPluginSrc = fetchFromGitHub {
 +    owner = "mer-hybris";
 +    repo = "nfcd-binder-plugin";
-+    rev = "4e9210573118eee93359bdd2653488de4a36649f";
-+    hash = "sha256-euBgshG41V0LxqZuVobyYyONn+A+rLT/S/QwcmUpAaQ=";
++    rev = "ee270922a39d3730226936d7e78896dd508400be";
++    hash = "sha256-t0dLVeEeFfvpaR1QuEW5KdWFEHPWrVP2VnFNtXg1r7w=";
 +  };
 +in
 +stdenv.mkDerivation {
