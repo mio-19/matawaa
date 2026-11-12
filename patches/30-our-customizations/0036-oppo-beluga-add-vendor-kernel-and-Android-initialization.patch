@@ -1,15 +1,17 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 54a815803dc8f353a5fb5e736660eec56b87e908 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Mon, 9 Nov 2026 10:55:56 +1100
 Subject: [PATCH] oppo-beluga: add vendor kernel and Android initialization
 
 ---
- devices/oppo-beluga/android-init.nix   | 172 +++++++++++++++++++
- devices/oppo-beluga/default.nix        | 222 +++++++++++++++++++++++++
- devices/oppo-beluga/kernel/default.nix | 112 +++++++++++++
- 3 files changed, 506 insertions(+)
+ devices/oppo-beluga/android-init.nix          | 172 ++++++++
+ devices/oppo-beluga/default.nix               | 222 +++++++++++
+ ...arm-cputype-add-missing-CPU-part-IDs.patch |  12 +
+ devices/oppo-beluga/kernel/default.nix        | 371 ++++++++++++++++++
+ 4 files changed, 777 insertions(+)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/default.nix
+ create mode 100644 devices/oppo-beluga/kernel/0001-arm-cputype-add-missing-CPU-part-IDs.patch
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
@@ -418,18 +420,39 @@ index 00000000..9d194e2e
 +    };
 +  };
 +}
+diff --git a/devices/oppo-beluga/kernel/0001-arm-cputype-add-missing-CPU-part-IDs.patch b/devices/oppo-beluga/kernel/0001-arm-cputype-add-missing-CPU-part-IDs.patch
+new file mode 100644
+index 00000000..7aeec443
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/0001-arm-cputype-add-missing-CPU-part-IDs.patch
+@@ -0,0 +1,12 @@
++--- a/arch/arm/include/asm/cputype.h
+++++ b/arch/arm/include/asm/cputype.h
++@@ -78,6 +78,11 @@
++ #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
+++#define ARM_CPU_PART_CORTEX_A53		0x4100d030
+++#define ARM_CPU_PART_CORTEX_A57		0x4100d070
+++#define ARM_CPU_PART_CORTEX_A72		0x4100d080
+++#define ARM_CPU_PART_CORTEX_A75		0x4100d0a0
+++#define ARM_CPU_PART_BRAHMA_B15		0x420000f0
++ #define ARM_CPU_PART_CORTEX_A73		0x4100d090
++ #define ARM_CPU_PART_KRYO2XX_GOLD		0x51008000
++ #define ARM_CPU_PART_MASK		0xff00fff0
 diff --git a/devices/oppo-beluga/kernel/default.nix b/devices/oppo-beluga/kernel/default.nix
 new file mode 100644
-index 00000000..a814af0c
+index 00000000..6e7cf7a0
 --- /dev/null
 +++ b/devices/oppo-beluga/kernel/default.nix
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,371 @@
 +{
++  lib,
 +  mobile-nixos,
 +  stdenv,
++  stdenvNoCC,
++  cacert,
 +  cpio,
++  curl,
 +  fetchgit,
-+  fetchpatch,
 +  fetchurl,
 +  runCommand,
 +  xz,
@@ -473,26 +496,84 @@ index 00000000..a814af0c
 +      inherit hash;
 +    };
 +
-+  # Incremental 4.9.112 -> 4.9.113 stable patch from kernel.org
-+  stablePatch113 = fetchpatch {
-+    name = "linux-4.9.112-113.patch";
-+    url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.9.112-113.xz";
-+    hash = "sha256-2ox6sDB/JEkVZ/9vRvA9ISCkJ/58jPNy1q5Y7Bxvyf4=";
-+    decode = "xz -d";
-+    nativeBuildInputs = [ xz ];
-+    excludes = [ "Makefile" ];
-+  };
++  # kernel.org's .xz increments are not byte-reproducible: re-encoding with a
++  # newer xz changes the compressed file. Pin the decompressed patch text
++  # instead, so the hash follows only what the kernel actually gets.
++  fetchXzPatch =
++    {
++      name,
++      url,
++      hash,
++    }:
++    stdenvNoCC.mkDerivation {
++      inherit name;
++      nativeBuildInputs = [
++        curl
++        xz
++      ];
++      outputHashAlgo = "sha256";
++      outputHashMode = "flat";
++      outputHash = hash;
++      SSL_CERT_FILE = "${cacert}/etc/ssl/certs/ca-bundle.crt";
++      buildCommand = ''
++        curl --fail --location --silent --show-error \
++          --retry 8 --retry-all-errors --retry-delay 3 ${url} | xz -dc > "$out"
++      '';
++    };
++
++  # One stable increment. The Makefile hunk is dropped because the version is
++  # set once in postPatch, and this kernel is 32-bit ARM only, so changes for
++  # other architectures are dropped as well.
++  stableIncr =
++    lo: hi: hash: excludes:
++    let
++      name = "linux-4.9.${lo}-${hi}.patch";
++      adaptation = ./stable/${name}.patch;
++      hasAdaptation = builtins.pathExists adaptation;
++      otherArches = "arch/(alpha|arc|arm64|avr32|blackfin|c6x|cris|frv|h8300|hexagon|ia64|m32r|m68k|metag|microblaze|mips|mn10300|nios2|openrisc|parisc|powerpc|s390|score|sh|sparc|tile|um|unicore32|x86|xtensa)/.*";
++      droppedFiles = lib.concatStringsSep "|" (
++        [
++          "Makefile"
++          otherArches
++        ]
++        ++ map lib.escapeRegex excludes
++      );
++    in
++    runCommand name
++      (
++        {
++          nativeBuildInputs = [ xz ];
++          patchText = fetchXzPatch {
++            inherit name hash;
++            url = "https://cdn.kernel.org/pub/linux/kernel/v4.x/incr/patch-4.9.${lo}-${hi}.xz";
++          };
++          inherit droppedFiles;
++        }
++        // lib.optionalAttrs hasAdaptation { inherit adaptation; }
++      )
++      ''
++        awk -v dropped="$droppedFiles" '
++          /^diff --git / { skip = ($3 ~ "^a/(" dropped ")$") }
++          !skip { print }
++        ' "$patchText" > "${name}"
++        ${lib.optionalString hasAdaptation ''
++          patch -p1 --batch -i "$adaptation"
++        ''}
++        cp "${name}" "$out"
++      '';
++
++  stablePatch113 = stableIncr "112" "113" "sha256-mszs8KHGW9sHfFDq66P4GcIp5S7i/unp4bTU+KdtcvM=" [ ];
 +
 +  configfile = runCommand "oppo-beluga-defconfig" { inherit upstreamDefconfig; } ''
 +    cp "$upstreamDefconfig" "$out"
 +  '';
 +in
 +kernel-builder-gcc8 {
-+  version = "4.9.113";
++  version = "4.9.160";
 +  inherit configfile;
 +
 +  postPatch = ''
-+    sed -i 's/^SUBLEVEL = 112/SUBLEVEL = 113/' Makefile
++    sed -i 's/^SUBLEVEL = 112/SUBLEVEL = 160/' Makefile
 +  '';
 +
 +  src = fetchgit {
@@ -502,7 +583,6 @@ index 00000000..a814af0c
 +  };
 +
 +  patches = [
-+    stablePatch113
 +    (upstreamPatch "0001-scripts-dtc-Remove-redundant-YYLOC-global-declaratio.patch" "sha256-mrpPIBWIT7Ex97F4skQ9h8YOhTzLJotQGnwY/dPK72g=")
 +    (upstreamPatch "0002-dts-Add-oppo-device-trees.patch" "sha256-P/zal1/f0P9h27mpMaEbwDQ0JbAkbncPVl0ORnGaho0=")
 +    (upstreamPatch "0003-cyttsp5-Fix-compilation.patch" "sha256-FyYsC6oOXO5xfuCt6KyjZohgiPbITwcQz5y0V0sc39Q=")
@@ -520,6 +600,205 @@ index 00000000..a814af0c
 +    (upstreamPatch "0015-touchscreen-cyttsp5-Add-delay-for-wakeup-report.patch" "sha256-AZZKWGL8eb+YlKKkXwsnD1OgHs5GH9DBs8+ODCmDo5M=")
 +    (upstreamPatch "0016-dts-msm8909w-Enable-more-GPU-clock-frequencies.patch" "sha256-u0ciKzWPboBvdqPol9y9dEE/BT05zOnpD2Sj4Gg2YPc=")
 +    (upstreamPatch "0017-linux3.4-ARM-8933-1-replace-Sun-Solaris-style-flag-on-section.patch" "sha256-nEJRKSB9cJydzoxVg+cjtsxm5qTy3rVrGCLzr4iHML0=")
++    # Cortex-A53/A57/A72/A75 and Brahma B15 part IDs that 4.9.139 starts to
++    # reference; this vendor tree predates them.
++    ./0001-arm-cputype-add-missing-CPU-part-IDs.patch
++  ]
++  # Stable increments run after the vendor fixups, the order the vendor tree
++  # takes them in; each entry lists the files this tree cannot accept. 4.9.160
++  # is where that mechanical pass stops: past it the vendor tree still carries
++  # the pre-4.9.139 sched irqtime accounting, the two-argument ext4_iget, the
++  # old f2fs inode flags and the old genetlink family ops, so later increments
++  # only apply by hand-porting whole subsystems. Upstream stable is 4.9.337.
++  ++ [
++    (stableIncr "113" "114" "sha256-qnljwfgrKu0gOyiAJ/aqfHAotBQo+nKG9ccRSjAZgeg=" [
++      "include/linux/compiler-gcc.h"
++    ])
++    (stableIncr "114" "115" "sha256-Y5lfpV7uHcrq3EOLL6cItoGrsoU0ZJCOH4N8NmDTlFE=" [
++      "sound/core/rawmidi.c"
++    ])
++    (stableIncr "115" "116" "sha256-CJ/4+uyShdejV5zXvfdKwuGus7/x4Ivg/mp3Ei3E+vA=" [
++      "include/linux/skbuff.h"
++      "include/net/tcp.h"
++      "net/ipv4/tcp_input.c"
++    ])
++    (stableIncr "116" "117" "sha256-rDQFNeOzZXhD1gqoyL1yRe7edf1JwuIrSNCxHIT1QfU=" [
++      "drivers/media/media-device.c"
++      "drivers/scsi/ufs/ufshcd.c"
++      "fs/crypto/crypto.c"
++      "fs/ext4/inode.c"
++      "fs/f2fs/file.c"
++      "fs/f2fs/gc.c"
++      "fs/f2fs/segment.c"
++      "fs/f2fs/super.c"
++    ])
++    (stableIncr "117" "118" "sha256-ibwXAJAW9ksdE3hJLNuXcdAEHjQSYJ7qABpTFq8//cM=" [
++      "fs/squashfs/block.c"
++      "include/net/tcp.h"
++      "net/ipv4/tcp_input.c"
++      "net/socket.c"
++    ])
++    (stableIncr "118" "119" "sha256-yiw4WcNeWsyMa1+Ep/a9FGS8CEdMAp7kxJT1959KaNQ=" [ ])
++    (stableIncr "119" "120" "sha256-4D6eGSrpVmSgLtOgiydSP90TCkLVMjGqQbMcX2W5qp4=" [
++      "arch/Kconfig"
++      "include/linux/swapfile.h"
++      "kernel/softirq.c"
++    ])
++    (stableIncr "120" "121" "sha256-H7F9jD3e5dqJG9xO/6kCFxdpC8UznO8nASHnQX4/BUU=" [
++      "net/bluetooth/hidp/core.c"
++    ])
++    (stableIncr "122" "123" "sha256-scE9pNA5+GsXm/c6gRyO/GMv91C3dIBv3wWq/6P7gec=" [ ])
++    (stableIncr "123" "124" "sha256-AYQsEJ2y8QNqJ/Qu+nIyB/DD4H7dUY/7DMiW3IVzUvM=" [ ])
++    (stableIncr "124" "125" "sha256-P8sswp2iNVWYCVxTLwrg/WG7FSMSpMVtTpv/sdgqKOA=" [
++      "drivers/staging/android/ion/ion-ioctl.c"
++      "drivers/staging/android/ion/ion.c"
++      "drivers/staging/android/ion/ion_priv.h"
++      "fs/squashfs/file.c"
++      "fs/squashfs/file_cache.c"
++      "fs/squashfs/file_direct.c"
++      "fs/squashfs/squashfs.h"
++      "kernel/sysctl.c"
++    ])
++    (stableIncr "125" "126" "sha256-mvM7ScslnrfQ8es71uNwRamyx/j/ucPWbY12dLSyOjI=" [ ])
++    (stableIncr "126" "127" "sha256-gZXq4qMb9dAv3AWSqRSWJ8hwaxDy1RgbfDe3HptHtzA=" [
++      "lib/debugobjects.c"
++    ])
++    (stableIncr "127" "128" "sha256-50WbzJdwHfGMlTCjyBM4oiHjznEasQSh3nBbgFAaRKc=" [
++      "block/blk-cgroup.c"
++      "block/cfq-iosched.c"
++      "drivers/infiniband/sw/rxe/rxe_resp.c"
++      "drivers/staging/rts5208/rtsx_scsi.c"
++      "fs/f2fs/file.c"
++      "fs/f2fs/gc.c"
++      "fs/f2fs/inline.c"
++      "fs/f2fs/node.c"
++      "fs/f2fs/segment.h"
++      "fs/f2fs/super.c"
++      "include/linux/mm_types.h"
++      "kernel/fork.c"
++      "kernel/locking/osq_lock.c"
++      "kernel/locking/rwsem-xadd.c"
++      "kernel/time/timer.c"
++      "mm/vmscan.c"
++      "net/wireless/nl80211.c"
++      "security/selinux/avc.c"
++    ])
++    (stableIncr "128" "129" "sha256-3MRljdcvPvj2jPD/DOkdTjtqi1cTXF8Octx4Wh6RvVg=" [ ])
++    (stableIncr "129" "130" "sha256-QQFYvgqVMocftpvOscDmwxHohboRcC7xsokOK0rL6r0=" [
++      "drivers/hid/hid-core.c"
++      "net/nfc/hci/core.c"
++    ])
++    (stableIncr "130" "131" "sha256-GWLVQCDeArrfWkBoUwBoBmesVKEIpQeeIZCakZtV344=" [
++      "include/linux/arm-smccc.h"
++    ])
++    (stableIncr "131" "132" "sha256-m3azZD5TdcdYOm/aJzlbmJdTlwM7ht2VurQpAKuj+4g=" [
++      "drivers/usb/misc/yurex.c"
++      "net/wireless/nl80211.c"
++    ])
++    (stableIncr "132" "133" "sha256-U5vNdrhtEHps3MZt4DejMHbzaRjKwXQ8rlsEicU/M3o=" [
++      "drivers/base/power/main.c"
++      "fs/f2fs/checkpoint.c"
++      "kernel/cgroup.c"
++    ])
++    (stableIncr "133" "134" "sha256-+QRz1TFZB5lUhzvaZQ9f0wtuDzan1sGxs9z+mwS4OzU=" [
++      "net/netlabel/netlabel_unlabeled.c"
++    ])
++    (stableIncr "134" "135" "sha256-mKLKyDJ1eckryNZn08DLR6qv+XkgKYJbX77K6PZVtfI=" [
++      "kernel/sched/cputime.c"
++      "kernel/sched/sched.h"
++    ])
++    (stableIncr "135" "136" "sha256-cQfI/Os9LCCI2S6l0E7WqU/zGwn5WMlLnbr7w92IHqI=" [
++      "drivers/gpu/drm/msm/msm_gem.c"
++      "drivers/usb/host/xhci-hub.c"
++      "fs/f2fs/dir.c"
++    ])
++    (stableIncr "136" "137" "sha256-+ET+J27CMb0NzBX1OS/hxOJt29Xdk6MGNCeoNuIjOYA=" [
++      "drivers/pinctrl/qcom/pinctrl-spmi-mpp.c"
++    ])
++    (stableIncr "137" "138" "sha256-JA9K2ucGocabn/2e7MNeU3rISV86J3ljFzqg4LAOFIg=" [ ])
++    (stableIncr "138" "139" "sha256-n2IWWXTOjsTRYdcC4dI14CwiSxHgGHRfvDufVDfvABY=" [
++      ".gitignore"
++      "Kbuild"
++      "arch/arm/include/asm/cputype.h"
++      "drivers/firmware/efi/libstub/Makefile"
++      "drivers/firmware/efi/libstub/arm64-stub.c"
++      "drivers/xen/Makefile"
++      "include/linux/kbuild.h"
++      "include/linux/module.h"
++      "net/ipv6/route.c"
++      "scripts/Kbuild.include"
++      "scripts/Makefile.build"
++      "scripts/Makefile.extrawarn"
++      "scripts/Makefile.host"
++      "scripts/Makefile.lib"
++      "scripts/mod/Makefile"
++    ])
++    (stableIncr "139" "140" "sha256-iWglylmTbAkzaKG7Cx1V9xLoGbHYI+iFwqqrxq7C+lE=" [ ])
++    (stableIncr "140" "141" "sha256-aj7R8X69VmDkRxiJjjFRmkyN9EhK9HRRzQub5gBjlks=" [ ])
++    (stableIncr "141" "142" "sha256-RqFaEnbviu4iv1AK3I1Bl4QBdmif1WxrYxqoxTCq8hk=" [
++      "drivers/scsi/ufs/ufs.h"
++      "drivers/scsi/ufs/ufshcd-pci.c"
++      "drivers/scsi/ufs/ufshcd-pltfrm.c"
++      "drivers/scsi/ufs/ufshcd.c"
++      "kernel/debug/kdb/kdb_io.c"
++      "kernel/sched/core.c"
++    ])
++    (stableIncr "142" "143" "sha256-dMlNgsJXFDbZQX3sozfg1YExeSlwkAw6uRdsZ2eCE1Q=" [
++      "drivers/firmware/efi/libstub/Makefile"
++      "drivers/usb/dwc3/gadget.c"
++    ])
++    (stableIncr "143" "144" "sha256-C4B4ssRD6iOQCMAkSiDVGDVq4RtHz+M6W/8bnCLHlqo=" [
++      "drivers/android/binder.c"
++      "drivers/net/wireless/ath/wil6210/wmi.c"
++      "fs/f2fs/checkpoint.c"
++      "fs/f2fs/data.c"
++      "fs/f2fs/f2fs.h"
++      "fs/f2fs/file.c"
++      "fs/f2fs/inode.c"
++      "fs/f2fs/node.c"
++      "fs/f2fs/recovery.c"
++      "fs/f2fs/segment.c"
++      "fs/f2fs/segment.h"
++      "fs/f2fs/super.c"
++    ])
++    (stableIncr "144" "145" "sha256-rGx9kx8oZwDKkYH7Vz1UQMVVw8K3wdVR1inmCANl2Xw=" [ ])
++    (stableIncr "145" "146" "sha256-4lE/GPTNA/5lfeLNE7qmZBksSArStrIWUcqnLVU3aQg=" [ ])
++    (stableIncr "146" "147" "sha256-PR5RIUjbbIUAzNHADoFsymP//GQwm4Zzcr+yxLhMULs=" [ ])
++    (stableIncr "147" "148" "sha256-S3A5/n0yEg/QwpwvKWZgF1xlIEteFrFmn7Q+mtEqO30=" [
++      "drivers/mmc/core/mmc.c"
++    ])
++    (stableIncr "148" "149" "sha256-Yzby3zXB1ROnAPpARo64Crcj6gGeTmReyI8Ny/frJMg=" [
++      "fs/f2fs/super.c"
++    ])
++    (stableIncr "149" "150" "sha256-994s7ZGBCKAMN/SofwMfmTHjIJPPduBtmsWE0V2lz8A=" [ ])
++    (stableIncr "150" "151" "sha256-5hyJT1s0dT4jdOlKv+5wJDGhExhlbWna++rB9rKVjiI=" [ ])
++    (stableIncr "151" "152" "sha256-j976yfHdTt0hUzvZSAjoYFQ3t8NDa9OslR6jIJq5WOg=" [
++      "drivers/scsi/scsi_pm.c"
++      "fs/f2fs/recovery.c"
++    ])
++    (stableIncr "152" "153" "sha256-9tP+Ez3chcnxN+gtX6E24E1qOmMyDB5S/+2JNcE4fPA=" [ ])
++    (stableIncr "153" "154" "sha256-5sq98eB+Agl3MqLCib3aGUgtakG32bz8ZhcPq/MJ+u8=" [
++      "fs/f2fs/node.c"
++      "include/linux/overflow.h"
++    ])
++    (stableIncr "154" "155" "sha256-8SEelYnzUCEDeAX0kY1vS74ZX2ovL5f/fwMhpSXaslQ=" [ ])
++    (stableIncr "155" "156" "sha256-nny4kGfZMytZ0nnyKFP2nIBiYxjDkHghL+QxIrQ1/Vw=" [
++      "drivers/iommu/arm-smmu.c"
++      "drivers/thermal/thermal_core.c"
++      "fs/f2fs/acl.c"
++      "fs/f2fs/f2fs.h"
++      "fs/f2fs/file.c"
++      "fs/f2fs/shrinker.c"
++      "include/linux/sched.h"
++      "mm/oom_kill.c"
++    ])
++    (stableIncr "156" "157" "sha256-Hkdftu6cXXkTi1rIXjlBo72xwPoyqwPwu/AC0TSbRQg=" [ ])
++    (stableIncr "157" "158" "sha256-BAqZbu1X/SIbezLIiobyp39/4Pv6/2pVcMcwEGjTaOk=" [ ])
++    (stableIncr "158" "159" "sha256-Lc05Le6ok9jdOuZ8vL9uLsj+VikchTGczC19rpLmx5w=" [
++      "arch/arm/kernel/setup.c"
++      "mm/memory.c"
++    ])
++    (stableIncr "159" "160" "sha256-bsX5lotgkgJGVIGW+HWUpwuf8ZeY6P7h/uDfGuBfntc=" [ ])
 +  ];
 +
 +  isModular = false;
@@ -536,3 +815,6 @@ index 00000000..a814af0c
 +    cp -f "$buildRoot/arch/arm/boot/zImage-dtb" "$out/zImage"
 +  '';
 +}
+-- 
+2.56.0
+
