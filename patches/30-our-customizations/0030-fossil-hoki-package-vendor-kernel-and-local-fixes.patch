@@ -1,40 +1,44 @@
-From b35435c172e3cca21c90b552b441c75fe784b752 Mon Sep 17 00:00:00 2001
+From 830a0f16b4cd661950f86638e7c4340c76d5d96f Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
-Date: Thu, 12 Nov 2026 17:08:39 +1100
+Date: Fri, 13 Nov 2026 00:05:36 +1100
 Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
 
 ---
  ...d-pm_qos_remove_request-with-active-.patch |  40 +
  .../fossil-hoki/kernel/90_dtbs-install.patch  |  29 +
- devices/fossil-hoki/kernel/default.nix        | 708 ++++++++++++++++++
- devices/fossil-hoki/kernel/defconfig.patch    |  48 ++
+ devices/fossil-hoki/kernel/default.nix        | 844 ++++++++++++++++++
+ devices/fossil-hoki/kernel/defconfig.patch    |  48 +
  .../stable/linux-4.14.206-207.patch.patch     |  30 +
  .../stable/linux-4.14.214-215.patch.patch     |  66 ++
- .../stable/linux-4.14.217-218.patch.patch     | 589 +++++++++++++++
+ .../stable/linux-4.14.217-218.patch.patch     | 589 ++++++++++++
  .../stable/linux-4.14.221-222.patch.patch     |  15 +
- .../stable/linux-4.14.223-224.patch.patch     |  48 ++
+ .../stable/linux-4.14.223-224.patch.patch     |  48 +
  .../stable/linux-4.14.224-225.patch.patch     |  20 +
  .../stable/linux-4.14.225-226.patch.patch     |  26 +
  .../stable/linux-4.14.226-227.patch.patch     |  11 +
  .../stable/linux-4.14.228-229.patch.patch     |  18 +
- .../stable/linux-4.14.235-236.patch.patch     |  44 ++
+ .../stable/linux-4.14.235-236.patch.patch     |  44 +
  .../stable/linux-4.14.236-237.patch.patch     |  37 +
  .../stable/linux-4.14.237-238.patch.patch     |  19 +
  .../stable/linux-4.14.238-239.patch.patch     |  18 +
- .../stable/linux-4.14.239-240.patch.patch     | 169 +++++
+ .../stable/linux-4.14.239-240.patch.patch     | 169 ++++
  .../stable/linux-4.14.240-241.patch.patch     |  24 +
  .../stable/linux-4.14.241-242.patch.patch     |  31 +
  .../stable/linux-4.14.244-245.patch.patch     |  21 +
  .../stable/linux-4.14.246-247.patch.patch     |  61 ++
  .../stable/linux-4.14.252-253.patch.patch     |  18 +
- .../stable/linux-4.14.256-257.patch.patch     |  45 ++
+ .../stable/linux-4.14.256-257.patch.patch     |  45 +
  .../stable/linux-4.14.258-259.patch.patch     |  27 +
  .../stable/linux-4.14.274-275.patch.patch     |  24 +
  .../stable/linux-4.14.277-278.patch.patch     |  22 +
  .../stable/linux-4.14.291-292.patch.patch     |  29 +
- .../stable/linux-4.14.295-296.patch.patch     |  45 ++
+ .../stable/linux-4.14.295-296.patch.patch     |  45 +
  .../stable/linux-4.14.304-305.patch.patch     |  33 +
  .../stable/linux-4.14.325-326.patch.patch     |  70 ++
+ .../stable/openela-4.14.336-337.patch.patch   |  13 +
+ .../stable/openela-4.14.340-341.patch.patch   |  29 +
+ .../stable/openela-4.14.343-344.patch.patch   |  31 +
+ .../stable/openela-4.14.355-356.patch.patch   | 183 ++++
  .../kernel/stable/vendor-235-236.patch        |  32 +
  .../kernel/stable/vendor-236-237.patch        |  13 +
  .../kernel/stable/vendor-237-238.patch        |  14 +
@@ -44,13 +48,13 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  .../kernel/stable/vendor-241-242.patch        |  26 +
  .../kernel/stable/vendor-244-245.patch        |  12 +
  .../kernel/stable/vendor-245-246.patch        |  34 +
- .../kernel/stable/vendor-246-247.patch        |  42 ++
+ .../kernel/stable/vendor-246-247.patch        |  42 +
  .../kernel/stable/vendor-249-250.patch        |  14 +
  .../kernel/stable/vendor-256-257.patch        |  64 ++
- .../kernel/stable/vendor-270-271.patch        | 232 ++++++
- .../kernel/stable/vendor-284-285.patch        | 233 ++++++
+ .../kernel/stable/vendor-270-271.patch        | 232 +++++
+ .../kernel/stable/vendor-284-285.patch        | 233 +++++
  .../kernel/stable/vendor-298-299.patch        |  15 +
- 46 files changed, 3219 insertions(+)
+ 50 files changed, 3611 insertions(+)
  create mode 100644 devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
  create mode 100644 devices/fossil-hoki/kernel/90_dtbs-install.patch
  create mode 100644 devices/fossil-hoki/kernel/default.nix
@@ -82,6 +86,10 @@ Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
  create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.295-296.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.304-305.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/linux-4.14.325-326.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/openela-4.14.336-337.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/openela-4.14.340-341.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/openela-4.14.343-344.patch.patch
+ create mode 100644 devices/fossil-hoki/kernel/stable/openela-4.14.355-356.patch.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/vendor-235-236.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/vendor-236-237.patch
  create mode 100644 devices/fossil-hoki/kernel/stable/vendor-237-238.patch
@@ -181,10 +189,10 @@ index 00000000..1cd6dc69
 + 	$(foreach DIR, $(DTSSUBDIR), $(Q)$(MAKE) $(build)=$(boot)/dts/$(DIR) MACHINE=$(MACHINE) dtbs)
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
-index 00000000..07ee8cd4
+index 00000000..d5a159d7
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/default.nix
-@@ -0,0 +1,708 @@
+@@ -0,0 +1,844 @@
 +{
 +  mobile-nixos,
 +  stdenv,
@@ -305,6 +313,47 @@ index 00000000..07ee8cd4
 +          /^diff --git / { skip = ($3 ~ "^a/(" dropped ")$") }
 +          !skip { print }
 +        ' raw.patch > "${name}"
++        ${lib.optionalString hasAdaptation ''
++          patch -p1 --batch -i "$adaptation"
++        ''}
++        cp "${name}" "$out"
++      '';
++
++  # OpenELA kernel-lts 4.14.336 -> 4.14.357, fetched from the GitHub compare
++  # endpoint instead of vendoring the generated diffs. As above, the Makefile
++  # hunk (SUBLEVEL is set once in postPatch) and the .elts/ release metadata
++  # are stripped. GitHub renders the diff itself, so it is pinned by hash: if
++  # GitHub ever changes that rendering the fetch fails loudly rather than
++  # silently changing the kernel.
++  openelaIncr =
++    lo: hi: hash: excludes:
++    let
++      name = "openela-4.14.${lo}-${hi}.patch";
++      adaptation = ./stable/${name}.patch;
++      hasAdaptation = builtins.pathExists adaptation;
++      droppedFiles = lib.concatStringsSep "|" (map lib.escapeRegex excludes);
++    in
++    runCommand name
++      (
++        {
++          src = fetchurl {
++            url = "https://github.com/openela/kernel-lts/compare/v4.14.${lo}-openela...v4.14.${hi}-openela.diff";
++            inherit hash;
++          };
++          inherit droppedFiles;
++        }
++        // lib.optionalAttrs hasAdaptation { inherit adaptation; }
++      )
++      ''
++        # One section per file starts at "diff --git"; drop the excluded ones.
++        awk -v dropped="$droppedFiles" '
++          /^diff --git / {
++            path = $3
++            sub(/^a\//, "", path)
++            skip = (path == "Makefile") || (path ~ /^\.elts\//) || (path ~ "^(" dropped ")$")
++          }
++          !skip { print }
++        ' "$src" > "${name}"
 +        ${lib.optionalString hasAdaptation ''
 +          patch -p1 --batch -i "$adaptation"
 +        ''}
@@ -454,16 +503,16 @@ index 00000000..07ee8cd4
 +      "kernel/sched/cpufreq_schedutil.c"
 +    ])
 +    (stableIncr "249-250" "sha256-AEBv3KamCUUmdtaE+ZyJmQhh8OhoG/MycJNgYqHOdbw=" [ ])
-+    (stableIncr "250-251" "sha256-YiSRItRyPpd9ESE2NWAcnERjPAVGEH7uFxwMPvLC2Ow=" [ ])
-+    (stableIncr "251-252" "sha256-YBBJ63If92f0xz/n3eGqDIJaLbKVUErrKlrzdUP44Jk=" [
++    (stableIncr "250-251" "sha256-Sg1UeDfh5DxHuRpC0SV7DszSZ6b6oJDU+2surjlOy8A=" [ ])
++    (stableIncr "251-252" "sha256-8NRF+ZWKmIzM363V+mEwGqCsd2+tztp5TLesheyQYkc=" [
 +      "drivers/usb/host/xhci-ring.c"
 +    ])
-+    (stableIncr "252-253" "sha256-KjVCZACtV6NQ5sI7IqhWxG/Xa+n9lXlBk870Awj8bTA=" [ ])
-+    (stableIncr "253-254" "sha256-AhON15NQNSB+ZGsqNnNycUtYPvslaCy3RKFUvsnrqzE=" [
++    (stableIncr "252-253" "sha256-oEYrQTWni5DbQOHj0abj6tJyKB7kXlLQ2fIGCtzB/EY=" [ ])
++    (stableIncr "253-254" "sha256-wBB/to0snlUg8xQyy3kT83V6mTrcjke99hUojTmcWxw=" [
 +      "arch/arm/Makefile"
 +    ])
-+    (stableIncr "254-255" "sha256-DAwaxjzbN1/y+abw0HBxI+EgBFVaUQxWconvmZqYMGo=" [ ])
-+    (stableIncr "255-256" "sha256-Wv5zrdEZCazaO4JP4d49NQPl8c6hRjfOZdStjl3xSK8=" [
++    (stableIncr "254-255" "sha256-jxCc7oUiTDVMTbrX0XfQ8anf1x7X9draBscEwECwQcg=" [ ])
++    (stableIncr "255-256" "sha256-tg8+/wcOCQgHlupXvsfCK5RQmelWBSSPyBFmya2r9Vk=" [
 +      "drivers/android/binder.c"
 +      "drivers/gpu/drm/msm/msm_gem.c"
 +      "drivers/net/wireless/ath/ath10k/mac.c"
@@ -477,69 +526,69 @@ index 00000000..07ee8cd4
 +      "security/selinux/hooks.c"
 +      "security/smack/smackfs.c"
 +    ])
-+    (stableIncr "256-257" "sha256-yc0xVV9oCoEDpWYRGZxpcJk3AcdrFAJZNykEBiFiNUU=" [
++    (stableIncr "256-257" "sha256-rDw24+vbRHDW+EZm1UxCyBL8EH2bMh9sG1FNfY/UsPA=" [
 +      "arch/parisc/install.sh"
 +      "drivers/usb/host/xhci-ring.c"
 +      "fs/file_table.c"
 +    ])
-+    (stableIncr "257-258" "sha256-F1X51Xp7b1f89kjImlolIDQBikRYnqAO91LnjYGFgDM=" [
++    (stableIncr "257-258" "sha256-0JAzCsBgbpYjs+9tZx8/L/TxB95PkTdQGSEpnulktM4=" [
 +      "drivers/usb/gadget/composite.c"
 +    ])
-+    (stableIncr "258-259" "sha256-Sh4fkCY4723mVtQA4S+KBv8GquuUk/lj3a10n3FVBzQ=" [
++    (stableIncr "258-259" "sha256-rAn5q+d3lGFaUM31EC1lxM4K3m2LPSh+fX2gNuSmqKI=" [
 +      "arch/Kconfig"
 +      "drivers/usb/gadget/composite.c"
 +    ])
-+    (stableIncr "259-260" "sha256-SYrTB0Uc4egFR+QyUoIS+O+oYN8U6VPuyTNxQy3cQ0w=" [
++    (stableIncr "259-260" "sha256-vuHyEcfm4QbgNmpGewiR6uVHrKCy6x//nbt4Q3Qxve8=" [
 +      "drivers/usb/gadget/function/u_ether.c"
 +    ])
-+    (stableIncr "260-261" "sha256-sx58U8gJZifC+OHyqnVZIcUSpHFgXGwY+SQFW5u1rxI=" [
++    (stableIncr "260-261" "sha256-gNuOHInS3g7B9hRxjtoLUv91HD7KHmlZ7IQ71ObUFbc=" [
 +      "drivers/android/binder_alloc.c"
 +    ])
-+    (stableIncr "261-262" "sha256-bYZ8XiGObYXPbkjESkfHNlbyYEVXizOEMiPG0m4HfSM=" [ ])
-+    (stableIncr "262-263" "sha256-mP8/dDBLX29st7biq9h9Ty/V+p3tr0+rz9G0LcqEGRk=" [
++    (stableIncr "261-262" "sha256-fQGfUI1+7m5iw+LsXAP1VnCRlz7eHxgfY3zbi8ZWs7g=" [ ])
++    (stableIncr "262-263" "sha256-HSUkwz5gRxWwZ8O1wrlLu3e1xnEL34sVs+7HbVtVbD8=" [
 +      "drivers/char/random.c"
 +      "drivers/media/dvb-core/dmxdev.c"
 +      "drivers/mmc/core/sdio.c"
 +      "drivers/usb/gadget/function/f_fs.c"
 +      "sound/core/pcm.c"
 +    ])
-+    (stableIncr "263-264" "sha256-8RybeHvn1qDYSc7Pt1CN8YudGMXuA8Fk9+QrGwpPUOo=" [ ])
-+    (stableIncr "264-265" "sha256-PwSCyGjrcRiA3FzwKVwlmPmFS1JZ0wtgIA8Oo5eoz9s=" [
++    (stableIncr "263-264" "sha256-9P257RBPmv3ji8Lyk2O9+llq6DEAdStG2vdb/0saCkg=" [ ])
++    (stableIncr "264-265" "sha256-dON3e9wEszetP5hsGYbb9qQPkb3sCslCMOqYK8LJyr4=" [
 +      "kernel/power/wakelock.c"
 +    ])
-+    (stableIncr "265-266" "sha256-mlLTyfYrexx4fZFOYy8pw4JjvIVgb74bldhL50nc/aA=" [ ])
-+    (stableIncr "266-267" "sha256-DVMaUjjK/ZxLemcvLCPgggiUe5djPn2HzBTOABKE2NY=" [
++    (stableIncr "265-266" "sha256-9/lXkSmDh3M4dOXzwhHkTBxuNkz63h+IcVClUT2VwUc=" [ ])
++    (stableIncr "266-267" "sha256-Z+J3iIvuKo+0BGK1/QgZOyIHBT6iTxMXg3ZNUD8pU6E=" [
 +      "drivers/usb/dwc3/gadget.c"
 +      "drivers/usb/gadget/composite.c"
 +      "drivers/usb/gadget/function/f_fs.c"
 +      "init/Kconfig"
 +    ])
-+    (stableIncr "267-268" "sha256-r5hz3igv7NylxGuvmDi9ex1L7loMErXKa0irpMVgwXQ=" [ ])
-+    (stableIncr "268-269" "sha256-OHqwBapq5ViPcB41UaJtL7PIqBZUE7cC7sRO49VkCtE=" [
++    (stableIncr "267-268" "sha256-EzgsOMrNew3vZc4PQunDLJpZ14BWr3QK4ccaw4x8HaY=" [ ])
++    (stableIncr "268-269" "sha256-8tRQSDG/06M87V4BRuE8TnTnZniQy8GAFB0qjNTPuQE=" [
 +      "drivers/usb/dwc3/gadget.c"
 +      "drivers/usb/gadget/function/rndis.c"
 +      "drivers/usb/gadget/function/rndis.h"
 +    ])
-+    (stableIncr "269-270" "sha256-JNMNeF+Ft5KNte98z4ktEqBMVjuaBIA+HogV2UZz8WU=" [
++    (stableIncr "269-270" "sha256-b6uaH3iIWZzDtA88h2JpSuTr/ZZbNSDQcY2H/JtXmng=" [
 +      "net/ipv6/ip6_output.c"
 +    ])
-+    (stableIncr "270-271" "sha256-d5LJXmpy2EKj9IW7fuur3jZG9WsUVFCL6X7S4yptBy4=" [
++    (stableIncr "270-271" "sha256-5u3fbqSL47CfFJ7MlSng4nLnP16yl0hfqj2V9xQUnUA=" [
 +      "arch/arm/include/asm/spectre.h"
 +      "arch/arm/kernel/spectre.c"
 +      "arch/arm/kernel/traps.c"
 +    ])
-+    (stableIncr "271-272" "sha256-O0l7opPUE/glnc5qhuthF1TNDQbD7S+l2QEpUXl/26M=" [
++    (stableIncr "271-272" "sha256-PaQhPI55LeW4EloxLzY0gsbXjbN5f+Oa7UfvzE+P0Pg=" [
 +      "arch/arm/include/asm/spectre.h"
 +    ])
-+    (stableIncr "272-273" "sha256-2tPgRS+RpgIXR0k3aE6kd8ap6d+gQ0J7wWC0v0r5K5g=" [ ])
-+    (stableIncr "273-274" "sha256-p0tFbMY+rTmOd7WrFI0b6Rq4VfDWlVSn+9VhYFGlXLY=" [
++    (stableIncr "272-273" "sha256-7SEbsZokIFGlx6o4EL+pMRql5e/NBXnNGqVk3HY9Rt8=" [ ])
++    (stableIncr "273-274" "sha256-TACBMeICNskp1OK9wZIP4TpR4cMJKUv/hZ6zl/JdCk8=" [
 +      "drivers/nfc/st21nfca/se.c"
 +      "include/net/sock.h"
 +      "net/ipv6/ip6_output.c"
 +      "include/net/esp.h"
 +      "net/core/sock.c"
 +    ])
-+    (stableIncr "274-275" "sha256-7cTWwloqrfbLIGWdmDfyQWv8eB947V2zPj91OZ9yDJU=" [
++    (stableIncr "274-275" "sha256-KMX0q474d5ZuuRr/k+xKVHfs4vSlj8u6f5MuZmflc0U=" [
 +      "Documentation/arm64/silicon-errata.txt"
 +      "arch/arm64/Kconfig"
 +      "arch/arm64/include/asm/cpucaps.h"
@@ -547,7 +596,7 @@ index 00000000..07ee8cd4
 +      "arch/arm64/include/asm/vectors.h"
 +      "arch/arm64/kernel/cpu_errata.c"
 +    ])
-+    (stableIncr "275-276" "sha256-VhdqUydrC1ibu/QoOuJyT5jkFErrQavYc0Ndre5HCjI=" [
++    (stableIncr "275-276" "sha256-mquGVY5FHLJ1oy4kFigATO9NOuRRi/pPI6s/DAQuy68=" [
 +      "drivers/clk/qcom/clk-rcg2.c"
 +      "drivers/mmc/core/host.c"
 +      "drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c"
@@ -557,22 +606,22 @@ index 00000000..07ee8cd4
 +      "net/xfrm/xfrm_policy.c"
 +      "net/xfrm/xfrm_user.c"
 +    ])
-+    (stableIncr "276-277" "sha256-hm8LuD0tGrLVoOpCak4P/4NQ9h6z7C6QqZp7yjYosC4=" [ ])
-+    (stableIncr "277-278" "sha256-u1RYtBL0dOQ1e5rfryUJRpsP4Qkif6MY/iEDvirXJnM=" [
++    (stableIncr "276-277" "sha256-bk7fCTB3ts+aLIY2zK0QaL24bADdQL3LQckCprRxiYY=" [ ])
++    (stableIncr "277-278" "sha256-cFqYf+Thmuo0KsRvpIhQ/NE2oN1lAd1Lqx7N17jRmIo=" [
 +      "drivers/usb/core/quirks.c"
 +      "drivers/usb/host/xhci-ring.c"
 +    ])
-+    (stableIncr "278-279" "sha256-adgBFMHTl5GwI/Pn+yK7QpZi96J5GzcIsKWgoAApKeo=" [ ])
-+    (stableIncr "279-280" "sha256-Sg1UeDfh5DxHuRpC0SV7DszSZ6b6oJDU+2surjlOy8A=" [
++    (stableIncr "278-279" "sha256-IsqXfrOUYx3ZK0SED50wmLmHd3SAadylc2FQA6Spj4o=" [ ])
++    (stableIncr "279-280" "sha256-nkebvTEjqUImtK4orBbUwLV7fEasGwa4jgUsVw3JYJc=" [
 +      "include/linux/netdev_features.h"
 +    ])
-+    (stableIncr "280-281" "sha256-mz2hZEUp4sPIU/X/wf0tKgcObDVhbp/T0jmabViRO14=" [
++    (stableIncr "280-281" "sha256-wAh+SDrbu7R33WYhPN35/t2AI+jLyZDWcTHriQJaihM=" [
 +      "drivers/mmc/core/mmc_ops.c"
 +    ])
-+    (stableIncr "281-282" "sha256-nkebvTEjqUImtK4orBbUwLV7fEasGwa4jgUsVw3JYJc=" [
++    (stableIncr "281-282" "sha256-lGQ3QnW+o/+Iun8/bsbEu1jfuTuJYRWM1I0GWWfd4+s=" [
 +      "drivers/md/dm-verity-target.c"
 +    ])
-+    (stableIncr "282-283" "sha256-89xxgsZPDbzCroWSp0rMQpkZnw1piTtc4KjGftvrh60=" [
++    (stableIncr "282-283" "sha256-4HwRnprDtkxZJIjM8pyH4hGWXAaTwq6uMeyp79CmaVA=" [
 +      "drivers/extcon/extcon.c"
 +      "drivers/mailbox/mailbox.c"
 +      "drivers/nfc/st21nfca/se.c"
@@ -582,10 +631,10 @@ index 00000000..07ee8cd4
 +      "fs/fat/fatent.c"
 +      "include/linux/mailbox_controller.h"
 +    ])
-+    (stableIncr "283-284" "sha256-IoMJCNtkenu5vsCFoCRok8Jyb/Y3zRlBaAAEpa+pgEI=" [
++    (stableIncr "283-284" "sha256-TwvB4buMOn75Jkbe3tmYE1wuqpcTaQXES5+v31TWXUs=" [
 +      "Documentation/admin-guide/hw-vuln/processor_mmio_stale_data.rst"
 +    ])
-+    (stableIncr "284-285" "sha256-5Iws9aUlVI6QoyE15ymdGnXCsghA63EVyxZA5WXnKkI=" [
++    (stableIncr "284-285" "sha256-ZvW0OirGGN78FbSURkJvatqXi0x/J6GIxhC+tqjH5gQ=" [
 +      "crypto/chacha20_generic.c"
 +      "drivers/char/Kconfig"
 +      "drivers/char/random.c"
@@ -605,43 +654,43 @@ index 00000000..07ee8cd4
 +      "include/trace/events/random.h"
 +      "lib/Makefile"
 +    ])
-+    (stableIncr "285-286" "sha256-NQjzr5D9zChJU01JcJ7Te5nW75nehP/r1Pw9pQwVNEg=" [
++    (stableIncr "285-286" "sha256-8EvXBkS9yJzFqfsuTAVTV8Htc60cmr9KnVfY4F5E+Ik=" [
 +      "drivers/char/random.c"
 +      "drivers/of/fdt.c"
 +    ])
-+    (stableIncr "286-287" "sha256-3FQ/eCP7C0SrBOkaG+8EvqqV/r9SptFMV+bfAVKKZUE=" [ ])
-+    (stableIncr "287-288" "sha256-k8uOSBMINDeT8gOl7/Wt7wW10LmiCwoX1FCk8qOLJS8=" [
++    (stableIncr "286-287" "sha256-CiNNd/9noQ8Tzd+ZeHfFtj2R/q3ptd7thmnkNU4BI0I=" [ ])
++    (stableIncr "287-288" "sha256-mHP2iGTFt7ErCZmzecxn3JpY9aZolLfZac75WRFZO+s=" [
 +      "include/net/esp.h"
 +    ])
-+    (stableIncr "288-289" "sha256-gMwUdgjN91JLWs+zQhX9S0D/I5QNQ8PtOpf8ufXYZkw=" [
++    (stableIncr "288-289" "sha256-y2XXxqcePIGybLwpmTqlJNaBOW08qRGiZF3gh7owau4=" [
 +      "drivers/usb/dwc3/gadget.c"
 +      "drivers/usb/host/xhci.c"
 +      "drivers/usb/host/xhci.h"
 +      "kernel/signal.c"
 +    ])
-+    (stableIncr "289-290" "sha256-lt/SnChkT1r1lO/JKD3jvkwfsDXT+0iVCBwhxDIP5ZE=" [
++    (stableIncr "289-290" "sha256-oqw8GYmigl6aPKYqQgt3eNnBALf1jqTmpHfc22qTVhY=" [
 +      "drivers/char/random.c"
 +    ])
-+    (stableIncr "290-291" "sha256-BtBkUDiN2ToFY7RWiR+3ZfVQr9Jr5TavDXaGChDGTXw=" [
++    (stableIncr "290-291" "sha256-v6T4J+lNRMJpr+XCt/JGkd5vdxz5p8GzM6Aq0nCEczA=" [
 +      "drivers/scsi/ufs/ufshcd-pltfrm.c"
 +      "fs/ext4/namei.c"
 +    ])
-+    (stableIncr "291-292" "sha256-CsIVhgGfwz1yJFOeClARq0At/oU7n9kfHiuKqLrI0/c=" [
++    (stableIncr "291-292" "sha256-a6LkwWC0se1hzcQpT+kC6SYpMUuz0DpXHJCXsolkYfk=" [
 +      "Documentation/admin-guide/hw-vuln/processor_mmio_stale_data.rst"
 +      "arch/arm64/include/asm/mmu.h"
 +      "arch/arm64/kernel/setup.c"
 +      "net/key/af_key.c"
 +    ])
-+    (stableIncr "292-293" "sha256-H64GmxL+Iz2ZiujEwxzkOFXPZdMMkODGW1akowtQbMo=" [
++    (stableIncr "292-293" "sha256-m0fQKsYOSAj9cqiVIKQm2+sJkWG+y2uFUUtmj4qCWSQ=" [
 +      "drivers/usb/dwc3/core.c"
 +      "drivers/usb/host/xhci.c"
 +      "net/netfilter/nf_conntrack_irc.c"
 +    ])
-+    (stableIncr "293-294" "sha256-sO59TXZuqQurfoPdTBnghtuhrnti6JUcyFZkcrl6PDY=" [ ])
-+    (stableIncr "294-295" "sha256-Vrxo0SpLwnRjlewXUib2431e7SOiBRzEp93NhBrXwhk=" [
++    (stableIncr "293-294" "sha256-3yFTUY3bGXvOuxTGtjiaoz0AViYfFjQvVsz1GEyeXZc=" [ ])
++    (stableIncr "294-295" "sha256-bF5/U8RNpRQWRm4Wo0N6xD2LWNb738UrWviLqZkZbYM=" [
 +      "net/netfilter/nf_conntrack_irc.c"
 +    ])
-+    (stableIncr "295-296" "sha256-pPiHngmjgpNtJa4rLzuf6fgl2dIa+quq4vSjtic7SLE=" [
++    (stableIncr "295-296" "sha256-4rwUl0dwf7LW/VMmTE/Q8Pem63s5dWGq5krZcZ2/4tY=" [
 +      "arch/powerpc/boot/dts/fsl/e500v1_power_isa.dtsi"
 +      "drivers/char/random.c"
 +      "drivers/rpmsg/qcom_glink_native.c"
@@ -649,34 +698,34 @@ index 00000000..07ee8cd4
 +      "fs/f2fs/extent_cache.c"
 +      "fs/nilfs2/segment.c"
 +    ])
-+    (stableIncr "296-297" "sha256-1cx/d0Kq29nGJHCxQyURU7GG0eBhdtiN3Jlg0+rhi9A=" [ ])
-+    (stableIncr "297-298" "sha256-Q/xH6AFmQVUwYeaCMpn4fsfnR7lOOKcgPRAUoVjlsLg=" [
++    (stableIncr "296-297" "sha256-b19NzKCS4yc5akPfo0yerTMk8nE/0SRw928YO0yQg8s=" [ ])
++    (stableIncr "297-298" "sha256-ju2TUF/UBdPxCNA89fVXe5LQ5XFy6EzdU9QgVqbwP70=" [
 +      "Documentation/arm64/silicon-errata.txt"
 +      "arch/arm64/include/asm/cpucaps.h"
 +      "arch/arm64/kernel/cpu_errata.c"
 +      "drivers/mmc/core/sdio_bus.c"
 +    ])
-+    (stableIncr "298-299" "sha256-oiSFliOjlXVAt3zOmfH9Og8ZId1buAmujuuiRv9ykzQ=" [
++    (stableIncr "298-299" "sha256-jwlPXrjlXItui5Chf7Z8lqtObfBw56riKp0brgrrkes=" [
 +      "include/linux/const.h"
 +      "include/net/udp.h"
 +    ])
-+    (stableIncr "299-300" "sha256-b6uaH3iIWZzDtA88h2JpSuTr/ZZbNSDQcY2H/JtXmng=" [ ])
-+    (stableIncr "300-301" "sha256-x0DMF2Vci9tx6aec+BDwyrU7iXqsf5rDhSkoptb+t38=" [
++    (stableIncr "299-300" "sha256-CjlD6ZhfStph03T227hCmMfm77btC5R03MlkBNch/KE=" [ ])
++    (stableIncr "300-301" "sha256-sLL+T7fit7aO9Y92eY48MojTOlE/CJS68ph+BBwjEaY=" [
 +      "arch/arm64/kernel/cpu_errata.c"
 +      "drivers/mmc/host/sdhci.c"
 +      "drivers/mmc/host/sdhci.h"
 +    ])
-+    (stableIncr "301-302" "sha256-wuGFzp45xxIEYnbTGvP9ggeHKBG5xxGRvQBgavEeU3I=" [
++    (stableIncr "301-302" "sha256-d3zSb4USnIwDtS+5VM/Pr2KfhC1iCI565abpn8k2JtY=" [
 +      "tools/testing/selftests/rcutorture/bin/mkinitrd.sh"
 +    ])
-+    (stableIncr "302-303" "sha256-MbpcFiTcVu3O4hZ6cMQ1oSdFCBQFPWuTBYSGSVFnwyM=" [
++    (stableIncr "302-303" "sha256-NRrDEN2Ofw6itjASq7FVSWQbVvBPWsrSmSo9HdYEdok=" [
 +      "drivers/base/dd.c"
 +      "drivers/net/ethernet/stmicro/stmmac/stmmac_hwtstamp.c"
 +      "drivers/net/ethernet/stmicro/stmmac/stmmac_ptp.h"
 +      "drivers/power/supply/power_supply_core.c"
 +    ])
-+    (stableIncr "303-304" "sha256-YH9nn9rswWo43Q9JJKTLC0drQUEcA8LSCucv5/k9JPQ=" [ ])
-+    (stableIncr "304-305" "sha256-z7oHZ6oSPQMfFq+ZCd96GhMqtqA7rd7uKN5judDiXGU=" [
++    (stableIncr "303-304" "sha256-RzNLJi1QyauzF8RHoH3t5UThlSKd/g2FOXU/12bohC8=" [ ])
++    (stableIncr "304-305" "sha256-imt/lGQqx+sWJGCroLFwitZ0ID/YLFmJxdnOYscg2ew=" [
 +      "Documentation/ABI/testing/sysfs-kernel-oops_count"
 +      "Documentation/ABI/testing/sysfs-kernel-warn_count"
 +      "drivers/edac/edac_device.c"
@@ -684,7 +733,7 @@ index 00000000..07ee8cd4
 +      "kernel/panic.c"
 +      "kernel/sched/core.c"
 +    ])
-+    (stableIncr "305-306" "sha256-g9M2E+3LivlVIFWCoW1qfGh2/Z565p/oAficWcIfXnE=" [
++    (stableIncr "305-306" "sha256-k7zBkRgm2bQb3u0ERbnEnNcatxIwXWuXkuyUZkDhT+M=" [
 +      "drivers/mmc/core/sdio_bus.c"
 +      "drivers/usb/core/quirks.c"
 +      "drivers/usb/gadget/function/f_fs.c"
@@ -694,89 +743,89 @@ index 00000000..07ee8cd4
 +      "tools/virtio/linux/kmsan.h"
 +      "tools/virtio/linux/topology.h"
 +    ])
-+    (stableIncr "306-307" "sha256-7gU0Sns0W0wb7tnbcuDcfWG0DCecVWjCe8uU9K1Cicg=" [
++    (stableIncr "306-307" "sha256-ktm/t2ajRu0a2oGpu8imMTFj/w11XbGB4Y4rhFobPU8=" [
 +      "arch/powerpc/boot/dts/fsl/qoriq-fman3-0-10g-2.dtsi"
 +      "arch/powerpc/boot/dts/fsl/qoriq-fman3-0-10g-3.dtsi"
 +    ])
-+    (stableIncr "307-308" "sha256-e36V+tFcfpPH8iScGQDgHb+mPYJpQzBFjHY5jI6JQTk=" [
++    (stableIncr "307-308" "sha256-q6eoQiFNkDftsO07Kgn/88rXw/17kS2e0zl+fQVodGg=" [
 +      "drivers/mtd/ubi/wl.c"
 +      "fs/f2fs/inline.c"
 +    ])
-+    (stableIncr "308-309" "sha256-1Nj4LwRodgWgHwTKnIKYB9INaM9hajNrVOGn0keSK7E=" [ ])
-+    (stableIncr "309-310" "sha256-4m2jPx694e/gdlBleJmC81fgdzEMfbl1p4X9oUZMl7g=" [
++    (stableIncr "308-309" "sha256-nqvQ5vtP5wBthj5S+Zv2c3p3V7P3vzupAs4KXm8xMsI=" [ ])
++    (stableIncr "309-310" "sha256-oD3s7BFWfbcjWr8ZJyTCQVuR0ICIWFEyCEOTH5KX8UM=" [
 +      "fs/ext4/namei.c"
 +    ])
-+    (stableIncr "310-311" "sha256-FKDRKlnJmIs1cFME32yC0CZ8AlaSKfgsTzRrGwwBFUo=" [
++    (stableIncr "310-311" "sha256-ZNLVXND6jgMYgJNAcNMDPLQkd7dECeXAarCseTAI3a0=" [
 +      "fs/ext4/page-io.c"
 +    ])
-+    (stableIncr "311-312" "sha256-Gkueyxd/sHJjen8FnfGmDbftQuVodW3wxaK4OlGcWLE=" [
++    (stableIncr "311-312" "sha256-/x2GrXye4AL14hVZ2OmktNJpX0p7yN2IWUNoOM8Tf6A=" [
 +      "arch/riscv/include/uapi/asm/setup.h"
 +      "fs/ext4/inode.c"
 +    ])
-+    (stableIncr "312-313" "sha256-h92vBSg12YG4HPhBeJtfp97P13HMD+ONL2JAMmdFf+w=" [ ])
-+    (stableIncr "313-314" "sha256-h90JhLKI3ty0VSgD7Za3zL7FUgUp28O3X0Azr236xms=" [
++    (stableIncr "312-313" "sha256-fzDxeSj0vgA9Uk3vneU34HJ596gh/dx+P0iYK7usbWg=" [ ])
++    (stableIncr "313-314" "sha256-a+hY/by3Xncn+K6rUUNjdc4H+Cl5L9CFFXc9ymGeApY=" [
 +      "net/ipv6/udp.c"
 +      "tools/testing/selftests/sigaltstack/current_stack_pointer.h"
 +      "net/ipv6/udplite.c"
 +      "include/net/udplite.h"
 +      "net/ipv4/udplite.c"
 +    ])
-+    (stableIncr "314-315" "sha256-CiNNd/9noQ8Tzd+ZeHfFtj2R/q3ptd7thmnkNU4BI0I=" [
++    (stableIncr "314-315" "sha256-QS+xMTZjPFq4fxH0Z+/pDGc5Efhl5SGke1j4/ViBqs4=" [
 +      "drivers/usb/dwc3/core.c"
 +    ])
-+    (stableIncr "315-316" "sha256-U0YplesOW3/1D0C26vQg6bkfcDRUiyaPAsbOQ6lFz6E=" [ ])
-+    (stableIncr "316-317" "sha256-ZvW0OirGGN78FbSURkJvatqXi0x/J6GIxhC+tqjH5gQ=" [
++    (stableIncr "315-316" "sha256-uaPVMy6sFA/OBCFa4xnzkoqjm12dpuoDCOLAq7+5G0Y=" [ ])
++    (stableIncr "316-317" "sha256-h9ulX10JzKI8oVKx9/HmEOh7qBvSHN8g/3fwEILNrAA=" [
 +      "drivers/usb/gadget/function/f_fs.c"
 +    ])
-+    (stableIncr "317-318" "sha256-ZDCbB7OV/6N6XaP7jDrJVtWKPLJOvlZnrCzb6jWqxE8=" [
++    (stableIncr "317-318" "sha256-qvMbhQ/KTcRwhArPyWibIQ+JvzUNXeE/+Eglg5zn0pQ=" [
 +      "include/net/pkt_sched.h"
 +      "net/sched/cls_api.c"
 +    ])
-+    (stableIncr "318-319" "sha256-54myI9iTGmloMMbPrCvFkrfnsLIHyOexY+XJyExFBWA=" [
++    (stableIncr "318-319" "sha256-IzTlSyR/5tZRzJ39jyscZROw51mEMeifn0AiMdLxNQg=" [
 +      "drivers/mmc/core/block.c"
 +      "net/core/dev.c"
 +      "include/linux/netdevice.h"
 +    ])
-+    (stableIncr "319-320" "sha256-Z7t4V6tiw/4hFkDdICGNWM+dmoCZ9cRfy1f+BHVVse0=" [
++    (stableIncr "319-320" "sha256-2g/C0GE9Wja9Mk8gdRFsTtulum7WxZ5QrDDUhU9dPTs=" [
 +      "arch/arm64/include/asm/sysreg.h"
 +    ])
-+    (stableIncr "320-321" "sha256-EZE0xkQCPY+M5BLFVycvVNbOb1OfegxoMI0twWrYgcU=" [
++    (stableIncr "320-321" "sha256-iSTvmgRQ59sCwNWQcbLCJFSBpuE8A0hXSdyWGZXKby0=" [
 +      "Documentation/admin-guide/hw-vuln/gather_data_sampling.rst"
 +      "init/main.c"
 +      "arch/arm/Kconfig"
 +      "arch/arm/include/asm/bugs.h"
 +      "arch/arm/kernel/bugs.c"
 +    ])
-+    (stableIncr "321-322" "sha256-Z01KwrSHsgV4Ax2Vs7OUfT8xn1FzgdS1TVHJ32f/5TY=" [
++    (stableIncr "321-322" "sha256-ltP0umy5rJj2gHAcsJeohztywUPSkgLm8TSmQ3yPYMU=" [
 +      "kernel/events/core.c"
 +      "mm/mempolicy.c"
 +      "net/ipv4/netfilter/nf_socket_ipv4.c"
 +      "net/ipv6/netfilter/nf_socket_ipv6.c"
 +      "tools/perf/tests/shell/test_uprobe_from_different_cu.sh"
 +    ])
-+    (stableIncr "322-323" "sha256-ynHvzyqlzEi6jkWYnZz9o3J1vYEnmZkvt6JOnX31oGc=" [
++    (stableIncr "322-323" "sha256-HlEdgmzxkWjxHMPYyzHn9QMnIlA10gg/Sjk+zMT78Cw=" [
 +      "drivers/usb/dwc3/gadget.c"
 +      "net/ipv6/ndisc.c"
 +    ])
-+    (stableIncr "323-324" "sha256-TrLcfG1iLBHs71WN6bOSnncsMJtj4N5xRbIevidIEBo=" [
++    (stableIncr "323-324" "sha256-f8lBe9jr4oHu6ZemjCBr0X3i6IlPbSlcI5GxsKnpzqs=" [
 +      "drivers/android/binder.c"
 +      "drivers/android/binder_alloc.c"
 +      "drivers/android/binder_alloc.h"
 +    ])
-+    (stableIncr "324-325" "sha256-afHZtwmqGWZDH51VuLBur+V0sF/j7L+EkRIDgB/kraI=" [ ])
-+    (stableIncr "325-326" "sha256-vx1X/+k3PlIpTdDAqHCYVtkM9ayM7mfZ4JlEjUn1m78=" [
++    (stableIncr "324-325" "sha256-EYwYJoHxm50jscewGNS/qYVL2adRpq9VvCNuHxciqoI=" [ ])
++    (stableIncr "325-326" "sha256-TA+hpv8YJ4KdjdzmujAp0jAWaJCziS2ux1e4LbFLbJE=" [
 +      "drivers/devfreq/devfreq.c"
 +      "fs/nilfs2/segment.c"
 +      "lib/ubsan.h"
 +    ])
-+    (stableIncr "326-327" "sha256-sZKwnT+HTnScSos6ou2ZIYsxySyQejcQ/ZUAB+EVoJY=" [
++    (stableIncr "326-327" "sha256-yLpk0JeDLd4ffmfmcXefFZn/O7KawXalZnPWI5fwUGg=" [
 +      "fs/ext4/namei.c"
 +    ])
-+    (stableIncr "327-328" "sha256-3+SW9NlluqecB38PnmKUWctUBJ7+6xtZOixhQT8HvnI=" [
++    (stableIncr "327-328" "sha256-y6wm2cev85yDsjvfHTJyVfrmXQ8KNTQclVddrVCfK6o=" [
 +      "include/linux/perf_event.h"
 +      "kernel/events/core.c"
 +    ])
-+    (stableIncr "328-329" "sha256-9/haCHrDojcy6eevZtF4751gSd4nIH4APq1jCOFI5IY=" [
++    (stableIncr "328-329" "sha256-imeJ86a6TZE4YeWVnqSwPAfCyMXGwnCW33uszRDngYs=" [
 +      "arch/arm/boot/bootp/init.S"
 +      "arch/arm/boot/compressed/big-endian.S"
 +      "arch/arm/boot/compressed/head.S"
@@ -786,24 +835,24 @@ index 00000000..07ee8cd4
 +      "fs/f2fs/gc.c"
 +      "kernel/events/core.c"
 +    ])
-+    (stableIncr "329-330" "sha256-yCoG23Ip3YtxpEn8EG02HfR1I1M/RldsJBq8gmDwZ64=" [
++    (stableIncr "329-330" "sha256-ANVkMiBzaMrRynBrDzXg1qiPiP7HvB4FmMd3PbiJbgY=" [
 +      "drivers/clk/qcom/clk-rcg2.c"
 +      "drivers/thermal/thermal_core.c"
 +      "drivers/tty/tty_jobctrl.c"
 +    ])
-+    (stableIncr "330-331" "sha256-2g/C0GE9Wja9Mk8gdRFsTtulum7WxZ5QrDDUhU9dPTs=" [
++    (stableIncr "330-331" "sha256-CfrKnHyhrrEubFs/rqNoNN4zVSfsNBZSxb2izllp/UE=" [
 +      "include/linux/pwm.h"
 +    ])
-+    (stableIncr "331-332" "sha256-wUziz5O8onzu8rreIfFyQbjSo+P8xjS9p/GturYiDfI=" [
++    (stableIncr "331-332" "sha256-L97fI+W78gzRQk8hpqn2qMVTLrBS2KcS4QrIbmF+gUA=" [
 +      "drivers/md/dm-verity-target.c"
 +      "drivers/usb/dwc3/core.c"
 +    ])
-+    (stableIncr "332-333" "sha256-IESb+kow48icboZtPGfOWIUvY54xZqQdSRqJNuDgjI0=" [ ])
-+    (stableIncr "333-334" "sha256-imt/lGQqx+sWJGCroLFwitZ0ID/YLFmJxdnOYscg2ew=" [ ])
-+    (stableIncr "334-335" "sha256-ca4GLdKekSvygpAGcO2/MU0usSn9JU0Fva9Qlnp5C2s=" [
++    (stableIncr "332-333" "sha256-cryCrAZ6GhDPd7Aft86OaAK8F2tOp8ZaNz7sbTUQSiQ=" [ ])
++    (stableIncr "333-334" "sha256-yCoG23Ip3YtxpEn8EG02HfR1I1M/RldsJBq8gmDwZ64=" [ ])
++    (stableIncr "334-335" "sha256-T1/IH/ucxfdzBVKI8hMgAipH7OuDljQS0Gfw8EBdodQ=" [
 +      "net/wireless/certs/wens.hex"
 +    ])
-+    (stableIncr "335-336" "sha256-NRrDEN2Ofw6itjASq7FVSWQbVvBPWsrSmSo9HdYEdok=" [
++    (stableIncr "335-336" "sha256-Z2wav1h/4CkXpYpKkA97v0rS/1K+Coi/pXY4MqRfb3o=" [
 +      "drivers/mmc/core/host.c"
 +    ])
 +  ];
@@ -823,13 +872,13 @@ index 00000000..07ee8cd4
 +in
 +
 +kernel-builder-gcc8 {
-+  version = "4.14.336";
++  version = "4.14.357";
 +  inherit configfile;
 +
 +  # The vendor tree claims 4.14.206 and every incremental patch's Makefile hunk
 +  # is dropped above, so the version is set here instead of 24 times over.
 +  postPatch = ''
-+    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 336/' Makefile
++    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 357/' Makefile
 +  '';
 +
 +  src = fetchFromGitHub {
@@ -839,8 +888,103 @@ index 00000000..07ee8cd4
 +    sha256 = "sha256-uf5Vln2M64ksT9BC4/R9gLV2yo6zK0vQeolyCUj/u+o=";
 +  };
 +
++  # OpenELA kernel-lts 4.14.336 -> 4.14.357, fetched from the OpenELA GitHub
++  # compare endpoint with the Makefile hunk (SUBLEVEL is set in postPatch) and
++  # .elts/ metadata stripped. Files whose hunks did not apply because the vendor
++  # tree diverges, is missing the file, or already carries the change, are
++  # dropped; the dropped files are listed here with the reason:
++  #
++  #   337-338: drivers/android/binder_alloc.c, fs/f2fs/namei.c   (vendor mmput/up_read and size/up_write contexts differ),
++  #            net/ncsi/ncsi-netlink.c                             (absent)
++  #   338-339: kernel/power/swap.c                                 (crc32_threadfn wrapped in CONFIG_HIBERNATION_SKIP_CRC)
++  #   339-340: drivers/infiniband/ulp/srpt/ib_srpt.c               (srpt_get_u64_x signature differs)
++  #   340-341: (re-added adapted: drivers/mmc/core/mmc.c, the vendor declares the arrays
++  #            static const unsigned int)
++  #   342-343: fs/select.c (already noinline_for_stack), sound/usb/stream.c
++  #   343-344: drivers/android/binder.c (all hunks already present), net/ipv4/tcp_ipv4.c, include/net/netns/ipv4.h (re-added adapted: sysctl_tcp_default_init_rwnd between)
++  #   344-345: mm/memory-failure.c (vendor try_to_unmap takes extra arg), mm/page_alloc.c
++  #   346-347: drivers/usb/gadget/composite.c                      (os_desc w_value handling differs)
++  #   348-349: fs/f2fs/segment.c, fs/f2fs/super.c
++  #   350-351: drivers/usb/gadget/configfs.c                       (usb_string_copy context differs)
++  #   351-352: arch/arm/include/asm/uaccess.h                      (vendor already carries change)
++  #   352-353: fs/ext4/namei.c, fs/f2fs/{f2fs.h (already present),inode.c,namei.c}, selftests/sigaltstack (absent)
++  #   353-354: drivers/mmc/core/mmc_test.c                         (test module context differs)
++  #   354-355: drivers/net/usb/usbnet.c                            (usbnet_init context differs)
++  #   355-356: arch/arm64/include/asm/cputype.h (arm64 N/A), drivers/usb/dwc3/core.c (no dis_split_quirk),
++  #            fs/ext4/{inline.c,namei.c}, fs/f2fs/{file.c,xattr.c (already present)}, include/linux/clk.h
++  #            (re-added adapted: clk_get_optional needed by clk-devres.c; net/qrtr/qrtr.c adapted
++  #            to the vendor's down_read/qrtr_all_epts context),
++  #            security/{selinux/selinuxfs.c,smack/smackfs.c}, drivers/net/usb/usbnet.c
 +  patches =
 +    stablePatches
++    ++ [
++      (openelaIncr "336" "337" "sha256-SNYUicSv6auGY+9q6w7sHOgEne3J28+NnerAqFyCp/A=" [ ])
++      (openelaIncr "337" "338" "sha256-cCy9LQ83C9YpksIuRJUG/sjy1XjsG2ju7Cv4AT0zrTg=" [
++        "drivers/android/binder_alloc.c"
++        "fs/f2fs/namei.c"
++        "net/ncsi/ncsi-netlink.c"
++      ])
++      (openelaIncr "338" "339" "sha256-E9jVwY5ACPJ/gSiwFxnGEYT8MXPKZiT4rHxwOOHa7mU=" [
++        "kernel/power/swap.c"
++      ])
++      (openelaIncr "339" "340" "sha256-JqDhvASSVLEWs+WGlt6AKynD5Eo18vJdyo23s9tbX8M=" [
++        "drivers/infiniband/ulp/srpt/ib_srpt.c"
++      ])
++      (openelaIncr "340" "341" "sha256-HrNTswzlUXD+HN2jvTj0Yi4jPbq2iQT6mM/nh0HLfJ0=" [ ])
++      (openelaIncr "341" "342" "sha256-+/AqNKfr3mJyUdhzJXYJSIRqajIXmx8+jX/Xd0Kj7TE=" [ ])
++      (openelaIncr "342" "343" "sha256-O1YkrpnotcisDs+1x2SV3+7MPezO/hW9yIX6XTI6zvk=" [
++        "fs/select.c"
++        "sound/usb/stream.c"
++      ])
++      (openelaIncr "343" "344" "sha256-iH1AvW2uJroiPwRwcVks87C4YPEIDU/qQS3AKUO9DZA=" [
++        "drivers/android/binder.c"
++      ])
++      (openelaIncr "344" "345" "sha256-xyzcIEsSjpAPQOfzx9SKTye21qBiDecidPMI0QIvKhs=" [
++        "mm/memory-failure.c"
++        "mm/page_alloc.c"
++      ])
++      (openelaIncr "345" "346" "sha256-JidE24zw43SVSv4aO+8Ds05sf4kScH2heeuPR/gFMOw=" [ ])
++      (openelaIncr "346" "347" "sha256-zRoyE70vjH/vjY06oRkOjg0Yajo3ssENMkc92iYHZuc=" [
++        "drivers/usb/gadget/composite.c"
++      ])
++      (openelaIncr "347" "348" "sha256-v/+x61magYDBxPw2avHzxpsctyn39Sr0UP9J52iAKe4=" [ ])
++      (openelaIncr "348" "349" "sha256-RbFQ6aLj973Sm0yGGQcMA15zK4r/L1HXtUBNOEefljY=" [
++        "fs/f2fs/segment.c"
++        "fs/f2fs/super.c"
++      ])
++      (openelaIncr "349" "350" "sha256-RboVU3uv8yPyB+WfLXehAD01x4UvyO57e1FBBC9axOk=" [ ])
++      (openelaIncr "350" "351" "sha256-j88e3O+kaEIFQk7b6ILKIYiAHnsWppEBg+SJTp33C1s=" [
++        "drivers/usb/gadget/configfs.c"
++      ])
++      (openelaIncr "351" "352" "sha256-5h3hk9zG3S4LthGaIgxNMJCF8AAPd4LyQ6iG72VkSt0=" [
++        "arch/arm/include/asm/uaccess.h"
++      ])
++      (openelaIncr "352" "353" "sha256-jJ6MA/kPrGW0i4/aPAwa8okI3gQRopQKKLZqPIRfq0E=" [
++        "fs/ext4/namei.c"
++        "fs/f2fs/f2fs.h"
++        "fs/f2fs/inode.c"
++        "fs/f2fs/namei.c"
++        "tools/testing/selftests/sigaltstack/current_stack_pointer.h"
++      ])
++      (openelaIncr "353" "354" "sha256-mXsDBNsGo3Cyn8SYXfNlLRMziymX4gUeIaJd8M7OkP8=" [
++        "drivers/mmc/core/mmc_test.c"
++      ])
++      (openelaIncr "354" "355" "sha256-FMnEIywzBK7gbDYbDWKwQ/MCk6/hATHeMIr9O/Lg5yc=" [
++        "drivers/net/usb/usbnet.c"
++      ])
++      (openelaIncr "355" "356" "sha256-879f5zYCWB9HaafLAmZiRUnfM24LEN6EeffWZFl6s84=" [
++        "arch/arm64/include/asm/cputype.h"
++        "drivers/net/usb/usbnet.c"
++        "drivers/usb/dwc3/core.c"
++        "fs/ext4/inline.c"
++        "fs/ext4/namei.c"
++        "fs/f2fs/file.c"
++        "fs/f2fs/xattr.c"
++        "security/selinux/selinuxfs.c"
++        "security/smack/smackfs.c"
++      ])
++      (openelaIncr "356" "357" "sha256-/SBd21q/qDwC5Dl4xbkbU1UugGUX8honSx7I5P6oN30=" [ ])
++    ]
 +    ++ [
 +      ./stable/vendor-235-236.patch
 +      ./stable/vendor-236-237.patch
@@ -2669,6 +2813,286 @@ index 00000000..c9d6fbaf
 + diff --git a/security/keys/keyctl.c b/security/keys/keyctl.c
 + index 9394d72a77e80..9e52a3e0fc672 100644
 + --- a/security/keys/keyctl.c
+diff --git a/devices/fossil-hoki/kernel/stable/openela-4.14.336-337.patch.patch b/devices/fossil-hoki/kernel/stable/openela-4.14.336-337.patch.patch
+new file mode 100644
+index 00000000..703bc0db
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/openela-4.14.336-337.patch.patch
+@@ -0,0 +1,13 @@
++--- a/openela-4.14.336-337.patch
+++++ b/openela-4.14.336-337.patch
++@@ -523,8 +523,8 @@
++  	if (kill)
++  		collect_procs(hpage, &tokill, flags & MF_ACTION_REQUIRED);
++  
++--	unmap_success = try_to_unmap(hpage, ttu);
++-+	unmap_success = try_to_unmap(p, ttu);
+++-	unmap_success = try_to_unmap(hpage, ttu, NULL);
++++	unmap_success = try_to_unmap(p, ttu, NULL);
++  	if (!unmap_success)
++  		pr_err("Memory failure: %#lx: failed to unmap page (mapcount=%d)\n",
++ -		       pfn, page_mapcount(hpage));
+diff --git a/devices/fossil-hoki/kernel/stable/openela-4.14.340-341.patch.patch b/devices/fossil-hoki/kernel/stable/openela-4.14.340-341.patch.patch
+new file mode 100644
+index 00000000..dd30f7d2
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/openela-4.14.340-341.patch.patch
+@@ -0,0 +1,29 @@
++--- a/openela-4.14.340-341.patch
+++++ b/openela-4.14.340-341.patch
++@@ -34,22 +34,21 @@
++  	if (!ret)
++  		return 0;
++ diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
++-index 32bf0b47e339..69f0cc3a28bc 100644
++ --- a/drivers/mmc/core/mmc.c
++ +++ b/drivers/mmc/core/mmc.c
++-@@ -990,10 +990,12 @@ static int mmc_select_bus_width(struct mmc_card *card)
++- 	static unsigned ext_csd_bits[] = {
+++@@ -1055,10 +1055,12 @@ static int mmc_select_bus_width(struct mmc_card *card)
+++ 	static const unsigned int ext_csd_bits[] = {
++  		EXT_CSD_BUS_WIDTH_8,
++  		EXT_CSD_BUS_WIDTH_4,
++ +		EXT_CSD_BUS_WIDTH_1,
++  	};
++- 	static unsigned bus_widths[] = {
+++ 	static const unsigned int bus_widths[] = {
++  		MMC_BUS_WIDTH_8,
++  		MMC_BUS_WIDTH_4,
++ +		MMC_BUS_WIDTH_1,
++  	};
++  	struct mmc_host *host = card->host;
++- 	unsigned idx, bus_width = 0;
+++ 	unsigned int idx, bus_width = 0;
++ diff --git a/drivers/net/gtp.c b/drivers/net/gtp.c
++ index 5ded1d25a5ab..a222736c3117 100644
++ --- a/drivers/net/gtp.c
+diff --git a/devices/fossil-hoki/kernel/stable/openela-4.14.343-344.patch.patch b/devices/fossil-hoki/kernel/stable/openela-4.14.343-344.patch.patch
+new file mode 100644
+index 00000000..afcb2083
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/openela-4.14.343-344.patch.patch
+@@ -0,0 +1,31 @@
++--- a/openela-4.14.343-344.patch
+++++ b/openela-4.14.343-344.patch
++@@ -5829,9 +5829,9 @@
++  	int sysctl_tcp_window_scaling;
++  	int sysctl_tcp_timestamps;
++ +	int sysctl_tcp_early_retrans;
+++ 	int sysctl_tcp_default_init_rwnd;
++  	struct inet_timewait_death_row tcp_death_row;
++  	int sysctl_max_syn_backlog;
++- 
++ diff --git a/include/net/nfc/nfc.h b/include/net/nfc/nfc.h
++ index bbdc73a3239d..8b86560b5cfb 100644
++ --- a/include/net/nfc/nfc.h
++@@ -6095,14 +6095,13 @@
++ index 8bbdd8e36618..a3e778f9f8df 100644
++ --- a/net/ipv4/tcp_ipv4.c
++ +++ b/net/ipv4/tcp_ipv4.c
++-@@ -2531,6 +2531,7 @@ static int __net_init tcp_sk_init(struct net *net)
+++@@ -2518,5 +2518,6 @@ static int __net_init tcp_sk_init(struct net *net)
++  	net->ipv4.sysctl_tcp_sack = 1;
++  	net->ipv4.sysctl_tcp_window_scaling = 1;
++  	net->ipv4.sysctl_tcp_timestamps = 1;
++ +	net->ipv4.sysctl_tcp_early_retrans = 3;
++- 
++- 	return 0;
++- fail:
+++ 	net->ipv4.sysctl_tcp_default_init_rwnd = TCP_INIT_CWND * 2;
+++ 
++ diff --git a/net/ipv4/tcp_metrics.c b/net/ipv4/tcp_metrics.c
++ index 820a97f92235..e9cd8c95eaa5 100644
++ --- a/net/ipv4/tcp_metrics.c
+diff --git a/devices/fossil-hoki/kernel/stable/openela-4.14.355-356.patch.patch b/devices/fossil-hoki/kernel/stable/openela-4.14.355-356.patch.patch
+new file mode 100644
+index 00000000..8c8961a1
+--- /dev/null
++++ b/devices/fossil-hoki/kernel/stable/openela-4.14.355-356.patch.patch
+@@ -0,0 +1,183 @@
++--- a/openela-4.14.355-356.patch
+++++ b/openela-4.14.355-356.patch
++@@ -5961,150 +5961,11 @@
++  
++  	switch (iinfo->i_alloc_type) {
++ diff --git a/include/linux/clk.h b/include/linux/clk.h
++-index 12c96d94d1fa..136a64bddcd9 100644
+++index fcceae7e0e0b..b4b4f7fd6f9b 100644
++ --- a/include/linux/clk.h
++ +++ b/include/linux/clk.h
++-@@ -315,6 +315,102 @@ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
++-  */
++- struct clk *devm_clk_get(struct device *dev, const char *id);
++- 
++-+/**
++-+ * devm_clk_get_prepared - devm_clk_get() + clk_prepare()
++-+ * @dev: device for clock "consumer"
++-+ * @id: clock consumer ID
++-+ *
++-+ * Context: May sleep.
++-+ *
++-+ * Return: a struct clk corresponding to the clock producer, or
++-+ * valid IS_ERR() condition containing errno.  The implementation
++-+ * uses @dev and @id to determine the clock consumer, and thereby
++-+ * the clock producer.  (IOW, @id may be identical strings, but
++-+ * clk_get may return different clock producers depending on @dev.)
++-+ *
++-+ * The returned clk (if valid) is prepared. Drivers must however assume
++-+ * that the clock is not enabled.
++-+ *
++-+ * The clock will automatically be unprepared and freed when the device
++-+ * is unbound from the bus.
++-+ */
++-+struct clk *devm_clk_get_prepared(struct device *dev, const char *id);
++-+
++-+/**
++-+ * devm_clk_get_enabled - devm_clk_get() + clk_prepare_enable()
++-+ * @dev: device for clock "consumer"
++-+ * @id: clock consumer ID
++-+ *
++-+ * Context: May sleep.
++-+ *
++-+ * Return: a struct clk corresponding to the clock producer, or
++-+ * valid IS_ERR() condition containing errno.  The implementation
++-+ * uses @dev and @id to determine the clock consumer, and thereby
++-+ * the clock producer.  (IOW, @id may be identical strings, but
++-+ * clk_get may return different clock producers depending on @dev.)
++-+ *
++-+ * The returned clk (if valid) is prepared and enabled.
++-+ *
++-+ * The clock will automatically be disabled, unprepared and freed
++-+ * when the device is unbound from the bus.
++-+ */
++-+struct clk *devm_clk_get_enabled(struct device *dev, const char *id);
++-+
++-+/**
++-+ * devm_clk_get_optional - lookup and obtain a managed reference to an optional
++-+ *			   clock producer.
++-+ * @dev: device for clock "consumer"
++-+ * @id: clock consumer ID
++-+ *
++-+ * Behaves the same as devm_clk_get() except where there is no clock producer.
++-+ * In this case, instead of returning -ENOENT, the function returns NULL.
++-+ */
++-+struct clk *devm_clk_get_optional(struct device *dev, const char *id);
++-+
++-+/**
++-+ * devm_clk_get_optional_prepared - devm_clk_get_optional() + clk_prepare()
++-+ * @dev: device for clock "consumer"
++-+ * @id: clock consumer ID
++-+ *
++-+ * Context: May sleep.
++-+ *
++-+ * Return: a struct clk corresponding to the clock producer, or
++-+ * valid IS_ERR() condition containing errno.  The implementation
++-+ * uses @dev and @id to determine the clock consumer, and thereby
++-+ * the clock producer.  If no such clk is found, it returns NULL
++-+ * which serves as a dummy clk.  That's the only difference compared
++-+ * to devm_clk_get_prepared().
++-+ *
++-+ * The returned clk (if valid) is prepared. Drivers must however
++-+ * assume that the clock is not enabled.
++-+ *
++-+ * The clock will automatically be unprepared and freed when the
++-+ * device is unbound from the bus.
++-+ */
++-+struct clk *devm_clk_get_optional_prepared(struct device *dev, const char *id);
++-+
++-+/**
++-+ * devm_clk_get_optional_enabled - devm_clk_get_optional() +
++-+ *                                 clk_prepare_enable()
++-+ * @dev: device for clock "consumer"
++-+ * @id: clock consumer ID
++-+ *
++-+ * Context: May sleep.
++-+ *
++-+ * Return: a struct clk corresponding to the clock producer, or
++-+ * valid IS_ERR() condition containing errno.  The implementation
++-+ * uses @dev and @id to determine the clock consumer, and thereby
++-+ * the clock producer.  If no such clk is found, it returns NULL
++-+ * which serves as a dummy clk.  That's the only difference compared
++-+ * to devm_clk_get_enabled().
++-+ *
++-+ * The returned clk (if valid) is prepared and enabled.
++-+ *
++-+ * The clock will automatically be disabled, unprepared and freed
++-+ * when the device is unbound from the bus.
++-+ */
++-+struct clk *devm_clk_get_optional_enabled(struct device *dev, const char *id);
++-+
++- /**
++-  * devm_get_clk_from_child - lookup and obtain a managed reference to a
++-  *			     clock producer from child node.
++-@@ -565,6 +661,36 @@ static inline struct clk *devm_clk_get(struct device *dev, const char *id)
++- 	return NULL;
++- }
++- 
++-+static inline struct clk *devm_clk_get_prepared(struct device *dev,
++-+						const char *id)
++-+{
++-+	return NULL;
++-+}
++-+
++-+static inline struct clk *devm_clk_get_enabled(struct device *dev,
++-+					       const char *id)
++-+{
++-+	return NULL;
++-+}
++-+
++-+static inline struct clk *devm_clk_get_optional(struct device *dev,
++-+						const char *id)
++-+{
++-+	return NULL;
++-+}
++-+
++-+static inline struct clk *devm_clk_get_optional_prepared(struct device *dev,
++-+							 const char *id)
++-+{
++-+	return NULL;
++-+}
++-+
++-+static inline struct clk *devm_clk_get_optional_enabled(struct device *dev,
++-+							const char *id)
++-+{
++-+	return NULL;
++-+}
++-+
++- static inline int devm_clk_bulk_get(struct device *dev, int num_clks,
++- 				    struct clk_bulk_data *clks)
++- {
++-@@ -679,6 +805,25 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
+++@@ -719,7 +719,26 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
+++ 	clk_bulk_disable(num_clks, clks);
++  	clk_bulk_unprepare(num_clks, clks);
++  }
++  
++@@ -6127,7 +5988,7 @@
++ +	return clk;
++ +}
++ +
++- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+++ #if defined(CONFIG_OF)
++  struct clk *of_clk_get(struct device_node *np, int index);
++  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
++ diff --git a/include/linux/jbd2.h b/include/linux/jbd2.h
++@@ -6958,13 +6819,12 @@
++  }
++  
++ diff --git a/net/qrtr/qrtr.c b/net/qrtr/qrtr.c
++-index f712f521db26..ee846d817cc4 100644
++ --- a/net/qrtr/qrtr.c
++ +++ b/net/qrtr/qrtr.c
++-@@ -652,7 +652,7 @@ static int qrtr_bcast_enqueue(struct qrtr_node *node, struct sk_buff *skb)
++- 
++- 	mutex_lock(&qrtr_node_lock);
++- 	list_for_each_entry(node, &qrtr_all_nodes, item) {
+++@@ -1709,7 +1709,7 @@ static int qrtr_bcast_enqueue(struct qrtr_node *node, struct sk_buff *skb,
+++ 	list_for_each_entry(node, &qrtr_all_epts, item) {
+++ 		if (node->nid == QRTR_EP_NID_AUTO && type != QRTR_TYPE_HELLO)
+++ 			continue;
++ -		skbn = skb_clone(skb, GFP_KERNEL);
++ +		skbn = pskb_copy(skb, GFP_KERNEL);
++  		if (!skbn)
 diff --git a/devices/fossil-hoki/kernel/stable/vendor-235-236.patch b/devices/fossil-hoki/kernel/stable/vendor-235-236.patch
 new file mode 100644
 index 00000000..2b8d9986
