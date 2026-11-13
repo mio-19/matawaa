@@ -1,17 +1,33 @@
-From 54a815803dc8f353a5fb5e736660eec56b87e908 Mon Sep 17 00:00:00 2001
+From 3e6f83c32698e08f359f92038f56e6134de8811b Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
 Date: Mon, 9 Nov 2026 10:55:56 +1100
 Subject: [PATCH] oppo-beluga: add vendor kernel and Android initialization
 
 ---
- devices/oppo-beluga/android-init.nix          | 172 ++++++++
- devices/oppo-beluga/default.nix               | 222 +++++++++++
+ devices/oppo-beluga/android-init.nix          | 172 ++++
+ devices/oppo-beluga/default.nix               | 222 +++++
  ...arm-cputype-add-missing-CPU-part-IDs.patch |  12 +
- devices/oppo-beluga/kernel/default.nix        | 371 ++++++++++++++++++
- 4 files changed, 777 insertions(+)
+ ...rry-the-exit-path-to-the-4.9.255-API.patch |  62 ++
+ ...restart_block-provide-set_restart_fn.patch |  30 +
+ ...ss-proc-credentials-to-the-LSM-hooks.patch |  83 ++
+ ...add-pending-label-state-and-spinlock.patch |  22 +
+ ...e-the-writepages-barrier-for-4.9.215.patch |  17 +
+ ...007-net-add-the-peer-credential-lock.patch |  11 +
+ ...he-program-memory-accounting-helpers.patch |  26 +
+ .../0009-vendor-tree-bends-for-4.9.337.patch  |  30 +
+ devices/oppo-beluga/kernel/default.nix        | 877 ++++++++++++++++++
+ 12 files changed, 1564 insertions(+)
  create mode 100644 devices/oppo-beluga/android-init.nix
  create mode 100644 devices/oppo-beluga/default.nix
  create mode 100644 devices/oppo-beluga/kernel/0001-arm-cputype-add-missing-CPU-part-IDs.patch
+ create mode 100644 devices/oppo-beluga/kernel/0002-futex-carry-the-exit-path-to-the-4.9.255-API.patch
+ create mode 100644 devices/oppo-beluga/kernel/0003-restart_block-provide-set_restart_fn.patch
+ create mode 100644 devices/oppo-beluga/kernel/0004-binder-pass-proc-credentials-to-the-LSM-hooks.patch
+ create mode 100644 devices/oppo-beluga/kernel/0005-selinux-add-pending-label-state-and-spinlock.patch
+ create mode 100644 devices/oppo-beluga/kernel/0006-ext4-rename-the-writepages-barrier-for-4.9.215.patch
+ create mode 100644 devices/oppo-beluga/kernel/0007-net-add-the-peer-credential-lock.patch
+ create mode 100644 devices/oppo-beluga/kernel/0008-bpf-declare-the-program-memory-accounting-helpers.patch
+ create mode 100644 devices/oppo-beluga/kernel/0009-vendor-tree-bends-for-4.9.337.patch
  create mode 100644 devices/oppo-beluga/kernel/default.nix
 
 diff --git a/devices/oppo-beluga/android-init.nix b/devices/oppo-beluga/android-init.nix
@@ -438,12 +454,341 @@ index 00000000..7aeec443
 + #define ARM_CPU_PART_CORTEX_A73		0x4100d090
 + #define ARM_CPU_PART_KRYO2XX_GOLD		0x51008000
 + #define ARM_CPU_PART_MASK		0xff00fff0
+diff --git a/devices/oppo-beluga/kernel/0002-futex-carry-the-exit-path-to-the-4.9.255-API.patch b/devices/oppo-beluga/kernel/0002-futex-carry-the-exit-path-to-the-4.9.255-API.patch
+new file mode 100644
+index 00000000..b336077e
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/0002-futex-carry-the-exit-path-to-the-4.9.255-API.patch
+@@ -0,0 +1,62 @@
++diff --git a/kernel/exit.c b/kernel/exit.c
++--- a/kernel/exit.c
+++++ b/kernel/exit.c
++@@ -471,7 +471,7 @@
++ 	struct core_state *core_state;
++ 	int mm_released;
++ 
++-	mm_release(tsk, mm);
+++	exit_mm_release(tsk, mm);
++ 	if (!mm)
++ 		return;
++ 	sync_mm_rss(mm);
++@@ -779,16 +779,7 @@
++ #else
++ 		pr_alert("Fixing recursive fault but reboot is needed!\n");
++ #endif
++-		/*
++-		 * We can do this unlocked here. The futex code uses
++-		 * this flag just to verify whether the pi state
++-		 * cleanup has been done or not. In the worst case it
++-		 * loops once more. We pretend that the cleanup was
++-		 * done as there is no way to return. Either the
++-		 * OWNER_DIED bit is set by now or we push the blocked
++-		 * task into the wait for ever nirwana as well.
++-		 */
++-		tsk->flags |= PF_EXITPIDONE;
+++		futex_exit_recursive(tsk);
++ 		set_current_state(TASK_UNINTERRUPTIBLE);
++ 		schedule();
++ 	}
++@@ -798,17 +789,6 @@
++ 	sched_exit(tsk);
++ 	schedtune_exit_task(tsk);
++ 
++-	/*
++-	 * Ensure that all new tsk->pi_lock acquisitions must observe
++-	 * PF_EXITING. Serializes against futex.c:attach_to_pi_owner().
++-	 */
++-	smp_mb();
++-	/*
++-	 * Ensure that we must observe the pi_state in exit_mm() ->
++-	 * mm_release() -> exit_pi_state_list().
++-	 */
++-	raw_spin_unlock_wait(&tsk->pi_lock);
++-
++ 	if (unlikely(in_atomic())) {
++ 		pr_info("note: %s[%d] exited with preempt_count %d\n",
++ 			current->comm, task_pid_nr(current),
++@@ -881,13 +861,6 @@
++ 	 * Make sure we are holding no locks:
++ 	 */
++ 	debug_check_no_locks_held();
++-	/*
++-	 * We can do this unlocked here. The futex code uses this flag
++-	 * just to verify whether the pi state cleanup has been done
++-	 * or not. In the worst case it loops once more.
++-	 */
++-	tsk->flags |= PF_EXITPIDONE;
++-
++ 	if (tsk->io_context)
++ 		exit_io_context(tsk);
++ 
+diff --git a/devices/oppo-beluga/kernel/0003-restart_block-provide-set_restart_fn.patch b/devices/oppo-beluga/kernel/0003-restart_block-provide-set_restart_fn.patch
+new file mode 100644
+index 00000000..81f2e181
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/0003-restart_block-provide-set_restart_fn.patch
+@@ -0,0 +1,30 @@
++diff --git a/include/linux/restart_block.h b/include/linux/restart_block.h
++--- a/include/linux/restart_block.h
+++++ b/include/linux/restart_block.h
++@@ -5,6 +5,7 @@
++ #define __LINUX_RESTART_BLOCK_H
++ 
++ #include <linux/compiler.h>
+++#include <linux/errno.h>
++ #include <linux/types.h>
++ 
++ struct timespec;
++@@ -46,6 +47,18 @@
++ 	};
++ };
++ 
+++#ifndef arch_set_restart_data
+++#define arch_set_restart_data(restart) do { } while (0)
+++#endif
+++
+++static inline long set_restart_fn(struct restart_block *restart,
+++					long (*fn)(struct restart_block *))
+++{
+++	restart->fn = fn;
+++	arch_set_restart_data(restart);
+++	return -ERESTART_RESTARTBLOCK;
+++}
+++
++ extern long do_no_restart_syscall(struct restart_block *parm);
++ 
++ #endif /* __LINUX_RESTART_BLOCK_H */
+diff --git a/devices/oppo-beluga/kernel/0004-binder-pass-proc-credentials-to-the-LSM-hooks.patch b/devices/oppo-beluga/kernel/0004-binder-pass-proc-credentials-to-the-LSM-hooks.patch
+new file mode 100644
+index 00000000..2215cf0a
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/0004-binder-pass-proc-credentials-to-the-LSM-hooks.patch
+@@ -0,0 +1,83 @@
++diff --git a/drivers/android/binder.c b/drivers/android/binder.c
++--- a/drivers/android/binder.c
+++++ b/drivers/android/binder.c
++@@ -553,6 +553,7 @@
++ 	struct task_struct *tsk;
++ 	struct files_struct *files;
++ 	struct mutex files_lock;
+++	const struct cred *cred;
++ 	struct hlist_node deferred_work_node;
++ 	int deferred_work;
++ 	bool is_dead;
++@@ -2505,7 +2506,7 @@
++ 		ret = -EINVAL;
++ 		goto done;
++ 	}
++-	if (security_binder_transfer_binder(proc->tsk, target_proc->tsk)) {
+++	if (security_binder_transfer_binder(proc->cred, target_proc->cred)) {
++ 		ret = -EPERM;
++ 		goto done;
++ 	}
++@@ -2551,7 +2552,7 @@
++ 				  proc->pid, thread->pid, fp->handle);
++ 		return -EINVAL;
++ 	}
++-	if (security_binder_transfer_binder(proc->tsk, target_proc->tsk)) {
+++	if (security_binder_transfer_binder(proc->cred, target_proc->cred)) {
++ 		ret = -EPERM;
++ 		goto done;
++ 	}
++@@ -2635,7 +2636,7 @@
++ 		ret = -EBADF;
++ 		goto err_fget;
++ 	}
++-	ret = security_binder_transfer_file(proc->tsk, target_proc->tsk, file);
+++	ret = security_binder_transfer_file(proc->cred, target_proc->cred, file);
++ 	if (ret < 0) {
++ 		ret = -EPERM;
++ 		goto err_security;
++@@ -3018,8 +3019,8 @@
++ 			goto err_dead_binder;
++ 		}
++ 		e->to_node = target_node->debug_id;
++-		if (security_binder_transaction(proc->tsk,
++-						target_proc->tsk) < 0) {
+++		if (security_binder_transaction(proc->cred,
+++						target_proc->cred) < 0) {
++ 			return_error = BR_FAILED_REPLY;
++ 			return_error_param = -EPERM;
++ 			return_error_line = __LINE__;
++@@ -3110,7 +3111,7 @@
++ 		t->from = thread;
++ 	else
++ 		t->from = NULL;
++-	t->sender_euid = task_euid(proc->tsk);
+++	t->sender_euid = proc->cred->euid;
++ 	t->to_proc = target_proc;
++ 	t->to_thread = target_thread;
++ 	t->code = tr->code;
++@@ -4479,6 +4480,7 @@
++ 	BUG_ON(!list_empty(&proc->delivered_death));
++ 	binder_alloc_deferred_release(&proc->alloc);
++ 	put_task_struct(proc->tsk);
+++	put_cred(proc->cred);
++ 	binder_stats_deleted(BINDER_STAT_PROC);
++ 	kfree(proc);
++ }
++@@ -4683,7 +4685,7 @@
++ 		ret = -EBUSY;
++ 		goto out;
++ 	}
++-	ret = security_binder_set_context_mgr(proc->tsk);
+++	ret = security_binder_set_context_mgr(proc->cred);
++ 	if (ret < 0)
++ 		goto out;
++ 	if (uid_valid(context->binder_context_mgr_uid)) {
++@@ -4935,6 +4937,7 @@
++ 	get_task_struct(current->group_leader);
++ 	proc->tsk = current->group_leader;
++ 	mutex_init(&proc->files_lock);
+++	proc->cred = get_cred(filp->f_cred);
++ 	INIT_LIST_HEAD(&proc->todo);
++ 	if (binder_supported_policy(current->policy)) {
++ 		proc->default_priority.sched_policy = current->policy;
+diff --git a/devices/oppo-beluga/kernel/0005-selinux-add-pending-label-state-and-spinlock.patch b/devices/oppo-beluga/kernel/0005-selinux-add-pending-label-state-and-spinlock.patch
+new file mode 100644
+index 00000000..fda97a2b
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/0005-selinux-add-pending-label-state-and-spinlock.patch
+@@ -0,0 +1,22 @@
++diff --git a/security/selinux/include/objsec.h b/security/selinux/include/objsec.h
++--- a/security/selinux/include/objsec.h
+++++ b/security/selinux/include/objsec.h
++@@ -40,7 +40,8 @@
++ 
++ enum label_initialized {
++ 	LABEL_INVALID,		/* invalid or not initialized */
++-	LABEL_INITIALIZED	/* initialized */
+++	LABEL_INITIALIZED,	/* initialized */
+++	LABEL_PENDING
++ };
++ 
++ struct inode_security_struct {
++@@ -55,7 +56,7 @@
++ 	unsigned char initialized;	/* initialization flag */
++ 	u32 tag;		/* Per-File-Encryption tag */
++ 	void *pfk_data; /* Per-File-Key data from ecryptfs */
++-	struct mutex lock;
+++	spinlock_t lock;
++ };
++ 
++ struct file_security_struct {
+diff --git a/devices/oppo-beluga/kernel/0006-ext4-rename-the-writepages-barrier-for-4.9.215.patch b/devices/oppo-beluga/kernel/0006-ext4-rename-the-writepages-barrier-for-4.9.215.patch
+new file mode 100644
+index 00000000..50cd44f0
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/0006-ext4-rename-the-writepages-barrier-for-4.9.215.patch
+@@ -0,0 +1,17 @@
++diff --git a/fs/ext4/ext4.h b/fs/ext4/ext4.h
++--- a/fs/ext4/ext4.h
+++++ b/fs/ext4/ext4.h
++@@ -1511,8 +1511,11 @@
++ 	struct ratelimit_state s_warning_ratelimit_state;
++ 	struct ratelimit_state s_msg_ratelimit_state;
++ 
++-	/* Barrier between changing inodes' journal flags and writepages ops. */
++-	struct percpu_rw_semaphore s_journal_flag_rwsem;
+++	/*
+++	 * Barrier between writepages ops and changing any inode's JOURNAL_DATA
+++	 * or EXT4_JOURNAL_DATA_FL flags.
+++	 */
+++	struct percpu_rw_semaphore s_writepages_rwsem;
++ };
++ 
++ static inline struct ext4_sb_info *EXT4_SB(struct super_block *sb)
+diff --git a/devices/oppo-beluga/kernel/0007-net-add-the-peer-credential-lock.patch b/devices/oppo-beluga/kernel/0007-net-add-the-peer-credential-lock.patch
+new file mode 100644
+index 00000000..06afa418
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/0007-net-add-the-peer-credential-lock.patch
+@@ -0,0 +1,11 @@
++diff --git a/include/net/sock.h b/include/net/sock.h
++--- a/include/net/sock.h
+++++ b/include/net/sock.h
++@@ -420,6 +420,7 @@
++ 	__u32			sk_priority;
++ 	__u32			sk_mark;
++ 	kuid_t			sk_uid;
+++	spinlock_t		sk_peer_lock;
++ 	struct pid		*sk_peer_pid;
++ 	const struct cred	*sk_peer_cred;
++ 	long			sk_rcvtimeo;
+diff --git a/devices/oppo-beluga/kernel/0008-bpf-declare-the-program-memory-accounting-helpers.patch b/devices/oppo-beluga/kernel/0008-bpf-declare-the-program-memory-accounting-helpers.patch
+new file mode 100644
+index 00000000..53dd2ea8
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/0008-bpf-declare-the-program-memory-accounting-helpers.patch
+@@ -0,0 +1,26 @@
++diff --git a/include/linux/bpf.h b/include/linux/bpf.h
++--- a/include/linux/bpf.h
+++++ b/include/linux/bpf.h
++@@ -255,6 +255,8 @@
++ struct bpf_prog *bpf_prog_add(struct bpf_prog *prog, int i);
++ struct bpf_prog *bpf_prog_inc(struct bpf_prog *prog);
++ void bpf_prog_put(struct bpf_prog *prog);
+++int __bpf_prog_charge(struct user_struct *user, u32 pages);
+++void __bpf_prog_uncharge(struct user_struct *user, u32 pages);
++ 
++ struct bpf_map *bpf_map_get_with_uref(u32 ufd);
++ struct bpf_map *__bpf_map_get(struct fd f);
++@@ -336,6 +338,13 @@
++ {
++ 	return ERR_PTR(-EOPNOTSUPP);
++ }
+++static inline int __bpf_prog_charge(struct user_struct *user, u32 pages)
+++{
+++	return 0;
+++}
+++static inline void __bpf_prog_uncharge(struct user_struct *user, u32 pages)
+++{
+++}
++ static inline int bpf_obj_get_user(const char __user *pathname)
++ {
++ 	return -EOPNOTSUPP;
+diff --git a/devices/oppo-beluga/kernel/0009-vendor-tree-bends-for-4.9.337.patch b/devices/oppo-beluga/kernel/0009-vendor-tree-bends-for-4.9.337.patch
+new file mode 100644
+index 00000000..87b6ca93
+--- /dev/null
++++ b/devices/oppo-beluga/kernel/0009-vendor-tree-bends-for-4.9.337.patch
+@@ -0,0 +1,30 @@
++diff --git a/drivers/soc/qcom/event_timer.c b/drivers/soc/qcom/event_timer.c
++@@ -51,8 +51,7 @@
++ static DEFINE_PER_CPU(struct hrtimer_info, per_cpu_hrtimer);
++ 
++ static DEFINE_PER_CPU(struct timerqueue_head, timer_head) = {
++-	.head = RB_ROOT,
++-	.next = NULL,
+++	.rb_root = RB_ROOT_CACHED,
++ };
++ 
++ static DEFINE_SPINLOCK(event_timer_lock);
++diff --git a/drivers/usb/gadget/configfs.c b/drivers/usb/gadget/configfs.c
++@@ -82,6 +82,7 @@
++ 	struct config_group os_desc_group;
++ 
++ 	struct mutex lock;
+++	spinlock_t spinlock;
++ 	struct usb_gadget_strings *gstrings[MAX_USB_STRING_LANGS + 1];
++ 	struct list_head string_list;
++ 	struct list_head available_func;
++diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
++@@ -560,7 +560,7 @@
++ 	return 0;
++ }
++ 
++-static struct ion_handle *__ion_alloc(
+++struct ion_handle *__ion_alloc(
++ 		struct ion_client *client, size_t len,
++ 		size_t align, unsigned int heap_id_mask,
++ 		unsigned int flags, bool grab_handle)
 diff --git a/devices/oppo-beluga/kernel/default.nix b/devices/oppo-beluga/kernel/default.nix
 new file mode 100644
-index 00000000..6e7cf7a0
+index 00000000..ddc617f0
 --- /dev/null
 +++ b/devices/oppo-beluga/kernel/default.nix
-@@ -0,0 +1,371 @@
+@@ -0,0 +1,877 @@
 +{
 +  lib,
 +  mobile-nixos,
@@ -569,11 +914,11 @@ index 00000000..6e7cf7a0
 +  '';
 +in
 +kernel-builder-gcc8 {
-+  version = "4.9.160";
++  version = "4.9.337";
 +  inherit configfile;
 +
 +  postPatch = ''
-+    sed -i 's/^SUBLEVEL = 112/SUBLEVEL = 160/' Makefile
++    sed -i 's/^SUBLEVEL = 112/SUBLEVEL = 337/' Makefile
 +  '';
 +
 +  src = fetchgit {
@@ -603,13 +948,24 @@ index 00000000..6e7cf7a0
 +    # Cortex-A53/A57/A72/A75 and Brahma B15 part IDs that 4.9.139 starts to
 +    # reference; this vendor tree predates them.
 +    ./0001-arm-cputype-add-missing-CPU-part-IDs.patch
++    # The vendor tree predates these 4.9 stable interfaces, and some of the
++    # increments below expect them to exist.
++    ./0002-futex-carry-the-exit-path-to-the-4.9.255-API.patch
++    ./0003-restart_block-provide-set_restart_fn.patch
++    ./0004-binder-pass-proc-credentials-to-the-LSM-hooks.patch
++    ./0005-selinux-add-pending-label-state-and-spinlock.patch
++    ./0006-ext4-rename-the-writepages-barrier-for-4.9.215.patch
++    ./0007-net-add-the-peer-credential-lock.patch
++    ./0008-bpf-declare-the-program-memory-accounting-helpers.patch
++    ./0009-vendor-tree-bends-for-4.9.337.patch
 +  ]
-+  # Stable increments run after the vendor fixups, the order the vendor tree
-+  # takes them in; each entry lists the files this tree cannot accept. 4.9.160
-+  # is where that mechanical pass stops: past it the vendor tree still carries
-+  # the pre-4.9.139 sched irqtime accounting, the two-argument ext4_iget, the
-+  # old f2fs inode flags and the old genetlink family ops, so later increments
-+  # only apply by hand-porting whole subsystems. Upstream stable is 4.9.337.
++  # Stable increments run after the vendor fixups, in the order the vendor tree
++  # takes them in; each entry lists the files this tree cannot accept, with the
++  # reason. Small API gaps the increments assume (see patches above) are
++  # hand-ported so the fix itself still arrives; where the vendor tree owns a
++  # whole subsystem that upstream rewrote -- the 4.9.320 RNG rework most of all
++  # -- that increment's files are dropped instead and stay vendor code. This
++  # carries the tree all the way to 4.9.337, the last 4.9 stable release.
 +  ++ [
 +    (stableIncr "113" "114" "sha256-qnljwfgrKu0gOyiAJ/aqfHAotBQo+nKG9ccRSjAZgeg=" [
 +      "include/linux/compiler-gcc.h"
@@ -799,6 +1155,501 @@ index 00000000..6e7cf7a0
 +      "mm/memory.c"
 +    ])
 +    (stableIncr "159" "160" "sha256-bsX5lotgkgJGVIGW+HWUpwuf8ZeY6P7h/uDfGuBfntc=" [ ])
++    (stableIncr "161" "162" "sha256-0WrVaVGrEt0N63/CJSADkKAoB99RkW/5TtF9Gj9djB8=" [
++      "drivers/gpu/drm/msm/msm_rd.c"
++      "sound/core/compress_offload.c"
++    ])
++    (stableIncr "162" "163" "sha256-OiSXyG2GxYYRIMLRhatdlMumxM1ExM/oTxOvOEei7o8=" [
++      "drivers/staging/android/ion/ion_system_heap.c"
++    ])
++    (stableIncr "163" "164" "sha256-13wZdwCqwnFfveRQ0jqmuoea1WBQKgUsMB7DF6Hq4Fw=" [
++      "security/keys/proc.c"
++    ])
++    (stableIncr "164" "165" "sha256-DscMueGZqVrBqf7yhZHCRyFe1meWbeqwfinCmbhz4uM=" [
++      "arch/arm/kernel/irq.c"
++      "drivers/scsi/sd.c"
++    ])
++    (stableIncr "165" "166" "sha256-9apxwXxKKvam3/BvKNXS3K+C0ASDjS2xfERQAq7WWGk=" [
++      "drivers/scsi/ufs/ufshcd.c"
++      "drivers/usb/core/config.c"
++      "include/net/inet_connection_sock.h"
++      "net/dccp/ipv4.c"
++      "net/dccp/ipv6.c"
++      "net/ipv4/tcp_input.c"
++    ])
++    (stableIncr "166" "167" "sha256-mxkCofcCXRdsdyFsisNrdiB/J9O+8jlMAR5FiLjKohc=" [
++      "drivers/scsi/sd.c"
++      "drivers/video/fbdev/goldfishfb.c"
++      "net/wireless/nl80211.c"
++    ])
++    (stableIncr "167" "168" "sha256-nnRmwTSyrmK6mZ1lEZPEy+KTso2yjmwAaPDseVmqhaU=" [
++      "drivers/hwtracing/coresight/coresight-etm4x.c"
++      "drivers/usb/gadget/function/f_fs.c"
++      "fs/f2fs/trace.c"
++    ])
++    (stableIncr "168" "169" "sha256-SiWZYbGGLvIdiSe4KqUjx3Zhs3AAkWweD0nXI7STc60=" [ ])
++    (stableIncr "169" "170" "sha256-jtXTTJJAoQ4um9V1kQFBS9F/Y3og7ty/djqBntgXDbs=" [
++      "fs/f2fs/super.c"
++    ])
++    (stableIncr "170" "171" "sha256-a297x6MTkGc8s0qRTl0B/T0vOzwENILiZbIt2eciedE=" [
++      "drivers/mmc/host/sdhci.c"
++      "kernel/trace/ftrace.c"
++      "sound/core/info.c"
++    ])
++    (stableIncr "171" "172" "sha256-44Ypsdz6hJmpIarmfhYZjgacptXO19gNPzEyJl8Dilw=" [
++      "net/ipv4/sysctl_net_ipv4.c"
++    ])
++    (stableIncr "172" "173" "sha256-RAszcusU2yaX9ZOAgvvkSqOVYhbZqBhSTxsHF/5b7kU=" [ ])
++    (stableIncr "173" "174" "sha256-Luf3gsTTlLbhO/CBhbZGHe3I/964SFS52ve77K/uWbQ=" [
++      "security/selinux/hooks.c"
++    ])
++    (stableIncr "174" "175" "sha256-Q+XNJaV8J5O8nZR9vRnGeSKUU4GAk+i/3uZzADKtnLU=" [
++      "drivers/usb/dwc3/core.c"
++      "kernel/time/timer_stats.c"
++    ])
++    (stableIncr "175" "176" "sha256-1nB4FQD15k4OMOZK3zVXXsUkY8/jZVktPMpQlTzNuTY=" [
++      "kernel/cpu.c"
++    ])
++    (stableIncr "176" "177" "sha256-HbF9oSK3TlwdOsPyTUxTLi01dGnPGU8wweqZceDU9XE=" [
++      "include/sound/pcm.h"
++      "kernel/bpf/hashtab.c"
++      "sound/core/pcm_lib.c"
++      "sound/core/pcm_native.c"
++    ])
++    (stableIncr "177" "178" "sha256-KHfeYu51veT5wjQ1RYoEBKGL8hN/0NLAc55g48IFDs0=" [
++      "include/linux/backing-dev-defs.h"
++      "mm/backing-dev.c"
++    ])
++    (stableIncr "178" "179" "sha256-V1drcLRpxCrys9GKVOvWi/q9/89fj1D2HdNQXTb5FSo=" [ ])
++    (stableIncr "179" "180" "sha256-uzStRtjsZ7ZZMu7zWmYDmFUtplyC5F0dqwNbnlYOjrA=" [
++      "drivers/scsi/sd.c"
++      "drivers/scsi/ufs/ufshcd.c"
++    ])
++    (stableIncr "180" "181" "sha256-PvaUdvAUHsiQc9alS5uHY5YGm1pQ0ngjE629HVIy60E=" [
++      "drivers/android/binder.c"
++      "drivers/firmware/efi/libstub/arm-stub.c"
++      "drivers/firmware/efi/libstub/arm64-stub.c"
++      "drivers/firmware/efi/libstub/efi-stub-helper.c"
++      "drivers/firmware/efi/libstub/efistub.h"
++      "include/linux/efi.h"
++    ])
++    (stableIncr "181" "182" "sha256-K/qRZdyY4I1+fpTSlzE2vd8UdfkRwWXqcTuCe1OBE2M=" [ ])
++    (stableIncr "182" "183" "sha256-PfYSpv8o7azTS4aHsfpIF9y04wRV+Z1QcVINv0zcecI=" [
++      "arch/arm/kernel/smp.c"
++    ])
++    (stableIncr "183" "184" "sha256-SkZxyk9C0ImqP9azYL5eUztwXKrx410FOVr2Sb2+l5s=" [ ])
++    (stableIncr "184" "185" "sha256-C43Aatq76Ev5xQVtdGj2NvQAvOdGUW0ku5l5g+ltuqM=" [
++      "drivers/scsi/ufs/ufshcd-pltfrm.c"
++      "kernel/cpu.c"
++    ])
++    (stableIncr "185" "186" "sha256-9K4TLzJ9/usTkL3DPT4uqoHKKo2SgGxb96TjJ//J8KY=" [
++      "drivers/usb/gadget/function/u_ether.c"
++      "fs/crypto/policy.c"
++    ])
++    (stableIncr "186" "187" "sha256-8wc3GPkZ7RUwSmBJ3aDPw2625Cas4B2gPRkHtwy4n4Q=" [
++      "drivers/edac/edac_mc_sysfs.c"
++      "drivers/tty/serial/msm_serial.c"
++    ])
++    (stableIncr "187" "188" "sha256-WjR2KcHLxvTSFr02elsZv+75X0VlgBYYXMi+G0fLz4o=" [
++      "drivers/android/binder.c"
++      "drivers/perf/arm_pmu.c"
++    ])
++    (stableIncr "188" "189" "sha256-DkJ8WUZ8GUPNaO/J2K1p4ITakl96500NaxlBTFZwhxU=" [ ])
++    (stableIncr "189" "190" "sha256-GrOXLrNWRurib5st3WO0OMtIkPgCz3K83/Vik9YpzCg=" [
++      "sound/core/compress_offload.c"
++    ])
++    (stableIncr "190" "191" "sha256-0R5o9aSTOEOv6nlhoTQZPZm6iw36qQ63MR/sc4+fl9M=" [
++      "drivers/usb/gadget/composite.c"
++      "fs/userfaultfd.c"
++      "sound/usb/mixer.c"
++    ])
++    (stableIncr "191" "192" "sha256-8UoAuRrRglhXCgcmAbT5erKyDbBe8qK0nHpF/NVAWGo=" [ ])
++    (stableIncr "192" "193" "sha256-C+IIbbWNTffNadyZYxRT3Z3sH5t2WwmF0tPWKyTMrrU=" [ ])
++    (stableIncr "193" "194" "sha256-WGpkwFHIPWiHIw5COb0llmkZsoXfU5XH+/G9X7wh5bw=" [ ])
++    (stableIncr "194" "195" "sha256-4VdlaKeVqLva7aDh84X+vjQOMzuogXBSbXaBAQCLWpU=" [ ])
++    (stableIncr "195" "196" "sha256-4zo+uCFJMbMFQBTwcq7k1sGNYEuiE3ILiRy3kCmvmnw=" [
++      "drivers/android/binder.c"
++    ])
++    (stableIncr "196" "197" "sha256-6KMvhMmnP6kgl+L/IQiK1iYz8l0Vj2BdSbPj11b6lf0=" [
++      "kernel/sched/core.c"
++      "drivers/usb/misc/yurex.c"
++    ])
++    (stableIncr "197" "198" "sha256-kstJOCgF3gZIU5c/PLKhPPtWw1jZnNk+7VGeLKs4PNA=" [ ])
++    (stableIncr "198" "199" "sha256-Quwzrp0flG2LQUBeyhtR7Y/bGhwDoYbJsIMtF2NEMSs=" [ ])
++    (stableIncr "199" "200" "sha256-w9ka1I/HQHhdYJKuVF1Ufx98vJMmNP8IitqArquwnNA=" [ ])
++    (stableIncr "200" "201" "sha256-f8idjtcdbSxhqVilg8atTdR0wgCV4MP9mOKZJ9gecjQ=" [
++      "drivers/usb/gadget/composite.c"
++      "drivers/usb/gadget/configfs.c"
++    ])
++    (stableIncr "201" "202" "sha256-PPV5whznOXMUBfsBsHrsDZSYzRoHBUBh5AgdeJdADco=" [
++      "drivers/usb/gadget/udc/core.c"
++      "include/linux/usb/gadget.h"
++      "kernel/cpu.c"
++    ])
++    (stableIncr "202" "203" "sha256-cl/O4JhEbd+3d721eImTLRIPlZgFlOGKfiY84ihHdHo=" [
++      "fs/f2fs/gc.c"
++      "fs/f2fs/recovery.c"
++      "fs/f2fs/super.c"
++      "include/linux/libfdt_env.h"
++    ])
++    (stableIncr "203" "204" "sha256-iWb2Mbye/oZlg//wgQmeU9flOtamK7dIakoaaMnzCW0=" [
++      "drivers/pinctrl/qcom/pinctrl-spmi-gpio.c"
++      "fs/f2fs/data.c"
++      "fs/f2fs/dir.c"
++      "fs/f2fs/segment.c"
++    ])
++    (stableIncr "204" "205" "sha256-xEv72iYdutq1YRK+dcl8AfDL6uWLTSV/iVckUBAO1Hk=" [ ])
++    (stableIncr "205" "206" "sha256-b/Kr6InyHUtN4Qg3pHghXRFGRikzc0FVNeGS9laV5a0=" [
++      "sound/core/compress_offload.c"
++    ])
++    (stableIncr "206" "207" "sha256-eMH+IMEd4OzzK5qdFfHqMCWTZlsTJP2i9Rww7YE2rgs=" [
++      "drivers/thermal/thermal_core.c"
++      "drivers/usb/dwc3/core.c"
++      "drivers/usb/host/xhci.c"
++      "drivers/net/ethernet/stmicro/stmmac/descs_com.h"
++      "drivers/net/ethernet/stmicro/stmmac/enh_desc.c"
++      "drivers/net/ethernet/stmicro/stmmac/norm_desc.c"
++    ])
++    (stableIncr "207" "208" "sha256-eCuEKKsVato6X1jKqj2rvsgna0kIS8xCz2Y4z3SaiJ8=" [
++      "kernel/time/hrtimer.c"
++    ])
++    (stableIncr "208" "209" "sha256-VGYOuvK66MapCc+xMyJ8n8EMwARjrSKzX0PeJig/0JI=" [
++      "drivers/gpu/drm/drm_property.c"
++      "kernel/locking/spinlock_debug.c"
++    ])
++    (stableIncr "209" "210" "sha256-GgRu0bOKD4zNq/tTus9Z97DkkRt8dWYw9uUDwQAgNvo=" [
++      "include/linux/kobject.h"
++      "lib/kobject.c"
++    ])
++    (stableIncr "210" "211" "sha256-0J8vltJrrrjLH43T0DQD6nZgzO/7NOoJ0Jaurh7/aGA=" [
++      "net/wireless/util.c"
++    ])
++    (stableIncr "211" "212" "sha256-BdT5e7+ge/4V/A3/kEGHKIoGQqj5a3B8yoQ1iX/vVTs=" [ ])
++    (stableIncr "212" "213" "sha256-u/BAKs0ccP6ZgrchqnIQ+X9ITQFlHo34ZVu5SSeAUms=" [ ])
++    (stableIncr "213" "214" "sha256-nF78KIiMTjUnnXze3arakuqDtmcZYysPFv5EUfxokTo=" [
++      "drivers/md/dm.c"
++      "fs/ext4/page-io.c"
++    ])
++    (stableIncr "214" "215" "sha256-j76U/nnAIlcr0C6xOJu83lL43iflai5eGuWNoldhz1o=" [
++      "drivers/usb/gadget/composite.c"
++      "drivers/usb/host/xhci-mem.c"
++      "fs/ext4/ext4.h"
++      "net/netfilter/xt_bpf.c"
++    ])
++    (stableIncr "215" "216" "sha256-jcq/fmDSD1yWnC4BVhD8YFzSLeV9SU36VDk0gQlZwQQ=" [
++      "drivers/gpu/drm/msm/msm_drv.c"
++      "drivers/usb/gadget/composite.c"
++      "drivers/usb/gadget/function/f_fs.c"
++    ])
++    (stableIncr "216" "217" "sha256-RH08IDDG6VNVuOH6ooHKxqwmE1WcgY6EH5LEzG6IyEk=" [ ])
++    (stableIncr "217" "218" "sha256-XIuPbKQ6HStzpntBGRiv9SAehHHqQ0U7SITjs/cemwk=" [
++      "drivers/scsi/sd.c"
++      "scripts/dtc/dtc-lexer.l"
++    ])
++    (stableIncr "218" "219" "sha256-20xc5tT3lCbwCC1tdOPyRXXq7OeNxtrjuArFbmAoGwY=" [
++      "drivers/clk/qcom/clk-rcg2.c"
++      "drivers/gpu/drm/msm/msm_gem.c"
++      "drivers/usb/dwc3/gadget.c"
++      "include/uapi/linux/coresight-stm.h"
++    ])
++    (stableIncr "219" "220" "sha256-iBCZwqgNrMUj2QEOAPKHIhXI0kyLsnj/105IcDJFMhw=" [
++      "drivers/net/wireless/ath/wil6210/interrupt.c"
++      "drivers/net/wireless/ath/wil6210/txrx.c"
++      "drivers/net/wireless/ath/wil6210/wmi.c"
++      "drivers/of/base.c"
++      "drivers/rtc/rtc-pm8xxx.c"
++      "drivers/scsi/ufs/ufs-qcom.c"
++      "drivers/scsi/ufs/ufshcd.c"
++      "drivers/usb/gadget/composite.c"
++      "kernel/cpu.c"
++    ])
++    (stableIncr "220" "221" "sha256-YueWU5AX1c6B76Mun8fRpfgb0uQhCde42gKiv9rGxw8=" [
++      "drivers/gpu/drm/msm/msm_gem.c"
++      "drivers/usb/gadget/function/f_fs.c"
++    ])
++    (stableIncr "221" "222" "sha256-KrcYEkOfVJSsQvbTour71qbpVHbkdPXYJPFdLZvxWlY=" [ ])
++    (stableIncr "222" "223" "sha256-fYnL5wNl7HznV3lPF++AF7JLyWhKhvNi/7ORBJtDKCU=" [ ])
++    (stableIncr "223" "224" "sha256-KR3S+5S02mj6rFbk3NWZh7XT+gTDB1ENr4qoG4lNn6Y=" [
++      "sound/core/rawmidi.c"
++    ])
++    (stableIncr "224" "225" "sha256-luksnSsNlu8SXLz81RXwf3Kmu6X6t+MIhGjfKwYr+Es=" [
++      "net/socket.c"
++    ])
++    (stableIncr "225" "226" "sha256-kLUxkzjCGeROZQTRU0RBaDwCjWBRqHKESZf61BJ5m5g=" [ ])
++    (stableIncr "226" "227" "sha256-q4ILFQGaXofQ10HBGiTORjzOe1D0fiVHftlaiSHGnEA=" [
++      "drivers/usb/gadget/function/f_uac2.c"
++    ])
++    (stableIncr "227" "228" "sha256-p/pOwsFx9kDlaREWnHddCvf5tTJlL0r9yYx5JIghRQo=" [ ])
++    (stableIncr "228" "229" "sha256-7bT3FwOrUcSq9S1cTbcGAVo5SO3UVtxgMFo/31qE8H0=" [
++      "drivers/usb/host/xhci-plat.c"
++    ])
++    (stableIncr "229" "230" "sha256-qjyN6AG/88bsdltzuWOwTLAsOYo8Z4nLU4qtwqetzcs=" [ ])
++    (stableIncr "230" "231" "sha256-KfUb0wZMXLcU4ADCMtQMz8Xnk2rWodOdFTZ90bSEcoo=" [
++      "drivers/irqchip/irq-gic.c"
++      "drivers/usb/host/xhci-plat.c"
++      "net/netlink/genetlink.c"
++      "sound/core/compress_offload.c"
++      # The vendor tree keeps the genl bind/unbind callbacks that 4.9.231
++      # removes, so the family struct has to keep them too.
++      "include/net/genetlink.h"
++    ])
++    (stableIncr "231" "232" "sha256-7tFmz3S9iytDPCvr2ZRrDGIzcz52O4SqybLWuj//H1U=" [ ])
++    (stableIncr "232" "233" "sha256-gaR0f3dqKmyzfNYOWsOq+IDOX5g0Z/heEbOrqoac3YM=" [
++      "drivers/android/binder.c"
++      "fs/f2fs/dir.c"
++      "include/uapi/drm/Kbuild"
++      "include/uapi/linux/Kbuild"
++    ])
++    (stableIncr "233" "234" "sha256-jglSL6pyJftix6YT9ge/0bwahiaY8XIcWxx1Kmff9dY=" [
++      "drivers/scsi/ufs/ufshcd.c"
++      "fs/ext4/namei.c"
++    ])
++    (stableIncr "234" "235" "sha256-Fifxj37u0keCVX6OW0cdT2C/d4+TAzTUVCmbd7jjfA0=" [
++      "drivers/md/dm-table.c"
++      "include/linux/overflow.h"
++    ])
++    (stableIncr "235" "236" "sha256-ciSE9nz/sZJUUyJrAt3ytSFOlg08iXHoKdiIVpTwI6k=" [ ])
++    (stableIncr "236" "237" "sha256-P2P6nR0BmItpj/lksPEqH/xURFN7Wgl1684oTs41BHs=" [ ])
++    (stableIncr "237" "238" "sha256-FzBlfukikDiKR/OgiHaIqgpz/YWkpDegkVE5ybkK0b8=" [ ])
++    (stableIncr "238" "239" "sha256-gwe/4XdF5YiBSshUEVJZ9LBGEWg89reQvSoNwXbcKxg=" [
++      "mm/page_alloc.c"
++    ])
++    (stableIncr "239" "240" "sha256-QiNYHq384BYZsoON6wwn8I14Gb6h/YkR1EhR8+y0PyY=" [ ])
++    (stableIncr "240" "241" "sha256-57e5eUwccywjE+U2ctTr/3c0kJvbyoAzA7Mnvf8Mr7Y=" [ ])
++    (stableIncr "241" "242" "sha256-8Qs7WSBJbUmtkatODz5wqcJ2KHZ0r8KfmIk+UP0Y9D4=" [
++      "fs/crypto/policy.c"
++      "fs/ext4/ext4.h"
++      "fs/ext4/ioctl.c"
++      "fs/f2fs/f2fs.h"
++      "fs/f2fs/file.c"
++      "fs/f2fs/namei.c"
++      "include/linux/fscrypto.h"
++    ])
++    (stableIncr "242" "243" "sha256-EC785yvjEiFOFhgR+cRGekqaUvlHdMJkdPwxEZ3DGnI=" [ ])
++    (stableIncr "243" "244" "sha256-NTY0KVA3ZFBdi7L7r+Jbq83zi0W6fIWxMKmMUMqTkuk=" [ ])
++    (stableIncr "244" "245" "sha256-Z/D46oIdzGqUWT5Ym9xhMBahdQylY3+Mi9rX5z/Po/Q=" [ ])
++    (stableIncr "245" "246" "sha256-HiOiu+mJAqu2O9F9WQ6YWxjCqrgPaKgaQvs/BTS6GEo=" [
++      "fs/ext4/ext4.h"
++    ])
++    (stableIncr "246" "247" "sha256-pqA9RYBr5FU1oQLyQkIqQBRdcVjtnJVus3+VQjI90+w=" [
++      "drivers/scsi/ufs/ufshcd.c"
++    ])
++    (stableIncr "247" "248" "sha256-xuiNWGWrmBS7KUw/L2dBSqGYgDBJswIJ47wOnq2T3oY=" [ ])
++    (stableIncr "248" "249" "sha256-jdNJA78KJ1HNvAYj+R+p8cXrsABFtK23/23mQFrNmzY=" [ ])
++    (stableIncr "249" "250" "sha256-S8SfzhqnkHW+TlpAQXX6fez+6nxfrajJHAG6W0WzgpE=" [
++      "net/ipv6/datagram.c"
++    ])
++    (stableIncr "250" "251" "sha256-v4gGxNct5vJFfTrhdbZDo32E9Atu2taxza6+e19fuwc=" [
++      "drivers/usb/gadget/composite.c"
++      "drivers/usb/gadget/configfs.c"
++    ])
++    (stableIncr "251" "252" "sha256-ZfzLNt5rpbYlhr38b+bu6O35woK8G1VOp+x0Ey7S4TU=" [
++      "include/asm-generic/vmlinux.lds.h"
++    ])
++    (stableIncr "252" "253" "sha256-j4UNPxbx7TY62x+ruK6xfks6S/KsMcmtgmCN4Sru9Uo=" [ ])
++    (stableIncr "253" "254" "sha256-VDZo7J94xygEG3VtBfzjgGcYNdibLE0sPOkTTQ4px8c=" [
++      "drivers/scsi/ufs/ufshcd.c"
++    ])
++    (stableIncr "254" "255" "sha256-j9tLqAlXDFOMsK15bJfNFBQk6e/QKHijsGmEmU+3H5Y=" [
++      "kernel/exit.c"
++    ])
++    (stableIncr "255" "256" "sha256-mvP4DNdn1pNY5Fjjtajk/g9xIW++3xDf64UsvYhSbok=" [ ])
++    (stableIncr "256" "257" "sha256-l4RJjynQaF7eeDbSoug8ZvCnB/grgrYVJ2H581R+JWU=" [ ])
++    (stableIncr "257" "258" "sha256-pD4Pv5cm7cSKcSEKIQ7G6FLRL/u2on/4Q5Tecmy+PZI=" [
++      "include/linux/memcontrol.h"
++      "mm/memcontrol.c"
++      "mm/page-writeback.c"
++    ])
++    (stableIncr "258" "259" "sha256-qokls3hq2Sr8MqNFI851zQ4ihWQhytcooV/3zlpHa50=" [ ])
++    (stableIncr "259" "260" "sha256-cgL0mdXo+uJrrrMn7ctUYE9TVIlrS10dVLqGbrY1QAY=" [ ])
++    (stableIncr "260" "261" "sha256-k+DgHeRJ6xnF6h70qR2JMPp0cEawIBzQ99gbhCcM4sE=" [
++      "drivers/md/dm-table.c"
++    ])
++    (stableIncr "261" "262" "sha256-dsFzNDq6/s6A9LvBlmfFRHvC71aJpYutIo6odQuNvbk=" [ ])
++    (stableIncr "262" "263" "sha256-NN8ZRlOMVxvi9ZTEZnHF8gRToAse6F9u+51OD/52Uvs=" [
++      "drivers/usb/gadget/configfs.c"
++      "include/linux/thread_info.h"
++    ])
++    (stableIncr "263" "264" "sha256-ObzmhlUNcKXYJLDAWHJBWER15pEHehEuLLPJMyceNco=" [ ])
++    (stableIncr "264" "265" "sha256-UCZLUW7PW8vEmhD8Detpy73Sd5ozhrcPfJ9vVv7U9nw=" [ ])
++    (stableIncr "265" "266" "sha256-0CiUopF5jDFH9xw6P8lq2jf1V3YlJJ2eAO9vQw9E8Es=" [ ])
++    (stableIncr "266" "267" "sha256-gjNGw1z2PyO/BcHet5ywqXxGtsFfThSVPRn5tJF2Rro=" [ ])
++    (stableIncr "267" "268" "sha256-OEw3wnV7QyNxPMaUWB4SFMz3Gx8KwXZD6WIeWgM0HDo=" [ ])
++    (stableIncr "268" "269" "sha256-xY5Qa6MDEs0kQTjXCFkOFtrb9WXkjkD9l+HeADvtPYs=" [
++      "drivers/usb/core/hub.c"
++      "drivers/mmc/core/core.c"
++    ])
++    (stableIncr "269" "270" "sha256-7oszsss5c9HLxbSnYKxdPp9dYQlKR3jSVC/RjNZq85E=" [
++      "drivers/leds/leds-lp5523.c"
++    ])
++    (stableIncr "270" "271" "sha256-iDAy+ZT1lEDOYox3WbvbDxuQ6/Q2UKGL1itOSCrwtTM=" [ ])
++    (stableIncr "271" "272" "sha256-ccBD2gWwA95QzX+LVTzh9Zz3uC/ZMTtkMPltUrOwfXA=" [ ])
++    (stableIncr "272" "273" "sha256-xXHSjIQTErNqz3P/gKejig3Njcdy7nHebXQWklqWJ+E=" [ ])
++    (stableIncr "273" "274" "sha256-YHWgViT66Ya5vtg9gVsVkbHpr1ktk+ILlJGmkTlI/hE=" [ ])
++    (stableIncr "274" "275" "sha256-w0YDQUJbiWwaMiG3gNwdYyzy0LIwMOruUyFG+UMFCu0=" [ ])
++    (stableIncr "275" "276" "sha256-YCgoWSwbB5ra+hm1DTM/CqPvBnYdhGBjdVAfH5Yj+vo=" [
++      "fs/crypto/fname.c"
++      "fs/fs-writeback.c"
++      "security/selinux/avc.c"
++    ])
++    (stableIncr "276" "277" "sha256-e19zv9gLlXbMZFRUSVniyOp+1BIRSQTIPNamCBfuemQ=" [ ])
++    (stableIncr "277" "278" "sha256-FHB9IE1jC0AYKCN0wvjb/z0zAscuQHY4Q1QALRTr9Hk=" [ ])
++    (stableIncr "278" "279" "sha256-lDGTfrHjyaHtXqPQ7aYruEE5ru2jI5Y/JlTpUD7LV1I=" [ ])
++    (stableIncr "279" "280" "sha256-MUIkAyKRy+HQKskgRMxI8aD9iz8Kk2RGtskaHE0tMcE=" [ ])
++    (stableIncr "280" "281" "sha256-N/5egQVRhERrwaHM6ZRI8bC4w9i2y9VIMTjPUG6BaUo=" [ ])
++    (stableIncr "281" "282" "sha256-WJcuEulf8/kcLDwCPrrhn6GndGyjqveOLixTI0pMT9Y=" [
++      "drivers/usb/dwc3/gadget.c"
++    ])
++    (stableIncr "282" "283" "sha256-PGvh9jdmzzQ0/Nxz1JOsEYUdm/oxK20DiphBU6kiT8c=" [
++      "drivers/usb/gadget/composite.c"
++      "fs/gfs2/acl.c"
++    ])
++    (stableIncr "283" "284" "sha256-qCs+hEw45OnU0XuTsY52qP2qdzvWiioYSSQAIg8k7/A=" [
++      "drivers/staging/android/ion/ion_system_heap.c"
++    ])
++    (stableIncr "284" "285" "sha256-eBRi2apo+WlLmAA6CyZ4gDmbD26CLszx5H+uUapR6BE=" [
++      "kernel/sched/cpufreq_schedutil.c"
++    ])
++    (stableIncr "285" "286" "sha256-nioQQ8pt4JMOvY057frMsaVXnA2PeO50EXJYOl0NWqQ=" [
++      "include/net/sock.h"
++    ])
++    (stableIncr "286" "287" "sha256-hYlL10oQrkP6/BaY90AiUgsc8fu+k86bLlRVnRfKln4=" [ ])
++    (stableIncr "287" "288" "sha256-jl4LhjQEhSokegE4zzJW3tGZRcwH3ZtchboOiBIqUkY=" [
++      "arch/arm/Kconfig"
++    ])
++    (stableIncr "288" "289" "sha256-HzmCZNIK3hvf/vLPuSKzBrWREtHvVtGUdPDUFnqgrrI=" [ ])
++    (stableIncr "289" "290" "sha256-sGuwdtys6aMFfmEBPfxgPlBvo44xn6+E3duiEYA6enw=" [ ])
++    (stableIncr "290" "291" "sha256-cxvZP0iq6GNqDiA4nULglKzJNavAJ1HMIXrLAFKBT0I=" [
++      "drivers/android/binder.c"
++    ])
++    (stableIncr "291" "292" "sha256-KuYD1TGH6/dvKMYQW+3ObtCQAWLyAc/jVr4rK39N3Rc=" [
++      "drivers/android/binder.c"
++      "drivers/thermal/thermal_core.c"
++      "drivers/usb/core/hub.c"
++    ])
++    (stableIncr "292" "293" "sha256-h1PY4mSXQ6ZTN0/w7Jg56e1AvD6ty0XiW8E1eDikR6I=" [
++      "drivers/android/binder.c"
++      "drivers/usb/gadget/composite.c"
++    ])
++    (stableIncr "293" "294" "sha256-z+Y37eZeHNefbETQdRgL8DYUkzYP2D0Azp67heAZWkc=" [
++      "drivers/usb/gadget/composite.c"
++    ])
++    (stableIncr "294" "295" "sha256-hle+VvLDNNLhQJetLSyr0QuXhRPdA0TLqiOOsel6pY8=" [ ])
++    (stableIncr "295" "296" "sha256-arjZ77QkP/5fW74RmyeauuINZkOz9Va9Q5Lod8voYHE=" [ ])
++    (stableIncr "296" "297" "sha256-vOHhPYg8ZBu1OAySnUVP8rOFhSA9U39BRXNkUX2fv2k=" [ ])
++    (stableIncr "297" "298" "sha256-NrzwiPiJdq6OtlNE+7vR2+71JSghb7yB8hbcOsM5yAY=" [
++      "drivers/media/dvb-core/dmxdev.c"
++      "fs/ext4/ioctl.c"
++    ])
++    (stableIncr "298" "299" "sha256-Mr6AljEnB2q+85YPWyTW/0A0BxAzrB4nH3y2teM2CV4=" [
++      "drivers/staging/android/ion/ion-ioctl.c"
++      "drivers/staging/android/ion/ion.c"
++      "drivers/staging/android/ion/ion_priv.h"
++    ])
++    (stableIncr "299" "300" "sha256-JFlLOJRzZhcE61iFt2fvmekheA11IEQeVepVTp6znxg=" [ ])
++    (stableIncr "300" "301" "sha256-ksjfTgcWwwqLegmMRX8K8Zy2MsATNUuslqPIe3TgKIQ=" [ ])
++    (stableIncr "301" "302" "sha256-vbtHu2LCWVsFvOZWQJAt8L3wAQMSoh/e5A9LhDpa9XA=" [ ])
++    (stableIncr "302" "303" "sha256-uxLd94ddnnbz3aCoHX/u0lUwhYg+MoLuXlsSodPvzhs=" [ ])
++    (stableIncr "303" "304" "sha256-ihRXPqnoJ+wjfNPfnP+KkrLPinqgt2Z7IY4us0ryipI=" [
++      "drivers/usb/dwc3/gadget.c"
++      "drivers/usb/gadget/function/rndis.c"
++      "drivers/usb/gadget/function/rndis.h"
++    ])
++    (stableIncr "304" "305" "sha256-FEF1PFyNhPRf9ztHtY5SzA99Cm2UXgwt0XdFzG34s04=" [
++      "net/ipv6/ip6_output.c"
++    ])
++    (stableIncr "305" "306" "sha256-ITnaJfGWo8uWhVAfye4AYEvG4/+pbiuPsbmD47lqpk8=" [
++      "include/linux/bpf.h"
++    ])
++    (stableIncr "306" "307" "sha256-KN7PYDDeih/G7GwD85nJzxrWTq+t0VFO7Ipxlqfqq9A=" [ ])
++    (stableIncr "307" "308" "sha256-H1cm1imAvWa0a1jQ5l3SD0SEa2gAsA7JgxZ40pJ7czA=" [ ])
++    (stableIncr "308" "309" "sha256-mFjHuxHIGDq2BiSzKTOhP6SG2tuHLxj/Qnz0sbDTMP0=" [
++      "drivers/nfc/st21nfca/se.c"
++      "net/ipv6/ip6_output.c"
++    ])
++    (stableIncr "309" "310" "sha256-vGegVa9YZO5S5T28C1xfmflduPC9Yf5ekdIAivu6JDo=" [ ])
++    (stableIncr "310" "311" "sha256-SHW0GyGeDHARLZ+6BY6t8N/SXqegu1pOMiXiKx4jXFA=" [
++      "drivers/clk/qcom/clk-rcg2.c"
++      "mm/memory.c"
++    ])
++    (stableIncr "311" "312" "sha256-BYimLlVd2Qs/gxNjl4+xEzQblY2a+XE6z7bUUHyJYAg=" [ ])
++    (stableIncr "312" "313" "sha256-CX9zwUiEDQR9n1C2d9RzAnlWNx+qPK4ISzbyt9f5tUU=" [ ])
++    (stableIncr "313" "314" "sha256-o5EVns2b8qI01MulYP4+n8EVH8Z9MzgxU+5brDcvhJ8=" [ ])
++    (stableIncr "314" "315" "sha256-Kb8FkNK/Gea+8+fXbCMdSytRnLGz3h+JqatQFcikEvw=" [ ])
++    (stableIncr "315" "316" "sha256-rb19Z+VVsDhN2rSDk9jQUpqZGz0S3fBfaBUqncOjyiM=" [
++      "drivers/mmc/core/core.c"
++      "drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c"
++    ])
++    (stableIncr "316" "317" "sha256-1BHiTDZtSVsnWpzvOK944oz0vrHr5v9KNVEdjNPhDoA=" [
++      "drivers/md/dm-verity-target.c"
++    ])
++    (stableIncr "317" "318" "sha256-F9MDaHvB8pw8HIvIHzQjP2fE6A0voEjhFxX8ORAL58k=" [
++      "drivers/nfc/st21nfca/se.c"
++      "fs/fat/fatent.c"
++    ])
++    (stableIncr "318" "319" "sha256-szI2n0ldgzvzd2CUyS1i6xtpie9S7/Ch5UTtacyRhCA=" [ ])
++    (stableIncr "319" "320" "sha256-IvIu0MVFpV9lp9IcGvb/sPtJtLOFvILp44081GyxV7Y=" [
++      "crypto/chacha20_generic.c"
++      "drivers/char/random.c"
++      "drivers/of/fdt.c"
++      "include/crypto/chacha20.h"
++      "kernel/cpu.c"
++      "lib/Makefile"
++      "lib/chacha20.c"
++      # Keep the trace header: this tree still has the tracepoints in random.c.
++      "include/trace/events/random.h"
++      "include/linux/random.h"
++      "lib/random32.c"
++      "kernel/irq/handle.c"
++      "init/main.c"
++      "crypto/drbg.c"
++      "drivers/char/hw_random/core.c"
++      "include/crypto/drbg.h"
++      "include/linux/hw_random.h"
++      # This tree's random.c still defines randomize_page(), which upstream
++      # moves to mm/util.c here; keeping both copies fails to link.
++      "mm/util.c"
++    ])
++    (stableIncr "320" "321" "sha256-reRxGbhTyH8D7P1IjJETRPs4J8/o8Z81zGt5gg+9788=" [
++      "drivers/char/random.c"
++      "drivers/of/fdt.c"
++    ])
++    (stableIncr "321" "322" "sha256-bdTtMtpI2bOSoTyDtVy2sqew9vKQ/HIrmq174HXH3Mc=" [ ])
++    (stableIncr "322" "323" "sha256-7QvHCc/OyDaLA9aNGOJkfWxGR71/3s8pnveTIfNyCn4=" [ ])
++    (stableIncr "323" "324" "sha256-tR0sSxy/S1WpsUOsTtR7KhGYC+kJcveztOQFKhibzWg=" [ ])
++    (stableIncr "324" "325" "sha256-2QlZdJ0w9XtssFFYFmBuoZ2sjQGuJcvHgceBhmgMeZE=" [
++      "drivers/char/random.c"
++    ])
++    (stableIncr "325" "326" "sha256-0qYL7+kMK2qO95w1UAPrB9cGzZWIvaWUdDy4aNPQSO0=" [
++      "drivers/staging/android/ion/ion-ioctl.c"
++      "include/linux/bpf.h"
++      "init/main.c"
++      "security/selinux/include/objsec.h"
++    ])
++    (stableIncr "326" "327" "sha256-d+HUkmzQEWH77NSCjTwPBcmwMgM+DWtcf2GUGkkl4xU=" [ ])
++    (stableIncr "327" "328" "sha256-EvbxBaD5pza8/mBToPRXBFMJ60jPlswgIjK7NrEGpCE=" [
++      "drivers/usb/dwc3/core.c"
++      "net/netfilter/nf_conntrack_irc.c"
++    ])
++    (stableIncr "328" "329" "sha256-g3be8ehGiHc3ZX7QE1oJfVK8l21NjtUTnUXNPgkEb/8=" [ ])
++    (stableIncr "329" "330" "sha256-EJIO4vC6Ws3d8y+v4lpLl9nnET6kkDE3l/KVEYxXVDE=" [
++      "net/netfilter/nf_conntrack_irc.c"
++    ])
++    (stableIncr "330" "331" "sha256-YIBFvoPzNT5X//HOmZltytRN7TIAelTwkI9tcRk2WJg=" [
++      "drivers/char/random.c"
++      "net/ipv4/udp.c"
++    ])
++    (stableIncr "331" "332" "sha256-E2PHDT/JRTMnrawq8SEF/+gilQqHoxAnnBpB90emuc4=" [
++      "drivers/mmc/core/sdio_bus.c"
++    ])
++    (stableIncr "332" "333" "sha256-blySpOpbg/pNV3/k2P2Am4oEg7xq2el1107vU45s4J8=" [ ])
++    (stableIncr "333" "334" "sha256-0aq/LUQJVe2S8KUXdW421aiAP8aOEkhIaH/TO57dA2I=" [ ])
++    (stableIncr "334" "335" "sha256-GRcdcibEPi7NgJC/RFQZQXHV5dPHQfQosQpWSB0YL8M=" [ ])
++    (stableIncr "335" "336" "sha256-8tw2ttAkGkpRoJgRgIsg1H/NtJaJpdwywz6PIrLdqic=" [
++      "drivers/mmc/host/sdhci.c"
++      "drivers/mmc/host/sdhci.h"
++    ])
++    (stableIncr "336" "337" "sha256-xH6W8Fua4NPmnGjLymcgq+BIJGpi2EYhasDvtgVDdP8=" [ ])
 +  ];
 +
 +  isModular = false;
@@ -815,6 +1666,3 @@ index 00000000..6e7cf7a0
 +    cp -f "$buildRoot/arch/arm/boot/zImage-dtb" "$out/zImage"
 +  '';
 +}
--- 
-2.56.0
-
