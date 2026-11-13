@@ -1,60 +1,60 @@
-From 830a0f16b4cd661950f86638e7c4340c76d5d96f Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Mio <mio@mio19.uk>
-Date: Fri, 13 Nov 2026 00:05:36 +1100
+Date: Mon, 9 Nov 2026 10:55:55 +1100
 Subject: [PATCH] fossil-hoki: package vendor kernel and local fixes
 
 ---
- ...d-pm_qos_remove_request-with-active-.patch |  40 +
- .../fossil-hoki/kernel/90_dtbs-install.patch  |  29 +
- devices/fossil-hoki/kernel/default.nix        | 844 ++++++++++++++++++
- devices/fossil-hoki/kernel/defconfig.patch    |  48 +
- .../stable/linux-4.14.206-207.patch.patch     |  30 +
- .../stable/linux-4.14.214-215.patch.patch     |  66 ++
- .../stable/linux-4.14.217-218.patch.patch     | 589 ++++++++++++
- .../stable/linux-4.14.221-222.patch.patch     |  15 +
- .../stable/linux-4.14.223-224.patch.patch     |  48 +
- .../stable/linux-4.14.224-225.patch.patch     |  20 +
- .../stable/linux-4.14.225-226.patch.patch     |  26 +
- .../stable/linux-4.14.226-227.patch.patch     |  11 +
- .../stable/linux-4.14.228-229.patch.patch     |  18 +
- .../stable/linux-4.14.235-236.patch.patch     |  44 +
- .../stable/linux-4.14.236-237.patch.patch     |  37 +
- .../stable/linux-4.14.237-238.patch.patch     |  19 +
- .../stable/linux-4.14.238-239.patch.patch     |  18 +
- .../stable/linux-4.14.239-240.patch.patch     | 169 ++++
- .../stable/linux-4.14.240-241.patch.patch     |  24 +
- .../stable/linux-4.14.241-242.patch.patch     |  31 +
- .../stable/linux-4.14.244-245.patch.patch     |  21 +
- .../stable/linux-4.14.246-247.patch.patch     |  61 ++
- .../stable/linux-4.14.252-253.patch.patch     |  18 +
- .../stable/linux-4.14.256-257.patch.patch     |  45 +
- .../stable/linux-4.14.258-259.patch.patch     |  27 +
- .../stable/linux-4.14.274-275.patch.patch     |  24 +
- .../stable/linux-4.14.277-278.patch.patch     |  22 +
- .../stable/linux-4.14.291-292.patch.patch     |  29 +
- .../stable/linux-4.14.295-296.patch.patch     |  45 +
- .../stable/linux-4.14.304-305.patch.patch     |  33 +
- .../stable/linux-4.14.325-326.patch.patch     |  70 ++
- .../stable/openela-4.14.336-337.patch.patch   |  13 +
- .../stable/openela-4.14.340-341.patch.patch   |  29 +
- .../stable/openela-4.14.343-344.patch.patch   |  31 +
- .../stable/openela-4.14.355-356.patch.patch   | 183 ++++
- .../kernel/stable/vendor-235-236.patch        |  32 +
- .../kernel/stable/vendor-236-237.patch        |  13 +
- .../kernel/stable/vendor-237-238.patch        |  14 +
- .../kernel/stable/vendor-238-239.patch        |  13 +
- .../kernel/stable/vendor-239-240.patch        |  75 ++
- .../kernel/stable/vendor-240-241.patch        |  15 +
- .../kernel/stable/vendor-241-242.patch        |  26 +
- .../kernel/stable/vendor-244-245.patch        |  12 +
- .../kernel/stable/vendor-245-246.patch        |  34 +
- .../kernel/stable/vendor-246-247.patch        |  42 +
- .../kernel/stable/vendor-249-250.patch        |  14 +
- .../kernel/stable/vendor-256-257.patch        |  64 ++
- .../kernel/stable/vendor-270-271.patch        | 232 +++++
- .../kernel/stable/vendor-284-285.patch        | 233 +++++
- .../kernel/stable/vendor-298-299.patch        |  15 +
- 50 files changed, 3611 insertions(+)
+ ...d-pm_qos_remove_request-with-active-.patch |   40 +
+ .../fossil-hoki/kernel/90_dtbs-install.patch  |   29 +
+ devices/fossil-hoki/kernel/default.nix        | 1029 +++++++++++++++++
+ devices/fossil-hoki/kernel/defconfig.patch    |   48 +
+ .../stable/linux-4.14.206-207.patch.patch     |   30 +
+ .../stable/linux-4.14.214-215.patch.patch     |   66 ++
+ .../stable/linux-4.14.217-218.patch.patch     |  589 ++++++++++
+ .../stable/linux-4.14.221-222.patch.patch     |   15 +
+ .../stable/linux-4.14.223-224.patch.patch     |   48 +
+ .../stable/linux-4.14.224-225.patch.patch     |   20 +
+ .../stable/linux-4.14.225-226.patch.patch     |   26 +
+ .../stable/linux-4.14.226-227.patch.patch     |   11 +
+ .../stable/linux-4.14.228-229.patch.patch     |   18 +
+ .../stable/linux-4.14.235-236.patch.patch     |   44 +
+ .../stable/linux-4.14.236-237.patch.patch     |   37 +
+ .../stable/linux-4.14.237-238.patch.patch     |   19 +
+ .../stable/linux-4.14.238-239.patch.patch     |   18 +
+ .../stable/linux-4.14.239-240.patch.patch     |  169 +++
+ .../stable/linux-4.14.240-241.patch.patch     |   24 +
+ .../stable/linux-4.14.241-242.patch.patch     |   31 +
+ .../stable/linux-4.14.244-245.patch.patch     |   21 +
+ .../stable/linux-4.14.246-247.patch.patch     |   61 +
+ .../stable/linux-4.14.252-253.patch.patch     |   18 +
+ .../stable/linux-4.14.256-257.patch.patch     |   45 +
+ .../stable/linux-4.14.258-259.patch.patch     |   27 +
+ .../stable/linux-4.14.274-275.patch.patch     |   24 +
+ .../stable/linux-4.14.277-278.patch.patch     |   22 +
+ .../stable/linux-4.14.291-292.patch.patch     |   29 +
+ .../stable/linux-4.14.295-296.patch.patch     |   45 +
+ .../stable/linux-4.14.304-305.patch.patch     |   33 +
+ .../stable/linux-4.14.325-326.patch.patch     |   70 ++
+ .../stable/openela-4.14.336-337.patch.patch   |   13 +
+ .../stable/openela-4.14.340-341.patch.patch   |   29 +
+ .../stable/openela-4.14.343-344.patch.patch   |   31 +
+ .../stable/openela-4.14.355-356.patch.patch   |  183 +++
+ .../kernel/stable/vendor-235-236.patch        |   32 +
+ .../kernel/stable/vendor-236-237.patch        |   13 +
+ .../kernel/stable/vendor-237-238.patch        |   14 +
+ .../kernel/stable/vendor-238-239.patch        |   13 +
+ .../kernel/stable/vendor-239-240.patch        |   75 ++
+ .../kernel/stable/vendor-240-241.patch        |   15 +
+ .../kernel/stable/vendor-241-242.patch        |   26 +
+ .../kernel/stable/vendor-244-245.patch        |   12 +
+ .../kernel/stable/vendor-245-246.patch        |   34 +
+ .../kernel/stable/vendor-246-247.patch        |   42 +
+ .../kernel/stable/vendor-249-250.patch        |   14 +
+ .../kernel/stable/vendor-256-257.patch        |   64 +
+ .../kernel/stable/vendor-270-271.patch        |  232 ++++
+ .../kernel/stable/vendor-284-285.patch        |  233 ++++
+ .../kernel/stable/vendor-298-299.patch        |   15 +
+ 50 files changed, 3796 insertions(+)
  create mode 100644 devices/fossil-hoki/kernel/0007-pcm_native-guard-pm_qos_remove_request-with-active-.patch
  create mode 100644 devices/fossil-hoki/kernel/90_dtbs-install.patch
  create mode 100644 devices/fossil-hoki/kernel/default.nix
@@ -189,17 +189,21 @@ index 00000000..1cd6dc69
 + 	$(foreach DIR, $(DTSSUBDIR), $(Q)$(MAKE) $(build)=$(boot)/dts/$(DIR) MACHINE=$(MACHINE) dtbs)
 diff --git a/devices/fossil-hoki/kernel/default.nix b/devices/fossil-hoki/kernel/default.nix
 new file mode 100644
-index 00000000..d5a159d7
+index 00000000..653808b1
 --- /dev/null
 +++ b/devices/fossil-hoki/kernel/default.nix
-@@ -0,0 +1,844 @@
+@@ -0,0 +1,1029 @@
 +{
 +  mobile-nixos,
 +  stdenv,
 +  cpio,
++  diffutils,
 +  fetchFromGitHub,
 +  fetchurl,
++  gawk,
 +  lib,
++  patch,
++  rpm,
 +  runCommand,
 +  xz,
 +  enableDroidspacesBackports ? false,
@@ -358,6 +362,178 @@ index 00000000..d5a159d7
 +          patch -p1 --batch -i "$adaptation"
 +        ''}
 +        cp "${name}" "$out"
++      '';
++
++  # Amazon Linux 2's maintained 4.14 kernel: 4.14.355-287.768.amzn2 is OpenELA
++  # 4.14.355 plus Amazon's 767-patch backport queue, and is the newest 4.14
++  # tree still getting fixes (AL2 shipped it in the 2026-11-09 update). It is
++  # only published as a source RPM; the blob path below is content-addressed
++  # by the same sha256 that pins it, so the fetch cannot drift.
++  #
++  # The tree is rebuilt from the RPM's pristine tarball and its patch queue and
++  # then emitted as a single patch against 4.14.355, so the vendor tree takes
++  # it through the same patch list as every other increment. Files the vendor
++  # tree diverges on are left out, keeping the vendor code instead of a rejected
++  # hunk, the same rule as the increments above.
++  #
++  # Dropping a single file of an AL2 change would leave its remaining files
++  # assuming the half that was dropped (AL2 moved mq_freeze_depth into a mutex,
++  # gave swapin_readahead a fourth argument, and so on), so the seed list below
++  # is expanded in the derivation: an AL2 patch touching a dropped file is
++  # dropped whole. That keeps every surviving change complete, and the build
++  # log prints the expanded list.
++  amzn2Excludes = [
++    # AL2's swapin_readahead takes a vma and address; the vendor swap.h keeps
++    # the vmf argument, so the caller has to stay vendor code too.
++    "mm/swapfile.c"
++    # arm64/x86 code is not built for this armv7l target, and the vendor tree
++    # carries its own arch backports.
++    "arch/arm64/Kconfig"
++    "arch/arm64/Makefile"
++    "arch/arm64/include/asm/Kbuild"
++    "arch/arm64/include/asm/cpucaps.h"
++    "arch/arm64/include/asm/spinlock.h"
++    "arch/arm64/kernel/alternative.c"
++    "arch/arm64/kernel/cpu-reset.h"
++    "arch/arm64/kernel/cpu_errata.c"
++    "arch/arm64/kernel/cpufeature.c"
++    "arch/arm64/kernel/machine_kexec.c"
++    "arch/arm64/kernel/topology.c"
++    "arch/x86/Kconfig"
++    "Documentation/arm64/silicon-errata.txt"
++    # The block layer's freeze API differs: AL2 moves to a mutex-backed
++    # mq_freeze_depth, which the vendor request_queue has no field for.
++    "block/blk-core.c"
++    "block/blk-mq.c"
++    # Vendor qcom/acpi firmware and iommu code predates the AL2 backports
++    # (firmware syfs attributes, non-strict iommu mode, ITS init ordering).
++    "drivers/acpi/device_sysfs.c"
++    "drivers/base/firmware_class.c"
++    "drivers/iommu/arm-smmu.c"
++    "drivers/iommu/dma-iommu.c"
++    "drivers/iommu/io-pgtable-arm.c"
++    "drivers/iommu/io-pgtable.h"
++    "drivers/irqchip/irq-gic-v3.c"
++    "include/linux/iommu.h"
++    # Vendor random.c is the pre-4.9.320 implementation; AL2's RANDOM_WAIT_JITTER
++    # and the ppp_async buffer handling expect Amazon's rewrite.
++    "drivers/char/Kconfig"
++    "drivers/char/random.c"
++    "drivers/net/ppp/ppp_async.c"
++    # Vendor build lists already name the vendor's own directories.
++    "drivers/Makefile"
++    "drivers/misc/Makefile"
++    "lib/Makefile"
++    # The vendor vfs/ext4/nilfs2/udf code takes different helper signatures
++    # (extra lookup arguments, the vendor's fscrypt layout, its nilfs2 pages).
++    "fs/ext4/ext4.h"
++    "fs/ext4/extents.c"
++    "fs/ext4/inline.c"
++    "fs/inode.c"
++    "fs/namei.c"
++    "fs/nilfs2/btree.c"
++    "fs/nilfs2/page.c"
++    "fs/proc/base.c"
++    "fs/udf/inode.c"
++    # AL2's per-netns tcp rmem/wmem and its arg_lock-carrying mm_struct do not
++    # exist in the vendor tree; the sock/tcp headers go with their C files.
++    "include/linux/mm_types.h"
++    "include/net/netns/ipv4.h"
++    "include/net/sock.h"
++    "include/net/tcp.h"
++    "kernel/fork.c"
++    "kernel/signal.c"
++    "kernel/sys.c"
++    "mm/init-mm.c"
++    "mm/swap_state.c"
++    "net/ipv4/syncookies.c"
++    "net/ipv4/tcp_ipv4.c"
++    "net/ipv4/tcp_minisocks.c"
++    "net/ipv4/tcp_output.c"
++    "net/ipv6/syncookies.c"
++    "net/sched/sch_api.c"
++    "net/tipc/bearer.c"
++    # Vendor IMA carries its own template/measurement code.
++    "security/integrity/ima/ima_api.c"
++    "security/integrity/ima/ima_template_lib.c"
++  ];
++
++  amzn2Patch =
++    runCommand "amzn2-4.14.355-287.768.patch"
++      {
++        nativeBuildInputs = [
++          cpio
++          diffutils
++          gawk
++          patch
++          rpm
++          xz
++        ];
++        src = fetchurl {
++          url = "https://amazonlinux-2-repos-us-east-1.s3.dualstack.us-east-1.amazonaws.com/blobstore/4056642df4afbf2fddf8d69b82a79e3f0fd39e84cbd64942c924e69e0b1649c8/kernel-4.14.355-287.768.amzn2.src.rpm";
++          sha256 = "sha256-QFZkLfSvvy/d+NabgqeePw/TnoTL1klCySTmngsWScg=";
++        };
++        seed = lib.concatStringsSep "\n" ([ "Makefile" ] ++ amzn2Excludes);
++      }
++      ''
++        mkdir queue
++        rpm2cpio "$src" > payload.cpio
++        ( cd queue && cpio -idm --quiet < ../payload.cpio )
++
++        mkdir pristine al2
++        tar -xJf queue/linux-4.14.355.tar.xz -C pristine --strip-components=1
++        cp -a pristine/. al2/
++        for p in queue/0*.patch; do
++          patch -p1 -d al2 --batch --forward --no-backup-if-mismatch -s -i "$PWD/$p"
++        done
++
++        # Expand the seed into whole AL2 changes: repeat until no patch in the
++        # queue touches a dropped file without being dropped in full.
++        printf '%s\n' "$seed" | sed '/^$/d' | LC_ALL=C sort -u > dropped.list
++        for attempt in $(seq 100); do
++          : > touched.list
++          for p in queue/0*.patch; do
++            sed -n 's|^diff --git a/[^ ]* b/||p' "$p" | LC_ALL=C sort -u > patch.files
++            if [ -s patch.files ] && comm -12 patch.files dropped.list | grep -q .; then
++              cat patch.files >> touched.list
++            fi
++          done
++          cat dropped.list touched.list | LC_ALL=C sort -u > expanded.list
++          if cmp -s dropped.list expanded.list; then break; fi
++          mv expanded.list dropped.list
++        done
++        echo "AL2 4.14.355-287.768.amzn2: dropping $(wc -l < dropped.list) files"
++        cat dropped.list
++
++        # One section per file, sorted by path so the patch is reproducible.
++        ( cd pristine && find . -type f -printf '%P\n' ) | LC_ALL=C sort > pristine.files
++        ( cd al2 && find . -type f -printf '%P\n' ) | LC_ALL=C sort > al2.files
++        LC_ALL=C sort -u pristine.files al2.files > files
++        : > raw.patch
++        while IFS= read -r f; do
++          if [ -f "pristine/$f" ] && [ -f "al2/$f" ] && cmp -s "pristine/$f" "al2/$f"; then
++            continue
++          fi
++          [ -f "pristine/$f" ] || [ -f "al2/$f" ] || continue
++          echo "diff --git a/$f b/$f" >> raw.patch
++          if [ -f "pristine/$f" ] && [ -f "al2/$f" ]; then
++            diff -u --label "a/$f" --label "b/$f" "pristine/$f" "al2/$f" >> raw.patch || true
++          elif [ -f "pristine/$f" ]; then
++            diff -u --label "a/$f" --label /dev/null "pristine/$f" /dev/null >> raw.patch || true
++          else
++            diff -u --label /dev/null --label "b/$f" /dev/null "al2/$f" >> raw.patch || true
++          fi
++        done < files
++
++        # One section per file starts at "diff --git"; drop the excluded ones.
++        awk -v dropped=" $(tr '\n' ' ' < dropped.list) " '
++          /^diff --git / {
++            path = $3
++            sub(/^a\//, "", path)
++            skip = (index(dropped, " " path " ") > 0)
++          }
++          !skip { print }
++        ' raw.patch > "$out"
 +      '';
 +
 +  # Incremental stable patches, 4.14.206 through 4.14.336.
@@ -872,13 +1048,17 @@ index 00000000..d5a159d7
 +in
 +
 +kernel-builder-gcc8 {
-+  version = "4.14.357";
++  version = "4.14.355-287.768.amzn2";
++  modDirVersion = "4.14.355-287.768.amzn2";
 +  inherit configfile;
 +
 +  # The vendor tree claims 4.14.206 and every incremental patch's Makefile hunk
-+  # is dropped above, so the version is set here instead of 24 times over.
++  # is dropped above, so the version is set here instead of 24 times over. The
++  # release suffix follows Amazon Linux 2's rpm: AL2 builds its kernels as
++  # 4.14.355-%{release}.%{_target_cpu}, so this is the armv7l equivalent.
 +  postPatch = ''
-+    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 357/' Makefile
++    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 355/' Makefile
++    sed -i -E 's/^EXTRAVERSION.*$/EXTRAVERSION = -287.768.amzn2/' Makefile
 +  '';
 +
 +  src = fetchFromGitHub {
@@ -1025,7 +1205,12 @@ index 00000000..d5a159d7
 +        "0009-arch-wire-up-close_range.patch"
 +        "0010-rtnetlink-accept-nexthop-message-types-and-multicast.patch"
 +      ]
-+    );
++    )
++    ++ [
++      # Amazon Linux 2 4.14.355-287.768.amzn2, last so it sees the vendor tree
++      # as every earlier patch left it.
++      amzn2Patch
++    ];
 +
 +  isModular = false;
 +
@@ -4017,6 +4202,3 @@ index 00000000..dcc4eb4c
 ++#define ULL(x)		(_ULL(x))
 ++
 ++#endif /* _LINUX_CONST_H */
--- 
-2.56.0
-
