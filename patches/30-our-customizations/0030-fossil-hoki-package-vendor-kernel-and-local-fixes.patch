@@ -418,7 +418,6 @@ index 00000000..9c825243
 +    "drivers/base/firmware_class.c"
 +    "drivers/iommu/arm-smmu.c"
 +    "drivers/iommu/dma-iommu.c"
-+    "drivers/iommu/iommu.c"
 +    "drivers/iommu/io-pgtable-arm.c"
 +    "drivers/iommu/io-pgtable.h"
 +    "drivers/irqchip/irq-gic-v3.c"
@@ -460,7 +459,6 @@ index 00000000..9c825243
 +    "include/trace/events/sock.h"
 +    "net/core/sock.c"
 +    "net/ipv4/syncookies.c"
-+    "net/ipv4/sysctl_net_ipv4.c"
 +    "net/ipv4/tcp.c"
 +    "net/ipv4/tcp_input.c"
 +    "net/ipv4/tcp_ipv4.c"
@@ -1062,6 +1060,8 @@ index 00000000..9c825243
 +  postPatch = ''
 +    sed -i -E 's/^SUBLEVEL = [0-9]+$/SUBLEVEL = 355/' Makefile
 +    sed -i -E 's/^EXTRAVERSION.*$/EXTRAVERSION = -287.768.amzn2/' Makefile
++    sed -i 's/^\tDOMAIN_ATTR_MAX,$/\tDOMAIN_ATTR_DMA_USE_FLUSH_QUEUE,\n\tDOMAIN_ATTR_MAX,/' include/linux/iommu.h
++    sed -i 's/^\tint sysctl_tcp_early_retrans;$/\tint sysctl_tcp_early_retrans;\n\tint sysctl_tcp_wmem[3];\n\tint sysctl_tcp_rmem[3];/' include/net/netns/ipv4.h
 +  '';
 +
 +  src = fetchFromGitHub {
